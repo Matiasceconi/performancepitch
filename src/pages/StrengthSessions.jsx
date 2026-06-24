@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Image } from "lucide-react";
+import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Image, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -59,7 +59,20 @@ function SessionBlock({ s, onDelete }) {
   const [loadingEx, setLoadingEx] = useState(false);
   const [showExForm, setShowExForm] = useState(false);
   const [exForm, setExForm] = useState({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "", image_url: "" });
+  const [uploadingEx, setUploadingEx] = useState(false);
   const { toast } = useToast();
+
+  async function uploadExImage(file) {
+    setUploadingEx(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setExForm((f) => ({ ...f, image_url: file_url }));
+    } catch {
+      toast({ title: "Error al subir imagen", variant: "destructive" });
+    } finally {
+      setUploadingEx(false);
+    }
+  }
 
   async function loadExercises() {
     if (loadingEx) return;
@@ -154,7 +167,19 @@ function SessionBlock({ s, onDelete }) {
                 <Input value={exForm.rest_seconds} onChange={(e) => setExForm((f) => ({ ...f, rest_seconds: e.target.value }))} placeholder="Descanso (s)" type="number" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
               </div>
               <Input value={exForm.notes} onChange={(e) => setExForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Observaciones" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
-              <Input value={exForm.image_url} onChange={(e) => setExForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="Link de imagen (https://...)" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+              {exForm.image_url ? (
+                <div className="relative w-full">
+                  <img src={exForm.image_url} alt="preview" className="w-full h-24 object-cover rounded-lg border border-zinc-600" />
+                  <button type="button" onClick={() => setExForm((f) => ({ ...f, image_url: "" }))} className="absolute top-1.5 right-1.5 bg-zinc-900/80 text-zinc-400 hover:text-red-400 rounded-full p-1 transition-colors">
+                    <Trash2 size={12} />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex items-center justify-center gap-2 w-full h-16 border border-dashed border-zinc-600 rounded-lg cursor-pointer hover:border-zinc-500 transition-colors ${uploadingEx ? "opacity-50 pointer-events-none" : ""}`}>
+                  {uploadingEx ? <div className="w-4 h-4 border-2 border-zinc-600 border-t-white rounded-full animate-spin" /> : <><Upload size={14} className="text-zinc-500" /><span className="text-xs text-zinc-500">Subir imagen del ejercicio</span></>}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadExImage(e.target.files[0])} />
+                </label>
+              )}
               <div className="flex gap-2">
                 <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">Guardar</Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setShowExForm(false)} className="text-zinc-400">Cancelar</Button>
@@ -188,7 +213,20 @@ export default function StrengthSessions() {
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: "", date: moment().format("YYYY-MM-DD"), intensity: "Media", duration_minutes: "", notes: "", image_url: "" });
+  const [uploadingSession, setUploadingSession] = useState(false);
   const { toast } = useToast();
+
+  async function uploadSessionImage(file) {
+    setUploadingSession(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setForm((f) => ({ ...f, image_url: file_url }));
+    } catch {
+      toast({ title: "Error al subir imagen", variant: "destructive" });
+    } finally {
+      setUploadingSession(false);
+    }
+  }
 
   useEffect(() => { load(); }, []);
 
@@ -285,8 +323,20 @@ export default function StrengthSessions() {
               <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Link de imagen</label>
-              <Input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="https://..." className="bg-zinc-800 border-zinc-700 text-white" />
+              <label className="text-xs text-zinc-400 mb-1 block">Imagen de la sesión</label>
+              {form.image_url ? (
+                <div className="relative w-full">
+                  <img src={form.image_url} alt="preview" className="w-full h-32 object-cover rounded-lg border border-zinc-700" />
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, image_url: "" }))} className="absolute top-2 right-2 bg-zinc-900/80 text-zinc-400 hover:text-red-400 rounded-full p-1 transition-colors">
+                    <Trash2 size={13} />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex flex-col items-center justify-center gap-2 w-full h-24 border-2 border-dashed border-zinc-700 rounded-lg cursor-pointer hover:border-zinc-500 transition-colors ${uploadingSession ? "opacity-50 pointer-events-none" : ""}`}>
+                  {uploadingSession ? <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" /> : <><Upload size={18} className="text-zinc-500" /><span className="text-xs text-zinc-500">Subir imagen</span></>}
+                  <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && uploadSessionImage(e.target.files[0])} />
+                </label>
+              )}
             </div>
             <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">Guardar sesión</Button>
           </form>
