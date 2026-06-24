@@ -1,7 +1,6 @@
 import React, { useState } from "react";
-import { Heart, Activity, Apple, FileSpreadsheet, Clock, Trophy } from "lucide-react";
+import { Heart, Apple, FileSpreadsheet, Clock, Trophy } from "lucide-react";
 import Medical from "@/pages/Medical";
-import GPS from "@/pages/GPS";
 import Nutrition from "@/pages/Nutrition";
 import Catapult from "@/pages/Catapult";
 import PlayerMinutes from "@/pages/PlayerMinutes";
@@ -9,7 +8,6 @@ import Matches from "@/pages/Matches";
 
 const tabs = [
   { id: "medical", label: "Médico", icon: Heart },
-  { id: "gps", label: "GPS", icon: Activity },
   { id: "nutrition", label: "Nutrición", icon: Apple },
   { id: "catapult", label: "Catapult GPS", icon: FileSpreadsheet },
   { id: "minutes", label: "Minutos", icon: Clock },
@@ -45,7 +43,6 @@ export default function Performance() {
 
       <div>
         {active === "medical" && <Medical />}
-        {active === "gps" && <GPS />}
         {active === "nutrition" && <Nutrition />}
         {active === "catapult" && <Catapult />}
         {active === "minutes" && <PlayerMinutes />}
