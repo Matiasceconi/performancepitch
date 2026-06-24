@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Video, Upload, X, Play, Clock, LayoutList, CalendarDays } from "lucide-react";
+import { Plus, Video, Play, Clock, LayoutList, CalendarDays } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,7 +87,7 @@ export default function Sessions() {
   const [loading, setLoading]     = useState(true);
   const [view, setView]           = useState("calendar"); // "calendar" | "list"
   const [showForm, setShowForm]   = useState(false);
-  const [uploading, setUploading] = useState(false);
+
   const [selectedDay, setSelectedDay]       = useState(null);
   const [selectedDaySessions, setSelectedDaySessions] = useState([]);
   const [prefilledDate, setPrefilledDate]   = useState(null);
@@ -133,20 +133,6 @@ export default function Sessions() {
     setSelectedDaySessions(daySessions);
   }
 
-  async function handleVideoUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploading(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      setForm((f) => ({ ...f, video_url: file_url }));
-      toast({ title: "Video subido correctamente" });
-    } catch {
-      toast({ title: "Error al subir video", variant: "destructive" });
-    } finally {
-      setUploading(false);
-    }
-  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -387,28 +373,13 @@ export default function Sessions() {
               />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-2 block">Video</label>
-              {form.video_url ? (
-                <div className="flex items-center gap-2 bg-zinc-800 p-3 rounded-lg">
-                  <Play size={16} className="text-emerald-400" />
-                  <span className="text-xs text-zinc-300 flex-1 truncate">Video cargado</span>
-                  <button type="button" onClick={() => setForm((f) => ({ ...f, video_url: "" }))} className="text-zinc-500 hover:text-red-400">
-                    <X size={14} />
-                  </button>
-                </div>
-              ) : (
-                <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-zinc-700 rounded-lg p-6 cursor-pointer hover:border-zinc-500 transition-colors">
-                  {uploading ? (
-                    <div className="w-5 h-5 border-2 border-zinc-600 border-t-white rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Upload size={24} className="text-zinc-600" />
-                      <span className="text-xs text-zinc-500">Subir video</span>
-                    </>
-                  )}
-                  <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" disabled={uploading} />
-                </label>
-              )}
+              <label className="text-xs text-zinc-400 mb-1 block">Link del video</label>
+              <Input
+                value={form.video_url}
+                onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))}
+                placeholder="https://youtube.com/... o cualquier URL"
+                className="bg-zinc-800 border-zinc-700 text-white"
+              />
             </div>
             <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">
               Guardar sesión
