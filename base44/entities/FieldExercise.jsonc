@@ -26,6 +26,14 @@
       "type": "string",
       "description": "Objetivo t\u00e1ctico/f\u00edsico del ejercicio"
     },
+    "width_m": {
+      "type": "number",
+      "description": "Ancho del espacio en metros"
+    },
+    "length_m": {
+      "type": "number",
+      "description": "Largo del espacio en metros"
+    },
     "order": {
       "type": "number",
       "description": "Orden dentro de la sesi\u00f3n"

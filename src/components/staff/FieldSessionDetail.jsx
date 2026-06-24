@@ -143,6 +143,9 @@ function ExerciseBlock({ exercise, players, onDelete }) {
           <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
             {exercise.space && <span>📍 {exercise.space}</span>}
             {exercise.duration_minutes && <span>⏱ {exercise.duration_minutes} min</span>}
+            {(exercise.width_m || exercise.length_m) && (
+              <span>📐 {exercise.width_m ?? "—"} × {exercise.length_m ?? "—"} m</span>
+            )}
             {exercise.objective && <span className="text-zinc-400">{exercise.objective}</span>}
           </div>
         </div>
@@ -181,7 +184,7 @@ export default function FieldSessionDetail({ session, onBack }) {
   const [players, setPlayers]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showForm, setShowForm]   = useState(!!session._openExForm);
-  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "" });
+  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "" });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -210,10 +213,12 @@ export default function FieldSessionDetail({ session, onBack }) {
         space: form.space || undefined,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
         objective: form.objective || undefined,
+        width_m: form.width_m ? Number(form.width_m) : undefined,
+        length_m: form.length_m ? Number(form.length_m) : undefined,
         order: exercises.length + 1,
       });
       setExercises((prev) => [...prev, created]);
-      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "" });
+      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "" });
       setShowForm(false);
       toast({ title: "Ejercicio agregado" });
     } catch {
@@ -288,6 +293,16 @@ export default function FieldSessionDetail({ session, onBack }) {
               <Input value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Duración (min)" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
             </div>
             <Input value={form.objective} onChange={(e) => setForm((f) => ({ ...f, objective: e.target.value }))} placeholder="Objetivo táctico / físico" className="bg-zinc-800 border-zinc-700 text-white" />
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Ancho (m)</label>
+                <Input value={form.width_m} onChange={(e) => setForm((f) => ({ ...f, width_m: e.target.value }))} placeholder="Ej: 20" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">Largo (m)</label>
+                <Input value={form.length_m} onChange={(e) => setForm((f) => ({ ...f, length_m: e.target.value }))} placeholder="Ej: 30" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
             <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descripción del ejercicio..." rows={2} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
             <div className="flex gap-2">
               <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">Guardar ejercicio</Button>
