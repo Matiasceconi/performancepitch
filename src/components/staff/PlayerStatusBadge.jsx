@@ -7,6 +7,8 @@ const statusConfig = {
   "Suspendido": { bg: "bg-orange-500/15", text: "text-orange-400", dot: "bg-orange-400" },
   "Permiso": { bg: "bg-blue-500/15", text: "text-blue-400", dot: "bg-blue-400" },
   "Selección": { bg: "bg-purple-500/15", text: "text-purple-400", dot: "bg-purple-400" },
+  "Juveniles": { bg: "bg-cyan-500/15", text: "text-cyan-400", dot: "bg-cyan-400" },
+  "Primera": { bg: "bg-yellow-500/15", text: "text-yellow-400", dot: "bg-yellow-400" },
 };
 
 export default function PlayerStatusBadge({ status }) {

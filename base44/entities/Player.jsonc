@@ -28,7 +28,9 @@
         "En recuperaci\u00f3n",
         "Suspendido",
         "Permiso",
-        "Selecci\u00f3n"
+        "Selecci\u00f3n",
+        "Juveniles",
+        "Primera"
       ],
       "default": "Disponible",
       "description": "Estado actual del jugador"
