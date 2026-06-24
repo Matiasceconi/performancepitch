@@ -47,6 +47,36 @@
     "photo_url": {
       "type": "string",
       "description": "Foto del jugador"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de nacimiento"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda del jugador (ej: 2005, Sub-20)"
+    },
+    "document_number": {
+      "type": "string",
+      "description": "N\u00famero de documento (DNI, pasaporte, etc.)"
+    },
+    "dominant_foot": {
+      "type": "string",
+      "enum": [
+        "Derecha",
+        "Izquierda",
+        "Ambidiestro"
+      ],
+      "description": "Pierna h\u00e1bil"
+    },
+    "birth_place": {
+      "type": "string",
+      "description": "Lugar de nacimiento"
+    },
+    "current_residence": {
+      "type": "string",
+      "description": "Lugar de residencia actual"
     }
   },
   "required": [

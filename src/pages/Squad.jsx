@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Users, X, Camera } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Camera, Cake, MapPin, FileText, Footprints } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -8,11 +8,30 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
+import moment from "moment";
 
 const positions = ["Arquero", "Defensor", "Mediocampista", "Delantero"];
-const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección"];
+const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera"];
+const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
 
-const positionOrder = { Arquero: 0, Defensor: 1, Mediocampista: 2, Delantero: 3 };
+const EMPTY_FORM = {
+  name: "", number: "", position: "Defensor", status: "Disponible",
+  injury_detail: "", expected_return: "", photo_url: "",
+  birth_date: "", category: "", document_number: "",
+  dominant_foot: "", birth_place: "", current_residence: "",
+};
+
+function isBirthdayToday(birth_date) {
+  if (!birth_date) return false;
+  const today = moment();
+  const bd = moment(birth_date);
+  return bd.month() === today.month() && bd.date() === today.date();
+}
+
+function calcAge(birth_date) {
+  if (!birth_date) return null;
+  return moment().diff(moment(birth_date), "years");
+}
 
 export default function Squad() {
   const [players, setPlayers] = useState([]);
@@ -20,75 +39,70 @@ export default function Squad() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ name: "", number: "", position: "Defensor", status: "Disponible", injury_detail: "", expected_return: "", photo_url: "" });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
 
   async function loadPlayers() {
-    try {
-      const data = await base44.entities.Player.list("-created_date", 50);
-      setPlayers(data);
-    } finally {
-      setLoading(false);
-    }
+    const data = await base44.entities.Player.list("-created_date", 100);
+    setPlayers(data);
+    setLoading(false);
   }
 
   function openNew() {
     setEditing(null);
-    setForm({ name: "", number: "", position: "Defensor", status: "Disponible", injury_detail: "", expected_return: "", photo_url: "" });
+    setForm(EMPTY_FORM);
     setShowForm(true);
   }
 
   function openEdit(p) {
     setEditing(p);
     setForm({
-      name: p.name,
-      number: String(p.number),
-      position: p.position,
+      name: p.name || "",
+      number: String(p.number || ""),
+      position: p.position || "Defensor",
       status: p.status || "Disponible",
       injury_detail: p.injury_detail || "",
       expected_return: p.expected_return || "",
       photo_url: p.photo_url || "",
+      birth_date: p.birth_date || "",
+      category: p.category || "",
+      document_number: p.document_number || "",
+      dominant_foot: p.dominant_foot || "",
+      birth_place: p.birth_place || "",
+      current_residence: p.current_residence || "",
     });
     setShowForm(true);
   }
 
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
   async function handleSubmit(e) {
     e.preventDefault();
     const payload = { ...form, number: Number(form.number) };
-    if (!payload.injury_detail) delete payload.injury_detail;
-    if (!payload.expected_return) delete payload.expected_return;
-    if (!payload.photo_url) delete payload.photo_url;
-
-    try {
-      if (editing) {
-        await base44.entities.Player.update(editing.id, payload);
-        toast({ title: "Jugador actualizado" });
-      } else {
-        await base44.entities.Player.create(payload);
-        toast({ title: "Jugador agregado" });
-      }
-      setShowForm(false);
-      setLoading(true);
-      loadPlayers();
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
+    // clean empty strings
+    Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
+    if (editing) {
+      await base44.entities.Player.update(editing.id, payload);
+      toast({ title: "Jugador actualizado" });
+    } else {
+      await base44.entities.Player.create(payload);
+      toast({ title: "Jugador agregado" });
     }
+    setShowForm(false);
+    setLoading(true);
+    loadPlayers();
   }
 
   async function handleDelete() {
     if (!deleteTarget) return;
-    try {
-      await base44.entities.Player.delete(deleteTarget.id);
-      toast({ title: "Jugador eliminado" });
-      setDeleteTarget(null);
-      setLoading(true);
-      loadPlayers();
-    } catch {
-      toast({ title: "Error al eliminar", variant: "destructive" });
-    }
+    await base44.entities.Player.delete(deleteTarget.id);
+    toast({ title: "Jugador eliminado" });
+    setDeleteTarget(null);
+    setLoading(true);
+    loadPlayers();
   }
 
   const grouped = positions.map((pos) => ({
@@ -96,13 +110,13 @@ export default function Squad() {
     players: players.filter((p) => p.position === pos).sort((a, b) => a.number - b.number),
   }));
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-      </div>
-    );
-  }
+  const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -115,6 +129,21 @@ export default function Squad() {
           <Plus size={16} className="mr-1.5" /> Agregar jugador
         </Button>
       </div>
+
+      {/* Birthday alert */}
+      {birthdayPlayers.length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl px-4 py-3 flex items-center gap-3">
+          <Cake size={20} className="text-yellow-400 shrink-0" />
+          <div>
+            <p className="text-yellow-300 font-semibold text-sm">
+              🎉 ¡Hoy es el cumpleaños de {birthdayPlayers.map((p) => p.name).join(", ")}!
+            </p>
+            <p className="text-yellow-400/70 text-xs mt-0.5">
+              {birthdayPlayers.map((p) => `${p.name} cumple ${calcAge(p.birth_date)} años`).join(" · ")}
+            </p>
+          </div>
+        </div>
+      )}
 
       {players.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
@@ -133,31 +162,43 @@ export default function Squad() {
                   {g.position}s ({g.players.length})
                 </h2>
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800/50">
-                  {g.players.map((p) => (
-                    <div key={p.id} className="flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors">
-                      <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
-                      {p.photo_url ? (
-                        <img src={p.photo_url} alt={p.name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
-                      ) : (
-                        <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                  {g.players.map((p) => {
+                    const isToday = isBirthdayToday(p.birth_date);
+                    const age = calcAge(p.birth_date);
+                    return (
+                      <div key={p.id} className={`flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors ${isToday ? "bg-yellow-500/5" : ""}`}>
+                        <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
+                        {p.photo_url ? (
+                          <img src={p.photo_url} alt={p.name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                            <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm text-white font-medium">{p.name}</p>
+                            {isToday && <Cake size={14} className="text-yellow-400" title="¡Cumpleaños hoy!" />}
+                          </div>
+                          <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                            {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
+                            {p.category && <span className="text-xs text-zinc-600">Cat. {p.category}</span>}
+                            {p.dominant_foot && <span className="text-xs text-zinc-600">{p.dominant_foot}</span>}
+                            {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
+                          </div>
                         </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-white font-medium">{p.name}</p>
-                        {p.injury_detail && <p className="text-xs text-zinc-500 mt-0.5">{p.injury_detail}</p>}
+                        <PlayerStatusBadge status={p.status || "Disponible"} />
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEdit(p)} className="p-1.5 text-zinc-600 hover:text-white transition-colors">
+                            <Pencil size={14} />
+                          </button>
+                          <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </div>
-                      <PlayerStatusBadge status={p.status || "Disponible"} />
-                      <div className="flex items-center gap-1">
-                        <button onClick={() => openEdit(p)} className="p-1.5 text-zinc-600 hover:text-white transition-colors">
-                          <Pencil size={14} />
-                        </button>
-                        <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors">
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             ) : null
@@ -165,13 +206,14 @@ export default function Squad() {
         </div>
       )}
 
+      {/* FORM DIALOG */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md">
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white">{editing ? "Editar jugador" : "Nuevo jugador"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Photo upload */}
+            {/* Photo */}
             <div className="flex items-center gap-4">
               {form.photo_url ? (
                 <img src={form.photo_url} alt="Foto" className="w-16 h-16 rounded-full object-cover border border-zinc-700" />
@@ -189,62 +231,101 @@ export default function Squad() {
                       const file = e.target.files?.[0];
                       if (!file) return;
                       setUploadingPhoto(true);
-                      try {
-                        const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                        setForm((f) => ({ ...f, photo_url: file_url }));
-                      } catch {
-                        toast({ title: "Error al subir imagen", variant: "destructive" });
-                      } finally {
-                        setUploadingPhoto(false);
-                      }
+                      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                      set("photo_url", file_url);
+                      setUploadingPhoto(false);
                     }}
                   />
                 </label>
                 {form.photo_url && (
-                  <button type="button" onClick={() => setForm((f) => ({ ...f, photo_url: "" }))} className="ml-2 text-xs text-zinc-600 hover:text-red-400 transition-colors">Quitar</button>
+                  <button type="button" onClick={() => set("photo_url", "")} className="ml-2 text-xs text-zinc-600 hover:text-red-400 transition-colors">Quitar</button>
                 )}
               </div>
             </div>
+
+            {/* Nombre */}
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Nombre</label>
-              <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" />
+              <label className="text-xs text-zinc-400 mb-1 block">Nombre completo *</label>
+              <Input value={form.name} onChange={(e) => set("name", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
             </div>
+
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Número</label>
-                <Input type="number" value={form.number} onChange={(e) => setForm((f) => ({ ...f, number: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" />
+                <label className="text-xs text-zinc-400 mb-1 block">Número *</label>
+                <Input type="number" value={form.number} onChange={(e) => set("number", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Posición</label>
-                <Select value={form.position} onValueChange={(v) => setForm((f) => ({ ...f, position: v }))}>
+                <label className="text-xs text-zinc-400 mb-1 block">Categoría</label>
+                <Input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="Ej: 2005, Sub-20" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Posición *</label>
+                <Select value={form.position} onValueChange={(v) => set("position", v)}>
                   <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
                     {positions.map((p) => <SelectItem key={p} value={p} className="text-white">{p}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Pierna hábil</label>
+                <Select value={form.dominant_foot} onValueChange={(v) => set("dominant_foot", v)}>
+                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
+                  <SelectContent className="bg-zinc-800 border-zinc-700">
+                    {dominantFeet.map((f) => <SelectItem key={f} value={f} className="text-white">{f}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Fecha de nacimiento</label>
+                <Input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Nº de documento</label>
+                <Input value={form.document_number} onChange={(e) => set("document_number", e.target.value)} placeholder="DNI / Pasaporte" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Lugar de nacimiento</label>
+                <Input value={form.birth_place} onChange={(e) => set("birth_place", e.target.value)} placeholder="Ciudad, País" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Residencia actual</label>
+                <Input value={form.current_residence} onChange={(e) => set("current_residence", e.target.value)} placeholder="Ciudad, Barrio" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
+
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Estado</label>
-              <Select value={form.status} onValueChange={(v) => setForm((f) => ({ ...f, status: v }))}>
+              <Select value={form.status} onValueChange={(v) => set("status", v)}>
                 <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
                   {statuses.map((s) => <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
-            {form.status !== "Disponible" && (
-              <>
+
+            {form.status !== "Disponible" && form.status !== "Juveniles" && form.status !== "Primera" && (
+              <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Detalle</label>
-                  <Input value={form.injury_detail} onChange={(e) => setForm((f) => ({ ...f, injury_detail: e.target.value }))} placeholder="Ej: Desgarro en isquiotibial" className="bg-zinc-800 border-zinc-700 text-white" />
+                  <Input value={form.injury_detail} onChange={(e) => set("injury_detail", e.target.value)} placeholder="Ej: Desgarro isquiotibial" className="bg-zinc-800 border-zinc-700 text-white" />
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Regreso estimado</label>
-                  <Input type="date" value={form.expected_return} onChange={(e) => setForm((f) => ({ ...f, expected_return: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
+                  <Input type="date" value={form.expected_return} onChange={(e) => set("expected_return", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" />
                 </div>
-              </>
+              </div>
             )}
+
             <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">
               {editing ? "Guardar cambios" : "Agregar jugador"}
             </Button>
