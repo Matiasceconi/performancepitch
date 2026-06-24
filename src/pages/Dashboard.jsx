@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle } from "lucide-react";
+import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle, Cake } from "lucide-react";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import moment from "moment";
 
@@ -36,6 +36,9 @@ export default function Dashboard() {
     );
   }
 
+  const today = moment().format("MM-DD");
+  const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
+
   const available = players.filter((p) => p.status === "Disponible").length;
   const injured = players.filter((p) => p.status === "Lesionado").length;
   const recovering = players.filter((p) => p.status === "En recuperación").length;
@@ -54,6 +57,18 @@ export default function Dashboard() {
         <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
         <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
       </div>
+
+      {birthdayPlayers.length > 0 && (
+        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
+          <Cake size={20} className="text-yellow-400 mt-0.5 shrink-0" />
+          <div>
+            <p className="text-yellow-300 font-semibold text-sm">¡Cumpleaños hoy! 🎂</p>
+            <p className="text-yellow-200/80 text-sm mt-0.5">
+              {birthdayPlayers.map((p) => `${p.name} (${moment().diff(moment(p.birth_date), "years")} años)`).join(" · ")}
+            </p>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {stats.map((s) => (
