@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map } from "lucide-react";
+import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -9,6 +9,7 @@ const navItems = [
   { label: "Catapult", path: "/catapult", icon: FileSpreadsheet },
   { label: "Plantel", path: "/squad", icon: Users },
   { label: "Mapa táctico", path: "/tactical", icon: Map },
+  { label: "Rendimiento", path: "/performance", icon: TrendingUp },
 ];
 
 export default function Sidebar() {

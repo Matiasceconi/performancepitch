@@ -18,6 +18,7 @@ import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
 import Squad from '@/pages/Squad';
 import Tactical from '@/pages/Tactical';
+import Performance from '@/pages/Performance';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -56,6 +57,7 @@ const AuthenticatedApp = () => {
           <Route path="/catapult" element={<Catapult />} />
           <Route path="/squad" element={<Squad />} />
           <Route path="/tactical" element={<Tactical />} />
+          <Route path="/performance" element={<Performance />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
