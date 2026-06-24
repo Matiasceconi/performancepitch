@@ -36,9 +36,16 @@ export default function Sidebar() {
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
-        <div className="p-6 border-b border-zinc-800">
-          <h1 className="text-lg font-bold text-white tracking-tight">Cuerpo Técnico</h1>
-          <p className="text-xs text-zinc-500 mt-1">Panel de Control</p>
+        <div className="p-5 border-b border-zinc-800 flex items-center gap-3">
+          <img
+            src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Escudo_defensa_y_justicia.png/240px-Escudo_defensa_y_justicia.png"
+            alt="Defensa y Justicia"
+            className="w-12 h-12 object-contain drop-shadow-lg"
+          />
+          <div>
+            <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Defensa y Justicia</h1>
+            <p className="text-xs mt-0.5" style={{ color: "#F0C800" }}>Cuerpo Técnico</p>
+          </div>
         </div>
 
         <nav className="p-4 space-y-1">
@@ -51,9 +58,10 @@ export default function Sidebar() {
                 onClick={() => setOpen(false)}
                 className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
                   isActive
-                    ? "bg-white text-zinc-900"
+                    ? "text-zinc-900 font-semibold"
                     : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
                 }`}
+                style={isActive ? { backgroundColor: "#F0C800", color: "#1a1a1a" } : {}}
               >
                 <item.icon size={18} />
                 {item.label}
