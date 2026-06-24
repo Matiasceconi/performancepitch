@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Users, X } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, X, Camera } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -20,7 +20,8 @@ export default function Squad() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [form, setForm] = useState({ name: "", number: "", position: "Defensor", status: "Disponible", injury_detail: "", expected_return: "" });
+  const [form, setForm] = useState({ name: "", number: "", position: "Defensor", status: "Disponible", injury_detail: "", expected_return: "", photo_url: "" });
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -36,7 +37,7 @@ export default function Squad() {
 
   function openNew() {
     setEditing(null);
-    setForm({ name: "", number: "", position: "Defensor", status: "Disponible", injury_detail: "", expected_return: "" });
+    setForm({ name: "", number: "", position: "Defensor", status: "Disponible", injury_detail: "", expected_return: "", photo_url: "" });
     setShowForm(true);
   }
 
@@ -49,6 +50,7 @@ export default function Squad() {
       status: p.status || "Disponible",
       injury_detail: p.injury_detail || "",
       expected_return: p.expected_return || "",
+      photo_url: p.photo_url || "",
     });
     setShowForm(true);
   }
@@ -58,6 +60,7 @@ export default function Squad() {
     const payload = { ...form, number: Number(form.number) };
     if (!payload.injury_detail) delete payload.injury_detail;
     if (!payload.expected_return) delete payload.expected_return;
+    if (!payload.photo_url) delete payload.photo_url;
 
     try {
       if (editing) {
@@ -133,6 +136,13 @@ export default function Squad() {
                   {g.players.map((p) => (
                     <div key={p.id} className="flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors">
                       <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
+                      {p.photo_url ? (
+                        <img src={p.photo_url} alt={p.name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                          <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                        </div>
+                      )}
                       <div className="flex-1 min-w-0">
                         <p className="text-sm text-white font-medium">{p.name}</p>
                         {p.injury_detail && <p className="text-xs text-zinc-500 mt-0.5">{p.injury_detail}</p>}
@@ -161,6 +171,40 @@ export default function Squad() {
             <DialogTitle className="text-white">{editing ? "Editar jugador" : "Nuevo jugador"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
+            {/* Photo upload */}
+            <div className="flex items-center gap-4">
+              {form.photo_url ? (
+                <img src={form.photo_url} alt="Foto" className="w-16 h-16 rounded-full object-cover border border-zinc-700" />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
+                  <Camera size={20} className="text-zinc-600" />
+                </div>
+              )}
+              <div className="flex-1">
+                <label className="text-xs text-zinc-400 mb-1 block">Foto del jugador</label>
+                <label className="cursor-pointer inline-flex items-center gap-2 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors rounded-md px-3 py-1.5">
+                  {uploadingPhoto ? "Subiendo..." : "Subir imagen"}
+                  <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto}
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      if (!file) return;
+                      setUploadingPhoto(true);
+                      try {
+                        const { file_url } = await base44.integrations.Core.UploadFile({ file });
+                        setForm((f) => ({ ...f, photo_url: file_url }));
+                      } catch {
+                        toast({ title: "Error al subir imagen", variant: "destructive" });
+                      } finally {
+                        setUploadingPhoto(false);
+                      }
+                    }}
+                  />
+                </label>
+                {form.photo_url && (
+                  <button type="button" onClick={() => setForm((f) => ({ ...f, photo_url: "" }))} className="ml-2 text-xs text-zinc-600 hover:text-red-400 transition-colors">Quitar</button>
+                )}
+              </div>
+            </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Nombre</label>
               <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" />

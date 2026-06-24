@@ -110,12 +110,21 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
             className="flex flex-col items-center gap-0.5 group"
             title={player.name}
           >
-            <span
-              style={{ background: chipColor, color: "#fff" }}
-              className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg border-2 border-white/30 transition-transform group-hover:scale-110"
-            >
-              {player.number}
-            </span>
+            {player.photo_url ? (
+              <span
+                style={{ borderColor: chipColor }}
+                className="w-7 h-7 rounded-full overflow-hidden shadow-lg border-2 transition-transform group-hover:scale-110 block"
+              >
+                <img src={player.photo_url} alt={player.name} className="w-full h-full object-cover" />
+              </span>
+            ) : (
+              <span
+                style={{ background: chipColor, color: "#fff" }}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold shadow-lg border-2 border-white/30 transition-transform group-hover:scale-110"
+              >
+                {player.number}
+              </span>
+            )}
             <span className="text-[8px] font-semibold text-white drop-shadow max-w-[52px] text-center leading-tight truncate">
               {player.name.split(" ").slice(-1)[0]}
             </span>
