@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, FileSpreadsheet, Zap, Gauge, Route, HeartPulse } from "lucide-react";
+import { Upload, FileSpreadsheet, Zap, Gauge, Route, HeartPulse, FileText, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
@@ -10,6 +10,7 @@ export default function Catapult() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [selectedMetric, setSelectedMetric] = useState("total_distance");
   const { toast } = useToast();
 
@@ -90,6 +91,27 @@ export default function Catapult() {
   ];
 
   const currentMetric = metrics.find((m) => m.key === selectedMetric);
+
+  async function handlePDFUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingPdf(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      // Store pdf_url on all records of the latest date
+      if (latestDate) {
+        const toUpdate = reports.filter((r) => r.date === latestDate);
+        await Promise.all(toUpdate.map((r) => base44.entities.CatapultReport.update(r.id, { pdf_url: file_url })));
+        toast({ title: "PDF cargado correctamente" });
+        loadReports();
+      }
+    } catch {
+      toast({ title: "Error al subir PDF", variant: "destructive" });
+    } finally {
+      setUploadingPdf(false);
+      e.target.value = "";
+    }
+  }
 
   const latestDate = reports.length > 0 ? reports.reduce((a, b) => (a.date > b.date ? a : b)).date : null;
   const latestReports = latestDate ? reports.filter((r) => r.date === latestDate) : [];
@@ -177,8 +199,31 @@ export default function Catapult() {
           )}
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between gap-3 flex-wrap">
               <h3 className="text-sm font-semibold text-white">Datos individuales — {moment(latestDate).format("DD/MM/YYYY")}</h3>
+              <div className="flex items-center gap-2">
+                {latestReports[0]?.pdf_url && (
+                  <a
+                    href={latestReports[0].pdf_url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors"
+                  >
+                    <ExternalLink size={12} /> Ver PDF
+                  </a>
+                )}
+                <label className="cursor-pointer">
+                  <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${uploadingPdf ? "bg-zinc-800 text-zinc-500" : "bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700"}`}>
+                    {uploadingPdf ? (
+                      <div className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <FileText size={12} />
+                    )}
+                    {uploadingPdf ? "Subiendo..." : latestReports[0]?.pdf_url ? "Reemplazar PDF" : "Subir PDF informe"}
+                  </span>
+                  <input type="file" accept=".pdf" onChange={handlePDFUpload} className="hidden" disabled={uploadingPdf} />
+                </label>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs">

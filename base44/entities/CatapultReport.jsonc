@@ -15,6 +15,10 @@
       "type": "string",
       "description": "URL del archivo CSV original"
     },
+    "pdf_url": {
+      "type": "string",
+      "description": "URL del informe PDF diario"
+    },
     "player_name": {
       "type": "string",
       "description": "Nombre del jugador"
