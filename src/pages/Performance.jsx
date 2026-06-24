@@ -1,10 +1,11 @@
 import React, { useState } from "react";
-import { Heart, Activity, Apple, FileSpreadsheet, Clock } from "lucide-react";
+import { Heart, Activity, Apple, FileSpreadsheet, Clock, Trophy } from "lucide-react";
 import Medical from "@/pages/Medical";
 import GPS from "@/pages/GPS";
 import Nutrition from "@/pages/Nutrition";
 import Catapult from "@/pages/Catapult";
 import PlayerMinutes from "@/pages/PlayerMinutes";
+import Matches from "@/pages/Matches";
 
 const tabs = [
   { id: "medical", label: "Médico", icon: Heart },
@@ -12,6 +13,7 @@ const tabs = [
   { id: "nutrition", label: "Nutrición", icon: Apple },
   { id: "catapult", label: "Catapult GPS", icon: FileSpreadsheet },
   { id: "minutes", label: "Minutos", icon: Clock },
+  { id: "matches", label: "Partidos", icon: Trophy },
 ];
 
 export default function Performance() {
@@ -47,6 +49,7 @@ export default function Performance() {
         {active === "nutrition" && <Nutrition />}
         {active === "catapult" && <Catapult />}
         {active === "minutes" && <PlayerMinutes />}
+        {active === "matches" && <Matches />}
       </div>
     </div>
   );

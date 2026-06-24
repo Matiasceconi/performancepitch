@@ -1,0 +1,82 @@
+{
+  "name": "MatchReport",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del partido"
+    },
+    "rival": {
+      "type": "string",
+      "description": "Nombre del rival"
+    },
+    "competition": {
+      "type": "string",
+      "description": "Competencia (ej: Liga, Copa Argentina)"
+    },
+    "location": {
+      "type": "string",
+      "enum": [
+        "Local",
+        "Visitante",
+        "Neutral"
+      ],
+      "description": "Condici\u00f3n de local/visitante"
+    },
+    "our_score": {
+      "type": "number",
+      "description": "Goles propios"
+    },
+    "rival_score": {
+      "type": "number",
+      "description": "Goles del rival"
+    },
+    "rival_formation": {
+      "type": "string",
+      "description": "Formaci\u00f3n del rival (ej: 4-3-3)"
+    },
+    "rival_notes": {
+      "type": "string",
+      "description": "An\u00e1lisis general del rival"
+    },
+    "set_pieces_notes": {
+      "type": "string",
+      "description": "Pelota parada del rival"
+    },
+    "video_analysis_url": {
+      "type": "string",
+      "description": "Link YouTube an\u00e1lisis del rival"
+    },
+    "video_set_pieces_url": {
+      "type": "string",
+      "description": "Link YouTube pelota parada"
+    },
+    "video_extra_url": {
+      "type": "string",
+      "description": "Link YouTube video adicional"
+    },
+    "squad_called": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Lista de convocados (IDs de jugadores)"
+    },
+    "squad_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Nombres de convocados (desnormalizado)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones generales"
+    }
+  },
+  "required": [
+    "rival",
+    "date"
+  ]
+}
