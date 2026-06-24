@@ -7,41 +7,25 @@ import moment from "moment";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import CsvPreviewTable from "@/components/catapult/CsvPreviewTable";
 
-// ── Required columns for validation ────────────────────────────────────────
-const REQUIRED_COLS = [
-  "Jugador", "Tot Dur", "Tot Dist (m)", "D 19,8-25,0 km/h (m)",
-  "D +25,0 km/h (m)", "Sprint Effs", "Acc +3 m/s² Eff",
-  "Dec +3 m/s² Eff", "Tot PL", "Max Vel (km/h)", "Max Vel (% Max)", "Metros x Min",
-];
-
-// ── CSV column name → entity field mapping ──────────────────────────────────
-const COL_MAP = {
-  // Name / player (with and without BOM)
-  "name": "player_name", "\ufeffname": "player_name",
-  "jugador": "player_name", "player": "player_name", "nombre": "player_name", "athlete": "player_name",
-  // Duration
-  "total duration": "total_duration", "tot dur": "total_duration",
-  // Distance
-  "total distance (m)": "total_distance", "tot dist (m)": "total_distance", "tot dist": "total_distance",
-  // HSR
-  "d 19,8-25,0 km/h (m)": "distance_hsr", "d 19.8-25.0 km/h (m)": "distance_hsr",
-  // Sprint distance
-  "d+ 25,0 km/h (m)": "sprint_distance", "d +25,0 km/h (m)": "sprint_distance", "d +25.0 km/h (m)": "sprint_distance",
-  // Sprint efforts
-  "sprint efforts": "sprint_efforts", "sprint effs": "sprint_efforts",
-  // Accelerations
-  "acc + 3mt/s eff": "accelerations", "acc +3 m/s² eff": "accelerations", "acc +3 m/s2 eff": "accelerations",
-  // Decelerations
-  "dec +3mts/s eff": "decelerations", "dec +3 m/s² eff": "decelerations", "dec +3 m/s2 eff": "decelerations",
-  // Player load
-  "total player load": "player_load", "tot pl": "player_load", "player load": "player_load",
-  // Max velocity
-  "maximum velocity (km/h)": "max_velocity", "max vel (km/h)": "max_velocity", "max velocity": "max_velocity",
-  // Max velocity %
-  "max vel (% max)": "max_velocity_percentage",
-  // Meters per minute
-  "metros x min": "meters_per_minute", "m/min": "meters_per_minute",
-};
+// ── Fuzzy column matcher: maps any header string to an entity field ──────────
+function matchColumn(raw) {
+  const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
+  if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
+  if (h === "total duration" || h === "tot dur") return "total_duration";
+  if (h.includes("total distance") || h === "tot dist (m)" || h === "tot dist") return "total_distance";
+  // HSR: contains "19" — covers "D 19,8-25,0 km/h (m)" and "D 19.8-25.0 km/h (m)"
+  if (h.startsWith("d") && h.includes("19")) return "distance_hsr";
+  // Sprint distance: "D+" or "D +" followed by 25
+  if ((h.startsWith("d+") || h.startsWith("d +")) && h.includes("25")) return "sprint_distance";
+  if (h === "sprint efforts" || h === "sprint effs") return "sprint_efforts";
+  if (h.includes("acc") && (h.includes("3mt") || h.includes("3 m"))) return "accelerations";
+  if (h.includes("dec") && (h.includes("3mt") || h.includes("3 m"))) return "decelerations";
+  if (h === "total player load" || h === "tot pl" || h === "player load") return "player_load";
+  if (h.includes("maximum velocity") || h === "max vel (km/h)" || h === "max velocity (km/h)") return "max_velocity";
+  if (h.includes("max vel") && h.includes("%")) return "max_velocity_percentage";
+  if (h === "metros x min" || h === "m/min" || h === "meters per minute") return "meters_per_minute";
+  return null;
+}
 
 function parseNum(val) {
   if (val == null || val === "" || val === "-") return null;
@@ -65,79 +49,91 @@ function parseDuration(val) {
   return parseNum(val);
 }
 
+// Split a CSV line respecting quoted fields
+function splitCSVLine(line, sep) {
+  const result = [];
+  let cur = "";
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') {
+      inQuotes = !inQuotes;
+    } else if (ch === sep && !inQuotes) {
+      result.push(cur.trim());
+      cur = "";
+    } else {
+      cur += ch;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
 function parseCSVFile(text) {
-  // Strip BOM if present
+  // Strip BOM
   const clean = text.replace(/^\uFEFF/, "");
-
-  // Detect separator from first line
-  const firstLine = clean.split("\n")[0];
-  const sep = firstLine.includes(";") ? ";" : ",";
-
   const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
 
-  // Find header row: look for a row that maps to at least 3 known fields
+  // Try semicolon first; if first line has more fields with ";" use it, else ","
+  const firstSemi = lines[0].split(";").length;
+  const firstComma = lines[0].split(",").length;
+  const sep = firstSemi > firstComma ? ";" : ",";
+
+  // Find header row: first col matches "name"/"jugador" OR ≥3 cols map to known fields
   let headerIdx = -1;
   let headers = [];
   for (let i = 0; i < Math.min(lines.length, 15); i++) {
-    const cols = lines[i].split(sep).map((c) => c.replace(/"/g, "").trim());
-    const mapped = cols.filter((c) => COL_MAP[c.toLowerCase().trim()]);
-    // Also accept if first col is "name" (with or without BOM)
+    const cols = splitCSVLine(lines[i], sep);
     const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
-    if (mapped.length >= 3 || firstLow === "name" || firstLow === "jugador" || firstLow === "athlete") {
+    const mapped = cols.filter((c) => matchColumn(c) !== null).length;
+    if (firstLow === "name" || firstLow === "jugador" || firstLow === "athlete" || mapped >= 3) {
       headerIdx = i;
-      // Strip BOM from first header just in case
       headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c);
       break;
     }
   }
 
   if (headerIdx === -1) {
-    const sample = lines.slice(0, 3).join(" | ");
-    return { error: `No se encontró fila de encabezados. Primeras líneas: ${sample}` };
+    return { error: `No se encontró fila de encabezados. Primeras líneas del archivo: ${lines.slice(0, 2).join(" | ")}` };
   }
 
-  console.log("[Catapult] Encabezados detectados:", headers);
-  console.log("[Catapult] Separador:", sep, "| Fila de encabezado:", headerIdx);
+  console.log("[Catapult] Headers:", headers, "| Sep:", sep);
 
-  const fieldMap = {}; // colIndex → fieldName
+  // Build fieldMap: colIndex → entity field
+  const fieldMap = {};
   headers.forEach((h, idx) => {
-    const field = COL_MAP[h.toLowerCase().trim()];
+    const field = matchColumn(h);
     if (field) fieldMap[idx] = field;
-    else if (idx === 0) fieldMap[idx] = "player_name"; // fallback: first col = player name
+    else if (idx === 0) fieldMap[idx] = "player_name";
   });
 
-  const missing = REQUIRED_COLS.filter((req) => {
-    return !Object.values(fieldMap).includes(COL_MAP[req.toLowerCase()] || req.toLowerCase());
-  });
+  const mappedFields = Object.values(fieldMap);
+  const EXPECTED = ["player_name", "total_distance", "distance_hsr", "sprint_distance", "player_load", "max_velocity"];
+  const missing = EXPECTED.filter((f) => !mappedFields.includes(f));
 
   const rows = [];
   const rawPreview = [];
   const totalLines = lines.length - headerIdx - 1;
 
   for (let i = headerIdx + 1; i < lines.length; i++) {
-    const cols = lines[i].split(sep).map((c) => c.replace(/"/g, "").trim());
+    const cols = splitCSVLine(lines[i], sep);
     const obj = {};
     Object.entries(fieldMap).forEach(([colIdx, field]) => {
       const raw = cols[parseInt(colIdx)];
-      if (field === "player_name") {
-        obj[field] = raw || "";
-      } else if (field === "total_duration") {
-        obj[field] = parseDuration(raw);
-      } else {
-        obj[field] = parseNum(raw);
-      }
+      if (field === "player_name") obj[field] = raw || "";
+      else if (field === "total_duration") obj[field] = parseDuration(raw);
+      else obj[field] = parseNum(raw);
     });
 
     const name = (obj.player_name || "").trim();
     if (!name) continue;
-    const lname = name.toLowerCase();
-    if (["total", "promedio", "average", "team", "totals"].includes(lname)) continue;
+    if (["total", "promedio", "average", "team", "totals"].includes(name.toLowerCase())) continue;
 
     rows.push(obj);
     if (rawPreview.length < 5) rawPreview.push(obj);
   }
 
-  console.log("[Catapult] Filas leídas:", totalLines, "| Jugadores válidos:", rows.length);
+  console.log("[Catapult] Jugadores válidos:", rows.length, "/ Filas:", totalLines);
 
   return { rows, headers, rawPreview, missing, sep, totalLines };
 }
