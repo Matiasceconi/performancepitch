@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Image, Upload } from "lucide-react";
+import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Image, Upload, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -53,7 +53,7 @@ function ExerciseRow({ ex, onDelete }) {
   );
 }
 
-function SessionBlock({ s, onDelete }) {
+function SessionBlock({ s, onDelete, onEdit }) {
   const [open, setOpen]       = useState(false);
   const [exercises, setExercises] = useState([]);
   const [loadingEx, setLoadingEx] = useState(false);
@@ -138,7 +138,7 @@ function SessionBlock({ s, onDelete }) {
             {s.duration_minutes && <span className="flex items-center gap-1"><Clock size={11} /> {s.duration_minutes} min</span>}
           </div>
         </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
           {s.image_url && (
             <a href={s.image_url} target="_blank" rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
@@ -147,6 +147,12 @@ function SessionBlock({ s, onDelete }) {
               <Image size={13} />
             </a>
           )}
+          <button onClick={(e) => { e.stopPropagation(); onEdit(s); }} className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-zinc-800">
+            <Pencil size={14} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onDelete(s.id); }} className="text-zinc-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-zinc-800">
+            <Trash2 size={14} />
+          </button>
           {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
         </div>
       </button>
@@ -204,9 +210,7 @@ function SessionBlock({ s, onDelete }) {
             </div>
           )}
 
-          <button onClick={() => onDelete(s.id)} className="text-xs text-zinc-700 hover:text-red-400 transition-colors mt-2">
-            Eliminar sesión
-          </button>
+
         </div>
       )}
     </div>
@@ -220,7 +224,9 @@ export default function StrengthSessions() {
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filterMD, setFilterMD] = useState(null);
-  const [form, setForm] = useState({ title: "", date: moment().format("YYYY-MM-DD"), match_day_code: "", intensity: "Media", duration_minutes: "", notes: "", image_url: "" });
+  const [editingSession, setEditingSession] = useState(null);
+  const emptyForm = { title: "", date: moment().format("YYYY-MM-DD"), match_day_code: "", intensity: "Media", duration_minutes: "", notes: "", image_url: "" };
+  const [form, setForm] = useState(emptyForm);
   const [uploadingSession, setUploadingSession] = useState(false);
   const { toast } = useToast();
 
@@ -247,25 +253,46 @@ export default function StrengthSessions() {
     }
   }
 
+  function openEdit(s) {
+    setEditingSession(s);
+    setForm({
+      title: s.title || "",
+      date: s.date || moment().format("YYYY-MM-DD"),
+      match_day_code: s.match_day_code || "",
+      intensity: s.intensity || "Media",
+      duration_minutes: s.duration_minutes ?? "",
+      notes: s.notes || "",
+      image_url: s.image_url || "",
+    });
+    setShowForm(true);
+  }
+
+  async function deleteSession(id) {
+    if (!confirm("¿Eliminar esta sesión?")) return;
+    await base44.entities.StrengthSession.delete(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    toast({ title: "Sesión eliminada" });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     try {
-      await base44.entities.StrengthSession.create({
-        ...form,
-        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
-      });
-      toast({ title: "Sesión de fuerza guardada" });
+      const payload = { ...form, duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined };
+      if (editingSession) {
+        await base44.entities.StrengthSession.update(editingSession.id, payload);
+        toast({ title: "Sesión actualizada" });
+      } else {
+        await base44.entities.StrengthSession.create(payload);
+        toast({ title: "Sesión de fuerza guardada" });
+      }
       setShowForm(false);
+      setEditingSession(null);
+      setForm(emptyForm);
       setLoading(true);
       load();
     } catch {
       toast({ title: "Error al guardar", variant: "destructive" });
     }
-  }
-
-  async function deleteSession(id) {
-    await base44.entities.StrengthSession.delete(id);
-    setSessions((prev) => prev.filter((s) => s.id !== id));
   }
 
   if (loading) return (
@@ -281,7 +308,7 @@ export default function StrengthSessions() {
           <h2 className="text-xl font-bold text-white tracking-tight">Sesiones de Fuerza</h2>
           <p className="text-zinc-500 text-sm mt-0.5">Planificación de trabajo en sala de pesas</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
+        <Button onClick={() => { setEditingSession(null); setForm(emptyForm); setShowForm(true); }} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={15} className="mr-1.5" /> Nueva sesión
         </Button>
       </div>
@@ -306,14 +333,14 @@ export default function StrengthSessions() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {sessions.filter((s) => !filterMD || s.match_day_code === filterMD).map((s) => <SessionBlock key={s.id} s={s} onDelete={deleteSession} />)}
+          {sessions.filter((s) => !filterMD || s.match_day_code === filterMD).map((s) => <SessionBlock key={s.id} s={s} onDelete={deleteSession} onEdit={openEdit} />)}
         </div>
       )}
 
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) { setEditingSession(null); setForm(emptyForm); } }}>
         <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white">Nueva sesión de fuerza</DialogTitle>
+            <DialogTitle className="text-white">{editingSession ? "Editar sesión de fuerza" : "Nueva sesión de fuerza"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

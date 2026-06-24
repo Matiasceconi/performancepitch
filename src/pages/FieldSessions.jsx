@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, ChevronRight, Video, Clock, Play } from "lucide-react";
+import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -40,7 +40,9 @@ export default function FieldSessions() {
   const [filterMD, setFilterMD]   = useState(null);
   const [filterType, setFilterType] = useState(null);
 
-  const [form, setForm] = useState({
+  const [editingSession, setEditingSession] = useState(null);
+
+  const emptyForm = {
     title: "",
     date: moment().format("YYYY-MM-DD"),
     match_day_code: "",
@@ -50,7 +52,9 @@ export default function FieldSessions() {
     notes: "",
     video_url: "",
     gps_pdf_url: "",
-  });
+  };
+
+  const [form, setForm] = useState(emptyForm);
 
   const { toast } = useToast();
 
@@ -65,18 +69,50 @@ export default function FieldSessions() {
     }
   }
 
+  function openEdit(s, e) {
+    e.stopPropagation();
+    setEditingSession(s);
+    setForm({
+      title: s.title || "",
+      date: s.date || moment().format("YYYY-MM-DD"),
+      match_day_code: s.match_day_code || "",
+      session_type: s.session_type || "Entrenamiento",
+      intensity: s.intensity || "Media",
+      duration_minutes: s.duration_minutes ?? "",
+      notes: s.notes || "",
+      video_url: s.video_url || "",
+      gps_pdf_url: s.gps_pdf_url || "",
+    });
+    setShowForm(true);
+  }
+
+  async function handleDelete(id, e) {
+    e.stopPropagation();
+    if (!confirm("¿Eliminar esta sesión?")) return;
+    await base44.entities.TrainingSession.delete(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+    toast({ title: "Sesión eliminada" });
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     try {
-      const created = await base44.entities.TrainingSession.create({
+      const payload = {
         ...form,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
-      });
-      toast({ title: "Sesión de campo guardada" });
+      };
+      if (editingSession) {
+        await base44.entities.TrainingSession.update(editingSession.id, payload);
+        toast({ title: "Sesión actualizada" });
+      } else {
+        const created = await base44.entities.TrainingSession.create(payload);
+        setSelected(created);
+      }
       setShowForm(false);
+      setEditingSession(null);
+      setForm(emptyForm);
       setLoading(true);
       await load();
-      setSelected(created);
     } catch {
       toast({ title: "Error al guardar", variant: "destructive" });
     }
@@ -99,7 +135,7 @@ export default function FieldSessions() {
           <h2 className="text-xl font-bold text-white tracking-tight">Sesiones de Campo</h2>
           <p className="text-zinc-500 text-sm mt-0.5">Ejercicios, espacio e interacción por jugador</p>
         </div>
-        <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
+        <Button onClick={() => { setEditingSession(null); setForm(emptyForm); setShowForm(true); }} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={15} className="mr-1.5" /> Nueva sesión
         </Button>
       </div>
@@ -163,12 +199,18 @@ export default function FieldSessions() {
                     )}
                   </div>
                 </button>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center gap-1.5 flex-shrink-0">
                   <button
                     onClick={() => setSelected({ ...s, _openExForm: true })}
                     className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition-colors"
                   >
                     <Plus size={13} /> Ejercicio
+                  </button>
+                  <button onClick={(e) => openEdit(s, e)} className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-zinc-800">
+                    <Pencil size={14} />
+                  </button>
+                  <button onClick={(e) => handleDelete(s.id, e)} className="text-zinc-500 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-zinc-800">
+                    <Trash2 size={14} />
                   </button>
                   <button onClick={() => setSelected(s)} className="text-zinc-600 hover:text-white transition-colors">
                     <ChevronRight size={16} />
@@ -180,10 +222,10 @@ export default function FieldSessions() {
         </div>
       )}
 
-      <Dialog open={showForm} onOpenChange={setShowForm}>
+      <Dialog open={showForm} onOpenChange={(v) => { setShowForm(v); if (!v) { setEditingSession(null); setForm(emptyForm); } }}>
         <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white">Nueva sesión de campo</DialogTitle>
+            <DialogTitle className="text-white">{editingSession ? "Editar sesión de campo" : "Nueva sesión de campo"}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
