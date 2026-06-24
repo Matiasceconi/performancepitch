@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -247,13 +247,24 @@ export default function FieldSessionDetail({ session, onBack }) {
           </div>
           {session.notes && <p className="text-xs text-zinc-600 mt-1">{session.notes}</p>}
         </div>
-        {session.video_url && (
-          <a href={session.video_url} target="_blank" rel="noopener noreferrer"
-            className="flex-shrink-0 bg-zinc-800 hover:bg-zinc-700 text-white p-2.5 rounded-lg transition-colors"
-          >
-            <Play size={16} />
-          </a>
-        )}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {session.video_url && (
+            <a href={session.video_url} target="_blank" rel="noopener noreferrer"
+              className="bg-zinc-800 hover:bg-zinc-700 text-white p-2.5 rounded-lg transition-colors"
+              title="Ver video"
+            >
+              <Play size={16} />
+            </a>
+          )}
+          {session.gps_pdf_url && (
+            <a href={session.gps_pdf_url} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-1.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white px-3 py-2 rounded-lg transition-colors text-xs font-medium"
+              title="Ver informe GPS"
+            >
+              <FileText size={14} /> Informe GPS
+            </a>
+          )}
+        </div>
       </div>
 
       {/* Exercises */}

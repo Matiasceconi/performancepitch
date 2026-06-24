@@ -49,6 +49,7 @@ export default function FieldSessions() {
     duration_minutes: "",
     notes: "",
     video_url: "",
+    gps_pdf_url: "",
   });
 
   const { toast } = useToast();
@@ -237,6 +238,10 @@ export default function FieldSessions() {
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Link del video</label>
               <Input value={form.video_url} onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))} placeholder="https://youtube.com/..." className="bg-zinc-800 border-zinc-700 text-white" />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Informe GPS (link PDF)</label>
+              <Input value={form.gps_pdf_url} onChange={(e) => setForm((f) => ({ ...f, gps_pdf_url: e.target.value }))} placeholder="https://drive.google.com/..." className="bg-zinc-800 border-zinc-700 text-white" />
             </div>
             <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">Guardar sesión</Button>
           </form>

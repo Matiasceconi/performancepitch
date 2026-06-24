@@ -42,6 +42,10 @@
       "type": "string",
       "description": "URL del video de la sesi\u00f3n"
     },
+    "gps_pdf_url": {
+      "type": "string",
+      "description": "Link al informe PDF de GPS de la sesi\u00f3n"
+    },
     "notes": {
       "type": "string",
       "description": "Notas y observaciones"
