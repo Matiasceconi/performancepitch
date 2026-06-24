@@ -197,6 +197,9 @@ function SessionRow({ session, sessionReports, onImportDone }) {
     if (!csvState?.rows) return;
     setImporting(true);
     try {
+      // Delete previous records for this session before importing
+      await base44.entities.CatapultReport.deleteMany({ session_id: session.id });
+
       const records = csvState.rows.map((r) => ({
         ...r,
         date: session.date,
