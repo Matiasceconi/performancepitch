@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Play } from "lucide-react";
+import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Image } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -121,12 +121,12 @@ function SessionBlock({ s, onDelete }) {
           </div>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {s.video_url && (
-            <a href={s.video_url} target="_blank" rel="noopener noreferrer"
+          {s.image_url && (
+            <a href={s.image_url} target="_blank" rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
               className="bg-zinc-800 hover:bg-zinc-700 text-white p-2 rounded-lg transition-colors"
             >
-              <Play size={13} />
+              <Image size={13} />
             </a>
           )}
           {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
@@ -187,7 +187,7 @@ export default function StrengthSessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ title: "", date: moment().format("YYYY-MM-DD"), intensity: "Media", duration_minutes: "", notes: "", video_url: "" });
+  const [form, setForm] = useState({ title: "", date: moment().format("YYYY-MM-DD"), intensity: "Media", duration_minutes: "", notes: "", image_url: "" });
   const { toast } = useToast();
 
   useEffect(() => { load(); }, []);
@@ -285,8 +285,8 @@ export default function StrengthSessions() {
               <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Link del video</label>
-              <Input value={form.video_url} onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))} placeholder="https://..." className="bg-zinc-800 border-zinc-700 text-white" />
+              <label className="text-xs text-zinc-400 mb-1 block">Link de imagen</label>
+              <Input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="https://..." className="bg-zinc-800 border-zinc-700 text-white" />
             </div>
             <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">Guardar sesión</Button>
           </form>

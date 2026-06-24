@@ -29,9 +29,9 @@
       "type": "string",
       "description": "Observaciones generales"
     },
-    "video_url": {
+    "image_url": {
       "type": "string",
-      "description": "Link de video"
+      "description": "Link de imagen de la sesi\u00f3n"
     }
   },
   "required": [
