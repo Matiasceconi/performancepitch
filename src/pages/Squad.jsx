@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Users, Camera, Cake, MapPin, FileText, Footprints } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -187,7 +187,17 @@ export default function Squad() {
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
                           </div>
                         </div>
-                        <PlayerStatusBadge status={p.status || "Disponible"} />
+                        <Select value={p.status || "Disponible"} onValueChange={async (v) => {
+                          await base44.entities.Player.update(p.id, { status: v });
+                          setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
+                        }}>
+                          <SelectTrigger className="h-auto py-0.5 px-2 border-0 bg-transparent text-xs w-auto focus:ring-0 shadow-none gap-1">
+                            <PlayerStatusBadge status={p.status || "Disponible"} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-800 border-zinc-700">
+                            {statuses.map((s) => <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                         <div className="flex items-center gap-1">
                           <button onClick={() => openEdit(p)} className="p-1.5 text-zinc-600 hover:text-white transition-colors">
                             <Pencil size={14} />
