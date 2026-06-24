@@ -7,6 +7,7 @@ import moment from "moment";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
 import CsvPreviewTable from "@/components/catapult/CsvPreviewTable";
 import PlayerEvolution from "@/components/catapult/PlayerEvolution";
+import SessionComparison from "@/components/catapult/SessionComparison";
 
 // ── Fuzzy column matcher: maps any header string to an entity field ──────────
 function matchColumn(raw) {
@@ -427,7 +428,8 @@ export default function Catapult() {
         {[
           { key: "sessions",   label: "Sesiones" },
           { key: "data",       label: "Datos GPS" },
-          { key: "evolution",  label: "Evolución" },
+          { key: "evolution",   label: "Evolución" },
+          { key: "comparison",  label: "Comparar" },
         ].map((t) => (
           <button
             key={t.key}
@@ -466,6 +468,11 @@ export default function Catapult() {
       {/* ── TAB: EVOLUTION ────────────────────────────────────────────── */}
       {activeTab === "evolution" && (
         <PlayerEvolution reports={reports} />
+      )}
+
+      {/* ── TAB: COMPARISON ───────────────────────────────────────────── */}
+      {activeTab === "comparison" && (
+        <SessionComparison reports={reports} sessions={sessions} />
       )}
 
       {/* ── TAB: GPS DATA ──────────────────────────────────────────────── */}
