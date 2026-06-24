@@ -37,10 +37,10 @@ export default function Sidebar() {
         }>
         
         <div className="p-5 border-b border-zinc-800 flex items-center gap-3">
-          <img
-            src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/Escudo_defensa_y_justicia.png/240px-Escudo_defensa_y_justicia.png"
-            alt="Defensa y Justicia"
-            className="w-12 h-12 object-contain drop-shadow-lg hidden" />
+          
+
+
+          
           
           <div>
             <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Defensa y Justicia</h1>
