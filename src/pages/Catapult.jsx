@@ -358,6 +358,7 @@ export default function Catapult() {
   const [activeTab, setActiveTab] = useState("sessions");
   const [selectedMetric, setSelectedMetric] = useState("total_distance");
   const [uploadingPdf, setUploadingPdf] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState("all");
   const { toast } = useToast();
 
   useEffect(() => { loadAll(); }, []);
@@ -397,9 +398,11 @@ export default function Catapult() {
 
   const latestDate = reports.length > 0 ? reports.reduce((a, b) => (a.date > b.date ? a : b)).date : null;
   const latestReports = latestDate ? reports.filter((r) => r.date === latestDate) : [];
+  const allPlayers = [...new Set(latestReports.map((r) => r.player_name).filter(Boolean))].sort();
+  const filteredReports = selectedPlayer === "all" ? latestReports : latestReports.filter((r) => r.player_name === selectedPlayer);
 
   const currentMetric = CHART_METRICS.find((m) => m.key === selectedMetric);
-  const chartData = latestReports
+  const chartData = filteredReports
     .filter((r) => r[selectedMetric] != null)
     .sort((a, b) => (b[selectedMetric] || 0) - (a[selectedMetric] || 0))
     .map((r) => ({ name: r.player_name?.split(" ").slice(-1)[0] || "—", value: r[selectedMetric] || 0 }));
@@ -469,13 +472,25 @@ export default function Catapult() {
             </div>
           ) : (
             <>
-              <div className="flex gap-2 flex-wrap">
-                {CHART_METRICS.map((m) => (
-                  <button key={m.key} onClick={() => setSelectedMetric(m.key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMetric === m.key ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
-                    {m.label}
-                  </button>
-                ))}
+              <div className="flex gap-2 flex-wrap items-center justify-between">
+                <div className="flex gap-2 flex-wrap">
+                  {CHART_METRICS.map((m) => (
+                    <button key={m.key} onClick={() => setSelectedMetric(m.key)}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMetric === m.key ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
+                      {m.label}
+                    </button>
+                  ))}
+                </div>
+                <select
+                  value={selectedPlayer}
+                  onChange={(e) => setSelectedPlayer(e.target.value)}
+                  className="bg-zinc-800 text-zinc-300 text-xs rounded-lg px-3 py-1.5 border border-zinc-700 focus:outline-none focus:border-zinc-500"
+                >
+                  <option value="all">Todos los jugadores</option>
+                  {allPlayers.map((p) => (
+                    <option key={p} value={p}>{p}</option>
+                  ))}
+                </select>
               </div>
 
               {chartData.length > 0 && (
@@ -519,7 +534,7 @@ export default function Catapult() {
                   </div>
                 </div>
                 <div className="p-4">
-                  <CsvPreviewTable rows={latestReports} />
+                  <CsvPreviewTable rows={filteredReports} />
                 </div>
               </div>
 
