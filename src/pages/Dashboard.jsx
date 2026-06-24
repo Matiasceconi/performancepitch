@@ -1,0 +1,127 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Link } from "react-router-dom";
+import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle } from "lucide-react";
+import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
+import moment from "moment";
+
+export default function Dashboard() {
+  const [players, setPlayers] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [p, s] = await Promise.all([
+          base44.entities.Player.list("-created_date", 50),
+          base44.entities.TrainingSession.list("-date", 5),
+        ]);
+        setPlayers(p);
+        setSessions(s);
+      } catch (e) {
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  const available = players.filter((p) => p.status === "Disponible").length;
+  const injured = players.filter((p) => p.status === "Lesionado").length;
+  const recovering = players.filter((p) => p.status === "En recuperación").length;
+  const unavailable = players.filter((p) => p.status !== "Disponible");
+
+  const stats = [
+    { label: "Jugadores", value: players.length, icon: Users, color: "text-blue-400" },
+    { label: "Disponibles", value: available, icon: Activity, color: "text-emerald-400" },
+    { label: "Lesionados", value: injured, icon: AlertCircle, color: "text-red-400" },
+    { label: "Sesiones", value: sessions.length, icon: Video, color: "text-purple-400" },
+  ];
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+        <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
+      </div>
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {stats.map((s) => (
+          <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <s.icon size={18} className={s.color} />
+            </div>
+            <p className="text-2xl font-bold text-white">{s.value}</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{s.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-4">
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white">No disponibles</h2>
+            <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+              Ver plantel <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="p-4">
+            {unavailable.length === 0 ? (
+              <p className="text-zinc-600 text-sm text-center py-6">Todos los jugadores están disponibles</p>
+            ) : (
+              <div className="space-y-3">
+                {unavailable.map((p) => (
+                  <div key={p.id} className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <span className="text-zinc-600 text-xs font-mono w-6 text-center">{p.number}</span>
+                      <span className="text-sm text-white">{p.name}</span>
+                    </div>
+                    <PlayerStatusBadge status={p.status} />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white">Últimas sesiones</h2>
+            <Link to="/sessions" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+              Ver todas <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="p-4">
+            {sessions.length === 0 ? (
+              <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p>
+            ) : (
+              <div className="space-y-3">
+                {sessions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white">{s.title}</p>
+                      <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
+                    </div>
+                    {s.intensity && (
+                      <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">{s.intensity}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

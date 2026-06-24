@@ -1,0 +1,55 @@
+{
+  "name": "Player",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre completo del jugador"
+    },
+    "number": {
+      "type": "number",
+      "description": "N\u00famero de camiseta"
+    },
+    "position": {
+      "type": "string",
+      "enum": [
+        "Arquero",
+        "Defensor",
+        "Mediocampista",
+        "Delantero"
+      ],
+      "description": "Posici\u00f3n del jugador"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "Disponible",
+        "Lesionado",
+        "En recuperaci\u00f3n",
+        "Suspendido",
+        "Permiso",
+        "Selecci\u00f3n"
+      ],
+      "default": "Disponible",
+      "description": "Estado actual del jugador"
+    },
+    "injury_detail": {
+      "type": "string",
+      "description": "Detalle de la lesi\u00f3n o motivo de baja"
+    },
+    "expected_return": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha estimada de regreso"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Foto del jugador"
+    }
+  },
+  "required": [
+    "name",
+    "number",
+    "position"
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "name": "CatapultReport",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID de la sesi\u00f3n asociada"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del reporte"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL del archivo CSV original"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador"
+    },
+    "total_distance": {
+      "type": "number",
+      "description": "Distancia total en metros"
+    },
+    "max_speed": {
+      "type": "number",
+      "description": "Velocidad m\u00e1xima km/h"
+    },
+    "high_speed_running": {
+      "type": "number",
+      "description": "Metros en alta velocidad"
+    },
+    "sprint_distance": {
+      "type": "number",
+      "description": "Metros en sprint"
+    },
+    "accelerations": {
+      "type": "number",
+      "description": "Cantidad de aceleraciones"
+    },
+    "decelerations": {
+      "type": "number",
+      "description": "Cantidad de desaceleraciones"
+    },
+    "player_load": {
+      "type": "number",
+      "description": "Player Load (carga del jugador)"
+    },
+    "heart_rate_avg": {
+      "type": "number",
+      "description": "Frecuencia card\u00edaca promedio"
+    }
+  },
+  "required": [
+    "date",
+    "player_name"
+  ]
+}

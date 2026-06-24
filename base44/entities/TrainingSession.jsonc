@@ -1,0 +1,54 @@
+{
+  "name": "TrainingSession",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo de la sesi\u00f3n"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la sesi\u00f3n"
+    },
+    "session_type": {
+      "type": "string",
+      "enum": [
+        "Entrenamiento",
+        "T\u00e1ctica",
+        "F\u00edsico",
+        "Regenerativo",
+        "Partido amistoso",
+        "Otro"
+      ],
+      "description": "Tipo de sesi\u00f3n"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "URL del video de la sesi\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas y observaciones"
+    },
+    "intensity": {
+      "type": "string",
+      "enum": [
+        "Baja",
+        "Media",
+        "Alta",
+        "Muy alta"
+      ],
+      "description": "Intensidad de la sesi\u00f3n"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Duraci\u00f3n en minutos"
+    }
+  },
+  "required": [
+    "title",
+    "date",
+    "session_type"
+  ]
+}
