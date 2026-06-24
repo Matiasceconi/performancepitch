@@ -28,20 +28,27 @@ const intensityBorder = {
 
 function ExerciseRow({ ex, onDelete }) {
   return (
-    <div className="flex items-center gap-3 py-2 border-b border-zinc-800/50 last:border-0">
-      <div className="flex-1 min-w-0">
-        <p className="text-sm text-white font-medium">{ex.name}</p>
-        <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
-          {ex.sets && <span>{ex.sets} series</span>}
-          {ex.reps && <span>× {ex.reps}</span>}
-          {ex.load && <span className="text-zinc-400 font-medium">{ex.load}</span>}
-          {ex.rest_seconds && <span>Desc: {ex.rest_seconds}s</span>}
+    <div className="py-2 border-b border-zinc-800/50 last:border-0">
+      <div className="flex items-start gap-3">
+        {ex.image_url && (
+          <a href={ex.image_url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+            <img src={ex.image_url} alt={ex.name} className="w-14 h-14 object-cover rounded-lg border border-zinc-700" onError={(e) => e.target.style.display='none'} />
+          </a>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-white font-medium">{ex.name}</p>
+          <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
+            {ex.sets && <span>{ex.sets} series</span>}
+            {ex.reps && <span>× {ex.reps}</span>}
+            {ex.load && <span className="text-zinc-400 font-medium">{ex.load}</span>}
+            {ex.rest_seconds && <span>Desc: {ex.rest_seconds}s</span>}
+          </div>
+          {ex.notes && <p className="text-xs text-zinc-600 mt-0.5">{ex.notes}</p>}
         </div>
-        {ex.notes && <p className="text-xs text-zinc-600 mt-0.5">{ex.notes}</p>}
+        <button onClick={() => onDelete(ex.id)} className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
+          <Trash2 size={14} />
+        </button>
       </div>
-      <button onClick={() => onDelete(ex.id)} className="text-zinc-700 hover:text-red-400 transition-colors">
-        <Trash2 size={14} />
-      </button>
     </div>
   );
 }
@@ -51,7 +58,7 @@ function SessionBlock({ s, onDelete }) {
   const [exercises, setExercises] = useState([]);
   const [loadingEx, setLoadingEx] = useState(false);
   const [showExForm, setShowExForm] = useState(false);
-  const [exForm, setExForm] = useState({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "" });
+  const [exForm, setExForm] = useState({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "", image_url: "" });
   const { toast } = useToast();
 
   async function loadExercises() {
@@ -81,10 +88,11 @@ function SessionBlock({ s, onDelete }) {
         load: exForm.load || undefined,
         rest_seconds: exForm.rest_seconds ? Number(exForm.rest_seconds) : undefined,
         notes: exForm.notes || undefined,
+        image_url: exForm.image_url || undefined,
         order: exercises.length + 1,
       });
       setExercises((prev) => [...prev, created]);
-      setExForm({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "" });
+      setExForm({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "", image_url: "" });
       setShowExForm(false);
       toast({ title: "Ejercicio agregado" });
     } catch {
@@ -146,6 +154,7 @@ function SessionBlock({ s, onDelete }) {
                 <Input value={exForm.rest_seconds} onChange={(e) => setExForm((f) => ({ ...f, rest_seconds: e.target.value }))} placeholder="Descanso (s)" type="number" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
               </div>
               <Input value={exForm.notes} onChange={(e) => setExForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Observaciones" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+              <Input value={exForm.image_url} onChange={(e) => setExForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="Link de imagen (https://...)" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
               <div className="flex gap-2">
                 <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">Guardar</Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setShowExForm(false)} className="text-zinc-400">Cancelar</Button>

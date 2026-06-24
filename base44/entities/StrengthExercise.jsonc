@@ -30,6 +30,10 @@
       "type": "string",
       "description": "Observaciones"
     },
+    "image_url": {
+      "type": "string",
+      "description": "Link de imagen del ejercicio"
+    },
     "order": {
       "type": "number",
       "description": "Orden dentro de la sesi\u00f3n"

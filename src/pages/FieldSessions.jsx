@@ -106,13 +106,12 @@ export default function FieldSessions() {
       ) : (
         <div className="grid gap-3">
           {sessions.map((s) => (
-            <button
+            <div
               key={s.id}
-              onClick={() => setSelected(s)}
-              className={`w-full text-left bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl p-4 hover:bg-zinc-800/40 transition-colors`}
+              className={`bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl p-4`}
             >
               <div className="flex items-center gap-3">
-                <div className="flex-1 min-w-0">
+                <button onClick={() => setSelected(s)} className="flex-1 min-w-0 text-left">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-semibold text-sm">{s.title}</span>
                     <span className={`text-xs px-2 py-0.5 rounded ${intensityColors[s.intensity] || "bg-zinc-800 text-zinc-400"}`}>
@@ -125,10 +124,20 @@ export default function FieldSessions() {
                       <span className="flex items-center gap-1"><Clock size={11} /> {s.duration_minutes} min</span>
                     )}
                   </div>
+                </button>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <button
+                    onClick={() => setSelected({ ...s, _openExForm: true })}
+                    className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Plus size={13} /> Ejercicio
+                  </button>
+                  <button onClick={() => setSelected(s)} className="text-zinc-600 hover:text-white transition-colors">
+                    <ChevronRight size={16} />
+                  </button>
                 </div>
-                <ChevronRight size={16} className="text-zinc-600 flex-shrink-0" />
               </div>
-            </button>
+            </div>
           ))}
         </div>
       )}

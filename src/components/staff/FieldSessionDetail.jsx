@@ -180,7 +180,7 @@ export default function FieldSessionDetail({ session, onBack }) {
   const [exercises, setExercises] = useState([]);
   const [players, setPlayers]     = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [showForm, setShowForm]   = useState(false);
+  const [showForm, setShowForm]   = useState(!!session._openExForm);
   const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "" });
   const { toast } = useToast();
 
