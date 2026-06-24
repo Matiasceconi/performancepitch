@@ -1,0 +1,43 @@
+{
+  "name": "MinutesRecord",
+  "type": "object",
+  "properties": {
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador"
+    },
+    "tournament": {
+      "type": "string",
+      "description": "Torneo o competencia",
+      "enum": [
+        "Proyecci\u00f3n Apertura",
+        "Clausura",
+        "Copa Argentina",
+        "Juveniles",
+        "Amistosos",
+        "Torneo Regional",
+        "Otro"
+      ]
+    },
+    "minutes": {
+      "type": "number",
+      "description": "Minutos jugados"
+    },
+    "matches": {
+      "type": "number",
+      "description": "Partidos jugados"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    }
+  },
+  "required": [
+    "player_name",
+    "tournament"
+  ]
+}
