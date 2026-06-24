@@ -213,10 +213,13 @@ function SessionBlock({ s, onDelete }) {
   );
 }
 
+const MD_CODES = ["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"];
+
 export default function StrengthSessions() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading]   = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [filterMD, setFilterMD] = useState(null);
   const [form, setForm] = useState({ title: "", date: moment().format("YYYY-MM-DD"), match_day_code: "", intensity: "Media", duration_minutes: "", notes: "", image_url: "" });
   const [uploadingSession, setUploadingSession] = useState(false);
   const { toast } = useToast();
@@ -283,6 +286,19 @@ export default function StrengthSessions() {
         </Button>
       </div>
 
+      {/* Filtro MD */}
+      {sessions.length > 0 && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-zinc-500 font-medium">Código MD:</span>
+          <button onClick={() => setFilterMD(null)} className={`text-xs px-2.5 py-1 rounded-full font-mono transition-colors ${filterMD === null ? "bg-violet-500/30 text-violet-300" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>Todos</button>
+          {MD_CODES.map((c) => (
+            <button key={c} onClick={() => setFilterMD(filterMD === c ? null : c)}
+              className={`text-xs px-2.5 py-1 rounded-full font-mono transition-colors ${filterMD === c ? "bg-violet-500/30 text-violet-300" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+            >{c}</button>
+          ))}
+        </div>
+      )}
+
       {sessions.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
           <Dumbbell size={36} className="text-zinc-700 mx-auto mb-3" />
@@ -290,7 +306,7 @@ export default function StrengthSessions() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {sessions.map((s) => <SessionBlock key={s.id} s={s} onDelete={deleteSession} />)}
+          {sessions.filter((s) => !filterMD || s.match_day_code === filterMD).map((s) => <SessionBlock key={s.id} s={s} onDelete={deleteSession} />)}
         </div>
       )}
 

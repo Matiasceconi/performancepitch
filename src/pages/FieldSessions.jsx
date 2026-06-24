@@ -30,11 +30,15 @@ const intensityBorder = {
   "Muy alta": "border-red-400",
 };
 
+const MD_CODES = ["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"];
+
 export default function FieldSessions() {
   const [sessions, setSessions]   = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showForm, setShowForm]   = useState(false);
-  const [selected, setSelected]   = useState(null); // session detail view
+  const [selected, setSelected]   = useState(null);
+  const [filterMD, setFilterMD]   = useState(null);
+  const [filterType, setFilterType] = useState(null);
 
   const [form, setForm] = useState({
     title: "",
@@ -99,6 +103,33 @@ export default function FieldSessions() {
         </Button>
       </div>
 
+      {/* Filters */}
+      {sessions.length > 0 && (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-500 font-medium">Código MD:</span>
+            <button
+              onClick={() => setFilterMD(null)}
+              className={`text-xs px-2.5 py-1 rounded-full font-mono transition-colors ${filterMD === null ? "bg-violet-500/30 text-violet-300" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+            >Todos</button>
+            {MD_CODES.map((c) => (
+              <button key={c} onClick={() => setFilterMD(filterMD === c ? null : c)}
+                className={`text-xs px-2.5 py-1 rounded-full font-mono transition-colors ${filterMD === c ? "bg-violet-500/30 text-violet-300" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+              >{c}</button>
+            ))}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-500 font-medium">Tipo:</span>
+            <button onClick={() => setFilterType(null)} className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterType === null ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>Todos</button>
+            {sessionTypes.map((t) => (
+              <button key={t} onClick={() => setFilterType(filterType === t ? null : t)}
+                className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterType === t ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+              >{t}</button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {sessions.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
           <Video size={36} className="text-zinc-700 mx-auto mb-3" />
@@ -106,7 +137,7 @@ export default function FieldSessions() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {sessions.map((s) => (
+          {sessions.filter((s) => (!filterMD || s.match_day_code === filterMD) && (!filterType || s.session_type === filterType)).map((s) => (
             <div
               key={s.id}
               className={`bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl p-4`}
