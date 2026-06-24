@@ -11,6 +11,21 @@
       "format": "date",
       "description": "Fecha de la sesi\u00f3n"
     },
+    "match_day_code": {
+      "type": "string",
+      "enum": [
+        "MD",
+        "MD-1",
+        "MD-2",
+        "MD-3",
+        "MD-4",
+        "MD-5",
+        "MD-6",
+        "MD+1",
+        "MD+2"
+      ],
+      "description": "C\u00f3digo de d\u00eda relativo al partido"
+    },
     "session_type": {
       "type": "string",
       "enum": [

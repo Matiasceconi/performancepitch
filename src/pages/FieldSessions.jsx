@@ -39,6 +39,7 @@ export default function FieldSessions() {
   const [form, setForm] = useState({
     title: "",
     date: moment().format("YYYY-MM-DD"),
+    match_day_code: "",
     session_type: "Entrenamiento",
     intensity: "Media",
     duration_minutes: "",
@@ -114,6 +115,11 @@ export default function FieldSessions() {
                 <button onClick={() => setSelected(s)} className="flex-1 min-w-0 text-left">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-white font-semibold text-sm">{s.title}</span>
+                    {s.match_day_code && (
+                      <span className="text-xs px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono font-bold">
+                        {s.match_day_code}
+                      </span>
+                    )}
                     <span className={`text-xs px-2 py-0.5 rounded ${intensityColors[s.intensity] || "bg-zinc-800 text-zinc-400"}`}>
                       {s.intensity}
                     </span>
@@ -161,6 +167,17 @@ export default function FieldSessions() {
                 <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
                 <Input type="number" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="90" className="bg-zinc-800 border-zinc-700 text-white" />
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Código MD (días para el partido)</label>
+              <Select value={form.match_day_code} onValueChange={(v) => setForm((f) => ({ ...f, match_day_code: v }))}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  {["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"].map((c) => (
+                    <SelectItem key={c} value={c} className="text-white">{c}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
