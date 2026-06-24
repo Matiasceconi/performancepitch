@@ -1,0 +1,190 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Plus, ChevronRight, Video, Clock, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import FieldSessionDetail from "@/components/staff/FieldSessionDetail";
+import moment from "moment";
+import "moment/locale/es";
+
+moment.locale("es");
+
+const sessionTypes = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Otro"];
+const intensities  = ["Baja", "Media", "Alta", "Muy alta"];
+
+const intensityColors = {
+  "Baja":     "bg-blue-500/15 text-blue-400",
+  "Media":    "bg-yellow-500/15 text-yellow-400",
+  "Alta":     "bg-orange-500/15 text-orange-400",
+  "Muy alta": "bg-red-500/15 text-red-400",
+};
+
+const intensityBorder = {
+  "Baja":     "border-blue-400",
+  "Media":    "border-yellow-400",
+  "Alta":     "border-orange-400",
+  "Muy alta": "border-red-400",
+};
+
+export default function FieldSessions() {
+  const [sessions, setSessions]   = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [showForm, setShowForm]   = useState(false);
+  const [selected, setSelected]   = useState(null); // session detail view
+
+  const [form, setForm] = useState({
+    title: "",
+    date: moment().format("YYYY-MM-DD"),
+    session_type: "Entrenamiento",
+    intensity: "Media",
+    duration_minutes: "",
+    notes: "",
+    video_url: "",
+  });
+
+  const { toast } = useToast();
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    try {
+      const data = await base44.entities.TrainingSession.list("-date", 200);
+      setSessions(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    try {
+      const created = await base44.entities.TrainingSession.create({
+        ...form,
+        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
+      });
+      toast({ title: "Sesión de campo guardada" });
+      setShowForm(false);
+      setLoading(true);
+      await load();
+      setSelected(created);
+    } catch {
+      toast({ title: "Error al guardar", variant: "destructive" });
+    }
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
+
+  if (selected) {
+    return <FieldSessionDetail session={selected} onBack={() => setSelected(null)} />;
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">Sesiones de Campo</h2>
+          <p className="text-zinc-500 text-sm mt-0.5">Ejercicios, espacio e interacción por jugador</p>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
+          <Plus size={15} className="mr-1.5" /> Nueva sesión
+        </Button>
+      </div>
+
+      {sessions.length === 0 ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+          <Video size={36} className="text-zinc-700 mx-auto mb-3" />
+          <p className="text-zinc-500 text-sm">No hay sesiones de campo cargadas</p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {sessions.map((s) => (
+            <button
+              key={s.id}
+              onClick={() => setSelected(s)}
+              className={`w-full text-left bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl p-4 hover:bg-zinc-800/40 transition-colors`}
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="text-white font-semibold text-sm">{s.title}</span>
+                    <span className={`text-xs px-2 py-0.5 rounded ${intensityColors[s.intensity] || "bg-zinc-800 text-zinc-400"}`}>
+                      {s.intensity}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+                    <span>{moment(s.date).format("DD/MM/YYYY")}</span>
+                    {s.duration_minutes && (
+                      <span className="flex items-center gap-1"><Clock size={11} /> {s.duration_minutes} min</span>
+                    )}
+                  </div>
+                </div>
+                <ChevronRight size={16} className="text-zinc-600 flex-shrink-0" />
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">Nueva sesión de campo</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Título</label>
+              <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" placeholder="Ej: Táctica ofensiva" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Fecha</label>
+                <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
+                <Input type="number" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="90" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Tipo</label>
+                <Select value={form.session_type} onValueChange={(v) => setForm((f) => ({ ...f, session_type: v }))}>
+                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-800 border-zinc-700">
+                    {sessionTypes.map((t) => <SelectItem key={t} value={t} className="text-white">{t}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Intensidad</label>
+                <Select value={form.intensity} onValueChange={(v) => setForm((f) => ({ ...f, intensity: v }))}>
+                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-800 border-zinc-700">
+                    {intensities.map((i) => <SelectItem key={i} value={i} className="text-white">{i}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
+              <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Link del video</label>
+              <Input value={form.video_url} onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))} placeholder="https://youtube.com/..." className="bg-zinc-800 border-zinc-700 text-white" />
+            </div>
+            <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">Guardar sesión</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

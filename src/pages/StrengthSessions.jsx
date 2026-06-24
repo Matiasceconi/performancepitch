@@ -1,0 +1,288 @@
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Plus, Dumbbell, Clock, ChevronDown, ChevronUp, Trash2, Play } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { useToast } from "@/components/ui/use-toast";
+import moment from "moment";
+import "moment/locale/es";
+
+moment.locale("es");
+
+const intensities = ["Baja", "Media", "Alta", "Muy alta"];
+const intensityColors = {
+  "Baja":     "bg-blue-500/15 text-blue-400",
+  "Media":    "bg-yellow-500/15 text-yellow-400",
+  "Alta":     "bg-orange-500/15 text-orange-400",
+  "Muy alta": "bg-red-500/15 text-red-400",
+};
+const intensityBorder = {
+  "Baja":     "border-blue-400",
+  "Media":    "border-yellow-400",
+  "Alta":     "border-orange-400",
+  "Muy alta": "border-red-400",
+};
+
+function ExerciseRow({ ex, onDelete }) {
+  return (
+    <div className="flex items-center gap-3 py-2 border-b border-zinc-800/50 last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-white font-medium">{ex.name}</p>
+        <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
+          {ex.sets && <span>{ex.sets} series</span>}
+          {ex.reps && <span>× {ex.reps}</span>}
+          {ex.load && <span className="text-zinc-400 font-medium">{ex.load}</span>}
+          {ex.rest_seconds && <span>Desc: {ex.rest_seconds}s</span>}
+        </div>
+        {ex.notes && <p className="text-xs text-zinc-600 mt-0.5">{ex.notes}</p>}
+      </div>
+      <button onClick={() => onDelete(ex.id)} className="text-zinc-700 hover:text-red-400 transition-colors">
+        <Trash2 size={14} />
+      </button>
+    </div>
+  );
+}
+
+function SessionBlock({ s, onDelete }) {
+  const [open, setOpen]       = useState(false);
+  const [exercises, setExercises] = useState([]);
+  const [loadingEx, setLoadingEx] = useState(false);
+  const [showExForm, setShowExForm] = useState(false);
+  const [exForm, setExForm] = useState({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "" });
+  const { toast } = useToast();
+
+  async function loadExercises() {
+    if (loadingEx) return;
+    setLoadingEx(true);
+    try {
+      const data = await base44.entities.StrengthExercise.filter({ session_id: s.id }, "order", 50);
+      setExercises(data);
+    } finally {
+      setLoadingEx(false);
+    }
+  }
+
+  function toggle() {
+    if (!open) loadExercises();
+    setOpen((v) => !v);
+  }
+
+  async function saveExercise(e) {
+    e.preventDefault();
+    try {
+      const created = await base44.entities.StrengthExercise.create({
+        session_id: s.id,
+        name: exForm.name,
+        sets: exForm.sets ? Number(exForm.sets) : undefined,
+        reps: exForm.reps || undefined,
+        load: exForm.load || undefined,
+        rest_seconds: exForm.rest_seconds ? Number(exForm.rest_seconds) : undefined,
+        notes: exForm.notes || undefined,
+        order: exercises.length + 1,
+      });
+      setExercises((prev) => [...prev, created]);
+      setExForm({ name: "", sets: "", reps: "", load: "", rest_seconds: "", notes: "" });
+      setShowExForm(false);
+      toast({ title: "Ejercicio agregado" });
+    } catch {
+      toast({ title: "Error al guardar ejercicio", variant: "destructive" });
+    }
+  }
+
+  async function deleteExercise(id) {
+    await base44.entities.StrengthExercise.delete(id);
+    setExercises((prev) => prev.filter((e) => e.id !== id));
+  }
+
+  return (
+    <div className={`bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl overflow-hidden`}>
+      <button onClick={toggle} className="w-full flex items-center gap-3 p-4 hover:bg-zinc-800/30 transition-colors text-left">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-white font-semibold text-sm">{s.title}</span>
+            {s.intensity && (
+              <span className={`text-xs px-2 py-0.5 rounded ${intensityColors[s.intensity]}`}>{s.intensity}</span>
+            )}
+          </div>
+          <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
+            <span>{moment(s.date).format("DD/MM/YYYY")}</span>
+            {s.duration_minutes && <span className="flex items-center gap-1"><Clock size={11} /> {s.duration_minutes} min</span>}
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {s.video_url && (
+            <a href={s.video_url} target="_blank" rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="bg-zinc-800 hover:bg-zinc-700 text-white p-2 rounded-lg transition-colors"
+            >
+              <Play size={13} />
+            </a>
+          )}
+          {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
+        </div>
+      </button>
+
+      {open && (
+        <div className="border-t border-zinc-800 px-4 pb-4 pt-3 space-y-3">
+          {s.notes && <p className="text-xs text-zinc-500">{s.notes}</p>}
+
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">Ejercicios</p>
+            <button onClick={() => setShowExForm((v) => !v)} className="text-xs text-zinc-400 hover:text-white flex items-center gap-1 transition-colors">
+              <Plus size={13} /> Agregar
+            </button>
+          </div>
+
+          {showExForm && (
+            <form onSubmit={saveExercise} className="bg-zinc-800 rounded-lg p-3 space-y-3">
+              <Input value={exForm.name} onChange={(e) => setExForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Nombre del ejercicio" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={exForm.sets} onChange={(e) => setExForm((f) => ({ ...f, sets: e.target.value }))} placeholder="Series" type="number" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+                <Input value={exForm.reps} onChange={(e) => setExForm((f) => ({ ...f, reps: e.target.value }))} placeholder="Reps / Tiempo" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+                <Input value={exForm.load} onChange={(e) => setExForm((f) => ({ ...f, load: e.target.value }))} placeholder="Carga (kg / %)" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+                <Input value={exForm.rest_seconds} onChange={(e) => setExForm((f) => ({ ...f, rest_seconds: e.target.value }))} placeholder="Descanso (s)" type="number" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+              </div>
+              <Input value={exForm.notes} onChange={(e) => setExForm((f) => ({ ...f, notes: e.target.value }))} placeholder="Observaciones" className="bg-zinc-700 border-zinc-600 text-white text-sm" />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">Guardar</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setShowExForm(false)} className="text-zinc-400">Cancelar</Button>
+              </div>
+            </form>
+          )}
+
+          {loadingEx ? (
+            <div className="py-4 flex justify-center">
+              <div className="w-4 h-4 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+            </div>
+          ) : exercises.length === 0 ? (
+            <p className="text-zinc-600 text-xs text-center py-4">Sin ejercicios cargados</p>
+          ) : (
+            <div>
+              {exercises.map((ex) => <ExerciseRow key={ex.id} ex={ex} onDelete={deleteExercise} />)}
+            </div>
+          )}
+
+          <button onClick={() => onDelete(s.id)} className="text-xs text-zinc-700 hover:text-red-400 transition-colors mt-2">
+            Eliminar sesión
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function StrengthSessions() {
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ title: "", date: moment().format("YYYY-MM-DD"), intensity: "Media", duration_minutes: "", notes: "", video_url: "" });
+  const { toast } = useToast();
+
+  useEffect(() => { load(); }, []);
+
+  async function load() {
+    try {
+      const data = await base44.entities.StrengthSession.list("-date", 100);
+      setSessions(data);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    try {
+      await base44.entities.StrengthSession.create({
+        ...form,
+        duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
+      });
+      toast({ title: "Sesión de fuerza guardada" });
+      setShowForm(false);
+      setLoading(true);
+      load();
+    } catch {
+      toast({ title: "Error al guardar", variant: "destructive" });
+    }
+  }
+
+  async function deleteSession(id) {
+    await base44.entities.StrengthSession.delete(id);
+    setSessions((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold text-white tracking-tight">Sesiones de Fuerza</h2>
+          <p className="text-zinc-500 text-sm mt-0.5">Planificación de trabajo en sala de pesas</p>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
+          <Plus size={15} className="mr-1.5" /> Nueva sesión
+        </Button>
+      </div>
+
+      {sessions.length === 0 ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+          <Dumbbell size={36} className="text-zinc-700 mx-auto mb-3" />
+          <p className="text-zinc-500 text-sm">No hay sesiones de fuerza cargadas</p>
+        </div>
+      ) : (
+        <div className="grid gap-3">
+          {sessions.map((s) => <SessionBlock key={s.id} s={s} onDelete={deleteSession} />)}
+        </div>
+      )}
+
+      <Dialog open={showForm} onOpenChange={setShowForm}>
+        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white">Nueva sesión de fuerza</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Título</label>
+              <Input value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" placeholder="Ej: Fuerza máxima tren inferior" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Fecha</label>
+                <Input type="date" value={form.date} onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
+                <Input type="number" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="60" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Intensidad</label>
+              <Select value={form.intensity} onValueChange={(v) => setForm((f) => ({ ...f, intensity: v }))}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  {intensities.map((i) => <SelectItem key={i} value={i} className="text-white">{i}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
+              <Textarea value={form.notes} onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))} rows={3} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Link del video</label>
+              <Input value={form.video_url} onChange={(e) => setForm((f) => ({ ...f, video_url: e.target.value }))} placeholder="https://..." className="bg-zinc-800 border-zinc-700 text-white" />
+            </div>
+            <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">Guardar sesión</Button>
+          </form>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

@@ -1,0 +1,38 @@
+{
+  "name": "FieldExercise",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID de la sesi\u00f3n de campo"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del ejercicio"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del ejercicio"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Duraci\u00f3n en minutos"
+    },
+    "space": {
+      "type": "string",
+      "description": "Espacio o zona de la cancha utilizada"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo t\u00e1ctico/f\u00edsico del ejercicio"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden dentro de la sesi\u00f3n"
+    }
+  },
+  "required": [
+    "session_id",
+    "name"
+  ]
+}
