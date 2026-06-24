@@ -4,7 +4,7 @@ import { Upload, FileSpreadsheet, FileText, ExternalLink, Check, X, ChevronDown,
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, LabelList } from "recharts";
 import CsvPreviewTable from "@/components/catapult/CsvPreviewTable";
 
 // ── Fuzzy column matcher: maps any header string to an entity field ──────────
@@ -505,7 +505,12 @@ export default function Catapult() {
                       <XAxis type="number" tick={{ fill: "#71717a", fontSize: 11 }} />
                       <YAxis dataKey="name" type="category" tick={{ fill: "#a1a1aa", fontSize: 11 }} width={90} />
                       <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 12 }} />
-                      <Bar dataKey="value" fill={currentMetric?.color || "#60a5fa"} radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="value" fill={currentMetric?.color || "#60a5fa"} radius={[0, 4, 4, 0]}>
+                        <LabelList dataKey="value" position="right" style={{ fill: "#e4e4e7", fontSize: 11, fontWeight: 600 }} formatter={(v) => {
+                          const isWhole = ["total_distance","distance_hsr","sprint_distance","sprint_efforts","accelerations","decelerations"].includes(selectedMetric);
+                          return isWhole ? Math.round(v) : Number(v).toFixed(1);
+                        }} />
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
