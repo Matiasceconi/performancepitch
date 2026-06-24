@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound } from "lucide-react";
+import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -10,6 +10,7 @@ const navItems = [
   { label: "Plantel", path: "/squad", icon: Users },
   { label: "Mapa táctico", path: "/tactical", icon: Map },
   { label: "Rendimiento", path: "/performance", icon: TrendingUp },
+  { label: "Calendario", path: "/schedule", icon: CalendarDays },
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
 ];
 

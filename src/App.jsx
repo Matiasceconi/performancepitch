@@ -20,6 +20,7 @@ import Squad from '@/pages/Squad';
 import Tactical from '@/pages/Tactical';
 import Performance from '@/pages/Performance';
 import Team from '@/pages/Team';
+import Schedule from '@/pages/Schedule';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -60,6 +61,7 @@ const AuthenticatedApp = () => {
           <Route path="/tactical" element={<Tactical />} />
           <Route path="/performance" element={<Performance />} />
           <Route path="/team" element={<Team />} />
+          <Route path="/schedule" element={<Schedule />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
