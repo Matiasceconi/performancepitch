@@ -8,6 +8,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import CsvPreviewTable from "@/components/catapult/CsvPreviewTable";
 import PlayerEvolution from "@/components/catapult/PlayerEvolution";
 import SessionComparison from "@/components/catapult/SessionComparison";
+import MatchImport from "@/components/catapult/MatchImport";
 
 // ── Fuzzy column matcher: maps any header string to an entity field ──────────
 function matchColumn(raw) {
@@ -426,7 +427,8 @@ export default function Catapult() {
       {/* Tabs */}
       <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
         {[
-          { key: "sessions",   label: "Sesiones" },
+          { key: "sessions",   label: "Entrenamientos" },
+          { key: "matches",    label: "Partidos" },
           { key: "data",       label: "Datos GPS" },
           { key: "evolution",   label: "Evolución" },
           { key: "comparison",  label: "Comparar" },
@@ -463,6 +465,11 @@ export default function Catapult() {
             ))
           )}
         </div>
+      )}
+
+      {/* ── TAB: MATCHES ──────────────────────────────────────────────── */}
+      {activeTab === "matches" && (
+        <MatchImport reports={reports} onReportsChange={loadAll} parseCSVFile={parseCSVFile} />
       )}
 
       {/* ── TAB: EVOLUTION ────────────────────────────────────────────── */}

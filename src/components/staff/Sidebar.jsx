@@ -6,10 +6,10 @@ import { useState } from "react";
 const navItems = [
 { label: "Dashboard", path: "/", icon: LayoutDashboard },
 { label: "Sesiones", path: "/sessions", icon: Video },
-{ label: "Catapult", path: "/catapult", icon: FileSpreadsheet },
 { label: "Plantel", path: "/squad", icon: Users },
 { label: "Mapa táctico", path: "/tactical", icon: Map },
 { label: "Rendimiento", path: "/performance", icon: TrendingUp },
+{ label: "Catapult GPS", path: "/catapult", icon: FileSpreadsheet },
 { label: "Calendario", path: "/schedule", icon: CalendarDays },
 { label: "Cuerpo Técnico", path: "/team", icon: UsersRound }];
 

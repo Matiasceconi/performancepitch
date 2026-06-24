@@ -22,6 +22,17 @@ const COLOR_LABELS = { blue:"Azul", green:"Verde", yellow:"Amarillo", orange:"Na
 
 const EMPTY_FORM = { date: "", time: "", title: "", type: "", duration_minutes: "", location: "", notes: "", color: "blue" };
 
+const QUICK_TEMPLATES = [
+  { title: "Desayuno", time: "08:00", duration_minutes: 45, color: "yellow", type: "Comida" },
+  { title: "Almuerzo", time: "13:00", duration_minutes: 60, color: "orange", type: "Comida" },
+  { title: "Cena", time: "20:00", duration_minutes: 60, color: "orange", type: "Comida" },
+  { title: "Entrenamiento", time: "10:00", duration_minutes: 90, color: "green", type: "Entrenamiento" },
+  { title: "Partido", time: "20:00", duration_minutes: 105, color: "red", type: "Partido" },
+  { title: "Charla técnica", time: "09:00", duration_minutes: 60, color: "blue", type: "Charla" },
+  { title: "Recuperación", time: "11:00", duration_minutes: 60, color: "cyan", type: "Físico" },
+  { title: "Viaje", time: "07:00", duration_minutes: 120, color: "purple", type: "Logística" },
+];
+
 function EventCard({ event, onEdit, onDelete }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
   return (
@@ -87,6 +98,22 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-white font-semibold">{initial ? "Editar evento" : "Nuevo evento"}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+        </div>
+        {/* Quick templates */}
+        <div className="mb-4">
+          <p className="text-xs text-zinc-500 mb-2">Plantillas rápidas</p>
+          <div className="flex flex-wrap gap-1.5">
+            {QUICK_TEMPLATES.map((t) => (
+              <button
+                key={t.title}
+                type="button"
+                onClick={() => setForm((f) => ({ ...f, title: t.title, time: t.time, duration_minutes: t.duration_minutes, color: t.color, type: t.type }))}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${COLOR_MAP[t.color].bg} ${COLOR_MAP[t.color].text} ${COLOR_MAP[t.color].border} hover:opacity-80`}
+              >
+                {t.title}
+              </button>
+            ))}
+          </div>
         </div>
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
