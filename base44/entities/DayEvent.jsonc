@@ -1,0 +1,54 @@
+{
+  "name": "DayEvent",
+  "type": "object",
+  "properties": {
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del evento"
+    },
+    "time": {
+      "type": "string",
+      "description": "Hora del evento (HH:MM)"
+    },
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo del evento"
+    },
+    "type": {
+      "type": "string",
+      "description": "Tipo de evento (ej: Desayuno, Viaje, Charla t\u00e9cnica, etc.)"
+    },
+    "duration_minutes": {
+      "type": "number",
+      "description": "Duraci\u00f3n en minutos"
+    },
+    "location": {
+      "type": "string",
+      "description": "Lugar o ubicaci\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    },
+    "color": {
+      "type": "string",
+      "enum": [
+        "blue",
+        "green",
+        "yellow",
+        "orange",
+        "red",
+        "purple",
+        "pink",
+        "cyan"
+      ],
+      "default": "blue",
+      "description": "Color del evento"
+    }
+  },
+  "required": [
+    "date",
+    "title"
+  ]
+}
