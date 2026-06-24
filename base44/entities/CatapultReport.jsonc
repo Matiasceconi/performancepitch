@@ -6,6 +6,10 @@
       "type": "string",
       "description": "ID de la sesi\u00f3n asociada"
     },
+    "session_label": {
+      "type": "string",
+      "description": "Etiqueta de la sesi\u00f3n"
+    },
     "date": {
       "type": "string",
       "format": "date",
@@ -23,37 +27,49 @@
       "type": "string",
       "description": "Nombre del jugador"
     },
+    "total_duration": {
+      "type": "number",
+      "description": "Duraci\u00f3n total (minutos)"
+    },
     "total_distance": {
       "type": "number",
-      "description": "Distancia total en metros"
+      "description": "Distancia total (m)"
     },
-    "max_speed": {
+    "distance_hsr": {
       "type": "number",
-      "description": "Velocidad m\u00e1xima km/h"
-    },
-    "high_speed_running": {
-      "type": "number",
-      "description": "Metros en alta velocidad"
+      "description": "Distancia 19.8-25 km/h (m)"
     },
     "sprint_distance": {
       "type": "number",
-      "description": "Metros en sprint"
+      "description": "Distancia +25 km/h (m)"
+    },
+    "sprint_efforts": {
+      "type": "number",
+      "description": "Sprint Efforts"
     },
     "accelerations": {
       "type": "number",
-      "description": "Cantidad de aceleraciones"
+      "description": "Aceleraciones +3 m/s\u00b2"
     },
     "decelerations": {
       "type": "number",
-      "description": "Cantidad de desaceleraciones"
+      "description": "Desaceleraciones +3 m/s\u00b2"
     },
     "player_load": {
       "type": "number",
-      "description": "Player Load (carga del jugador)"
+      "description": "Player Load"
     },
-    "heart_rate_avg": {
+    "max_velocity": {
       "type": "number",
-      "description": "Frecuencia card\u00edaca promedio"
+      "description": "Velocidad m\u00e1xima (km/h)"
+    },
+    "max_velocity_percentage": {
+      "type": "number",
+      "description": "% Vel. M\u00e1xima"
+    },
+    "meters_per_minute": {
+      "type": "number",
+      "description": "Metros por minuto"
     }
   },
   "required": [
