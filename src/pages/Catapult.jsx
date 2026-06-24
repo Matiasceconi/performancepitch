@@ -16,76 +16,130 @@ const REQUIRED_COLS = [
 
 // ── CSV column name → entity field mapping ──────────────────────────────────
 const COL_MAP = {
+  // Name / player (with and without BOM)
+  "name": "player_name", "\ufeffname": "player_name",
   "jugador": "player_name", "player": "player_name", "nombre": "player_name", "athlete": "player_name",
-  "tot dur": "total_duration", "total duration": "total_duration", "duration": "total_duration",
-  "tot dist (m)": "total_distance", "total distance": "total_distance", "tot dist": "total_distance",
-  "d 19,8-25,0 km/h (m)": "distance_hsr", "d 19.8-25.0 km/h (m)": "distance_hsr", "hsr": "distance_hsr",
-  "d +25,0 km/h (m)": "sprint_distance", "d +25.0 km/h (m)": "sprint_distance", "sprint dist": "sprint_distance",
-  "sprint effs": "sprint_efforts", "sprint efforts": "sprint_efforts",
-  "acc +3 m/s² eff": "accelerations", "acc +3 m/s2 eff": "accelerations", "accelerations": "accelerations",
-  "dec +3 m/s² eff": "decelerations", "dec +3 m/s2 eff": "decelerations", "decelerations": "decelerations",
-  "tot pl": "player_load", "player load": "player_load",
-  "max vel (km/h)": "max_velocity", "max velocity": "max_velocity", "max speed": "max_velocity",
-  "max vel (% max)": "max_velocity_percentage", "max velocity %": "max_velocity_percentage",
-  "metros x min": "meters_per_minute", "m/min": "meters_per_minute", "meters per minute": "meters_per_minute",
+  // Duration
+  "total duration": "total_duration", "tot dur": "total_duration",
+  // Distance
+  "total distance (m)": "total_distance", "tot dist (m)": "total_distance", "tot dist": "total_distance",
+  // HSR
+  "d 19,8-25,0 km/h (m)": "distance_hsr", "d 19.8-25.0 km/h (m)": "distance_hsr",
+  // Sprint distance
+  "d+ 25,0 km/h (m)": "sprint_distance", "d +25,0 km/h (m)": "sprint_distance", "d +25.0 km/h (m)": "sprint_distance",
+  // Sprint efforts
+  "sprint efforts": "sprint_efforts", "sprint effs": "sprint_efforts",
+  // Accelerations
+  "acc + 3mt/s eff": "accelerations", "acc +3 m/s² eff": "accelerations", "acc +3 m/s2 eff": "accelerations",
+  // Decelerations
+  "dec +3mts/s eff": "decelerations", "dec +3 m/s² eff": "decelerations", "dec +3 m/s2 eff": "decelerations",
+  // Player load
+  "total player load": "player_load", "tot pl": "player_load", "player load": "player_load",
+  // Max velocity
+  "maximum velocity (km/h)": "max_velocity", "max vel (km/h)": "max_velocity", "max velocity": "max_velocity",
+  // Max velocity %
+  "max vel (% max)": "max_velocity_percentage",
+  // Meters per minute
+  "metros x min": "meters_per_minute", "m/min": "meters_per_minute",
 };
 
 function parseNum(val) {
   if (val == null || val === "" || val === "-") return null;
-  const cleaned = String(val).replace(/\./g, "").replace(",", ".");
+  // Handle both comma and dot as decimal separator
+  const str = String(val).trim();
+  // If it has a comma (e.g. "4.010,55" or "81,81"), normalize
+  const hasCommaDecimal = /^\d+,\d+$/.test(str) || /^\d{1,3}(\.\d{3})*,\d+$/.test(str);
+  const cleaned = hasCommaDecimal
+    ? str.replace(/\./g, "").replace(",", ".")
+    : str.replace(",", ".");
   const n = parseFloat(cleaned);
   return isNaN(n) ? null : n;
 }
 
-function parseCSVFile(text) {
-  const firstLine = text.split("\n")[0];
-  const sep = firstLine.includes(";") ? ";" : ",";
-  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
+// Parse "HH:MM:SS" or "MM:SS" duration to minutes
+function parseDuration(val) {
+  if (!val) return null;
+  const parts = String(val).trim().split(":").map(Number);
+  if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+  if (parts.length === 2) return parts[0] + parts[1] / 60;
+  return parseNum(val);
+}
 
+function parseCSVFile(text) {
+  // Strip BOM if present
+  const clean = text.replace(/^\uFEFF/, "");
+
+  // Detect separator from first line
+  const firstLine = clean.split("\n")[0];
+  const sep = firstLine.includes(";") ? ";" : ",";
+
+  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
+
+  // Find header row: look for a row that maps to at least 3 known fields
   let headerIdx = -1;
   let headers = [];
-  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+  for (let i = 0; i < Math.min(lines.length, 15); i++) {
     const cols = lines[i].split(sep).map((c) => c.replace(/"/g, "").trim());
-    const normalized = cols.map((c) => c.toLowerCase());
-    if (normalized.some((c) => c.includes("jugador") || c.includes("player") || c.includes("athlete"))) {
+    const mapped = cols.filter((c) => COL_MAP[c.toLowerCase().trim()]);
+    // Also accept if first col is "name" (with or without BOM)
+    const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
+    if (mapped.length >= 3 || firstLow === "name" || firstLow === "jugador" || firstLow === "athlete") {
       headerIdx = i;
-      headers = cols;
+      // Strip BOM from first header just in case
+      headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c);
       break;
     }
   }
-  if (headerIdx === -1) return { error: "No se encontró la columna 'Jugador' o 'Player' en el archivo." };
 
-  // Validate required columns
-  const headersLower = headers.map((h) => h.toLowerCase().trim());
-  const missing = REQUIRED_COLS.filter((req) => {
-    const reqLow = req.toLowerCase();
-    return !headersLower.some((h) => h === reqLow || COL_MAP[h] === COL_MAP[reqLow]);
-  });
+  if (headerIdx === -1) {
+    const sample = lines.slice(0, 3).join(" | ");
+    return { error: `No se encontró fila de encabezados. Primeras líneas: ${sample}` };
+  }
 
-  const fieldMap = {};
+  console.log("[Catapult] Encabezados detectados:", headers);
+  console.log("[Catapult] Separador:", sep, "| Fila de encabezado:", headerIdx);
+
+  const fieldMap = {}; // colIndex → fieldName
   headers.forEach((h, idx) => {
     const field = COL_MAP[h.toLowerCase().trim()];
     if (field) fieldMap[idx] = field;
+    else if (idx === 0) fieldMap[idx] = "player_name"; // fallback: first col = player name
+  });
+
+  const missing = REQUIRED_COLS.filter((req) => {
+    return !Object.values(fieldMap).includes(COL_MAP[req.toLowerCase()] || req.toLowerCase());
   });
 
   const rows = [];
   const rawPreview = [];
+  const totalLines = lines.length - headerIdx - 1;
+
   for (let i = headerIdx + 1; i < lines.length; i++) {
     const cols = lines[i].split(sep).map((c) => c.replace(/"/g, "").trim());
     const obj = {};
     Object.entries(fieldMap).forEach(([colIdx, field]) => {
       const raw = cols[parseInt(colIdx)];
-      obj[field] = field === "player_name" ? (raw || "") : parseNum(raw);
+      if (field === "player_name") {
+        obj[field] = raw || "";
+      } else if (field === "total_duration") {
+        obj[field] = parseDuration(raw);
+      } else {
+        obj[field] = parseNum(raw);
+      }
     });
-    const name = obj.player_name || "";
+
+    const name = (obj.player_name || "").trim();
     if (!name) continue;
     const lname = name.toLowerCase();
-    if (lname === "total" || lname === "promedio" || lname === "average" || lname === "team") continue;
+    if (["total", "promedio", "average", "team", "totals"].includes(lname)) continue;
+
     rows.push(obj);
     if (rawPreview.length < 5) rawPreview.push(obj);
   }
 
-  return { rows, headers, rawPreview, missing, sep };
+  console.log("[Catapult] Filas leídas:", totalLines, "| Jugadores válidos:", rows.length);
+
+  return { rows, headers, rawPreview, missing, sep, totalLines };
 }
 
 const CHART_METRICS = [
@@ -240,12 +294,16 @@ function SessionRow({ session, sessionReports, onImportDone }) {
                 <div>
                   <p className="text-yellow-300 font-semibold text-sm">Vista previa — {csvState.rows.length} jugadores detectados</p>
                   <p className="text-zinc-500 text-xs mt-0.5">
-                    Separador detectado: <code className="text-zinc-400 bg-zinc-800 px-1 rounded">{csvState.sep === ";" ? "punto y coma (;)" : "coma (,)"}</code>
-                    &nbsp;·&nbsp; Columnas: {csvState.headers.length}
+                    Separador: <code className="text-zinc-400 bg-zinc-800 px-1 rounded">{csvState.sep === ";" ? ";" : ","}</code>
+                    &nbsp;·&nbsp; Filas leídas: <span className="text-zinc-400">{csvState.totalLines}</span>
+                    &nbsp;·&nbsp; Jugadores válidos: <span className="text-green-400">{csvState.rows.length}</span>
+                  </p>
+                  <p className="text-zinc-600 text-xs mt-1">
+                    Columnas detectadas: {csvState.headers.join(", ")}
                   </p>
                   {csvState.missing?.length > 0 && (
                     <p className="text-orange-400 text-xs mt-1 flex items-center gap-1">
-                      <AlertCircle size={11} /> Columnas no encontradas: {csvState.missing.join(", ")}
+                      <AlertCircle size={11} /> Columnas no mapeadas: {csvState.missing.join(", ")}
                     </p>
                   )}
                 </div>
