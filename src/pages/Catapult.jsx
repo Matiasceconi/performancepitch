@@ -9,6 +9,7 @@ import CsvPreviewTable from "@/components/catapult/CsvPreviewTable";
 import PlayerEvolution from "@/components/catapult/PlayerEvolution";
 import SessionComparison from "@/components/catapult/SessionComparison";
 import MatchImport from "@/components/catapult/MatchImport";
+import TeamReport from "@/components/catapult/TeamReport";
 
 // ── Fuzzy column matcher: maps any header string to an entity field ──────────
 function matchColumn(raw) {
@@ -510,6 +511,7 @@ export default function Catapult() {
           { key: "sessions",   label: "Entrenamientos" },
           { key: "matches",    label: "Partidos" },
           { key: "data",       label: "Datos GPS" },
+          { key: "team",       label: "Informe de Equipo" },
           { key: "evolution",   label: "Evolución" },
           { key: "comparison",  label: "Comparar" },
         ].map((t) => (
@@ -550,6 +552,11 @@ export default function Catapult() {
       {/* ── TAB: MATCHES ──────────────────────────────────────────────── */}
       {activeTab === "matches" && (
         <MatchImport reports={reports} onReportsChange={loadAll} parseCSVFile={parseCSVFile} />
+      )}
+
+      {/* ── TAB: TEAM REPORT ──────────────────────────────────────────── */}
+      {activeTab === "team" && (
+        <TeamReport />
       )}
 
       {/* ── TAB: EVOLUTION ────────────────────────────────────────────── */}
