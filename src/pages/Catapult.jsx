@@ -150,6 +150,21 @@ const CHART_METRICS = [
   { key: "accelerations",  label: "Aceleraciones",     color: "#fb923c" },
 ];
 
+// Calculate session averages
+function calculateSessionAverages(rows) {
+  const metrics = ["total_distance", "distance_hsr", "sprint_distance", "player_load", "max_velocity", "accelerations", "decelerations"];
+  const averages = {};
+  
+  metrics.forEach(metric => {
+    const values = rows.map(r => r[metric]).filter(v => v != null);
+    if (values.length > 0) {
+      averages[metric] = values.reduce((a, b) => a + b, 0) / values.length;
+    }
+  });
+  
+  return averages;
+}
+
 // ── Session Row with inline CSV import ─────────────────────────────────────
 function SessionRow({ session, sessionReports, onImportDone }) {
   const [expanded, setExpanded] = useState(false);
@@ -161,6 +176,7 @@ function SessionRow({ session, sessionReports, onImportDone }) {
   const { toast } = useToast();
 
   const hasData = sessionReports.length > 0;
+  const sessionAverages = csvState?.rows ? calculateSessionAverages(csvState.rows) : {};
 
   async function handleFile(e) {
     const file = e.target.files?.[0];
@@ -321,6 +337,28 @@ function SessionRow({ session, sessionReports, onImportDone }) {
                     )}
                     Confirmar importación
                   </Button>
+                </div>
+              </div>
+
+              {/* Averages and charts */}
+              <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                <p className="text-white font-semibold text-xs mb-3">Promedios de la sesión:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: "total_distance", label: "Distancia (m)", format: (v) => Math.round(v) },
+                    { key: "distance_hsr", label: "19.8-25 km/h (m)", format: (v) => Math.round(v) },
+                    { key: "sprint_distance", label: "+25 km/h (m)", format: (v) => Math.round(v) },
+                    { key: "player_load", label: "Player Load", format: (v) => v.toFixed(0) },
+                    { key: "max_velocity", label: "Vel. Máx (km/h)", format: (v) => v.toFixed(1) },
+                    { key: "accelerations", label: "Aceleraciones", format: (v) => Math.round(v) },
+                  ].map(({ key, label, format }) => (
+                    sessionAverages[key] && (
+                      <div key={key} className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-center">
+                        <p className="text-zinc-500 text-xs">{label}</p>
+                        <p className="text-white font-bold text-sm mt-0.5">{format(sessionAverages[key])}</p>
+                      </div>
+                    )
+                  ))}
                 </div>
               </div>
 
