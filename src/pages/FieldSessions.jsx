@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2 } from "lucide-react";
+import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,6 +15,14 @@ moment.locale("es");
 
 const sessionTypes = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Otro"];
 const intensities  = ["Baja", "Media", "Alta", "Muy alta"];
+const focusAreas   = ["Tensión", "Duración", "Velocidad", "Recuperación"];
+
+const focusColors = {
+  "Tensión":      "bg-red-500/20 text-red-400",
+  "Duración":     "bg-blue-500/20 text-blue-400",
+  "Velocidad":    "bg-yellow-500/20 text-yellow-400",
+  "Recuperación": "bg-green-500/20 text-green-400",
+};
 
 const intensityColors = {
   "Baja":     "bg-blue-500/15 text-blue-400",
@@ -33,12 +41,13 @@ const intensityBorder = {
 const MD_CODES = ["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"];
 
 export default function FieldSessions() {
-  const [sessions, setSessions]   = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [showForm, setShowForm]   = useState(false);
-  const [selected, setSelected]   = useState(null);
-  const [filterMD, setFilterMD]   = useState(null);
-  const [filterType, setFilterType] = useState(null);
+  const [sessions, setSessions]       = useState([]);
+  const [availableCount, setAvailableCount] = useState(0);
+  const [loading, setLoading]         = useState(true);
+  const [showForm, setShowForm]       = useState(false);
+  const [selected, setSelected]       = useState(null);
+  const [filterMD, setFilterMD]       = useState(null);
+  const [filterType, setFilterType]   = useState(null);
 
   const [editingSession, setEditingSession] = useState(null);
 
@@ -47,6 +56,7 @@ export default function FieldSessions() {
     date: moment().format("YYYY-MM-DD"),
     match_day_code: "",
     session_type: "Entrenamiento",
+    focus_area: "",
     intensity: "Media",
     duration_minutes: "",
     notes: "",
@@ -62,8 +72,12 @@ export default function FieldSessions() {
 
   async function load() {
     try {
-      const data = await base44.entities.TrainingSession.list("-date", 200);
+      const [data, players] = await Promise.all([
+        base44.entities.TrainingSession.list("-date", 200),
+        base44.entities.Player.filter({ status: "Disponible" }, "number", 100),
+      ]);
       setSessions(data);
+      setAvailableCount(players.length);
     } finally {
       setLoading(false);
     }
@@ -77,6 +91,7 @@ export default function FieldSessions() {
       date: s.date || moment().format("YYYY-MM-DD"),
       match_day_code: s.match_day_code || "",
       session_type: s.session_type || "Entrenamiento",
+      focus_area: s.focus_area || "",
       intensity: s.intensity || "Media",
       duration_minutes: s.duration_minutes ?? "",
       notes: s.notes || "",
@@ -133,7 +148,12 @@ export default function FieldSessions() {
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
           <h2 className="text-xl font-bold text-white tracking-tight">Sesiones de Campo</h2>
-          <p className="text-zinc-500 text-sm mt-0.5">Ejercicios, espacio e interacción por jugador</p>
+          <p className="text-zinc-500 text-sm mt-0.5 flex items-center gap-1.5">
+            Ejercicios, espacio e interacción por jugador
+            <span className="inline-flex items-center gap-1 ml-2 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5 text-xs font-medium">
+              <Users size={11} /> {availableCount} disponibles
+            </span>
+          </p>
         </div>
         <Button onClick={() => { setEditingSession(null); setForm(emptyForm); setShowForm(true); }} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={15} className="mr-1.5" /> Nueva sesión
@@ -186,6 +206,11 @@ export default function FieldSessions() {
                     {s.match_day_code && (
                       <span className="text-xs px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono font-bold">
                         {s.match_day_code}
+                      </span>
+                    )}
+                    {s.focus_area && (
+                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${focusColors[s.focus_area] || "bg-zinc-800 text-zinc-400"}`}>
+                        {s.focus_area}
                       </span>
                     )}
                     <span className={`text-xs px-2 py-0.5 rounded ${intensityColors[s.intensity] || "bg-zinc-800 text-zinc-400"}`}>
@@ -272,6 +297,15 @@ export default function FieldSessions() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Foco de la sesión</label>
+              <Select value={form.focus_area} onValueChange={(v) => setForm((f) => ({ ...f, focus_area: v }))}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar foco..." /></SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  {focusAreas.map((f) => <SelectItem key={f} value={f} className="text-white">{f}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Notas</label>

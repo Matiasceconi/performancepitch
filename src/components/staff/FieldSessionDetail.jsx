@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText, FileDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -179,10 +179,136 @@ function ExerciseBlock({ exercise, players, onDelete }) {
   );
 }
 
+const focusColors = {
+  "Tensión":      "bg-red-500/20 text-red-400",
+  "Duración":     "bg-blue-500/20 text-blue-400",
+  "Velocidad":    "bg-yellow-500/20 text-yellow-400",
+  "Recuperación": "bg-green-500/20 text-green-400",
+};
+
+async function exportSessionPDF(session, exercises, availablePlayers) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210;
+  const M = 14;
+
+  // Header
+  doc.setFillColor(24, 24, 27);
+  doc.rect(0, 0, W, 28, "F");
+  doc.setFillColor(240, 200, 0);
+  doc.rect(0, 28, W, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(255, 255, 255);
+  doc.text("SESIÓN DE CAMPO", M, 12);
+  doc.setFontSize(9);
+  doc.setTextColor(160, 160, 160);
+  doc.text("Defensa y Justicia — Cuerpo Técnico", M, 20);
+  doc.setTextColor(240, 200, 0);
+  doc.text(moment(session.date).format("dddd D [de] MMMM YYYY").toUpperCase(), W - M, 12, { align: "right" });
+  doc.setTextColor(160, 160, 160);
+  doc.setFontSize(8);
+  doc.text(`Generado: ${moment().format("DD/MM/YYYY HH:mm")}`, W - M, 20, { align: "right" });
+
+  let y = 36;
+
+  // Session info box
+  doc.setFillColor(39, 39, 42);
+  doc.roundedRect(M, y, W - M * 2, 22, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text(session.title, M + 4, y + 8);
+
+  const tags = [session.session_type, session.focus_area, session.intensity].filter(Boolean).join("  ·  ");
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.setTextColor(160, 160, 160);
+  doc.text(tags, M + 4, y + 14);
+
+  const meta = [
+    session.duration_minutes ? `${session.duration_minutes} min` : null,
+    session.match_day_code || null,
+    `${availablePlayers} jugadores disponibles`,
+  ].filter(Boolean).join("   ·   ");
+  doc.text(meta, M + 4, y + 20);
+
+  y += 28;
+
+  if (session.notes) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(8);
+    doc.setTextColor(120, 120, 120);
+    const lines = doc.splitTextToSize(session.notes, W - M * 2 - 8);
+    doc.text(lines, M + 4, y);
+    y += lines.length * 4 + 4;
+  }
+
+  // Exercises
+  exercises.forEach((ex, idx) => {
+    if (y > 260) { doc.addPage(); y = 14; }
+
+    doc.setFillColor(45, 45, 50);
+    doc.roundedRect(M, y, W - M * 2, 8, 1, 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(240, 200, 0);
+    doc.text(`${idx + 1}. ${ex.name}`, M + 3, y + 5.5);
+    y += 10;
+
+    const details = [
+      ex.space ? `📍 ${ex.space}` : null,
+      ex.duration_minutes ? `⏱ ${ex.duration_minutes} min` : null,
+      (ex.width_m && ex.length_m) ? `📐 ${ex.width_m}×${ex.length_m} m` : null,
+      ex.num_players ? `👥 ${ex.num_players} jugadores` : null,
+    ].filter(Boolean).join("    ");
+
+    if (details) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8);
+      doc.setTextColor(150, 150, 150);
+      doc.text(details, M + 3, y);
+      y += 5;
+    }
+
+    if (ex.objective) {
+      doc.setFont("helvetica", "italic");
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      const lines = doc.splitTextToSize(`Objetivo: ${ex.objective}`, W - M * 2 - 6);
+      doc.text(lines, M + 3, y);
+      y += lines.length * 4 + 2;
+    }
+
+    if (ex.description) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(100, 100, 100);
+      const lines = doc.splitTextToSize(ex.description, W - M * 2 - 6);
+      doc.text(lines, M + 3, y);
+      y += lines.length * 4;
+    }
+
+    y += 5;
+  });
+
+  // Footer
+  doc.setDrawColor(60, 60, 60);
+  doc.line(M, 285, W - M, 285);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 100, 100);
+  doc.text("PerformancePitch — Defensa y Justicia", M, 290);
+
+  doc.save(`Sesion_${session.title.replace(/\s+/g, "_")}_${session.date}.pdf`);
+}
+
 export default function FieldSessionDetail({ session, onBack }) {
   const [exercises, setExercises] = useState([]);
   const [players, setPlayers]     = useState([]);
+  const [availablePlayers, setAvailablePlayers] = useState(0);
   const [loading, setLoading]     = useState(true);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showForm, setShowForm]   = useState(!!session._openExForm);
   const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "" });
   const { toast } = useToast();
@@ -190,18 +316,14 @@ export default function FieldSessionDetail({ session, onBack }) {
   useEffect(() => {
     Promise.all([
       base44.entities.FieldExercise.filter({ session_id: session.id }, "order", 100),
+      base44.entities.Player.list("number", 100),
       base44.entities.Player.filter({ status: "Disponible" }, "number", 100),
-    ]).then(([exs, pls]) => {
+    ]).then(([exs, allPls, availPls]) => {
       setExercises(exs);
-      // Also include all players (not just available) so you can track everyone
-      return base44.entities.Player.list("number", 100).then(setPlayers);
+      setPlayers(allPls);
+      setAvailablePlayers(availPls.length);
     }).finally(() => setLoading(false));
   }, [session.id]);
-
-  // Re-fetch all players (available + others for tracking)
-  useEffect(() => {
-    base44.entities.Player.list("number", 100).then(setPlayers);
-  }, []);
 
   async function saveExercise(e) {
     e.preventDefault();
@@ -241,14 +363,36 @@ export default function FieldSessionDetail({ session, onBack }) {
         </button>
         <div className="flex-1 min-w-0">
           <h2 className="text-xl font-bold text-white tracking-tight">{session.title}</h2>
-          <div className="flex items-center gap-3 mt-0.5 text-xs text-zinc-500">
-            <span>{moment(session.date).format("dddd D [de] MMMM YYYY")}</span>
-            {session.duration_minutes && <span>{session.duration_minutes} min</span>}
-            {session.intensity && <span className="text-zinc-400">{session.intensity}</span>}
+          <div className="flex items-center gap-2 flex-wrap mt-1">
+            <span className="text-xs text-zinc-500">{moment(session.date).format("dddd D [de] MMMM YYYY")}</span>
+            {session.duration_minutes && <span className="text-xs text-zinc-500">{session.duration_minutes} min</span>}
+            {session.intensity && <span className="text-xs text-zinc-400">{session.intensity}</span>}
+            {session.focus_area && (
+              <span className={`text-xs px-2 py-0.5 rounded font-semibold ${focusColors[session.focus_area] || "bg-zinc-800 text-zinc-400"}`}>
+                {session.focus_area}
+              </span>
+            )}
+            <span className="text-xs flex items-center gap-1 text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-full px-2 py-0.5">
+              <Users size={10} /> {availablePlayers} disponibles
+            </span>
           </div>
           {session.notes && <p className="text-xs text-zinc-600 mt-1">{session.notes}</p>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
+          <button
+            onClick={async () => {
+              setGeneratingPdf(true);
+              await exportSessionPDF(session, exercises, availablePlayers);
+              setGeneratingPdf(false);
+            }}
+            disabled={generatingPdf}
+            className="flex items-center gap-1.5 bg-yellow-500 hover:bg-yellow-400 disabled:opacity-50 text-zinc-900 font-semibold px-3 py-2 rounded-lg transition-colors text-xs"
+          >
+            {generatingPdf
+              ? <div className="w-3 h-3 border border-zinc-700 border-t-zinc-900 rounded-full animate-spin" />
+              : <FileDown size={14} />}
+            PDF
+          </button>
           {session.video_url && (
             <a href={session.video_url} target="_blank" rel="noopener noreferrer"
               className="bg-zinc-800 hover:bg-zinc-700 text-white p-2.5 rounded-lg transition-colors"

@@ -38,6 +38,16 @@
       ],
       "description": "Tipo de sesi\u00f3n"
     },
+    "focus_area": {
+      "type": "string",
+      "enum": [
+        "Tensi\u00f3n",
+        "Duraci\u00f3n",
+        "Velocidad",
+        "Recuperaci\u00f3n"
+      ],
+      "description": "Foco principal de la sesi\u00f3n"
+    },
     "video_url": {
       "type": "string",
       "description": "URL del video de la sesi\u00f3n"
