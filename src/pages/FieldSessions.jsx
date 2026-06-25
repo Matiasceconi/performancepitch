@@ -49,6 +49,7 @@ export default function FieldSessions() {
   const [selected, setSelected]       = useState(null);
   const [filterMD, setFilterMD]       = useState(null);
   const [filterType, setFilterType]   = useState(null);
+  const [filterFocus, setFilterFocus] = useState(null);
 
   const [editingSession, setEditingSession] = useState(null);
 
@@ -185,6 +186,15 @@ export default function FieldSessions() {
               >{t}</button>
             ))}
           </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-500 font-medium">Foco:</span>
+            <button onClick={() => setFilterFocus(null)} className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterFocus === null ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>Todos</button>
+            {focusAreas.map((f) => (
+              <button key={f} onClick={() => setFilterFocus(filterFocus === f ? null : f)}
+                className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterFocus === f ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+              >{f}</button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -195,7 +205,7 @@ export default function FieldSessions() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {sessions.filter((s) => (!filterMD || s.match_day_code === filterMD) && (!filterType || s.session_type === filterType)).map((s) => (
+          {sessions.filter((s) => (!filterMD || s.match_day_code === filterMD) && (!filterType || s.session_type === filterType) && (!filterFocus || s.focus_area === filterFocus)).map((s) => (
             <div
               key={s.id}
               className={`bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl p-4`}
