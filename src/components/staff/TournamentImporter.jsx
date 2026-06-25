@@ -1,50 +1,55 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, AlertCircle } from "lucide-react";
+import { Upload, AlertCircle, Loader } from "lucide-react";
 import { toast } from "@/components/ui/use-toast";
 
 export default function TournamentImporter() {
+  const [url, setUrl] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const handleImport = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleImport = async () => {
+    if (!url.trim()) {
+      setError("Ingresa una URL");
+      return;
+    }
 
     setLoading(true);
     setError("");
 
     try {
-      const text = await file.text();
-      const lines = text.split("\n").filter((l) => l.trim());
+      // Usar LLM para extraer datos de la página
+      const response = await base44.integrations.Core.InvokeLLM({
+        prompt: `Extrae la tabla de clasificación de esta URL: ${url}\n\nDevuelve un JSON con un array de objetos así:\n[\n  {\n    "position": número,\n    "team_name": "nombre del equipo",\n    "matches_played": número,\n    "wins": número,\n    "draws": número,\n    "losses": número,\n    "goals_for": número,\n    "goals_against": número,\n    "points": número,\n    "group": "General" o "Zona A" o "Zona B"\n  }\n]\n\nSolo devuelve el JSON válido, sin explicaciones.`,
+        add_context_from_internet: true,
+        response_json_schema: {
+          type: "object",
+          properties: {
+            standings: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  position: { type: "number" },
+                  team_name: { type: "string" },
+                  matches_played: { type: "number" },
+                  wins: { type: "number" },
+                  draws: { type: "number" },
+                  losses: { type: "number" },
+                  goals_for: { type: "number" },
+                  goals_against: { type: "number" },
+                  points: { type: "number" },
+                  group: { type: "string" },
+                },
+              },
+            },
+          },
+        },
+      });
 
-      if (lines.length < 2) {
-        setError("El archivo debe contener datos de clasificación");
-        return;
-      }
-
-      // Parse CSV o tabla texto
-      const records = [];
-      for (let i = 1; i < lines.length; i++) {
-        const parts = lines[i].split(",").map((p) => p.trim());
-        if (parts.length >= 9) {
-          records.push({
-            position: parseInt(parts[0]) || i,
-            team_name: parts[1] || "",
-            matches_played: parseInt(parts[2]) || 0,
-            wins: parseInt(parts[3]) || 0,
-            draws: parseInt(parts[4]) || 0,
-            losses: parseInt(parts[5]) || 0,
-            goals_for: parseInt(parts[6]) || 0,
-            goals_against: parseInt(parts[7]) || 0,
-            points: parseInt(parts[8]) || 0,
-            group: parts[9] || "General",
-          });
-        }
-      }
-
-      if (records.length === 0) {
-        setError("No se pudieron procesar los datos del archivo");
+      const data = response.standings || response;
+      if (!Array.isArray(data) || data.length === 0) {
+        setError("No se encontraron datos en esa página");
         return;
       }
 
@@ -52,15 +57,15 @@ export default function TournamentImporter() {
       await base44.entities.TournamentStanding.deleteMany({});
 
       // Crear nuevos registros
-      await base44.entities.TournamentStanding.bulkCreate(records);
+      await base44.entities.TournamentStanding.bulkCreate(data);
 
       toast({
-        description: `✓ Tabla actualizada con ${records.length} equipos`,
+        description: `✓ Tabla actualizada con ${data.length} equipos`,
       });
 
-      e.target.value = "";
+      setUrl("");
     } catch (err) {
-      setError("Error al procesar el archivo: " + err.message);
+      setError("Error al procesar la página: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -68,26 +73,39 @@ export default function TournamentImporter() {
 
   return (
     <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4">
-      <label className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-        <Upload size={18} className="text-blue-400" />
-        <span className="text-sm font-medium text-white">
-          {loading ? "Cargando..." : "Importar CSV de clasificación"}
-        </span>
+      <div className="flex gap-2">
         <input
-          type="file"
-          accept=".csv,.txt"
-          onChange={handleImport}
+          type="url"
+          placeholder="Pega la URL de la clasificación..."
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
           disabled={loading}
-          className="hidden"
+          className="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-blue-500"
+          onKeyPress={(e) => e.key === "Enter" && handleImport()}
         />
-      </label>
+        <button
+          onClick={handleImport}
+          disabled={loading || !url.trim()}
+          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-700 text-white text-sm font-medium transition-colors flex items-center gap-2"
+        >
+          {loading ? (
+            <>
+              <Loader size={16} className="animate-spin" /> Cargando...
+            </>
+          ) : (
+            <>
+              <Upload size={16} /> Importar
+            </>
+          )}
+        </button>
+      </div>
       {error && (
         <div className="mt-3 flex gap-2 text-xs text-red-400 p-2 bg-red-500/10 rounded">
           <AlertCircle size={14} className="shrink-0 mt-0.5" />
           <p>{error}</p>
         </div>
       )}
-      <p className="text-xs text-zinc-500 mt-2">Formato: posición, equipo, PJ, G, E, P, GF, GC, Pts, grupo</p>
+      <p className="text-xs text-zinc-500 mt-2">Pega el enlace de cualquier página con la tabla de posiciones</p>
     </div>
   );
 }
