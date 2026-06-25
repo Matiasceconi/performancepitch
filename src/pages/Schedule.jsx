@@ -37,7 +37,10 @@ function EventCard({ event, onEdit, onDelete }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
   return (
     <div className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${c.bg} ${c.border} group`}>
-      <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${c.dot}`} />
+      {event.rival_logo_url
+        ? <img src={event.rival_logo_url} alt="Escudo" className="w-7 h-7 object-contain shrink-0 mt-0.5" onError={(e) => { e.target.style.display = "none"; }} />
+        : <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${c.dot}`} />
+      }
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-1">
           <div>
