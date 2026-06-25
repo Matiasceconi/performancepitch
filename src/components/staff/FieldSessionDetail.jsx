@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText, FileDown } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText, FileDown, Pencil, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,11 +56,45 @@ function PlayerRow({ log, onChange }) {
   );
 }
 
-function ExerciseBlock({ exercise, players, onDelete }) {
+function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState({
+    name: exercise.name || "",
+    description: exercise.description || "",
+    space: exercise.space || "",
+    duration_minutes: exercise.duration_minutes ?? "",
+    objective: exercise.objective || "",
+    width_m: exercise.width_m ?? "",
+    length_m: exercise.length_m ?? "",
+    num_players: exercise.num_players ?? "",
+    image_url: exercise.image_url || "",
+  });
   const [logs, setLogs] = useState({}); // player_id -> log data
   const [saving, setSaving] = useState({});
   const { toast } = useToast();
+
+  async function saveEdit(e) {
+    e.preventDefault();
+    try {
+      const updated = await base44.entities.FieldExercise.update(exercise.id, {
+        name: editForm.name,
+        description: editForm.description || undefined,
+        space: editForm.space || undefined,
+        duration_minutes: editForm.duration_minutes ? Number(editForm.duration_minutes) : undefined,
+        objective: editForm.objective || undefined,
+        width_m: editForm.width_m ? Number(editForm.width_m) : undefined,
+        length_m: editForm.length_m ? Number(editForm.length_m) : undefined,
+        num_players: editForm.num_players ? Number(editForm.num_players) : undefined,
+        image_url: editForm.image_url || undefined,
+      });
+      onUpdate(updated);
+      setEditing(false);
+      toast({ title: "Ejercicio actualizado" });
+    } catch {
+      toast({ title: "Error al guardar", variant: "destructive" });
+    }
+  }
 
   useEffect(() => {
     if (!open || !players.length) return;
@@ -134,33 +168,66 @@ function ExerciseBlock({ exercise, players, onDelete }) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="w-full flex items-center gap-3 p-4 hover:bg-zinc-800/30 transition-colors text-left"
-      >
-        <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm">{exercise.name}</p>
-          <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
-            {exercise.space && <span>📍 {exercise.space}</span>}
-            {exercise.duration_minutes && <span>⏱ {exercise.duration_minutes} min</span>}
-            {(exercise.width_m || exercise.length_m) && (
-              <span>📐 {exercise.width_m ?? "—"} × {exercise.length_m ?? "—"} m</span>
-            )}
-            {exercise.objective && <span className="text-zinc-400">{exercise.objective}</span>}
+      <div className="flex items-center gap-2 p-4">
+        <button
+          onClick={() => setOpen((v) => !v)}
+          className="flex-1 min-w-0 flex items-center gap-3 text-left"
+        >
+          <div className="flex-1 min-w-0">
+            <p className="text-white font-semibold text-sm">{exercise.name}</p>
+            <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
+              {exercise.space && <span>📍 {exercise.space}</span>}
+              {exercise.duration_minutes && <span>⏱ {exercise.duration_minutes} min</span>}
+              {(exercise.width_m || exercise.length_m) && (
+                <span>📐 {exercise.width_m ?? "—"} × {exercise.length_m ?? "—"} m</span>
+              )}
+              {exercise.objective && <span className="text-zinc-400">{exercise.objective}</span>}
+            </div>
           </div>
+        </button>
+        <div className="flex items-center gap-1.5 shrink-0">
+          <button
+            onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); setOpen(true); }}
+            className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-zinc-800"
+          >
+            <Pencil size={14} />
+          </button>
+          {open ? <ChevronUp size={16} className="text-zinc-500 cursor-pointer" onClick={() => setOpen(false)} /> : <ChevronDown size={16} className="text-zinc-500 cursor-pointer" onClick={() => setOpen(true)} />}
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
-        </div>
-      </button>
+      </div>
 
       {open && (
         <div className="border-t border-zinc-800 px-4 pb-4 pt-3">
-          {exercise.image_url && (
-            <img src={exercise.image_url} alt="Ejercicio" className="mb-3 rounded-lg w-full max-h-52 object-cover border border-zinc-700" />
-          )}
-          {exercise.description && (
-            <p className="text-xs text-zinc-500 mb-3">{exercise.description}</p>
+          {editing ? (
+            <form onSubmit={saveEdit} className="space-y-3 mb-4">
+              <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Editar ejercicio</p>
+              <Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Nombre" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+              <div className="grid grid-cols-2 gap-2">
+                <Input value={editForm.space} onChange={(e) => setEditForm((f) => ({ ...f, space: e.target.value }))} placeholder="Espacio" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+                <Input value={editForm.duration_minutes} onChange={(e) => setEditForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Duración (min)" type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+              </div>
+              <Input value={editForm.objective} onChange={(e) => setEditForm((f) => ({ ...f, objective: e.target.value }))} placeholder="Objetivo" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+              <div className="grid grid-cols-3 gap-2">
+                <Input value={editForm.width_m} onChange={(e) => setEditForm((f) => ({ ...f, width_m: e.target.value }))} placeholder="Ancho (m)" type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+                <Input value={editForm.length_m} onChange={(e) => setEditForm((f) => ({ ...f, length_m: e.target.value }))} placeholder="Largo (m)" type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+                <Input value={editForm.num_players} onChange={(e) => setEditForm((f) => ({ ...f, num_players: e.target.value }))} placeholder="N° jug." type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+              </div>
+              <Textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descripción..." rows={2} className="bg-zinc-800 border-zinc-700 text-white text-sm resize-none" />
+              <Input value={editForm.image_url} onChange={(e) => setEditForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="URL de imagen" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+              <div className="flex gap-2">
+                <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200 h-7 text-xs">Guardar</Button>
+                <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)} className="text-zinc-400 h-7 text-xs">Cancelar</Button>
+              </div>
+            </form>
+          ) : (
+            <>
+              {exercise.image_url && (
+                <img src={exercise.image_url} alt="Ejercicio" className="mb-3 rounded-lg w-full max-h-52 object-cover border border-zinc-700" />
+              )}
+              {exercise.description && (
+                <p className="text-xs text-zinc-500 mb-3">{exercise.description}</p>
+              )}
+            </>
           )}
           <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Interacción por jugador</p>
           <div className="overflow-x-auto">
@@ -436,7 +503,13 @@ export default function FieldSessionDetail({ session, onBack }) {
       ) : (
         <div className="space-y-3">
           {exercises.map((ex) => (
-            <ExerciseBlock key={ex.id} exercise={ex} players={players} onDelete={deleteExercise} />
+            <ExerciseBlock
+              key={ex.id}
+              exercise={ex}
+              players={players}
+              onDelete={deleteExercise}
+              onUpdate={(updated) => setExercises((prev) => prev.map((e) => e.id === updated.id ? updated : e))}
+            />
           ))}
         </div>
       )}
