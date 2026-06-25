@@ -106,6 +106,7 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
     name: exercise.name || "",
     description: exercise.description || "",
     space: exercise.space || "",
+    blocks: exercise.blocks ?? "",
     duration_minutes: exercise.duration_minutes ?? "",
     objective: exercise.objective || "",
     width_m: exercise.width_m ?? "",
@@ -124,6 +125,7 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
         name: editForm.name,
         description: editForm.description || undefined,
         space: editForm.space || undefined,
+        blocks: editForm.blocks ? Number(editForm.blocks) : undefined,
         duration_minutes: editForm.duration_minutes ? Number(editForm.duration_minutes) : undefined,
         objective: editForm.objective || undefined,
         width_m: editForm.width_m ? Number(editForm.width_m) : undefined,
@@ -220,7 +222,15 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
             <p className="text-white font-semibold text-sm">{exercise.name}</p>
             <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
               {exercise.space && <span>📍 {exercise.space}</span>}
-              {exercise.duration_minutes && <span>⏱ {exercise.duration_minutes} min</span>}
+              {exercise.blocks && exercise.duration_minutes && (
+                <span>🔁 {exercise.blocks} bloques × {exercise.duration_minutes} min</span>
+              )}
+              {exercise.blocks && !exercise.duration_minutes && (
+                <span>🔁 {exercise.blocks} bloques</span>
+              )}
+              {!exercise.blocks && exercise.duration_minutes && (
+                <span>⏱ {exercise.duration_minutes} min</span>
+              )}
               {(exercise.width_m || exercise.length_m) && (
                 <span>📐 {exercise.width_m ?? "—"} × {exercise.length_m ?? "—"} m</span>
               )}
@@ -245,9 +255,10 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
             <form onSubmit={saveEdit} className="space-y-3 mb-4">
               <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">Editar ejercicio</p>
               <Input value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Nombre" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <Input value={editForm.space} onChange={(e) => setEditForm((f) => ({ ...f, space: e.target.value }))} placeholder="Espacio" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
-                <Input value={editForm.duration_minutes} onChange={(e) => setEditForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Duración (min)" type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+                <Input value={editForm.blocks} onChange={(e) => setEditForm((f) => ({ ...f, blocks: e.target.value }))} placeholder="Bloques" type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+                <Input value={editForm.duration_minutes} onChange={(e) => setEditForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Min/bloque" type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
               </div>
               <Input value={editForm.objective} onChange={(e) => setEditForm((f) => ({ ...f, objective: e.target.value }))} placeholder="Objetivo" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
               <div className="grid grid-cols-3 gap-2">
@@ -409,7 +420,7 @@ export default function FieldSessionDetail({ session, onBack }) {
   const [loading, setLoading]     = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showForm, setShowForm]   = useState(!!session._openExForm);
-  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "", image_url: "" });
+  const [form, setForm] = useState({ name: "", description: "", space: "", blocks: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "", image_url: "" });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -432,6 +443,7 @@ export default function FieldSessionDetail({ session, onBack }) {
         name: form.name,
         description: form.description || undefined,
         space: form.space || undefined,
+        blocks: form.blocks ? Number(form.blocks) : undefined,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
         objective: form.objective || undefined,
         width_m: form.width_m ? Number(form.width_m) : undefined,
@@ -441,7 +453,7 @@ export default function FieldSessionDetail({ session, onBack }) {
         order: exercises.length + 1,
       });
       setExercises((prev) => [...prev, created]);
-      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "", image_url: "" });
+      setForm({ name: "", description: "", space: "", blocks: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "", image_url: "" });
       setShowForm(false);
       toast({ title: "Ejercicio agregado" });
     } catch {
@@ -465,7 +477,6 @@ export default function FieldSessionDetail({ session, onBack }) {
           <h2 className="text-xl font-bold text-white tracking-tight">{session.title}</h2>
           <div className="flex items-center gap-2 flex-wrap mt-1">
             <span className="text-xs text-zinc-500">{moment(session.date).format("dddd D [de] MMMM YYYY")}</span>
-            {session.duration_minutes && <span className="text-xs text-zinc-500">{session.duration_minutes} min</span>}
             {session.intensity && <span className="text-xs text-zinc-400">{session.intensity}</span>}
             {session.focus_area && (
               <span className={`text-xs px-2 py-0.5 rounded font-semibold ${focusColors[session.focus_area] || "bg-zinc-800 text-zinc-400"}`}>
@@ -541,6 +552,20 @@ export default function FieldSessionDetail({ session, onBack }) {
               onUpdate={(updated) => setExercises((prev) => prev.map((e) => e.id === updated.id ? updated : e))}
             />
           ))}
+          {exercises.length > 0 && (() => {
+            const totalMin = exercises.reduce((acc, ex) => {
+              if (ex.blocks && ex.duration_minutes) return acc + ex.blocks * ex.duration_minutes;
+              if (ex.duration_minutes) return acc + ex.duration_minutes;
+              return acc;
+            }, 0);
+            if (!totalMin) return null;
+            return (
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-zinc-800/50">
+                <span className="text-xs text-zinc-500">Tiempo total de ejercicios:</span>
+                <span className="text-sm font-bold text-white">{totalMin} min</span>
+              </div>
+            );
+          })()}
         </div>
       )}
 
@@ -550,9 +575,10 @@ export default function FieldSessionDetail({ session, onBack }) {
           <p className="text-sm font-semibold text-white mb-4">Nuevo ejercicio</p>
           <form onSubmit={saveExercise} className="space-y-3">
             <Input value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} required placeholder="Nombre del ejercicio" className="bg-zinc-800 border-zinc-700 text-white" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <Input value={form.space} onChange={(e) => setForm((f) => ({ ...f, space: e.target.value }))} placeholder="Espacio (ej: Mitad de campo)" className="bg-zinc-800 border-zinc-700 text-white" />
-              <Input value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Duración (min)" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
+              <Input value={form.blocks} onChange={(e) => setForm((f) => ({ ...f, blocks: e.target.value }))} placeholder="Bloques" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
+              <Input value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Min/bloque" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
             </div>
             <Input value={form.objective} onChange={(e) => setForm((f) => ({ ...f, objective: e.target.value }))} placeholder="Objetivo táctico / físico" className="bg-zinc-800 border-zinc-700 text-white" />
             <div className="grid grid-cols-3 gap-3">
