@@ -7,52 +7,176 @@ import "moment/locale/es";
 
 moment.locale("es");
 
-function parseCsvText(text) {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return { headers: [], rows: [] };
-  const sep = lines[0].includes(";") ? ";" : ",";
-  const headers = lines[0].split(sep).map((h) => h.trim().replace(/^"|"$/g, ""));
-  const rows = lines.slice(1).map((l) =>
-    l.split(sep).map((v) => v.trim().replace(/^"|"$/g, ""))
-  );
-  return { headers, rows };
+// ── Mismo parser que Catapult ──────────────────────────────────────────────
+function matchColumn(raw) {
+  const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
+  if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
+  if (h === "total duration" || h === "tot dur") return "total_duration";
+  if (h.includes("total distance") || h === "tot dist (m)" || h === "tot dist") return "total_distance";
+  if (h.startsWith("d") && h.includes("19")) return "distance_hsr";
+  if ((h.startsWith("d+") || h.startsWith("d +")) && h.includes("25")) return "sprint_distance";
+  if (h === "sprint efforts" || h === "sprint effs") return "sprint_efforts";
+  if (h.includes("acc") && (h.includes("3mt") || h.includes("3 m"))) return "accelerations";
+  if (h.includes("dec") && (h.includes("3mt") || h.includes("3 m"))) return "decelerations";
+  if (h === "total player load" || h === "tot pl" || h === "player load") return "player_load";
+  if (h.includes("maximum velocity") || h === "max vel (km/h)" || h === "max velocity (km/h)") return "max_velocity";
+  if (h.includes("max vel") && h.includes("%")) return "max_velocity_percentage";
+  if (h === "metros x min" || h === "m/min" || h === "meters per minute") return "meters_per_minute";
+  return null;
 }
 
+function parseNum(val) {
+  if (val == null || val === "" || val === "-") return null;
+  const str = String(val).trim();
+  const hasCommaDecimal = /^\d+,\d+$/.test(str) || /^\d{1,3}(\.\d{3})*,\d+$/.test(str);
+  const cleaned = hasCommaDecimal ? str.replace(/\./g, "").replace(",", ".") : str.replace(",", ".");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+
+function parseDuration(val) {
+  if (!val) return null;
+  const parts = String(val).trim().split(":").map(Number);
+  if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+  if (parts.length === 2) return parts[0] + parts[1] / 60;
+  return parseNum(val);
+}
+
+function splitCSVLine(line, sep) {
+  const result = [];
+  let cur = "", inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (ch === sep && !inQuotes) { result.push(cur.trim()); cur = ""; }
+    else cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+function parseCatapultCSV(text) {
+  const clean = text.replace(/^\uFEFF/, "");
+  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
+  const firstSemi = lines[0].split(";").length;
+  const firstComma = lines[0].split(",").length;
+  const sep = firstSemi > firstComma ? ";" : ",";
+
+  let headerIdx = -1, headers = [];
+  for (let i = 0; i < Math.min(lines.length, 15); i++) {
+    const cols = splitCSVLine(lines[i], sep);
+    const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
+    const mapped = cols.filter((c) => matchColumn(c) !== null).length;
+    if (firstLow === "name" || firstLow === "jugador" || firstLow === "athlete" || mapped >= 3) {
+      headerIdx = i;
+      headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c);
+      break;
+    }
+  }
+  if (headerIdx === -1) return { error: "No se encontró fila de encabezados válida." };
+
+  const fieldMap = {};
+  headers.forEach((h, idx) => {
+    const field = matchColumn(h);
+    if (field) fieldMap[idx] = field;
+    else if (idx === 0) fieldMap[idx] = "player_name";
+  });
+
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitCSVLine(lines[i], sep);
+    const obj = {};
+    Object.entries(fieldMap).forEach(([colIdx, field]) => {
+      const raw = cols[parseInt(colIdx)];
+      if (field === "player_name") obj[field] = raw || "";
+      else if (field === "total_duration") obj[field] = parseDuration(raw);
+      else obj[field] = parseNum(raw);
+    });
+    const name = (obj.player_name || "").trim();
+    if (!name) continue;
+    if (["total", "promedio", "average", "team", "totals"].includes(name.toLowerCase())) continue;
+    rows.push(obj);
+  }
+  return { rows };
+}
+
+const METRICS = [
+  { key: "total_distance",  label: "Distancia (m)",      fmt: (v) => Math.round(v) },
+  { key: "distance_hsr",   label: "19.8-25 km/h (m)",   fmt: (v) => Math.round(v) },
+  { key: "sprint_distance", label: "+25 km/h (m)",        fmt: (v) => Math.round(v) },
+  { key: "player_load",    label: "Player Load",          fmt: (v) => v.toFixed(0)  },
+  { key: "max_velocity",   label: "Vel. Máx (km/h)",     fmt: (v) => v.toFixed(1)  },
+  { key: "accelerations",  label: "Aceleraciones",        fmt: (v) => Math.round(v) },
+  { key: "decelerations",  label: "Desaceleraciones",     fmt: (v) => Math.round(v) },
+  { key: "sprint_efforts", label: "Sprint Efforts",       fmt: (v) => Math.round(v) },
+];
+
 function CsvDataTable({ csvUrl }) {
-  const [data, setData] = useState(null);
+  const [rows, setRows] = useState(null);
+  const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!csvUrl) return;
     fetch(csvUrl)
       .then((r) => r.text())
-      .then((text) => setData(parseCsvText(text)))
+      .then((text) => {
+        const result = parseCatapultCSV(text);
+        if (result.error) setError(result.error);
+        else setRows(result.rows);
+      })
+      .catch(() => setError("Error al cargar el archivo."))
       .finally(() => setLoading(false));
   }, [csvUrl]);
 
-  if (loading) return <div className="text-xs text-zinc-600 py-2">Cargando datos...</div>;
-  if (!data || data.headers.length === 0) return <div className="text-xs text-zinc-600 py-2">No se pudieron leer los datos del CSV.</div>;
+  if (loading) return <div className="text-xs text-zinc-600 py-2 mt-2">Cargando datos...</div>;
+  if (error) return <div className="text-xs text-red-400 py-2 mt-2">{error}</div>;
+  if (!rows || rows.length === 0) return <div className="text-xs text-zinc-600 py-2 mt-2">Sin datos válidos en el archivo.</div>;
+
+  // Promedios
+  const avgs = {};
+  METRICS.forEach(({ key }) => {
+    const vals = rows.map(r => r[key]).filter(v => v != null);
+    if (vals.length) avgs[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+  });
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-zinc-800 mt-3">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="bg-zinc-800/80">
-            {data.headers.map((h, i) => (
-              <th key={i} className="px-3 py-2 text-left text-zinc-400 font-semibold whitespace-nowrap">{h}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {data.rows.map((row, ri) => (
-            <tr key={ri} className={ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/30"}>
-              {row.map((cell, ci) => (
-                <td key={ci} className="px-3 py-1.5 text-zinc-300 whitespace-nowrap">{cell || "—"}</td>
+    <div className="mt-3 space-y-3">
+      {/* Promedios */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {METRICS.filter(({ key }) => avgs[key] != null).map(({ key, label, fmt }) => (
+          <div key={key} className="bg-zinc-800/60 border border-zinc-700 rounded-lg p-2.5 text-center">
+            <p className="text-zinc-500 text-xs">{label}</p>
+            <p className="text-white font-bold text-sm mt-0.5">{fmt(avgs[key])}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabla por jugador */}
+      <div className="overflow-x-auto rounded-lg border border-zinc-800">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-zinc-800/80">
+              <th className="px-3 py-2 text-left text-zinc-400 font-semibold whitespace-nowrap">Jugador</th>
+              {METRICS.filter(({ key }) => rows.some(r => r[key] != null)).map(({ key, label }) => (
+                <th key={key} className="px-3 py-2 text-right text-zinc-400 font-semibold whitespace-nowrap">{label}</th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, ri) => (
+              <tr key={ri} className={ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/30"}>
+                <td className="px-3 py-1.5 text-zinc-200 font-medium whitespace-nowrap">{row.player_name}</td>
+                {METRICS.filter(({ key }) => rows.some(r => r[key] != null)).map(({ key, fmt }) => (
+                  <td key={key} className="px-3 py-1.5 text-zinc-300 text-right whitespace-nowrap">
+                    {row[key] != null ? fmt(row[key]) : "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
