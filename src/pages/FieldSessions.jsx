@@ -421,9 +421,10 @@ export default function FieldSessions() {
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Intensidad</label>
-                <Select value={form.intensity} onValueChange={(v) => setForm((f) => ({ ...f, intensity: v }))}>
-                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
+                <Select value={form.intensity || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, intensity: v === "__none__" ? "" : v }))}>
+                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Sin etiqueta" /></SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
+                    <SelectItem value="__none__" className="text-zinc-400">Sin etiqueta</SelectItem>
                     {intensities.map((i) => <SelectItem key={i} value={i} className="text-white">{i}</SelectItem>)}
                   </SelectContent>
                 </Select>
