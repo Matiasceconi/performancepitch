@@ -18,7 +18,7 @@ const EMPTY_FORM = {
   name: "", number: "", position: "Defensor", status: "Disponible",
   injury_detail: "", expected_return: "", photo_url: "",
   birth_date: "", category: "", document_number: "",
-  dominant_foot: "", birth_place: "", current_residence: "",
+  dominant_foot: "", birth_place: "", current_residence: "", club_housing: false,
 };
 
 function isBirthdayToday(birth_date) {
@@ -73,6 +73,7 @@ export default function Squad() {
       dominant_foot: p.dominant_foot || "",
       birth_place: p.birth_place || "",
       current_residence: p.current_residence || "",
+      club_housing: p.club_housing || false,
     });
     setShowForm(true);
   }
@@ -184,6 +185,7 @@ export default function Squad() {
                             {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
                             {p.category && <span className="text-xs text-zinc-600">Cat. {p.category}</span>}
                             {p.dominant_foot && <span className="text-xs text-zinc-600">{p.dominant_foot}</span>}
+                            {p.club_housing && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Pensión</span>}
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
                           </div>
                         </div>
@@ -335,6 +337,11 @@ export default function Squad() {
                 </div>
               </div>
             )}
+
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="club_housing" checked={form.club_housing} onChange={(e) => set("club_housing", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
+              <label htmlFor="club_housing" className="text-xs text-zinc-400 cursor-pointer">Vive en pensión del club o tiene contrato</label>
+            </div>
 
             <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">
               {editing ? "Guardar cambios" : "Agregar jugador"}

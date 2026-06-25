@@ -28,6 +28,7 @@ const QUICK_TEMPLATES = [
   { title: "Cena", time: "20:00", duration_minutes: 60, color: "orange", type: "Comida" },
   { title: "Entrenamiento", time: "10:00", duration_minutes: 90, color: "green", type: "Entrenamiento" },
   { title: "Partido", time: "20:00", duration_minutes: 105, color: "red", type: "Partido" },
+  { title: "Jornada de Juveniles", time: "14:00", duration_minutes: 120, color: "pink", type: "Jornada de Juveniles" },
   { title: "Charla técnica", time: "09:00", duration_minutes: 60, color: "blue", type: "Charla" },
   { title: "Recuperación", time: "11:00", duration_minutes: 60, color: "cyan", type: "Físico" },
   { title: "Viaje", time: "07:00", duration_minutes: 120, color: "purple", type: "Logística" },
@@ -148,7 +149,7 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
               <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
               <textarea rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" placeholder="Observaciones..." value={form.notes} onChange={(e) => set("notes", e.target.value)} />
             </div>
-            {form.type === "Partido" && (
+            {(form.type === "Partido" || form.type === "Jornada de Juveniles") && (
               <div className="col-span-2">
                 <label className="text-xs text-zinc-400 mb-1 block">URL escudo rival (opcional)</label>
                 <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://..." value={form.rival_logo_url || ""} onChange={(e) => set("rival_logo_url", e.target.value)} />

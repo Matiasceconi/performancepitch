@@ -81,6 +81,11 @@
     "current_residence": {
       "type": "string",
       "description": "Lugar de residencia actual"
+    },
+    "club_housing": {
+      "type": "boolean",
+      "default": false,
+      "description": "Vive en pensi\u00f3n del club o tiene contrato de alojamiento"
     }
   },
   "required": [
