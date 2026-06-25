@@ -48,6 +48,10 @@
       ],
       "description": "Foco principal de la sesi\u00f3n"
     },
+    "players_count": {
+      "type": "number",
+      "description": "Cantidad de jugadores que participaron en la sesi\u00f3n"
+    },
     "video_url": {
       "type": "string",
       "description": "URL del video de la sesi\u00f3n"

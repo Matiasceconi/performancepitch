@@ -44,6 +44,7 @@ const MD_CODES = ["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"];
 export default function FieldSessions() {
   const [sessions, setSessions]       = useState([]);
   const [availableCount, setAvailableCount] = useState(0);
+  const [availablePlayers, setAvailablePlayers] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [showForm, setShowForm]       = useState(false);
   const [selected, setSelected]       = useState(null);
@@ -61,6 +62,7 @@ export default function FieldSessions() {
     focus_area: "",
     intensity: "Media",
     duration_minutes: "",
+    players_count: "",
     notes: "",
     video_url: "",
     gps_pdf_url: "",
@@ -80,6 +82,7 @@ export default function FieldSessions() {
       ]);
       setSessions(data);
       setAvailableCount(players.length);
+      setAvailablePlayers(players);
     } finally {
       setLoading(false);
     }
@@ -96,6 +99,7 @@ export default function FieldSessions() {
       focus_area: s.focus_area || "",
       intensity: s.intensity || "Media",
       duration_minutes: s.duration_minutes ?? "",
+      players_count: s.players_count ?? "",
       notes: s.notes || "",
       video_url: s.video_url || "",
       gps_pdf_url: s.gps_pdf_url || "",
@@ -117,6 +121,7 @@ export default function FieldSessions() {
       const payload = {
         ...form,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
+        players_count: form.players_count !== "" ? Number(form.players_count) : undefined,
       };
       if (editingSession) {
         await base44.entities.TrainingSession.update(editingSession.id, payload);
@@ -233,6 +238,9 @@ export default function FieldSessions() {
                     {s.duration_minutes && (
                       <span className="flex items-center gap-1"><Clock size={11} /> {s.duration_minutes} min</span>
                     )}
+                    {s.players_count && (
+                      <span className="flex items-center gap-1 text-emerald-400"><Users size={11} /> {s.players_count} jugadores</span>
+                    )}
                   </div>
                 </button>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
@@ -294,6 +302,50 @@ export default function FieldSessions() {
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
                 <Input type="number" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="90" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">
+                Jugadores participantes
+                {availableCount > 0 && (
+                  <span className="ml-2 text-emerald-400">({availableCount} disponibles hoy)</span>
+                )}
+              </label>
+              <div className="flex gap-2 flex-wrap">
+                {availablePlayers.length > 0 ? (
+                  <>
+                    <Select
+                      value={form.players_count !== "" ? String(form.players_count) : ""}
+                      onValueChange={(v) => setForm((f) => ({ ...f, players_count: v }))}
+                    >
+                      <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white flex-1">
+                        <SelectValue placeholder="Seleccionar cantidad..." />
+                      </SelectTrigger>
+                      <SelectContent className="bg-zinc-800 border-zinc-700 max-h-48">
+                        {Array.from({ length: availablePlayers.length }, (_, i) => i + 1).map((n) => (
+                          <SelectItem key={n} value={String(n)} className="text-white">{n} jugadores</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={form.players_count}
+                      onChange={(e) => setForm((f) => ({ ...f, players_count: e.target.value }))}
+                      placeholder="O ingresá un número"
+                      className="bg-zinc-800 border-zinc-700 text-white w-44"
+                    />
+                  </>
+                ) : (
+                  <Input
+                    type="number"
+                    min={1}
+                    value={form.players_count}
+                    onChange={(e) => setForm((f) => ({ ...f, players_count: e.target.value }))}
+                    placeholder="Cantidad de jugadores"
+                    className="bg-zinc-800 border-zinc-700 text-white"
+                  />
+                )}
               </div>
             </div>
             <div>
