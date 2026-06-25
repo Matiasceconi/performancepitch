@@ -20,7 +20,7 @@ export default function TournamentImporter() {
     try {
       // Usar LLM para extraer datos de la página
       const response = await base44.integrations.Core.InvokeLLM({
-        prompt: `Extrae TODAS las tablas de clasificación de esta URL: ${url}\n\nIDENTIFICACIÓN DE GRUPOS - SER EXACTO:\n- Si la tabla está encabezada por "Grupo A", "Apertura - Grupo A", "Apertura Grupo A", o está debajo de ese título: asigna group: "Zona A"\n- Si la tabla está encabezada por "Grupo B", "Apertura - Grupo B", "Apertura Grupo B", o está debajo de ese título: asigna group: "Zona B"\n- Si la tabla está encabezada por "Tabla Anual", "Tabla General", "Tabla Anual - Tabla Anual" o similar: asigna group: "Tabla Anual"\n\nPARA CADA EQUIPO EXTRAE:\nposition (número), team_name (sin "(Reserva)"), matches_played, wins, draws, losses, goals_for, goals_against, points, team_logo_url (URL del escudo)\n\nRETORNA: Un array JSON con TODOS los equipos de TODAS las tablas. Sin texto adicional.`,
+        prompt: `Extrae TODAS las tablas de clasificación de esta URL: ${url}\n\nIDENTIFICACIÓN DE GRUPOS - SER EXACTO:\n- Si la tabla está encabezada por "Grupo A", "Apertura - Grupo A", "Apertura Grupo A", o está debajo de ese título: asigna group: "Zona A"\n- Si la tabla está encabezada por "Grupo B", "Apertura - Grupo B", "Apertura Grupo B", o está debajo de ese título: asigna group: "Zona B"\n- Si la tabla está encabezada por "Tabla Anual", "Tabla General", "Tabla Anual - Tabla Anual", "Campeonato de Reserva", "Group B" o similar: asigna group: "Tabla General"\n\nPARA CADA EQUIPO EXTRAE:\nposition (número), team_name (sin "(Reserva)"), matches_played, wins, draws, losses, goals_for, goals_against, points, team_logo_url (URL del escudo)\n\nRETORNA: Un array JSON con TODOS los equipos de TODAS las tablas. Sin texto adicional.`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "array",
@@ -64,7 +64,7 @@ export default function TournamentImporter() {
           goals_for: parseInt(item.goals_for),
           goals_against: parseInt(item.goals_against),
           points: parseInt(item.points),
-          group: ["Zona A", "Zona B", "Tabla Anual"].includes(item.group) ? item.group : "General",
+          group: ["Zona A", "Zona B", "Tabla Anual", "Tabla General"].includes(item.group) ? item.group : "General",
           team_logo_url: item.team_logo_url || null,
         }));
 
