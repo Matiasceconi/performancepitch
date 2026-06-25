@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield } from "lucide-react";
+import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, FileText } from "lucide-react";
 
 function NextMatchCard({ match }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
@@ -36,6 +36,7 @@ import moment from "moment";
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
 
@@ -44,11 +45,13 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [p, events] = await Promise.all([
+        const [p, events, s] = await Promise.all([
           base44.entities.Player.list("-created_date", 50),
           base44.entities.DayEvent.list("date", 200),
+          base44.entities.TrainingSession.list("-date", 5),
         ]);
         setPlayers(p);
+        setSessions(s);
         const today = moment().format("YYYY-MM-DD");
         const match = events.find((e) => e.type === "Partido" && e.date >= today);
         setNextMatch(match || null);
@@ -212,7 +215,25 @@ export default function Dashboard() {
             </Link>
           </div>
           <div className="p-4">
-            <p className="text-zinc-600 text-sm text-center py-6">Ingresá a Sesiones para ver el detalle</p>
+            {sessions.length === 0 ? (
+              <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p>
+            ) : (
+              <div className="space-y-3">
+                {sessions.map((s) => (
+                  <div key={s.id} className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-white">{s.title}</p>
+                      <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
+                    </div>
+                    {s.gps_pdf_url && (
+                      <a href={s.gps_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2">
+                        <FileText size={13} /> GPS
+                      </a>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </div>
