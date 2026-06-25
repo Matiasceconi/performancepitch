@@ -4,32 +4,58 @@ import { Link } from "react-router-dom";
 import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-function NextMatchCard({ match }) {
+function NextMatchCard({ match, matchReport }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
   const [logoError, setLogoError] = useState(false);
+  const [showSquad, setShowSquad] = useState(false);
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
-      <div className="w-14 h-14 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
-        {match.rival_logo_url && !logoError ?
-        <img src={match.rival_logo_url} alt="Rival" className="w-full h-full object-contain p-1" onError={() => setLogoError(true)} /> :
-        <Shield size={24} className="text-zinc-500" />
-        }
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="p-4 flex items-center gap-4">
+        <div className="w-14 h-14 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
+          {match.rival_logo_url && !logoError ?
+          <img src={match.rival_logo_url} alt="Rival" className="w-full h-full object-contain p-1" onError={() => setLogoError(true)} /> :
+          <Shield size={24} className="text-zinc-500" />
+          }
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-0.5">Próximo partido</p>
+          <p className="text-white font-bold text-base truncate">{match.title}</p>
+          <p className="text-zinc-400 text-sm capitalize">
+            {moment(match.date).format("dddd D [de] MMMM")}
+            {match.time ? ` · ${match.time}hs` : ""}
+            {match.location ? ` · ${match.location}` : ""}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <div className="text-right">
+            <p className="text-3xl font-black text-white leading-none">{daysLeft}</p>
+            <p className="text-xs text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
+          </div>
+          {matchReport && matchReport.squad_names && matchReport.squad_names.length > 0 && (
+            <button
+              onClick={() => setShowSquad(!showSquad)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 transition-colors font-medium"
+            >
+              <Users size={12} />
+              Convocados ({matchReport.squad_names.length})
+            </button>
+          )}
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-0.5">Próximo partido</p>
-        <p className="text-white font-bold text-base truncate">{match.title}</p>
-        <p className="text-zinc-400 text-sm capitalize">
-          {moment(match.date).format("dddd D [de] MMMM")}
-          {match.time ? ` · ${match.time}hs` : ""}
-          {match.location ? ` · ${match.location}` : ""}
-        </p>
-      </div>
-      <div className="text-right shrink-0">
-        <p className="text-3xl font-black text-white leading-none">{daysLeft}</p>
-        <p className="text-xs text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
-      </div>
+      {showSquad && matchReport && (
+        <div className="border-t border-zinc-800 p-4">
+          <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Lista de convocados</p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {matchReport.squad_names.map((name, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm text-white">
+                <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
+                {name}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>);
-
 }
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PitchMap from "@/components/staff/PitchMap";
@@ -45,20 +71,26 @@ export default function Dashboard() {
   const [showStatusPanel, setShowStatusPanel] = useState(false);
 
   const [nextMatch, setNextMatch] = useState(null);
+  const [nextMatchReport, setNextMatchReport] = useState(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [p, events, s] = await Promise.all([
+        const [p, events, s, matchReports] = await Promise.all([
         base44.entities.Player.list("-created_date", 50),
         base44.entities.DayEvent.list("date", 200),
-        base44.entities.TrainingSession.list("-date", 5)]
+        base44.entities.TrainingSession.list("-date", 5),
+        base44.entities.MatchReport.list("-date", 20)]
         );
         setPlayers(p);
         setSessions(s);
         const today = moment().format("YYYY-MM-DD");
         const match = events.find((e) => e.type === "Partido" && e.date >= today);
         setNextMatch(match || null);
+        if (match) {
+          const report = matchReports.find((r) => r.date === match.date);
+          setNextMatchReport(report || null);
+        }
       } catch (e) {
         console.error(e);
       } finally {
@@ -175,7 +207,7 @@ export default function Dashboard() {
       }
 
       {nextMatch &&
-      <NextMatchCard match={nextMatch} />
+      <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />
       }
 
       {birthdayPlayers.length > 0 &&
