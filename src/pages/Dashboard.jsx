@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap } from "lucide-react";
+import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 function NextMatchCard({ match }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
@@ -41,6 +42,7 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
+  const [showStatusPanel, setShowStatusPanel] = useState(false);
 
   const [nextMatch, setNextMatch] = useState(null);
 
@@ -97,14 +99,66 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
           <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
         </div>
-        <button
-          onClick={() => setShowMap(!showMap)}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors"
-        >
-          {showMap ? <X size={15} /> : <Map size={15} />}
-          {showMap ? "Cerrar mapa" : "Ver mapa del día"}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowStatusPanel(!showStatusPanel)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors"
+          >
+            {showStatusPanel ? <X size={15} /> : <ClipboardList size={15} />}
+            {showStatusPanel ? "Cerrar estados" : "Estado del plantel"}
+          </button>
+          <button
+            onClick={() => setShowMap(!showMap)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors"
+          >
+            {showMap ? <X size={15} /> : <Map size={15} />}
+            {showMap ? "Cerrar mapa" : "Ver mapa del día"}
+          </button>
+        </div>
       </div>
+
+      {showStatusPanel && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white">Estado del plantel</h2>
+            <p className="text-xs text-zinc-500 mt-0.5">Modificá el estado de cada jugador directamente</p>
+          </div>
+          <div className="p-4">
+            <div className="grid gap-2">
+              {[...players].sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) => (
+                <div key={p.id} className="flex items-center gap-3 py-1.5">
+                  <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
+                  {p.photo_url ? (
+                    <img src={p.photo_url} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
+                  ) : (
+                    <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                      <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                    </div>
+                  )}
+                  <span className="text-sm text-white flex-1 min-w-0 truncate">{p.name}</span>
+                  <span className="text-xs text-zinc-600 hidden sm:block">{p.position}</span>
+                  <Select
+                    value={p.status || "Disponible"}
+                    onValueChange={async (v) => {
+                      await base44.entities.Player.update(p.id, { status: v });
+                      setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
+                    }}
+                  >
+                    <SelectTrigger className="h-7 w-36 text-xs bg-zinc-800 border-zinc-700 text-white shrink-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 border-zinc-700">
+                      {["Disponible","Lesionado","En recuperación","Suspendido","Permiso","Selección","Juveniles","Primera"].map((s) => (
+                        <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showMap && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
