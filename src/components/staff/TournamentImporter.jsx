@@ -20,7 +20,7 @@ export default function TournamentImporter() {
     try {
       // Usar LLM para extraer datos de la página
       const response = await base44.integrations.Core.InvokeLLM({
-        prompt: `Extrae la tabla de clasificación de esta URL: ${url}\n\nDevuelve un JSON con un array de objetos así:\n[\n  {\n    "position": número,\n    "team_name": "nombre del equipo",\n    "matches_played": número,\n    "wins": número,\n    "draws": número,\n    "losses": número,\n    "goals_for": número,\n    "goals_against": número,\n    "points": número,\n    "group": "General" o "Zona A" o "Zona B"\n  }\n]\n\nSolo devuelve el JSON válido, sin explicaciones.`,
+        prompt: `Analiza esta URL: ${url}\n\nBusca las tablas de clasificación. Si encuentras encabezados como "Grupo A" o "Apertura - Grupo A", todos los equipos listados debajo pertenecen a "Zona A". Si encuentras "Grupo B" o "Clausura - Grupo B", asigna "Zona B". Si hay una tabla general sin grupo específico, asigna "General".\n\nExtrae TODOS los equipos con estos campos exactos:\n- position (número del 1 al 18)\n- team_name (nombre limpio sin "(Reserva)" ni paréntesis)\n- matches_played (partidos jugados)\n- wins (victorias)\n- draws (empates)\n- losses (derrotas)\n- goals_for (goles a favor)\n- goals_against (goles en contra)\n- points (puntos totales)\n- group ("Zona A", "Zona B" o "General")\n\nDevuelve solo el JSON como array, sin explicaciones:\n[\n  {"position": 1, "team_name": "Equipo1", "matches_played": 18, "wins": 14, "draws": 2, "losses": 2, "goals_for": 40, "goals_against": 11, "points": 44, "group": "Zona A"},\n  ...\n]`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "object",
