@@ -225,6 +225,17 @@ export default function FieldSessions() {
                   </div>
                 </button>
                 <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {s.video_url && (
+                    <a
+                      href={s.video_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-xs text-red-400 hover:text-white bg-red-500/15 hover:bg-red-500/30 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                    >
+                      <Play size={13} /> Video
+                    </a>
+                  )}
                   <button
                     onClick={() => setSelected({ ...s, _openExForm: true })}
                     className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition-colors"
