@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2, Users, Zap } from "lucide-react";
+import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2, Users, Zap, Filter } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -169,34 +169,40 @@ export default function FieldSessions() {
 
       {/* Filters */}
       {sessions.length > 0 && (
-        <div className="space-y-2">
+        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 space-y-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Filter size={13} className="text-zinc-400" />
+            <span className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Filtros</span>
+          </div>
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-zinc-500 font-medium">Código MD:</span>
+            <span className="text-xs text-zinc-500 w-16 shrink-0">Código MD</span>
             <button
               onClick={() => setFilterMD(null)}
-              className={`text-xs px-2.5 py-1 rounded-full font-mono transition-colors ${filterMD === null ? "bg-violet-500/30 text-violet-300" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+              className={`text-xs px-3 py-1 rounded-full font-mono font-semibold transition-all ${filterMD === null ? "bg-violet-600 text-white shadow shadow-violet-500/30" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
             >Todos</button>
             {MD_CODES.map((c) => (
               <button key={c} onClick={() => setFilterMD(filterMD === c ? null : c)}
-                className={`text-xs px-2.5 py-1 rounded-full font-mono transition-colors ${filterMD === c ? "bg-violet-500/30 text-violet-300" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+                className={`text-xs px-3 py-1 rounded-full font-mono font-semibold transition-all ${filterMD === c ? "bg-violet-600 text-white shadow shadow-violet-500/30" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
               >{c}</button>
             ))}
           </div>
+          <div className="h-px bg-zinc-800" />
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-zinc-500 font-medium">Tipo:</span>
-            <button onClick={() => setFilterType(null)} className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterType === null ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>Todos</button>
+            <span className="text-xs text-zinc-500 w-16 shrink-0">Tipo</span>
+            <button onClick={() => setFilterType(null)} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterType === null ? "bg-zinc-200 text-zinc-900 shadow" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}>Todos</button>
             {sessionTypes.map((t) => (
               <button key={t} onClick={() => setFilterType(filterType === t ? null : t)}
-                className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterType === t ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+                className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterType === t ? "bg-zinc-200 text-zinc-900 shadow" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
               >{t}</button>
             ))}
           </div>
+          <div className="h-px bg-zinc-800" />
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-zinc-500 font-medium">Foco:</span>
-            <button onClick={() => setFilterFocus(null)} className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterFocus === null ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}>Todos</button>
+            <span className="text-xs text-zinc-500 w-16 shrink-0">Foco</span>
+            <button onClick={() => setFilterFocus(null)} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterFocus === null ? "bg-zinc-200 text-zinc-900 shadow" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}>Todos</button>
             {focusAreas.map((f) => (
               <button key={f} onClick={() => setFilterFocus(filterFocus === f ? null : f)}
-                className={`text-xs px-2.5 py-1 rounded-full transition-colors ${filterFocus === f ? "bg-white/10 text-white" : "bg-zinc-800 text-zinc-500 hover:text-zinc-300"}`}
+                className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterFocus === f ? "bg-zinc-200 text-zinc-900 shadow" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
               >{f}</button>
             ))}
           </div>
@@ -213,33 +219,38 @@ export default function FieldSessions() {
           {sessions.filter((s) => (!filterMD || s.match_day_code === filterMD) && (!filterType || s.session_type === filterType) && (!filterFocus || s.focus_area === filterFocus)).map((s) => (
             <div
               key={s.id}
-              className={`bg-zinc-900 border border-zinc-800 border-l-2 ${intensityBorder[s.intensity] || "border-zinc-700"} rounded-xl p-4`}
+              className={`group relative bg-zinc-900 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-600 border-l-4 ${intensityBorder[s.intensity] || "border-l-zinc-700"} rounded-xl p-4 transition-all duration-200 cursor-pointer`}
             >
               <div className="flex items-center gap-3">
                 <button onClick={() => setSelected(s)} className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-white font-semibold text-sm">{s.title}</span>
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="text-white font-bold text-base">{s.title}</span>
                     {s.match_day_code && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-violet-500/20 text-violet-300 font-mono font-bold">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-violet-600/30 text-violet-300 font-mono font-bold border border-violet-500/30">
                         {s.match_day_code}
                       </span>
                     )}
                     {s.focus_area && (
-                      <span className={`text-xs px-2 py-0.5 rounded font-semibold ${focusColors[s.focus_area] || "bg-zinc-800 text-zinc-400"}`}>
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${focusColors[s.focus_area] || "bg-zinc-800 text-zinc-400"} border-current/20`}>
                         {s.focus_area}
                       </span>
                     )}
-                    <span className={`text-xs px-2 py-0.5 rounded ${intensityColors[s.intensity] || "bg-zinc-800 text-zinc-400"}`}>
-                      {s.intensity}
-                    </span>
+                    {s.intensity && (
+                      <span className={`text-xs px-2.5 py-0.5 rounded-full font-semibold ${intensityColors[s.intensity] || "bg-zinc-800 text-zinc-400"}`}>
+                        {s.intensity}
+                      </span>
+                    )}
                   </div>
-                  <div className="flex items-center gap-3 mt-1 text-xs text-zinc-500">
-                    <span>{moment(s.date).format("DD/MM/YYYY")}</span>
+                  <div className="flex items-center gap-4 text-xs text-zinc-500">
+                    <span className="text-zinc-400 font-medium">{moment(s.date).format("ddd DD/MM/YYYY")}</span>
                     {s.duration_minutes && (
                       <span className="flex items-center gap-1"><Clock size={11} /> {s.duration_minutes} min</span>
                     )}
                     {s.players_count && (
-                      <span className="flex items-center gap-1 text-emerald-400"><Users size={11} /> {s.players_count} jugadores</span>
+                      <span className="flex items-center gap-1 text-emerald-400 font-semibold"><Users size={11} /> {s.players_count} jug.</span>
+                    )}
+                    {s.session_type && (
+                      <span className="text-zinc-600">{s.session_type}</span>
                     )}
                   </div>
                 </button>
