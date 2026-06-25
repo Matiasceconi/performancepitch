@@ -52,6 +52,20 @@
       "type": "number",
       "description": "Cantidad de jugadores que participaron en la sesi\u00f3n"
     },
+    "player_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "IDs de los jugadores que participaron"
+    },
+    "player_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Nombres de jugadores participantes (desnormalizado)"
+    },
     "video_url": {
       "type": "string",
       "description": "URL del video de la sesi\u00f3n"

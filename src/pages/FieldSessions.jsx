@@ -43,6 +43,7 @@ const MD_CODES = ["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"];
 
 export default function FieldSessions() {
   const [sessions, setSessions]       = useState([]);
+  const [allPlayers, setAllPlayers]   = useState([]);
   const [availableCount, setAvailableCount] = useState(0);
   const [availablePlayers, setAvailablePlayers] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -63,6 +64,7 @@ export default function FieldSessions() {
     intensity: "Media",
     duration_minutes: "",
     players_count: "",
+    player_ids: [],
     notes: "",
     video_url: "",
     gps_pdf_url: "",
@@ -78,11 +80,13 @@ export default function FieldSessions() {
     try {
       const [data, players] = await Promise.all([
         base44.entities.TrainingSession.list("-date", 200),
-        base44.entities.Player.filter({ status: "Disponible" }, "number", 100),
+        base44.entities.Player.list("number", 200),
       ]);
       setSessions(data);
-      setAvailableCount(players.length);
-      setAvailablePlayers(players);
+      const avail = players.filter(p => p.status === "Disponible" || !p.status);
+      setAvailableCount(avail.length);
+      setAvailablePlayers(avail);
+      setAllPlayers(players);
     } finally {
       setLoading(false);
     }
@@ -100,6 +104,7 @@ export default function FieldSessions() {
       intensity: s.intensity || "Media",
       duration_minutes: s.duration_minutes ?? "",
       players_count: s.players_count ?? "",
+      player_ids: s.player_ids || [],
       notes: s.notes || "",
       video_url: s.video_url || "",
       gps_pdf_url: s.gps_pdf_url || "",
@@ -118,10 +123,13 @@ export default function FieldSessions() {
   async function handleSubmit(e) {
     e.preventDefault();
     try {
+      const selectedPlayers = allPlayers.filter(p => form.player_ids.includes(p.id));
       const payload = {
         ...form,
         duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined,
-        players_count: form.players_count !== "" ? Number(form.players_count) : undefined,
+        players_count: form.player_ids.length > 0 ? form.player_ids.length : (form.players_count !== "" ? Number(form.players_count) : undefined),
+        player_ids: form.player_ids,
+        player_names: selectedPlayers.map(p => p.name),
       };
       if (editingSession) {
         await base44.entities.TrainingSession.update(editingSession.id, payload);
@@ -316,15 +324,78 @@ export default function FieldSessions() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Jugadores participantes</label>
-              <Input
-                type="number"
-                min={1}
-                value={form.players_count}
-                onChange={(e) => setForm((f) => ({ ...f, players_count: e.target.value }))}
-                placeholder="Ej: 22"
-                className="bg-zinc-800 border-zinc-700 text-white"
-              />
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-zinc-400 font-semibold uppercase tracking-wider">Plantel</label>
+                <span className="text-xs text-emerald-400 font-semibold">{form.player_ids.length} seleccionados</span>
+              </div>
+
+              {/* Disponibles */}
+              <div className="mb-2">
+                <p className="text-xs text-emerald-400 font-semibold mb-1.5">✓ Disponibles ({availablePlayers.length})</p>
+                <div className="grid grid-cols-2 gap-1 max-h-40 overflow-y-auto pr-1">
+                  {availablePlayers.map((p) => {
+                    const selected = form.player_ids.includes(p.id);
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => setForm((f) => ({
+                          ...f,
+                          player_ids: selected
+                            ? f.player_ids.filter(id => id !== p.id)
+                            : [...f.player_ids, p.id]
+                        }))}
+                        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-left ${
+                          selected
+                            ? "bg-emerald-600/30 border border-emerald-500/50 text-emerald-300"
+                            : "bg-zinc-800 border border-zinc-700 text-zinc-400 hover:border-zinc-500 hover:text-zinc-200"
+                        }`}
+                      >
+                        <span className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[10px] font-bold text-zinc-300 shrink-0">
+                          {p.number || "?"}
+                        </span>
+                        <span className="truncate">{p.name}</span>
+                        {selected && <span className="ml-auto text-emerald-400">✓</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* No disponibles */}
+              {allPlayers.filter(p => p.status && p.status !== "Disponible").length > 0 && (
+                <div>
+                  <p className="text-xs text-zinc-500 font-semibold mb-1.5">No disponibles</p>
+                  <div className="grid grid-cols-2 gap-1 max-h-28 overflow-y-auto pr-1">
+                    {allPlayers.filter(p => p.status && p.status !== "Disponible").map((p) => {
+                      const selected = form.player_ids.includes(p.id);
+                      return (
+                        <button
+                          key={p.id}
+                          type="button"
+                          onClick={() => setForm((f) => ({
+                            ...f,
+                            player_ids: selected
+                              ? f.player_ids.filter(id => id !== p.id)
+                              : [...f.player_ids, p.id]
+                          }))}
+                          className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all text-left ${
+                            selected
+                              ? "bg-amber-600/20 border border-amber-500/40 text-amber-300"
+                              : "bg-zinc-900 border border-zinc-800 text-zinc-600 hover:border-zinc-600 hover:text-zinc-400"
+                          }`}
+                        >
+                          <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-500 shrink-0">
+                            {p.number || "?"}
+                          </span>
+                          <span className="truncate">{p.name}</span>
+                          <span className="ml-auto text-[10px] text-zinc-600 shrink-0">{p.status}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Código MD (días para el partido)</label>
