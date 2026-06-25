@@ -184,7 +184,7 @@ export default function FieldSessionDetail({ session, onBack }) {
   const [players, setPlayers]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [showForm, setShowForm]   = useState(!!session._openExForm);
-  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "" });
+  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "" });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -215,10 +215,11 @@ export default function FieldSessionDetail({ session, onBack }) {
         objective: form.objective || undefined,
         width_m: form.width_m ? Number(form.width_m) : undefined,
         length_m: form.length_m ? Number(form.length_m) : undefined,
+        num_players: form.num_players ? Number(form.num_players) : undefined,
         order: exercises.length + 1,
       });
       setExercises((prev) => [...prev, created]);
-      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "" });
+      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "" });
       setShowForm(false);
       toast({ title: "Ejercicio agregado" });
     } catch {
@@ -304,7 +305,7 @@ export default function FieldSessionDetail({ session, onBack }) {
               <Input value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))} placeholder="Duración (min)" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
             </div>
             <Input value={form.objective} onChange={(e) => setForm((f) => ({ ...f, objective: e.target.value }))} placeholder="Objetivo táctico / físico" className="bg-zinc-800 border-zinc-700 text-white" />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-3 gap-3">
               <div>
                 <label className="text-xs text-zinc-500 mb-1 block">Ancho (m)</label>
                 <Input value={form.width_m} onChange={(e) => setForm((f) => ({ ...f, width_m: e.target.value }))} placeholder="Ej: 20" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
@@ -312,6 +313,10 @@ export default function FieldSessionDetail({ session, onBack }) {
               <div>
                 <label className="text-xs text-zinc-500 mb-1 block">Largo (m)</label>
                 <Input value={form.length_m} onChange={(e) => setForm((f) => ({ ...f, length_m: e.target.value }))} placeholder="Ej: 30" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-500 mb-1 block">N° jugadores</label>
+                <Input value={form.num_players} onChange={(e) => setForm((f) => ({ ...f, num_players: e.target.value }))} placeholder="Ej: 8" type="number" className="bg-zinc-800 border-zinc-700 text-white" />
               </div>
             </div>
             <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descripción del ejercicio..." rows={2} className="bg-zinc-800 border-zinc-700 text-white resize-none" />

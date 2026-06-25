@@ -1,10 +1,17 @@
 import React, { useState } from "react";
-import { Dumbbell, TreePine } from "lucide-react";
+import { Dumbbell, TreePine, BookOpen } from "lucide-react";
 import FieldSessions from "@/pages/FieldSessions";
 import StrengthSessions from "@/pages/StrengthSessions";
+import ExercisesLibrary from "@/pages/ExercisesLibrary";
 
 export default function Sessions() {
-  const [tab, setTab] = useState("field"); // "field" | "strength"
+  const [tab, setTab] = useState("field"); // "field" | "strength" | "exercises"
+
+  const tabs = [
+    { key: "field",      label: "Campo",      icon: TreePine },
+    { key: "strength",   label: "Fuerza",     icon: Dumbbell },
+    { key: "exercises",  label: "Ejercicios", icon: BookOpen },
+  ];
 
   return (
     <div className="space-y-6">
@@ -15,26 +22,22 @@ export default function Sessions() {
 
       {/* Tab toggle */}
       <div className="flex items-center bg-zinc-800 rounded-lg p-1 gap-1 w-fit">
-        <button
-          onClick={() => setTab("field")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "field" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <TreePine size={15} /> Campo
-        </button>
-        <button
-          onClick={() => setTab("strength")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "strength" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <Dumbbell size={15} /> Fuerza
-        </button>
+        {tabs.map(({ key, label, icon: Icon }) => (
+          <button
+            key={key}
+            onClick={() => setTab(key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              tab === key ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            <Icon size={15} /> {label}
+          </button>
+        ))}
       </div>
 
-      {tab === "field" && <FieldSessions />}
-      {tab === "strength" && <StrengthSessions />}
+      {tab === "field"     && <FieldSessions />}
+      {tab === "strength"  && <StrengthSessions />}
+      {tab === "exercises" && <ExercisesLibrary />}
     </div>
   );
 }

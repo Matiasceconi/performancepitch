@@ -34,9 +34,21 @@
       "type": "number",
       "description": "Largo del espacio en metros"
     },
+    "num_players": {
+      "type": "number",
+      "description": "N\u00famero de jugadores en el ejercicio"
+    },
     "order": {
       "type": "number",
       "description": "Orden dentro de la sesi\u00f3n"
+    },
+    "external_csv_url": {
+      "type": "string",
+      "description": "URL del CSV con carga externa del ejercicio"
+    },
+    "external_csv_label": {
+      "type": "string",
+      "description": "Nombre o descripci\u00f3n del archivo CSV cargado"
     }
   },
   "required": [
