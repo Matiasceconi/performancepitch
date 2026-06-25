@@ -305,48 +305,15 @@ export default function FieldSessions() {
               </div>
             </div>
             <div>
-              <label className="text-xs text-zinc-400 mb-1 block">
-                Jugadores participantes
-                {availableCount > 0 && (
-                  <span className="ml-2 text-emerald-400">({availableCount} disponibles hoy)</span>
-                )}
-              </label>
-              <div className="flex gap-2 flex-wrap">
-                {availablePlayers.length > 0 ? (
-                  <>
-                    <Select
-                      value={form.players_count !== "" ? String(form.players_count) : ""}
-                      onValueChange={(v) => setForm((f) => ({ ...f, players_count: v }))}
-                    >
-                      <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white flex-1">
-                        <SelectValue placeholder="Seleccionar cantidad..." />
-                      </SelectTrigger>
-                      <SelectContent className="bg-zinc-800 border-zinc-700 max-h-48">
-                        {Array.from({ length: availablePlayers.length }, (_, i) => i + 1).map((n) => (
-                          <SelectItem key={n} value={String(n)} className="text-white">{n} jugadores</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="number"
-                      min={1}
-                      value={form.players_count}
-                      onChange={(e) => setForm((f) => ({ ...f, players_count: e.target.value }))}
-                      placeholder="O ingresá un número"
-                      className="bg-zinc-800 border-zinc-700 text-white w-44"
-                    />
-                  </>
-                ) : (
-                  <Input
-                    type="number"
-                    min={1}
-                    value={form.players_count}
-                    onChange={(e) => setForm((f) => ({ ...f, players_count: e.target.value }))}
-                    placeholder="Cantidad de jugadores"
-                    className="bg-zinc-800 border-zinc-700 text-white"
-                  />
-                )}
-              </div>
+              <label className="text-xs text-zinc-400 mb-1 block">Jugadores participantes</label>
+              <Input
+                type="number"
+                min={1}
+                value={form.players_count}
+                onChange={(e) => setForm((f) => ({ ...f, players_count: e.target.value }))}
+                placeholder="Ej: 22"
+                className="bg-zinc-800 border-zinc-700 text-white"
+              />
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Código MD (días para el partido)</label>
