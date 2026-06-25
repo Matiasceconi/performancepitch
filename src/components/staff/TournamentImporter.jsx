@@ -47,9 +47,40 @@ export default function TournamentImporter() {
         },
       });
 
-      const data = response.standings || response;
+      // Extraer array de la respuesta (puede estar en diferentes formatos)
+      let data = Array.isArray(response) ? response : response.standings || response.data || [];
+      
+      // Si la respuesta es un objeto con propiedades de equipo, convertirlo a array
+      if (data.length === 0 && typeof response === "object") {
+        data = Object.values(response).filter(item => item.team_name && item.position);
+      }
+
       if (!Array.isArray(data) || data.length === 0) {
-        setError("No se encontraron datos en esa página");
+        console.error("Respuesta del LLM:", response);
+        setError("No se encontraron datos en esa página. Verifica que la URL tenga tablas de clasificación.");
+        return;
+      }
+
+      // Validar y limpiar datos
+      const validData = data.filter(item => 
+        item.team_name && 
+        typeof item.position === "number" && 
+        typeof item.points === "number"
+      ).map(item => ({
+        position: parseInt(item.position) || 0,
+        team_name: String(item.team_name).replace(/\s*\(Reserva\)\s*/i, "").trim(),
+        matches_played: parseInt(item.matches_played) || parseInt(item.j) || 0,
+        wins: parseInt(item.wins) || parseInt(item.g) || 0,
+        draws: parseInt(item.draws) || parseInt(item.e) || 0,
+        losses: parseInt(item.losses) || parseInt(item.p) || 0,
+        goals_for: parseInt(item.goals_for) || parseInt(item.gf) || 0,
+        goals_against: parseInt(item.goals_against) || parseInt(item.gc) || 0,
+        points: parseInt(item.points) || parseInt(item.pts) || 0,
+        group: (item.group || "General").includes("B") ? "Zona B" : (item.group || "General").includes("A") ? "Zona A" : "General"
+      }));
+
+      if (validData.length === 0) {
+        setError("No se pudieron procesar los datos. Intenta con otra URL.");
         return;
       }
 
@@ -57,10 +88,10 @@ export default function TournamentImporter() {
       await base44.entities.TournamentStanding.deleteMany({});
 
       // Crear nuevos registros
-      await base44.entities.TournamentStanding.bulkCreate(data);
+      await base44.entities.TournamentStanding.bulkCreate(validData);
 
       toast({
-        description: `✓ Tabla actualizada con ${data.length} equipos`,
+        description: `✓ Tabla actualizada con ${validData.length} equipos`,
       });
 
       setUrl("");
