@@ -1,19 +1,29 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target } from "lucide-react";
+import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
 
 moment.locale("es");
 
-function ExerciseCard({ exercise, session }) {
+function ExerciseCard({ exercise, session, onDelete }) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [csvUrl, setCsvUrl] = useState(exercise.external_csv_url || null);
   const [csvLabel, setCsvLabel] = useState(exercise.external_csv_label || null);
   const fileRef = useRef();
   const { toast } = useToast();
+
+  async function handleDelete(e) {
+    e.stopPropagation();
+    if (!confirm(`¿Eliminar el ejercicio "${exercise.name}"?`)) return;
+    setDeleting(true);
+    await base44.entities.FieldExercise.delete(exercise.id);
+    toast({ title: "Ejercicio eliminado" });
+    onDelete(exercise.id);
+  }
 
   async function handleCsvUpload(e) {
     const file = e.target.files?.[0];
@@ -73,6 +83,13 @@ function ExerciseCard({ exercise, session }) {
           {csvUrl && (
             <span className="text-xs bg-green-900/40 text-green-400 border border-green-800/50 px-2 py-0.5 rounded-full">CSV</span>
           )}
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            className="text-zinc-600 hover:text-red-400 transition-colors p-1 rounded"
+          >
+            <Trash2 size={14} />
+          </button>
           {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
         </div>
       </button>
@@ -282,7 +299,12 @@ export default function ExercisesLibrary() {
       ) : (
         <div className="space-y-3">
           {filtered.map((ex) => (
-            <ExerciseCard key={ex.id} exercise={ex} session={sessions[ex.session_id]} />
+            <ExerciseCard
+              key={ex.id}
+              exercise={ex}
+              session={sessions[ex.session_id]}
+              onDelete={(id) => setExercises((prev) => prev.filter((e) => e.id !== id))}
+            />
           ))}
         </div>
       )}
