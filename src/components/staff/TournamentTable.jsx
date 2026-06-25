@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
+import { RefreshCw } from "lucide-react";
 
 export default function TournamentTable() {
   const [standings, setStandings] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("General");
 
   useEffect(() => {
     async function load() {
@@ -16,6 +18,11 @@ export default function TournamentTable() {
     }
     load();
   }, []);
+
+  const filteredStandings = standings.filter((team) => {
+    if (activeTab === "General") return team.group === "General" || !team.group;
+    return team.group === activeTab;
+  });
 
   if (loading) {
     return (
@@ -34,7 +41,23 @@ export default function TournamentTable() {
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div>
+      <div className="flex gap-2 mb-4 border-b border-zinc-800 pb-3">
+        {["General", "Zona A", "Zona B"].map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              activeTab === tab
+                ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/30"
+                : "text-zinc-400 hover:text-white"
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+      <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
           <tr className="border-b border-zinc-700">
@@ -51,7 +74,7 @@ export default function TournamentTable() {
           </tr>
         </thead>
         <tbody>
-          {standings.map((team, idx) => {
+          {filteredStandings.map((team, idx) => {
             const diff = team.goals_for - team.goals_against;
             const isHighlighted = team.team_name.toLowerCase().includes("defensa") && team.team_name.toLowerCase().includes("justicia");
             return (
@@ -87,6 +110,7 @@ export default function TournamentTable() {
           })}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }

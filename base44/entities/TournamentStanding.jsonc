@@ -46,6 +46,16 @@
       "type": "string",
       "description": "Nombre del torneo",
       "default": "Proyecci\u00f3n Apertura"
+    },
+    "group": {
+      "type": "string",
+      "enum": [
+        "Zona A",
+        "Zona B",
+        "General"
+      ],
+      "description": "Grupo o zona del torneo",
+      "default": "General"
     }
   },
   "required": [
