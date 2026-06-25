@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2, FileDown } from "lucide-react";
+import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2, FileDown, ImagePlus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
@@ -356,17 +356,37 @@ async function exportExercisePDF(exercise, session, csvRows) {
 function ExerciseCard({ exercise, session, onDelete }) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [csvUrl, setCsvUrl] = useState(exercise.external_csv_url || null);
   const [csvLabel, setCsvLabel] = useState(exercise.external_csv_label || null);
-  const [csvRows, setCsvRows] = useState(null); // se llena cuando CsvDataTable parsea el CSV
+  const [csvRows, setCsvRows] = useState(null);
+  const [imageUrl, setImageUrl] = useState(exercise.image_url || null);
   const fileRef = useRef();
+  const imgRef = useRef();
   const { toast } = useToast();
+
+  async function handleImageUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setUploadingImg(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.FieldExercise.update(exercise.id, { image_url: file_url });
+      setImageUrl(file_url);
+      toast({ title: "Imagen guardada" });
+    } catch {
+      toast({ title: "Error al subir imagen", variant: "destructive" });
+    } finally {
+      setUploadingImg(false);
+    }
+  }
 
   async function handleExportPdf() {
     setGeneratingPdf(true);
-    await exportExercisePDF(exercise, session, csvRows);
+    await exportExercisePDF({ ...exercise, image_url: imageUrl }, session, csvRows);
     setGeneratingPdf(false);
   }
 
@@ -463,8 +483,25 @@ function ExerciseCard({ exercise, session, onDelete }) {
         <div className="border-t border-zinc-800 p-4 space-y-4">
 
           {/* Imagen del ejercicio */}
-          {exercise.image_url && (
-            <img src={exercise.image_url} alt="Ejercicio" className="w-full max-h-64 object-cover rounded-lg border border-zinc-800" />
+          {imageUrl ? (
+            <div className="relative group">
+              <img src={imageUrl} alt="Ejercicio" className="w-full max-h-64 object-cover rounded-lg border border-zinc-800" />
+              <label className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
+                <div className="flex items-center gap-1.5 bg-zinc-900/80 text-zinc-300 hover:text-white text-xs px-2.5 py-1.5 rounded-lg border border-zinc-700">
+                  {uploadingImg ? <div className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" /> : <ImagePlus size={12} />}
+                  Cambiar
+                </div>
+                <input ref={imgRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImg} />
+              </label>
+            </div>
+          ) : (
+            <label className="cursor-pointer block">
+              <div className={`flex items-center justify-center gap-2 border border-dashed border-zinc-700 rounded-lg px-4 py-6 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors ${uploadingImg ? "opacity-60 pointer-events-none" : ""}`}>
+                {uploadingImg ? <div className="w-3.5 h-3.5 border border-zinc-500 border-t-white rounded-full animate-spin" /> : <ImagePlus size={16} />}
+                {uploadingImg ? "Subiendo imagen..." : "Agregar imagen al ejercicio"}
+              </div>
+              <input ref={imgRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImg} />
+            </label>
           )}
 
           {/* Detalles del ejercicio */}

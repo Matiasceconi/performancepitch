@@ -42,6 +42,10 @@
       "type": "number",
       "description": "Orden dentro de la sesi\u00f3n"
     },
+    "image_url": {
+      "type": "string",
+      "description": "URL de la imagen del ejercicio"
+    },
     "external_csv_url": {
       "type": "string",
       "description": "URL del CSV con carga externa del ejercicio"
