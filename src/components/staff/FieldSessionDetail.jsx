@@ -1,12 +1,55 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText, FileDown, Pencil, X } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText, FileDown, Pencil, X, ImagePlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
+
+function ImageUploadButton({ value, onChange }) {
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+  const inputRef = useState(null);
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      onChange(file_url);
+    } catch {
+      toast({ title: "Error al subir imagen", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1">
+      <label className="text-xs text-zinc-500">Imagen del ejercicio</label>
+      <div className="flex items-center gap-2">
+        <label className={`flex items-center gap-2 px-3 py-2 rounded-lg border border-zinc-700 bg-zinc-800 text-xs text-zinc-300 cursor-pointer hover:bg-zinc-700 transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+          {uploading
+            ? <div className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" />
+            : <ImagePlus size={14} />}
+          {uploading ? "Subiendo..." : "Subir imagen"}
+          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+        </label>
+        {value && (
+          <div className="flex items-center gap-2">
+            <img src={value} alt="preview" className="h-8 w-12 object-cover rounded border border-zinc-700" />
+            <button type="button" onClick={() => onChange("")} className="text-zinc-600 hover:text-red-400 transition-colors">
+              <X size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 const performanceLevels = ["Muy bien", "Bien", "Regular", "Mal"];
 const performanceColors = {
@@ -213,7 +256,7 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
                 <Input value={editForm.num_players} onChange={(e) => setEditForm((f) => ({ ...f, num_players: e.target.value }))} placeholder="N° jug." type="number" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
               </div>
               <Textarea value={editForm.description} onChange={(e) => setEditForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descripción..." rows={2} className="bg-zinc-800 border-zinc-700 text-white text-sm resize-none" />
-              <Input value={editForm.image_url} onChange={(e) => setEditForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="URL de imagen" className="bg-zinc-800 border-zinc-700 text-white text-sm" />
+              <ImageUploadButton value={editForm.image_url} onChange={(url) => setEditForm((f) => ({ ...f, image_url: url }))} />
               <div className="flex gap-2">
                 <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200 h-7 text-xs">Guardar</Button>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setEditing(false)} className="text-zinc-400 h-7 text-xs">Cancelar</Button>
@@ -540,7 +583,7 @@ export default function FieldSessionDetail({ session, onBack }) {
               </div>
             </div>
             <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descripción del ejercicio..." rows={2} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
-            <Input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="URL de imagen del ejercicio (opcional)" className="bg-zinc-800 border-zinc-700 text-white" />
+            <ImageUploadButton value={form.image_url} onChange={(url) => setForm((f) => ({ ...f, image_url: url }))} />
             <div className="flex gap-2">
               <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">Guardar ejercicio</Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)} className="text-zinc-400">Cancelar</Button>
