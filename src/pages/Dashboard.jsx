@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, FileText } from "lucide-react";
+import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap } from "lucide-react";
 
 function NextMatchCard({ match }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
@@ -225,11 +225,9 @@ export default function Dashboard() {
                       <p className="text-sm text-white">{s.title}</p>
                       <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
                     </div>
-                    {s.gps_pdf_url && (
-                      <a href={s.gps_pdf_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2">
-                        <FileText size={13} /> GPS
-                      </a>
-                    )}
+                    <Link to="/catapult" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2">
+                      <Zap size={13} /> GPS
+                    </Link>
                   </div>
                 ))}
               </div>
