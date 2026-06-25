@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2 } from "lucide-react";
+import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2, FileDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
@@ -111,7 +111,7 @@ const METRICS = [
   { key: "sprint_efforts", label: "Sprint Efforts",       fmt: (v) => Math.round(v) },
 ];
 
-function CsvDataTable({ csvUrl }) {
+function CsvDataTable({ csvUrl, onRowsParsed }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +123,7 @@ function CsvDataTable({ csvUrl }) {
       .then((text) => {
         const result = parseCatapultCSV(text);
         if (result.error) setError(result.error);
-        else setRows(result.rows);
+        else { setRows(result.rows); onRowsParsed?.(result.rows); }
       })
       .catch(() => setError("Error al cargar el archivo."))
       .finally(() => setLoading(false));
@@ -181,14 +181,194 @@ function CsvDataTable({ csvUrl }) {
   );
 }
 
+async function exportExercisePDF(exercise, session, csvRows) {
+  const { jsPDF } = await import("jspdf");
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+  const W = 210;
+  const M = 14;
+
+  // Header
+  doc.setFillColor(24, 24, 27);
+  doc.rect(0, 0, W, 28, "F");
+  doc.setFillColor(240, 200, 0);
+  doc.rect(0, 28, W, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(15);
+  doc.setTextColor(255, 255, 255);
+  doc.text("EJERCICIO", M, 12);
+  doc.setFontSize(9);
+  doc.setTextColor(160, 160, 160);
+  doc.text("Defensa y Justicia — Biblioteca de Ejercicios", M, 20);
+  doc.setTextColor(240, 200, 0);
+  doc.text(moment().format("DD/MM/YYYY HH:mm"), W - M, 12, { align: "right" });
+  if (session) {
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(8);
+    doc.text(`${session.title} · ${moment(session.date).format("DD/MM/YYYY")}`, W - M, 20, { align: "right" });
+  }
+
+  let y = 36;
+
+  // Nombre del ejercicio
+  doc.setFillColor(39, 39, 42);
+  doc.roundedRect(M, y, W - M * 2, 16, 2, 2, "F");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.setTextColor(255, 255, 255);
+  doc.text(exercise.name, M + 4, y + 10);
+  y += 22;
+
+  // Métricas del ejercicio
+  const meta = [
+    exercise.duration_minutes ? `Duración: ${exercise.duration_minutes} min` : null,
+    exercise.space ? `Espacio: ${exercise.space}` : null,
+    (exercise.width_m && exercise.length_m) ? `Dimensiones: ${exercise.width_m} × ${exercise.length_m} m` : null,
+    exercise.num_players ? `Jugadores: ${exercise.num_players}` : null,
+  ].filter(Boolean);
+
+  if (meta.length) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.setTextColor(150, 150, 150);
+    doc.text(meta.join("    ·    "), M + 2, y);
+    y += 8;
+  }
+
+  if (exercise.objective) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(9);
+    doc.setTextColor(200, 200, 100);
+    const lines = doc.splitTextToSize(`Objetivo: ${exercise.objective}`, W - M * 2 - 4);
+    doc.text(lines, M + 2, y);
+    y += lines.length * 5 + 2;
+  }
+
+  if (exercise.description) {
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8.5);
+    doc.setTextColor(120, 120, 120);
+    const lines = doc.splitTextToSize(exercise.description, W - M * 2 - 4);
+    doc.text(lines, M + 2, y);
+    y += lines.length * 4.5 + 4;
+  }
+
+  // Imagen del ejercicio
+  if (exercise.image_url) {
+    try {
+      const imgData = await new Promise((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          canvas.getContext("2d").drawImage(img, 0, 0);
+          resolve(canvas.toDataURL("image/jpeg", 0.85));
+        };
+        img.onerror = reject;
+        img.src = exercise.image_url;
+      });
+      const imgW = W - M * 2;
+      const imgH = 60;
+      if (y + imgH > 270) { doc.addPage(); y = 14; }
+      doc.addImage(imgData, "JPEG", M, y, imgW, imgH, undefined, "FAST");
+      y += imgH + 6;
+    } catch { /* imagen no disponible */ }
+  }
+
+  // Datos GPS del CSV
+  if (csvRows && csvRows.length > 0) {
+    if (y + 20 > 265) { doc.addPage(); y = 14; }
+    doc.setFillColor(45, 45, 50);
+    doc.roundedRect(M, y, W - M * 2, 8, 1, 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(240, 200, 0);
+    doc.text("Carga externa GPS", M + 3, y + 5.5);
+    y += 11;
+
+    const activeMetrics = METRICS.filter(({ key }) => csvRows.some(r => r[key] != null));
+
+    // Promedios
+    const avgs = {};
+    activeMetrics.forEach(({ key }) => {
+      const vals = csvRows.map(r => r[key]).filter(v => v != null);
+      if (vals.length) avgs[key] = vals.reduce((a, b) => a + b, 0) / vals.length;
+    });
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(130, 130, 130);
+    doc.text("Promedios:", M + 2, y);
+    y += 5;
+    const avgText = activeMetrics.filter(({ key }) => avgs[key]).map(({ key, label, fmt }) => `${label}: ${fmt(avgs[key])}`).join("   ·   ");
+    const avgLines = doc.splitTextToSize(avgText, W - M * 2 - 4);
+    doc.setTextColor(200, 200, 200);
+    doc.text(avgLines, M + 2, y);
+    y += avgLines.length * 4.5 + 5;
+
+    // Tabla de jugadores
+    if (y + 10 > 270) { doc.addPage(); y = 14; }
+    const colW = Math.min(28, (W - M * 2 - 50) / activeMetrics.length);
+    const nameW = 50;
+
+    // Header fila
+    doc.setFillColor(50, 50, 55);
+    doc.rect(M, y, W - M * 2, 7, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.setTextColor(180, 180, 180);
+    doc.text("Jugador", M + 2, y + 4.5);
+    activeMetrics.forEach(({ label }, i) => {
+      doc.text(label, M + nameW + i * colW + colW / 2, y + 4.5, { align: "center" });
+    });
+    y += 7;
+
+    csvRows.forEach((row, ri) => {
+      if (y > 270) { doc.addPage(); y = 14; }
+      if (ri % 2 === 0) {
+        doc.setFillColor(35, 35, 38);
+        doc.rect(M, y, W - M * 2, 6, "F");
+      }
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(7.5);
+      doc.setTextColor(210, 210, 210);
+      doc.text(row.player_name?.substring(0, 22) || "", M + 2, y + 4);
+      activeMetrics.forEach(({ key, fmt }, i) => {
+        const val = row[key] != null ? fmt(row[key]) : "—";
+        doc.text(String(val), M + nameW + i * colW + colW / 2, y + 4, { align: "center" });
+      });
+      y += 6;
+    });
+  }
+
+  // Footer
+  doc.setDrawColor(60, 60, 60);
+  doc.line(M, 285, W - M, 285);
+  doc.setFont("helvetica", "italic");
+  doc.setFontSize(7);
+  doc.setTextColor(100, 100, 100);
+  doc.text("PerformancePitch — Defensa y Justicia", M, 290);
+
+  doc.save(`Ejercicio_${exercise.name.replace(/\s+/g, "_")}.pdf`);
+}
+
 function ExerciseCard({ exercise, session, onDelete }) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [generatingPdf, setGeneratingPdf] = useState(false);
   const [csvUrl, setCsvUrl] = useState(exercise.external_csv_url || null);
   const [csvLabel, setCsvLabel] = useState(exercise.external_csv_label || null);
+  const [csvRows, setCsvRows] = useState(null); // se llena cuando CsvDataTable parsea el CSV
   const fileRef = useRef();
   const { toast } = useToast();
+
+  async function handleExportPdf() {
+    setGeneratingPdf(true);
+    await exportExercisePDF(exercise, session, csvRows);
+    setGeneratingPdf(false);
+  }
 
   async function handleDelete(e) {
     e.stopPropagation();
@@ -257,6 +437,16 @@ function ExerciseCard({ exercise, session, onDelete }) {
           {csvUrl && (
             <span className="text-xs bg-green-900/40 text-green-400 border border-green-800/50 px-2 py-0.5 rounded-full">CSV</span>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); handleExportPdf(); }}
+            disabled={generatingPdf}
+            title="Exportar PDF"
+            className="text-zinc-500 hover:text-yellow-400 transition-colors p-1 rounded disabled:opacity-50"
+          >
+            {generatingPdf
+              ? <div className="w-3.5 h-3.5 border border-zinc-500 border-t-yellow-400 rounded-full animate-spin" />
+              : <FileDown size={14} />}
+          </button>
           <button
             onClick={handleDelete}
             disabled={deleting}
@@ -336,7 +526,7 @@ function ExerciseCard({ exercise, session, onDelete }) {
                     <X size={14} />
                   </button>
                 </div>
-                <CsvDataTable csvUrl={csvUrl} />
+                <CsvDataTable csvUrl={csvUrl} onRowsParsed={setCsvRows} />
               </>
             ) : (
               <label className="cursor-pointer">
