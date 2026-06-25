@@ -7,6 +7,56 @@ import "moment/locale/es";
 
 moment.locale("es");
 
+function parseCsvText(text) {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) return { headers: [], rows: [] };
+  const sep = lines[0].includes(";") ? ";" : ",";
+  const headers = lines[0].split(sep).map((h) => h.trim().replace(/^"|"$/g, ""));
+  const rows = lines.slice(1).map((l) =>
+    l.split(sep).map((v) => v.trim().replace(/^"|"$/g, ""))
+  );
+  return { headers, rows };
+}
+
+function CsvDataTable({ csvUrl }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!csvUrl) return;
+    fetch(csvUrl)
+      .then((r) => r.text())
+      .then((text) => setData(parseCsvText(text)))
+      .finally(() => setLoading(false));
+  }, [csvUrl]);
+
+  if (loading) return <div className="text-xs text-zinc-600 py-2">Cargando datos...</div>;
+  if (!data || data.headers.length === 0) return <div className="text-xs text-zinc-600 py-2">No se pudieron leer los datos del CSV.</div>;
+
+  return (
+    <div className="overflow-x-auto rounded-lg border border-zinc-800 mt-3">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="bg-zinc-800/80">
+            {data.headers.map((h, i) => (
+              <th key={i} className="px-3 py-2 text-left text-zinc-400 font-semibold whitespace-nowrap">{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {data.rows.map((row, ri) => (
+            <tr key={ri} className={ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/30"}>
+              {row.map((cell, ci) => (
+                <td key={ci} className="px-3 py-1.5 text-zinc-300 whitespace-nowrap">{cell || "—"}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function ExerciseCard({ exercise, session, onDelete }) {
   const [open, setOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -97,6 +147,12 @@ function ExerciseCard({ exercise, session, onDelete }) {
       {/* Expanded */}
       {open && (
         <div className="border-t border-zinc-800 p-4 space-y-4">
+
+          {/* Imagen del ejercicio */}
+          {exercise.image_url && (
+            <img src={exercise.image_url} alt="Ejercicio" className="w-full max-h-64 object-cover rounded-lg border border-zinc-800" />
+          )}
+
           {/* Detalles del ejercicio */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             <div className="bg-zinc-800/60 rounded-lg p-3">
@@ -144,17 +200,20 @@ function ExerciseCard({ exercise, session, onDelete }) {
           <div className="border-t border-zinc-800 pt-4">
             <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Carga externa (CSV)</p>
             {csvUrl ? (
-              <div className="flex items-center gap-3 bg-zinc-800/60 rounded-lg px-3 py-2.5">
-                <FileSpreadsheet size={16} className="text-green-400 shrink-0" />
-                <span className="text-zinc-300 text-xs flex-1 truncate">{csvLabel || "Archivo CSV"}</span>
-                <a href={csvUrl} target="_blank" rel="noopener noreferrer"
-                  className="text-zinc-400 hover:text-white transition-colors p-1">
-                  <ExternalLink size={14} />
-                </a>
-                <button onClick={removeCsv} className="text-zinc-600 hover:text-red-400 transition-colors p-1">
-                  <X size={14} />
-                </button>
-              </div>
+              <>
+                <div className="flex items-center gap-3 bg-zinc-800/60 rounded-lg px-3 py-2.5">
+                  <FileSpreadsheet size={16} className="text-green-400 shrink-0" />
+                  <span className="text-zinc-300 text-xs flex-1 truncate">{csvLabel || "Archivo CSV"}</span>
+                  <a href={csvUrl} target="_blank" rel="noopener noreferrer"
+                    className="text-zinc-400 hover:text-white transition-colors p-1">
+                    <ExternalLink size={14} />
+                  </a>
+                  <button onClick={removeCsv} className="text-zinc-600 hover:text-red-400 transition-colors p-1">
+                    <X size={14} />
+                  </button>
+                </div>
+                <CsvDataTable csvUrl={csvUrl} />
+              </>
             ) : (
               <label className="cursor-pointer">
                 <div className={`flex items-center gap-2 border border-dashed border-zinc-700 rounded-lg px-4 py-3 text-xs text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
