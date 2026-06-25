@@ -269,9 +269,10 @@ export default function FieldSessions() {
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Código MD (días para el partido)</label>
-              <Select value={form.match_day_code} onValueChange={(v) => setForm((f) => ({ ...f, match_day_code: v }))}>
+              <Select value={form.match_day_code} onValueChange={(v) => setForm((f) => ({ ...f, match_day_code: v === "__none__" ? "" : v }))}>
                 <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar..." /></SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectItem value="__none__" className="text-zinc-400">Sin etiqueta</SelectItem>
                   {["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"].map((c) => (
                     <SelectItem key={c} value={c} className="text-white">{c}</SelectItem>
                   ))}
