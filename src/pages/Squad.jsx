@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { useToast } from "@/components/ui/use-toast";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
+import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
 import moment from "moment";
 
 const positions = ["Arquero", "Defensor", "Mediocampista", "Delantero"];
@@ -39,6 +40,7 @@ export default function Squad() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const { toast } = useToast();
@@ -167,7 +169,7 @@ export default function Squad() {
                     const isToday = isBirthdayToday(p.birth_date);
                     const age = calcAge(p.birth_date);
                     return (
-                      <div key={p.id} className={`flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors ${isToday ? "bg-yellow-500/5" : ""}`}>
+                      <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors cursor-pointer ${isToday ? "bg-yellow-500/5" : ""}`}>
                         <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
                         {p.photo_url ? (
                           <img src={p.photo_url} alt={p.name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
@@ -364,6 +366,13 @@ export default function Squad() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {selectedPlayer && (
+        <PlayerProfileDetail
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>
   );
 }
