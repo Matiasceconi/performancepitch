@@ -150,13 +150,15 @@ function ExerciseBlock({ exercise, players, onDelete }) {
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs text-zinc-600 flex items-center gap-1"><Users size={12} /> {players.length}</span>
           {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
         </div>
       </button>
 
       {open && (
         <div className="border-t border-zinc-800 px-4 pb-4 pt-3">
+          {exercise.image_url && (
+            <img src={exercise.image_url} alt="Ejercicio" className="mb-3 rounded-lg w-full max-h-52 object-cover border border-zinc-700" />
+          )}
           {exercise.description && (
             <p className="text-xs text-zinc-500 mb-3">{exercise.description}</p>
           )}
@@ -310,7 +312,7 @@ export default function FieldSessionDetail({ session, onBack }) {
   const [loading, setLoading]     = useState(true);
   const [generatingPdf, setGeneratingPdf] = useState(false);
   const [showForm, setShowForm]   = useState(!!session._openExForm);
-  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "" });
+  const [form, setForm] = useState({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "", image_url: "" });
   const { toast } = useToast();
 
   useEffect(() => {
@@ -338,10 +340,11 @@ export default function FieldSessionDetail({ session, onBack }) {
         width_m: form.width_m ? Number(form.width_m) : undefined,
         length_m: form.length_m ? Number(form.length_m) : undefined,
         num_players: form.num_players ? Number(form.num_players) : undefined,
+        image_url: form.image_url || undefined,
         order: exercises.length + 1,
       });
       setExercises((prev) => [...prev, created]);
-      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "" });
+      setForm({ name: "", description: "", space: "", duration_minutes: "", objective: "", width_m: "", length_m: "", num_players: "", image_url: "" });
       setShowForm(false);
       toast({ title: "Ejercicio agregado" });
     } catch {
@@ -464,6 +467,7 @@ export default function FieldSessionDetail({ session, onBack }) {
               </div>
             </div>
             <Textarea value={form.description} onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))} placeholder="Descripción del ejercicio..." rows={2} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
+            <Input value={form.image_url} onChange={(e) => setForm((f) => ({ ...f, image_url: e.target.value }))} placeholder="URL de imagen del ejercicio (opcional)" className="bg-zinc-800 border-zinc-700 text-white" />
             <div className="flex gap-2">
               <Button type="submit" size="sm" className="bg-white text-zinc-900 hover:bg-zinc-200">Guardar ejercicio</Button>
               <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)} className="text-zinc-400">Cancelar</Button>
