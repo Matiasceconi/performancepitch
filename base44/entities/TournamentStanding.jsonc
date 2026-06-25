@@ -52,6 +52,7 @@
       "enum": [
         "Zona A",
         "Zona B",
+        "Tabla Anual",
         "General"
       ],
       "description": "Grupo o zona del torneo",

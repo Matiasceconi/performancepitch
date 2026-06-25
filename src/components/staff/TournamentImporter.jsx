@@ -20,7 +20,7 @@ export default function TournamentImporter() {
     try {
       // Usar LLM para extraer datos de la página
       const response = await base44.integrations.Core.InvokeLLM({
-        prompt: `Extrae las tablas de clasificación de esta URL: ${url}\n\nREGLAS CRÍTICAS:\n1. Si encuentras encabezados "Grupo A", "Apertura - Grupo A" o similar: TODOS los equipos debajo = group: "Zona A" exactamente\n2. Si encuentras encabezados "Grupo B", "Clausura - Grupo B" o similar: TODOS los equipos debajo = group: "Zona B" exactamente\n3. IGNORA COMPLETAMENTE cualquier sección titulada "Tabla Anual" o "Tabla General"\n4. Para cada equipo, extrae: position, team_name (sin "(Reserva)"), matches_played, wins, draws, losses, goals_for, goals_against, points\n\nDevuelve SOLO un array JSON, sin explicaciones ni texto adicional.`,
+        prompt: `Extrae las tablas de clasificación de esta URL: ${url}\n\nREGLAS CRÍTICAS:\n1. Si encuentras encabezados "Grupo A", "Apertura - Grupo A" o similar: TODOS los equipos debajo = group: "Zona A" exactamente\n2. Si encuentras encabezados "Grupo B", "Clausura - Grupo B" o similar: TODOS los equipos debajo = group: "Zona B" exactamente\n3. Si encuentras una sección "Tabla Anual" o "Tabla General": TODOS los equipos debajo = group: "Tabla Anual" exactamente\n4. Para cada equipo, extrae: position, team_name (sin "(Reserva)"), matches_played, wins, draws, losses, goals_for, goals_against, points\n\nDevuelve SOLO un array JSON, sin explicaciones ni texto adicional.`,
         add_context_from_internet: true,
         response_json_schema: {
           type: "array",
@@ -63,7 +63,7 @@ export default function TournamentImporter() {
           goals_for: parseInt(item.goals_for),
           goals_against: parseInt(item.goals_against),
           points: parseInt(item.points),
-          group: ["Zona A", "Zona B"].includes(item.group) ? item.group : "General",
+          group: ["Zona A", "Zona B", "Tabla Anual"].includes(item.group) ? item.group : "General",
         }));
 
       if (validData.length === 0) {
