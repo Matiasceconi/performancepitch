@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield } from "lucide-react";
+import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield } from "lucide-react";
 
 function NextMatchCard({ match }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
@@ -36,7 +36,6 @@ import moment from "moment";
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
-  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
 
@@ -45,13 +44,11 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [p, s, events] = await Promise.all([
+        const [p, events] = await Promise.all([
           base44.entities.Player.list("-created_date", 50),
-          base44.entities.TrainingSession.list("-date", 5),
           base44.entities.DayEvent.list("date", 200),
         ]);
         setPlayers(p);
-        setSessions(s);
         const today = moment().format("YYYY-MM-DD");
         const match = events.find((e) => e.type === "Partido" && e.date >= today);
         setNextMatch(match || null);
@@ -77,14 +74,15 @@ export default function Dashboard() {
 
   const availablePlayers = players.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
   const unavailablePlayers = players.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
-  const available = availablePlayers.length;
+  const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
+  const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
   const injured = players.filter((p) => p.status === "Lesionado").length;
 
   const stats = [
     { label: "Jugadores", value: players.length, icon: Users, color: "text-blue-400" },
-    { label: "Disponibles", value: available, icon: Activity, color: "text-emerald-400" },
+    { label: "Campo disp.", value: availableField, icon: Activity, color: "text-emerald-400" },
     { label: "Lesionados", value: injured, icon: AlertCircle, color: "text-red-400" },
-    { label: "Sesiones", value: sessions.length, icon: Video, color: "text-purple-400" },
+    { label: "Arqueros disp.", value: availableGoalkeepers, icon: Shield, color: "text-yellow-400" },
   ];
 
   return (
@@ -209,28 +207,12 @@ export default function Dashboard() {
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="flex items-center justify-between p-4 border-b border-zinc-800">
             <h2 className="text-sm font-semibold text-white">Últimas sesiones</h2>
-            <Link to="/sessions" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-              Ver todas <ChevronRight size={14} />
+                <Link to="/sessions" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+              Ver sesiones <ChevronRight size={14} />
             </Link>
           </div>
           <div className="p-4">
-            {sessions.length === 0 ? (
-              <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p>
-            ) : (
-              <div className="space-y-3">
-                {sessions.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-white">{s.title}</p>
-                      <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
-                    </div>
-                    {s.intensity && (
-                      <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded">{s.intensity}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
+            <p className="text-zinc-600 text-sm text-center py-6">Ingresá a Sesiones para ver el detalle</p>
           </div>
         </div>
       </div>
