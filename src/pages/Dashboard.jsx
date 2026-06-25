@@ -32,6 +32,7 @@ function NextMatchCard({ match }) {
 }
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PitchMap from "@/components/staff/PitchMap";
+import TournamentTable from "@/components/staff/TournamentTable";
 import moment from "moment";
 
 export default function Dashboard() {
@@ -204,6 +205,15 @@ export default function Dashboard() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+
+        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white">Clasificación — Torneo Proyección</h2>
+          </div>
+          <div className="p-4">
+            <TournamentTable />
           </div>
         </div>
 
