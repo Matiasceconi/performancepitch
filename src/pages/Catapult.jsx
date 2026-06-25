@@ -372,8 +372,50 @@ function SessionRow({ session, sessionReports, onImportDone }) {
 
           {/* Existing GPS data */}
           {!csvState && sessionReports.length > 0 && (
-            <div className="p-4">
-              <p className="text-zinc-500 text-xs mb-3">Datos GPS cargados — {sessionReports.length} jugadores</p>
+            <div className="p-4 space-y-4">
+              <div>
+                <p className="text-zinc-500 text-xs mb-3">Datos GPS cargados — {sessionReports.length} jugadores</p>
+              </div>
+
+              {/* Session averages */}
+              <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                <p className="text-white font-semibold text-xs mb-3">Promedios de la sesión:</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    { key: "total_distance", label: "Distancia (m)", format: (v) => Math.round(v) },
+                    { key: "distance_hsr", label: "19.8-25 km/h (m)", format: (v) => Math.round(v) },
+                    { key: "sprint_distance", label: "+25 km/h (m)", format: (v) => Math.round(v) },
+                    { key: "player_load", label: "Player Load", format: (v) => v.toFixed(0) },
+                    { key: "max_velocity", label: "Vel. Máx (km/h)", format: (v) => v.toFixed(1) },
+                    { key: "accelerations", label: "Aceleraciones", format: (v) => Math.round(v) },
+                  ].map(({ key, label, format }) => {
+                    const avg = calculateSessionAverages(sessionReports)[key];
+                    return avg ? (
+                      <div key={key} className="bg-zinc-900 border border-zinc-700 rounded-lg p-2 text-center">
+                        <p className="text-zinc-500 text-xs">{label}</p>
+                        <p className="text-white font-bold text-sm mt-0.5">{format(avg)}</p>
+                      </div>
+                    ) : null;
+                  })}
+                </div>
+              </div>
+
+              {/* Chart for loaded data */}
+              <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+                <p className="text-white font-semibold text-xs mb-3">Distancia total por jugador:</p>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={sessionReports.filter(r => r.total_distance != null).sort((a, b) => (b.total_distance || 0) - (a.total_distance || 0)).map(r => ({ name: r.player_name?.split(" ").slice(-1)[0] || "—", value: r.total_distance || 0 }))} layout="vertical" margin={{ left: 10, right: 20 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                    <XAxis type="number" tick={{ fill: "#71717a", fontSize: 10 }} />
+                    <YAxis dataKey="name" type="category" tick={{ fill: "#a1a1aa", fontSize: 10 }} width={80} />
+                    <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 11 }} />
+                    <Bar dataKey="value" fill="#60a5fa" radius={[0, 4, 4, 0]}>
+                      <LabelList dataKey="value" position="right" style={{ fill: "#e4e4e7", fontSize: 10, fontWeight: 600 }} formatter={(v) => Math.round(v)} />
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
               <CsvPreviewTable rows={sessionReports} />
             </div>
           )}
