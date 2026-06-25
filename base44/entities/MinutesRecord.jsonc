@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Nombre del jugador"
     },
+    "player_number": {
+      "type": "number",
+      "description": "N\u00famero de camiseta"
+    },
     "tournament": {
       "type": "string",
       "description": "Torneo o competencia",
@@ -23,13 +27,22 @@
         "Otro"
       ]
     },
+    "match_label": {
+      "type": "string",
+      "description": "Etiqueta del partido (ej: vs River 12/06)"
+    },
+    "match_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del partido"
+    },
+    "rival": {
+      "type": "string",
+      "description": "Rival del partido"
+    },
     "minutes": {
       "type": "number",
-      "description": "Minutos jugados"
-    },
-    "matches": {
-      "type": "number",
-      "description": "Partidos jugados"
+      "description": "Minutos jugados en ese partido"
     },
     "notes": {
       "type": "string",
