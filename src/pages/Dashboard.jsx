@@ -1,7 +1,35 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle, Cake, Map, X } from "lucide-react";
+import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield } from "lucide-react";
+
+function NextMatchCard({ match }) {
+  const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
+  const [logoError, setLogoError] = useState(false);
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-center gap-4">
+      <div className="w-14 h-14 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
+        {match.rival_logo_url && !logoError
+          ? <img src={match.rival_logo_url} alt="Rival" className="w-full h-full object-contain p-1" onError={() => setLogoError(true)} />
+          : <Shield size={24} className="text-zinc-500" />
+        }
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-0.5">Próximo partido</p>
+        <p className="text-white font-bold text-base truncate">{match.title}</p>
+        <p className="text-zinc-400 text-sm capitalize">
+          {moment(match.date).format("dddd D [de] MMMM")}
+          {match.time ? ` · ${match.time}hs` : ""}
+          {match.location ? ` · ${match.location}` : ""}
+        </p>
+      </div>
+      <div className="text-right shrink-0">
+        <p className="text-3xl font-black text-white leading-none">{daysLeft}</p>
+        <p className="text-xs text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
+      </div>
+    </div>
+  );
+}
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PitchMap from "@/components/staff/PitchMap";
 import moment from "moment";
@@ -12,15 +40,21 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
 
+  const [nextMatch, setNextMatch] = useState(null);
+
   useEffect(() => {
     async function load() {
       try {
-        const [p, s] = await Promise.all([
+        const [p, s, events] = await Promise.all([
           base44.entities.Player.list("-created_date", 50),
           base44.entities.TrainingSession.list("-date", 5),
+          base44.entities.DayEvent.list("date", 200),
         ]);
         setPlayers(p);
         setSessions(s);
+        const today = moment().format("YYYY-MM-DD");
+        const match = events.find((e) => e.type === "Partido" && e.date >= today);
+        setNextMatch(match || null);
       } catch (e) {
         console.error(e);
       } finally {
@@ -81,6 +115,10 @@ export default function Dashboard() {
             <PitchMap players={availablePlayers} emptyLabel="No hay jugadores disponibles hoy" />
           </div>
         </div>
+      )}
+
+      {nextMatch && (
+        <NextMatchCard match={nextMatch} />
       )}
 
       {birthdayPlayers.length > 0 && (

@@ -20,7 +20,7 @@ const COLOR_MAP = {
 const COLORS = ["blue","green","yellow","orange","red","purple","pink","cyan"];
 const COLOR_LABELS = { blue:"Azul", green:"Verde", yellow:"Amarillo", orange:"Naranja", red:"Rojo", purple:"Violeta", pink:"Rosa", cyan:"Celeste" };
 
-const EMPTY_FORM = { date: "", time: "", title: "", type: "", duration_minutes: "", location: "", notes: "", color: "blue" };
+const EMPTY_FORM = { date: "", time: "", title: "", type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival_logo_url: "" };
 
 const QUICK_TEMPLATES = [
   { title: "Desayuno", time: "08:00", duration_minutes: 45, color: "yellow", type: "Comida" },
@@ -145,6 +145,15 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
               <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
               <textarea rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" placeholder="Observaciones..." value={form.notes} onChange={(e) => set("notes", e.target.value)} />
             </div>
+            {form.type === "Partido" && (
+              <div className="col-span-2">
+                <label className="text-xs text-zinc-400 mb-1 block">URL escudo rival (opcional)</label>
+                <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://..." value={form.rival_logo_url || ""} onChange={(e) => set("rival_logo_url", e.target.value)} />
+                {form.rival_logo_url && (
+                  <img src={form.rival_logo_url} alt="Escudo" className="mt-2 w-12 h-12 object-contain rounded" onError={(e) => e.target.style.display="none"} />
+                )}
+              </div>
+            )}
             <div className="col-span-2">
               <label className="text-xs text-zinc-400 mb-2 block">Color</label>
               <div className="flex gap-2 flex-wrap">

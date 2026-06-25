@@ -45,6 +45,10 @@
       ],
       "default": "blue",
       "description": "Color del evento"
+    },
+    "rival_logo_url": {
+      "type": "string",
+      "description": "URL del escudo del equipo rival (solo para eventos tipo Partido)"
     }
   },
   "required": [
