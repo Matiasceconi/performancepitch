@@ -272,16 +272,6 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
               )}
             </>
           )}
-          <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2">Interacción por jugador</p>
-          <div className="overflow-x-auto">
-            {playerList.length === 0 ? (
-              <p className="text-zinc-600 text-xs text-center py-4">Sin jugadores en el plantel</p>
-            ) : (
-              playerList.map((log) => (
-                <PlayerRow key={log.player_id} log={log} onChange={handleChange} />
-              ))
-            )}
-          </div>
           <button onClick={() => onDelete(exercise.id)} className="mt-3 text-xs text-zinc-700 hover:text-red-400 transition-colors">
             Eliminar ejercicio
           </button>
