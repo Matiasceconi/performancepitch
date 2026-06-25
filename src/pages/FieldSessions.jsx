@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2, Users } from "lucide-react";
+import { Link } from "react-router-dom";
+import { Plus, ChevronRight, Video, Clock, Play, Pencil, Trash2, Users, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -236,6 +237,13 @@ export default function FieldSessions() {
                       <Play size={13} /> Video
                     </a>
                   )}
+                  <Link
+                    to="/catapult"
+                    onClick={(e) => e.stopPropagation()}
+                    className="flex items-center gap-1 text-xs text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/30 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
+                  >
+                    <Zap size={13} /> GPS
+                  </Link>
                   <button
                     onClick={() => setSelected({ ...s, _openExForm: true })}
                     className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white bg-zinc-800 hover:bg-zinc-700 px-2.5 py-1.5 rounded-lg transition-colors"
