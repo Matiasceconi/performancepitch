@@ -126,6 +126,14 @@ export default function PlayerProfileDetail({ player, onClose }) {
               <p className="text-xs text-zinc-500 mb-1">Pierna hábil</p>
               <p className="text-white font-semibold">{player.dominant_foot || "—"}</p>
             </div>
+            <div>
+              <p className="text-xs text-zinc-500 mb-1">Pensión del club</p>
+              <p className="text-white font-semibold">{player.club_housing ? "Sí" : "No"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-zinc-500 mb-1">Contrato</p>
+              <p className="text-white font-semibold">{player.has_contract ? "Sí" : "No"}</p>
+            </div>
           </div>
 
           {/* Historial médico */}

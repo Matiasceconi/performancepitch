@@ -85,7 +85,12 @@
     "club_housing": {
       "type": "boolean",
       "default": false,
-      "description": "Vive en pensi\u00f3n del club o tiene contrato de alojamiento"
+      "description": "Reside en la pensi\u00f3n del club"
+    },
+    "has_contract": {
+      "type": "boolean",
+      "default": false,
+      "description": "Tiene contrato con el club"
     }
   },
   "required": [

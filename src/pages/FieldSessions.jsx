@@ -330,9 +330,10 @@ export default function FieldSessions() {
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Foco de la sesión</label>
-              <Select value={form.focus_area} onValueChange={(v) => setForm((f) => ({ ...f, focus_area: v }))}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar foco..." /></SelectTrigger>
+              <Select value={form.focus_area || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, focus_area: v === "__none__" ? "" : v }))}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Sin foco" /></SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectItem value="__none__" className="text-zinc-400">Sin foco</SelectItem>
                   {focusAreas.map((f) => <SelectItem key={f} value={f} className="text-white">{f}</SelectItem>)}
                 </SelectContent>
               </Select>
