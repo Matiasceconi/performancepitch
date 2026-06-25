@@ -14,9 +14,11 @@ import moment from "moment";
 const positions = ["Arquero", "Defensor", "Mediocampista", "Delantero"];
 const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
+const seasonPeriods = ["En competencia", "Pretemporada", "Transitorio"];
 
 const EMPTY_FORM = {
   name: "", number: "", position: "Defensor", status: "Disponible",
+  season_period: "",
   injury_detail: "", expected_return: "", photo_url: "",
   birth_date: "", category: "", document_number: "",
   dominant_foot: "", birth_place: "", current_residence: "", club_housing: false, has_contract: false,
@@ -43,6 +45,7 @@ export default function Squad() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [filterPeriod, setFilterPeriod] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -66,6 +69,7 @@ export default function Squad() {
       number: String(p.number || ""),
       position: p.position || "Defensor",
       status: p.status || "Disponible",
+      season_period: p.season_period || "",
       injury_detail: p.injury_detail || "",
       expected_return: p.expected_return || "",
       photo_url: p.photo_url || "",
@@ -85,7 +89,7 @@ export default function Squad() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const payload = { ...form, number: Number(form.number) };
+    const payload = { ...form, number: form.number ? Number(form.number) : undefined };
     // clean empty strings
     Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
     if (editing) {
@@ -109,9 +113,11 @@ export default function Squad() {
     loadPlayers();
   }
 
+  const filteredPlayers = filterPeriod ? players.filter(p => p.season_period === filterPeriod) : players;
+
   const grouped = positions.map((pos) => ({
     position: pos,
-    players: players.filter((p) => p.position === pos).sort((a, b) => a.number - b.number),
+    players: filteredPlayers.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
   }));
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
@@ -132,6 +138,17 @@ export default function Squad() {
         <Button onClick={openNew} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={16} className="mr-1.5" /> Agregar jugador
         </Button>
+      </div>
+
+      {/* Filtros de período de temporada */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-zinc-500 font-medium">Temporada:</span>
+        <button onClick={() => setFilterPeriod(null)} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterPeriod === null ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}>Todos</button>
+        {seasonPeriods.map((p) => (
+          <button key={p} onClick={() => setFilterPeriod(filterPeriod === p ? null : p)}
+            className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterPeriod === p ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
+          >{p}</button>
+        ))}
       </div>
 
       {/* Birthday alert */}
@@ -267,8 +284,8 @@ export default function Squad() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Número *</label>
-                <Input type="number" value={form.number} onChange={(e) => set("number", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
+                <label className="text-xs text-zinc-400 mb-1 block">Número</label>
+                <Input type="number" value={form.number} onChange={(e) => set("number", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" placeholder="Opcional" />
               </div>
               <div>
                 <label className="text-xs text-zinc-400 mb-1 block">Categoría</label>
@@ -317,6 +334,17 @@ export default function Squad() {
                 <label className="text-xs text-zinc-400 mb-1 block">Residencia actual</label>
                 <Input value={form.current_residence} onChange={(e) => set("current_residence", e.target.value)} placeholder="Ciudad, Barrio" className="bg-zinc-800 border-zinc-700 text-white" />
               </div>
+            </div>
+
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Período de temporada</label>
+              <Select value={form.season_period || "__none__"} onValueChange={(v) => set("season_period", v === "__none__" ? "" : v)}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Sin período" /></SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectItem value="__none__" className="text-zinc-400">Sin período</SelectItem>
+                  {seasonPeriods.map((p) => <SelectItem key={p} value={p} className="text-white">{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>

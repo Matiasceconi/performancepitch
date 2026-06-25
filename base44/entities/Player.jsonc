@@ -39,6 +39,15 @@
       "default": "Disponible",
       "description": "Estado actual del jugador"
     },
+    "season_period": {
+      "type": "string",
+      "enum": [
+        "En competencia",
+        "Pretemporada",
+        "Transitorio"
+      ],
+      "description": "Per\u00edodo de la temporada del jugador"
+    },
     "injury_detail": {
       "type": "string",
       "description": "Detalle de la lesi\u00f3n o motivo de baja"
@@ -95,7 +104,6 @@
   },
   "required": [
     "name",
-    "number",
     "position"
   ]
 }
