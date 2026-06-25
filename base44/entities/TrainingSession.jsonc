@@ -26,6 +26,15 @@
       ],
       "description": "C\u00f3digo de d\u00eda relativo al partido"
     },
+    "season_period": {
+      "type": "string",
+      "enum": [
+        "En competencia",
+        "Pretemporada",
+        "Transitorio"
+      ],
+      "description": "Per\u00edodo de la temporada"
+    },
     "session_type": {
       "type": "string",
       "enum": [

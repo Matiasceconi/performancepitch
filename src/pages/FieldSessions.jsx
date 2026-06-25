@@ -40,6 +40,7 @@ const intensityBorder = {
 };
 
 const MD_CODES = ["MD-6","MD-5","MD-4","MD-3","MD-2","MD-1","MD","MD+1","MD+2"];
+const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
 
 export default function FieldSessions() {
   const [sessions, setSessions]       = useState([]);
@@ -49,9 +50,10 @@ export default function FieldSessions() {
   const [loading, setLoading]         = useState(true);
   const [showForm, setShowForm]       = useState(false);
   const [selected, setSelected]       = useState(null);
-  const [filterMD, setFilterMD]       = useState(null);
-  const [filterType, setFilterType]   = useState(null);
-  const [filterFocus, setFilterFocus] = useState(null);
+  const [filterMD, setFilterMD]           = useState(null);
+  const [filterType, setFilterType]       = useState(null);
+  const [filterFocus, setFilterFocus]     = useState(null);
+  const [filterPeriod, setFilterPeriod]   = useState(null);
 
   const [editingSession, setEditingSession] = useState(null);
 
@@ -68,6 +70,7 @@ export default function FieldSessions() {
     notes: "",
     video_url: "",
     gps_pdf_url: "",
+    season_period: "",
   };
 
   const [form, setForm] = useState(emptyForm);
@@ -108,6 +111,7 @@ export default function FieldSessions() {
       notes: s.notes || "",
       video_url: s.video_url || "",
       gps_pdf_url: s.gps_pdf_url || "",
+      season_period: s.season_period || "",
     });
     setShowForm(true);
   }
@@ -214,6 +218,16 @@ export default function FieldSessions() {
               >{f}</button>
             ))}
           </div>
+          <div className="h-px bg-zinc-800" />
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-zinc-500 w-16 shrink-0">Período</span>
+            <button onClick={() => setFilterPeriod(null)} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterPeriod === null ? "bg-zinc-200 text-zinc-900 shadow" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}>Todos</button>
+            {SEASON_PERIODS.map((p) => (
+              <button key={p} onClick={() => setFilterPeriod(filterPeriod === p ? null : p)}
+                className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterPeriod === p ? "bg-zinc-200 text-zinc-900 shadow" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
+              >{p}</button>
+            ))}
+          </div>
         </div>
       )}
 
@@ -224,7 +238,7 @@ export default function FieldSessions() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {sessions.filter((s) => (!filterMD || s.match_day_code === filterMD) && (!filterType || s.session_type === filterType) && (!filterFocus || s.focus_area === filterFocus)).map((s) => (
+          {sessions.filter((s) => (!filterMD || s.match_day_code === filterMD) && (!filterType || s.session_type === filterType) && (!filterFocus || s.focus_area === filterFocus) && (!filterPeriod || s.season_period === filterPeriod)).map((s) => (
             <div
               key={s.id}
               className={`group relative bg-zinc-900 hover:bg-zinc-800/80 border border-zinc-800 hover:border-zinc-600 border-l-4 ${intensityBorder[s.intensity] || "border-l-zinc-700"} rounded-xl p-4 transition-all duration-200 cursor-pointer`}
@@ -429,6 +443,16 @@ export default function FieldSessions() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Período de temporada</label>
+              <Select value={form.season_period || "__none__"} onValueChange={(v) => setForm((f) => ({ ...f, season_period: v === "__none__" ? "" : v }))}>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Sin período" /></SelectTrigger>
+                <SelectContent className="bg-zinc-800 border-zinc-700">
+                  <SelectItem value="__none__" className="text-zinc-400">Sin período</SelectItem>
+                  {SEASON_PERIODS.map((p) => <SelectItem key={p} value={p} className="text-white">{p}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Foco de la sesión</label>

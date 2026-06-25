@@ -45,7 +45,6 @@ export default function Squad() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [filterPeriod, setFilterPeriod] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -113,11 +112,9 @@ export default function Squad() {
     loadPlayers();
   }
 
-  const filteredPlayers = filterPeriod ? players.filter(p => p.season_period === filterPeriod) : players;
-
   const grouped = positions.map((pos) => ({
     position: pos,
-    players: filteredPlayers.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
+    players: players.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
   }));
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
@@ -138,17 +135,6 @@ export default function Squad() {
         <Button onClick={openNew} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={16} className="mr-1.5" /> Agregar jugador
         </Button>
-      </div>
-
-      {/* Filtros de período de temporada */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-zinc-500 font-medium">Temporada:</span>
-        <button onClick={() => setFilterPeriod(null)} className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterPeriod === null ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}>Todos</button>
-        {seasonPeriods.map((p) => (
-          <button key={p} onClick={() => setFilterPeriod(filterPeriod === p ? null : p)}
-            className={`text-xs px-3 py-1 rounded-full font-semibold transition-all ${filterPeriod === p ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-700"}`}
-          >{p}</button>
-        ))}
       </div>
 
       {/* Birthday alert */}
