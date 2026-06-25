@@ -211,14 +211,11 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-      <div className="flex items-center gap-2 p-4">
+      <button onClick={() => setOpen((v) => !v)} className="w-full text-left">
         {exercise.image_url && (
-          <img src={exercise.image_url} alt="Ejercicio" className="h-14 w-20 object-cover rounded-lg border border-zinc-700 shrink-0" />
+          <img src={exercise.image_url} alt="Ejercicio" className="w-full max-h-56 object-cover" />
         )}
-        <button
-          onClick={() => setOpen((v) => !v)}
-          className="flex-1 min-w-0 flex items-center gap-3 text-left"
-        >
+        <div className="flex items-center gap-2 p-4">
           <div className="flex-1 min-w-0">
             <p className="text-white font-semibold text-sm">{exercise.name}</p>
             <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-zinc-500">
@@ -230,17 +227,17 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
               {exercise.objective && <span className="text-zinc-400">{exercise.objective}</span>}
             </div>
           </div>
-        </button>
-        <div className="flex items-center gap-1.5 shrink-0">
-          <button
-            onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); setOpen(true); }}
-            className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-zinc-800"
-          >
-            <Pencil size={14} />
-          </button>
-          {open ? <ChevronUp size={16} className="text-zinc-500 cursor-pointer" onClick={() => setOpen(false)} /> : <ChevronDown size={16} className="text-zinc-500 cursor-pointer" onClick={() => setOpen(true)} />}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={(e) => { e.stopPropagation(); setEditing((v) => !v); setOpen(true); }}
+              className="text-zinc-500 hover:text-white transition-colors p-1.5 rounded-lg hover:bg-zinc-800"
+            >
+              <Pencil size={14} />
+            </button>
+            {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
+          </div>
         </div>
-      </div>
+      </button>
 
       {open && (
         <div className="border-t border-zinc-800 px-4 pb-4 pt-3">
@@ -267,9 +264,6 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
             </form>
           ) : (
             <>
-              {exercise.image_url && (
-                <img src={exercise.image_url} alt="Ejercicio" className="mb-3 rounded-lg w-full max-h-52 object-cover border border-zinc-700" />
-              )}
               {exercise.description && (
                 <p className="text-xs text-zinc-500 mb-3">{exercise.description}</p>
               )}
