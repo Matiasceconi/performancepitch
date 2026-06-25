@@ -434,15 +434,153 @@ function SessionRow({ session, sessionReports, onImportDone }) {
   );
 }
 
+// ── Training CSV Upload (global, top-level) ─────────────────────────────────
+function TrainingUploadBar({ sessions, reports, onImportDone }) {
+  const [csvState, setCsvState] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [selectedSession, setSelectedSession] = useState("");
+  const fileRef = useRef();
+  const { toast } = useToast();
+
+  async function handleFile(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setUploading(true);
+    setCsvState(null);
+    try {
+      const text = await file.text();
+      const parsed = parseCSVFile(text);
+      if (parsed.error) { setCsvState({ error: parsed.error }); return; }
+      if (parsed.rows.length === 0) { setCsvState({ error: "No se encontraron jugadores válidos." }); return; }
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      setCsvState({ ...parsed, file_url });
+    } catch (err) {
+      setCsvState({ error: "Error: " + err.message });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function confirmImport() {
+    if (!csvState?.rows || !selectedSession) return;
+    const session = sessions.find(s => s.id === selectedSession);
+    if (!session) return;
+    setImporting(true);
+    try {
+      await base44.entities.CatapultReport.deleteMany({ session_id: session.id });
+      const records = csvState.rows.map(r => ({ ...r, date: session.date, session_id: session.id, session_label: session.title, file_url: csvState.file_url }));
+      await base44.entities.CatapultReport.bulkCreate(records);
+      toast({ title: `✓ ${records.length} jugadores importados para "${session.title}"` });
+      setCsvState(null);
+      setSelectedSession("");
+      onImportDone();
+    } catch (err) {
+      toast({ title: "Error al importar", description: err.message, variant: "destructive" });
+    } finally {
+      setImporting(false);
+    }
+  }
+
+  const sessionAverages = csvState?.rows ? calculateSessionAverages(csvState.rows) : null;
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+      <div className="p-4 border-b border-zinc-800">
+        <div className="flex items-center gap-3 flex-wrap">
+          <label className="cursor-pointer">
+            <span className={`flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors ${uploading ? "bg-zinc-700 text-zinc-400" : "bg-blue-600 hover:bg-blue-700 text-white"}`}>
+              {uploading ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Upload size={16} />}
+              {uploading ? "Leyendo..." : "Cargar CSV Entrenamiento"}
+            </span>
+            <input ref={fileRef} type="file" accept=".csv,.txt" onChange={handleFile} className="hidden" disabled={uploading} />
+          </label>
+          {csvState && !csvState.error && (
+            <>
+              <select
+                value={selectedSession}
+                onChange={e => setSelectedSession(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-blue-500"
+              >
+                <option value="">— Asignar a sesión —</option>
+                {sessions.map(s => <option key={s.id} value={s.id}>{moment(s.date).format("DD/MM/YY")} · {s.title}</option>)}
+              </select>
+              <button
+                onClick={confirmImport}
+                disabled={importing || !selectedSession}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-semibold bg-green-600 hover:bg-green-700 disabled:bg-zinc-700 disabled:text-zinc-500 text-white transition-colors"
+              >
+                {importing ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Check size={16} />}
+                Confirmar
+              </button>
+              <button onClick={() => setCsvState(null)} className="flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm text-zinc-400 hover:text-white transition-colors">
+                <X size={14} /> Cancelar
+              </button>
+            </>
+          )}
+        </div>
+        {csvState?.error && (
+          <div className="mt-3 flex items-center gap-2 text-xs text-red-400 bg-red-900/20 border border-red-800/30 rounded-lg p-3">
+            <AlertCircle size={14} className="shrink-0" /> {csvState.error}
+          </div>
+        )}
+      </div>
+
+      {/* Informe de Entrenamiento */}
+      {csvState && !csvState.error && sessionAverages && (
+        <div className="p-4 space-y-4">
+          <p className="text-white font-semibold text-sm">Informe de Entrenamiento — <span className="text-zinc-400 font-normal">{csvState.rows.length} jugadores detectados</span></p>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {[
+              { key: "total_distance", label: "Distancia (m)", fmt: v => Math.round(v) },
+              { key: "distance_hsr", label: "19.8–25 km/h (m)", fmt: v => Math.round(v) },
+              { key: "sprint_distance", label: "+25 km/h (m)", fmt: v => Math.round(v) },
+              { key: "player_load", label: "Player Load", fmt: v => v.toFixed(0) },
+              { key: "max_velocity", label: "Vel. Máx (km/h)", fmt: v => v.toFixed(1) },
+              { key: "accelerations", label: "Aceleraciones", fmt: v => Math.round(v) },
+            ].map(({ key, label, fmt }) => sessionAverages[key] ? (
+              <div key={key} className="bg-zinc-800 border border-zinc-700 rounded-lg p-3 text-center">
+                <p className="text-zinc-500 text-xs">{label}</p>
+                <p className="text-white font-bold text-lg mt-0.5">{fmt(sessionAverages[key])}</p>
+              </div>
+            ) : null)}
+          </div>
+          <div className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-3">
+            <p className="text-zinc-400 text-xs font-semibold mb-3">Distancia total por jugador</p>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={csvState.rows.filter(r => r.total_distance != null).sort((a,b)=>(b.total_distance||0)-(a.total_distance||0)).map(r=>({ name: r.player_name?.split(" ").slice(-1)[0]||"—", value: r.total_distance||0 }))} layout="vertical" margin={{ left: 10, right: 30 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
+                <XAxis type="number" tick={{ fill: "#71717a", fontSize: 10 }} />
+                <YAxis dataKey="name" type="category" tick={{ fill: "#a1a1aa", fontSize: 10 }} width={80} />
+                <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 11 }} />
+                <Bar dataKey="value" fill="#60a5fa" radius={[0,4,4,0]}>
+                  <LabelList dataKey="value" position="right" style={{ fill: "#e4e4e7", fontSize: 10, fontWeight: 600 }} formatter={v => Math.round(v)} />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+          <CsvPreviewTable rows={csvState.rows} />
+        </div>
+      )}
+
+      {/* Estado vacío */}
+      {!csvState && (
+        <div className="p-6 text-center">
+          <FileSpreadsheet size={32} className="text-zinc-700 mx-auto mb-2" />
+          <p className="text-zinc-600 text-xs">Cargá un CSV de Catapult OpenField para ver el informe de entrenamiento</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ───────────────────────────────────────────────────────────────
 export default function Catapult() {
   const [sessions, setSessions] = useState([]);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("sessions");
-  const [selectedMetric, setSelectedMetric] = useState("total_distance");
-  const [uploadingPdf, setUploadingPdf] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState("all");
+  const [activeTab, setActiveTab] = useState("training");
   const { toast } = useToast();
 
   useEffect(() => { loadAll(); }, []);
@@ -460,37 +598,6 @@ export default function Catapult() {
     }
   }
 
-  async function handlePDFUpload(e) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadingPdf(true);
-    try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-      if (latestDate) {
-        const toUpdate = reports.filter((r) => r.date === latestDate);
-        await Promise.all(toUpdate.map((r) => base44.entities.CatapultReport.update(r.id, { pdf_url: file_url })));
-        toast({ title: "PDF cargado correctamente" });
-        loadAll();
-      }
-    } catch {
-      toast({ title: "Error al subir PDF", variant: "destructive" });
-    } finally {
-      setUploadingPdf(false);
-      e.target.value = "";
-    }
-  }
-
-  const latestDate = reports.length > 0 ? reports.reduce((a, b) => (a.date > b.date ? a : b)).date : null;
-  const latestReports = latestDate ? reports.filter((r) => r.date === latestDate) : [];
-  const allPlayers = [...new Set(latestReports.map((r) => r.player_name).filter(Boolean))].sort();
-  const filteredReports = selectedPlayer === "all" ? latestReports : latestReports.filter((r) => r.player_name === selectedPlayer);
-
-  const currentMetric = CHART_METRICS.find((m) => m.key === selectedMetric);
-  const chartData = filteredReports
-    .filter((r) => r[selectedMetric] != null)
-    .sort((a, b) => (b[selectedMetric] || 0) - (a[selectedMetric] || 0))
-    .map((r) => ({ name: r.player_name?.split(" ").slice(-1)[0] || "—", value: r[selectedMetric] || 0 }));
-
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
@@ -502,18 +609,17 @@ export default function Catapult() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white tracking-tight">Catapult GPS</h1>
-        <p className="text-zinc-500 text-sm mt-1">Importá el CSV de OpenField por sesión de entrenamiento</p>
+        <p className="text-zinc-500 text-sm mt-1">Importá el CSV de OpenField para generar informes de entrenamiento y partido</p>
       </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
         {[
-          { key: "sessions",   label: "Entrenamientos" },
-          { key: "matches",    label: "Partidos" },
-          { key: "data",       label: "Datos GPS" },
-          { key: "team",       label: "Informe de Equipo" },
-          { key: "evolution",   label: "Evolución" },
-          { key: "comparison",  label: "Comparar" },
+          { key: "training", label: "Entrenamiento" },
+          { key: "matches",  label: "Partido" },
+          { key: "team",     label: "Informe de Equipo" },
+          { key: "evolution", label: "Evolución" },
+          { key: "comparison", label: "Comparar" },
         ].map((t) => (
           <button
             key={t.key}
@@ -527,26 +633,9 @@ export default function Catapult() {
         ))}
       </div>
 
-      {/* ── TAB: SESSIONS ─────────────────────────────────────────────── */}
-      {activeTab === "sessions" && (
-        <div className="space-y-3">
-          {sessions.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-              <FileSpreadsheet size={40} className="text-zinc-700 mx-auto mb-3" />
-              <p className="text-zinc-500 text-sm">No hay sesiones de campo registradas</p>
-              <p className="text-zinc-600 text-xs mt-1">Creá sesiones en el módulo de Campo para cargar GPS aquí</p>
-            </div>
-          ) : (
-            sessions.map((s) => (
-              <SessionRow
-                key={s.id}
-                session={s}
-                sessionReports={reports.filter((r) => r.session_id === s.id)}
-                onImportDone={loadAll}
-              />
-            ))
-          )}
-        </div>
+      {/* ── TAB: TRAINING ─────────────────────────────────────────────── */}
+      {activeTab === "training" && (
+        <TrainingUploadBar sessions={sessions} reports={reports} onImportDone={loadAll} />
       )}
 
       {/* ── TAB: MATCHES ──────────────────────────────────────────────── */}
@@ -567,98 +656,6 @@ export default function Catapult() {
       {/* ── TAB: COMPARISON ───────────────────────────────────────────── */}
       {activeTab === "comparison" && (
         <SessionComparison reports={reports} sessions={sessions} />
-      )}
-
-      {/* ── TAB: GPS DATA ──────────────────────────────────────────────── */}
-      {activeTab === "data" && (
-        <>
-          {reports.length === 0 ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-              <FileSpreadsheet size={40} className="text-zinc-700 mx-auto mb-3" />
-              <p className="text-zinc-500 text-sm">No hay datos GPS cargados</p>
-              <p className="text-zinc-600 text-xs mt-1">Importá el CSV desde la solapa Sesiones</p>
-            </div>
-          ) : (
-            <>
-              <div className="flex gap-2 flex-wrap items-center justify-between">
-                <div className="flex gap-2 flex-wrap">
-                  {CHART_METRICS.map((m) => (
-                    <button key={m.key} onClick={() => setSelectedMetric(m.key)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedMetric === m.key ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
-                      {m.label}
-                    </button>
-                  ))}
-                </div>
-                <select
-                  value={selectedPlayer}
-                  onChange={(e) => setSelectedPlayer(e.target.value)}
-                  className="bg-zinc-800 text-zinc-300 text-xs rounded-lg px-3 py-1.5 border border-zinc-700 focus:outline-none focus:border-zinc-500"
-                >
-                  <option value="all">Todos los jugadores</option>
-                  {allPlayers.map((p) => (
-                    <option key={p} value={p}>{p}</option>
-                  ))}
-                </select>
-              </div>
-
-              {chartData.length > 0 && (
-                <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-sm font-semibold text-white">{currentMetric?.label}</h3>
-                    <span className="text-xs text-zinc-500">{moment(latestDate).format("DD/MM/YYYY")}</span>
-                  </div>
-                  <ResponsiveContainer width="100%" height={300}>
-                    <BarChart data={chartData} layout="vertical" margin={{ left: 10, right: 20 }}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-                      <XAxis type="number" tick={{ fill: "#71717a", fontSize: 11 }} />
-                      <YAxis dataKey="name" type="category" tick={{ fill: "#a1a1aa", fontSize: 11 }} width={90} />
-                      <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 12 }} />
-                      <Bar dataKey="value" fill={currentMetric?.color || "#60a5fa"} radius={[0, 4, 4, 0]}>
-                        <LabelList dataKey="value" position="right" style={{ fill: "#e4e4e7", fontSize: 11, fontWeight: 600 }} formatter={(v) => {
-                          const isWhole = ["total_distance","distance_hsr","sprint_distance","sprint_efforts","accelerations","decelerations"].includes(selectedMetric);
-                          return isWhole ? Math.round(v) : Number(v).toFixed(1);
-                        }} />
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              )}
-
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-                <div className="p-4 border-b border-zinc-800 flex items-center justify-between gap-3 flex-wrap">
-                  <div>
-                    <h3 className="text-sm font-semibold text-white">Datos individuales — última sesión</h3>
-                    <span className="text-xs text-zinc-500">{moment(latestDate).format("DD [de] MMMM YYYY")}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {latestReports[0]?.pdf_url && (
-                      <a href={latestReports[0].pdf_url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700 transition-colors">
-                        <ExternalLink size={12} /> Ver PDF
-                      </a>
-                    )}
-                    <label className="cursor-pointer">
-                      <span className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${uploadingPdf ? "bg-zinc-800 text-zinc-500" : "bg-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-700"}`}>
-                        {uploadingPdf ? <div className="w-3 h-3 border border-zinc-500 border-t-white rounded-full animate-spin" /> : <FileText size={12} />}
-                        {uploadingPdf ? "Subiendo..." : latestReports[0]?.pdf_url ? "Reemplazar PDF" : "Subir PDF"}
-                      </span>
-                      <input type="file" accept=".pdf" onChange={handlePDFUpload} className="hidden" disabled={uploadingPdf} />
-                    </label>
-                  </div>
-                </div>
-                <div className="p-4">
-                  <CsvPreviewTable rows={filteredReports} />
-                </div>
-              </div>
-
-              <div className="flex items-center gap-4 text-xs text-zinc-500 px-1">
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-green-900/70 inline-block" /> Alto rendimiento</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-yellow-900/70 inline-block" /> Rendimiento medio</span>
-                <span className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-sm bg-red-900/70 inline-block" /> Bajo rendimiento</span>
-              </div>
-            </>
-          )}
-        </>
       )}
     </div>
   );
