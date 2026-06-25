@@ -14,9 +14,13 @@
       "type": "string",
       "enum": [
         "Arquero",
-        "Defensor",
-        "Mediocampista",
-        "Delantero"
+        "Defensor Central",
+        "Lateral Derecho",
+        "Lateral Izquierdo",
+        "Mediocampista Central",
+        "Volante Interno",
+        "Extremo",
+        "Delantero Centro"
       ],
       "description": "Posici\u00f3n del jugador"
     },

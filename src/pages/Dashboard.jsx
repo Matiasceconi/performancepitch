@@ -1,14 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle, Cake } from "lucide-react";
+import { Video, FileSpreadsheet, Users, Activity, ChevronRight, AlertCircle, Cake, Map, X } from "lucide-react";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
+import PitchMap from "@/components/staff/PitchMap";
 import moment from "moment";
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -53,10 +55,33 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
-        <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+          <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
+        </div>
+        <button
+          onClick={() => setShowMap(!showMap)}
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors"
+        >
+          {showMap ? <X size={15} /> : <Map size={15} />}
+          {showMap ? "Cerrar mapa" : "Ver mapa del día"}
+        </button>
       </div>
+
+      {showMap && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Mapa del día — Jugadores disponibles</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">{availablePlayers.length} jugadores disponibles hoy</p>
+            </div>
+          </div>
+          <div className="p-4">
+            <PitchMap players={availablePlayers} emptyLabel="No hay jugadores disponibles hoy" />
+          </div>
+        </div>
+      )}
 
       {birthdayPlayers.length > 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">

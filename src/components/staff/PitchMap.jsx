@@ -26,15 +26,17 @@ function rowPositions(count, yPercent) {
 
 export default function PitchMap({ players, highlighted = new Set(), onToggle, emptyLabel }) {
   const arqueros       = players.filter((p) => p.position === "Arquero");
-  const defensores     = players.filter((p) => p.position === "Defensor");
-  const mediocampistas = players.filter((p) => p.position === "Mediocampista");
-  const delanteros     = players.filter((p) => p.position === "Delantero");
+  const defensores     = players.filter((p) => ["Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Defensor"].includes(p.position));
+  const mediocampistas = players.filter((p) => ["Mediocampista Central", "Volante Interno", "Mediocampista"].includes(p.position));
+  const extremos       = players.filter((p) => p.position === "Extremo");
+  const delanteros     = players.filter((p) => ["Delantero Centro", "Delantero"].includes(p.position));
 
   const rows = [
     { group: arqueros,       y: 88 },
-    { group: defensores,     y: 68 },
-    { group: mediocampistas, y: 45 },
-    { group: delanteros,     y: 22 },
+    { group: defensores,     y: 70 },
+    { group: mediocampistas, y: 50 },
+    { group: extremos,       y: 32 },
+    { group: delanteros,     y: 16 },
   ];
 
   const allDots = [];
