@@ -296,35 +296,63 @@ const focusColors = {
   "Recuperación": "bg-green-500/20 text-green-400",
 };
 
+async function loadImageAsDataUrl(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      canvas.getContext("2d").drawImage(img, 0, 0);
+      resolve({ dataUrl: canvas.toDataURL("image/jpeg", 0.85), w: img.naturalWidth, h: img.naturalHeight });
+    };
+    img.onerror = () => resolve(null);
+    img.src = url;
+  });
+}
+
 async function exportSessionPDF(session, exercises, availablePlayers) {
   const { jsPDF } = await import("jspdf");
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const W = 210;
   const M = 14;
+  const CONTENT_W = W - M * 2;
 
-  // Header
-  doc.setFillColor(24, 24, 27);
-  doc.rect(0, 0, W, 28, "F");
-  doc.setFillColor(240, 200, 0);
-  doc.rect(0, 28, W, 2, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
-  doc.setTextColor(255, 255, 255);
-  doc.text("SESIÓN DE CAMPO", M, 12);
-  doc.setFontSize(9);
-  doc.setTextColor(160, 160, 160);
-  doc.text("Defensa y Justicia — Cuerpo Técnico", M, 20);
-  doc.setTextColor(240, 200, 0);
-  doc.text(moment(session.date).format("dddd D [de] MMMM YYYY").toUpperCase(), W - M, 12, { align: "right" });
-  doc.setTextColor(160, 160, 160);
-  doc.setFontSize(8);
-  doc.text(`Generado: ${moment().format("DD/MM/YYYY HH:mm")}`, W - M, 20, { align: "right" });
+  // Pre-cargar todas las imágenes en paralelo
+  const imageMap = {};
+  await Promise.all(
+    exercises.filter((ex) => ex.image_url).map(async (ex) => {
+      const result = await loadImageAsDataUrl(ex.image_url);
+      if (result) imageMap[ex.id] = result;
+    })
+  );
 
+  function addHeader(isFirst = false) {
+    doc.setFillColor(24, 24, 27);
+    doc.rect(0, 0, W, 28, "F");
+    doc.setFillColor(240, 200, 0);
+    doc.rect(0, 28, W, 2, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(15);
+    doc.setTextColor(255, 255, 255);
+    doc.text("SESIÓN DE CAMPO", M, 12);
+    doc.setFontSize(9);
+    doc.setTextColor(160, 160, 160);
+    doc.text("Defensa y Justicia — Cuerpo Técnico", M, 20);
+    doc.setTextColor(240, 200, 0);
+    doc.text(moment(session.date).format("dddd D [de] MMMM YYYY").toUpperCase(), W - M, 12, { align: "right" });
+    doc.setTextColor(160, 160, 160);
+    doc.setFontSize(8);
+    doc.text(`Generado: ${moment().format("DD/MM/YYYY HH:mm")}`, W - M, 20, { align: "right" });
+  }
+
+  addHeader(true);
   let y = 36;
 
   // Session info box
   doc.setFillColor(39, 39, 42);
-  doc.roundedRect(M, y, W - M * 2, 22, 2, 2, "F");
+  doc.roundedRect(M, y, CONTENT_W, 22, 2, 2, "F");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.setTextColor(255, 255, 255);
@@ -349,66 +377,115 @@ async function exportSessionPDF(session, exercises, availablePlayers) {
     doc.setFont("helvetica", "italic");
     doc.setFontSize(8);
     doc.setTextColor(120, 120, 120);
-    const lines = doc.splitTextToSize(session.notes, W - M * 2 - 8);
+    const lines = doc.splitTextToSize(session.notes, CONTENT_W - 8);
     doc.text(lines, M + 4, y);
     y += lines.length * 4 + 4;
   }
 
-  // Exercises
-  exercises.forEach((ex, idx) => {
-    if (y > 260) { doc.addPage(); y = 14; }
+  // Exercises — cada uno en su propio bloque con imagen
+  for (let idx = 0; idx < exercises.length; idx++) {
+    const ex = exercises[idx];
+    const img = imageMap[ex.id] || null;
 
-    doc.setFillColor(45, 45, 50);
-    doc.roundedRect(M, y, W - M * 2, 8, 1, 1, "F");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.setTextColor(240, 200, 0);
-    doc.text(`${idx + 1}. ${ex.name}`, M + 3, y + 5.5);
-    y += 10;
+    // Calcular altura estimada del bloque para decidir si hacer nueva página
+    const imgH = img ? Math.min(75, (img.h / img.w) * CONTENT_W) : 0;
+    const detailLines = [
+      ex.space ? `Espacio: ${ex.space}` : null,
+      ex.blocks && ex.duration_minutes ? `Bloques: ${ex.blocks} x ${ex.duration_minutes} min (Total: ${ex.blocks * ex.duration_minutes} min)` : ex.blocks ? `Bloques: ${ex.blocks}` : ex.duration_minutes ? `Duracion: ${ex.duration_minutes} min` : null,
+      (ex.width_m && ex.length_m) ? `Dimensiones: ${ex.width_m} x ${ex.length_m} m` : null,
+      ex.num_players ? `Jugadores: ${ex.num_players}` : null,
+    ].filter(Boolean);
+    const estimatedH = 10 + (detailLines.length * 5) + (ex.objective ? 10 : 0) + (ex.description ? 12 : 0) + imgH + 8;
 
-    const details = [
-      ex.space ? `📍 ${ex.space}` : null,
-      ex.duration_minutes ? `⏱ ${ex.duration_minutes} min` : null,
-      (ex.width_m && ex.length_m) ? `📐 ${ex.width_m}×${ex.length_m} m` : null,
-      ex.num_players ? `👥 ${ex.num_players} jugadores` : null,
-    ].filter(Boolean).join("    ");
-
-    if (details) {
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(8);
-      doc.setTextColor(150, 150, 150);
-      doc.text(details, M + 3, y);
-      y += 5;
+    if (y + estimatedH > 272) {
+      doc.addPage();
+      addHeader();
+      y = 34;
     }
 
+    // — Cabecera del ejercicio —
+    doc.setFillColor(45, 45, 50);
+    doc.roundedRect(M, y, CONTENT_W, 9, 1, 1, "F");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.setTextColor(240, 200, 0);
+    doc.text(`${idx + 1}. ${ex.name}`, M + 3, y + 6.5);
+    y += 11;
+
+    // — Imagen (si existe) —
+    if (img) {
+      const renderedH = Math.min(75, (img.h / img.w) * CONTENT_W);
+      if (y + renderedH > 272) { doc.addPage(); addHeader(); y = 34; }
+      doc.addImage(img.dataUrl, "JPEG", M, y, CONTENT_W, renderedH, undefined, "FAST");
+      y += renderedH + 3;
+    }
+
+    // — Detalles de tiempo y espacio —
+    if (detailLines.length > 0) {
+      doc.setFillColor(35, 35, 40);
+      doc.roundedRect(M, y, CONTENT_W, detailLines.length * 5 + 4, 1, 1, "F");
+      detailLines.forEach((line, i) => {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(8);
+        doc.setTextColor(180, 180, 180);
+        doc.text(line, M + 4, y + 4 + i * 5);
+      });
+      y += detailLines.length * 5 + 7;
+    }
+
+    // — Objetivo —
     if (ex.objective) {
       doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
-      doc.setTextColor(120, 120, 120);
-      const lines = doc.splitTextToSize(`Objetivo: ${ex.objective}`, W - M * 2 - 6);
+      doc.setTextColor(200, 200, 100);
+      const lines = doc.splitTextToSize(`Objetivo: ${ex.objective}`, CONTENT_W - 6);
       doc.text(lines, M + 3, y);
-      y += lines.length * 4 + 2;
+      y += lines.length * 4.5 + 2;
     }
 
+    // — Descripción —
     if (ex.description) {
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 100, 100);
-      const lines = doc.splitTextToSize(ex.description, W - M * 2 - 6);
+      doc.setFontSize(8);
+      doc.setTextColor(120, 120, 120);
+      const lines = doc.splitTextToSize(ex.description, CONTENT_W - 6);
       doc.text(lines, M + 3, y);
-      y += lines.length * 4;
+      y += lines.length * 4.5;
     }
 
-    y += 5;
-  });
+    y += 7;
+  }
 
-  // Footer
-  doc.setDrawColor(60, 60, 60);
-  doc.line(M, 285, W - M, 285);
-  doc.setFont("helvetica", "italic");
-  doc.setFontSize(7);
-  doc.setTextColor(100, 100, 100);
-  doc.text("PerformancePitch — Defensa y Justicia", M, 290);
+  // Tiempo total al final
+  const totalMin = exercises.reduce((acc, ex) => {
+    if (ex.blocks && ex.duration_minutes) return acc + ex.blocks * ex.duration_minutes;
+    if (ex.duration_minutes) return acc + ex.duration_minutes;
+    return acc;
+  }, 0);
+  if (totalMin > 0) {
+    if (y + 10 > 272) { doc.addPage(); addHeader(); y = 34; }
+    doc.setDrawColor(80, 80, 80);
+    doc.line(M, y, W - M, y);
+    y += 5;
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.setTextColor(240, 200, 0);
+    doc.text(`Tiempo total de ejercicios: ${totalMin} min`, W - M, y, { align: "right" });
+    y += 6;
+  }
+
+  // Footer en cada página
+  const totalPages = doc.getNumberOfPages();
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p);
+    doc.setDrawColor(60, 60, 60);
+    doc.line(M, 285, W - M, 285);
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(7);
+    doc.setTextColor(100, 100, 100);
+    doc.text("PerformancePitch — Defensa y Justicia", M, 290);
+    doc.text(`Página ${p} de ${totalPages}`, W - M, 290, { align: "right" });
+  }
 
   doc.save(`Sesion_${session.title.replace(/\s+/g, "_")}_${session.date}.pdf`);
 }
