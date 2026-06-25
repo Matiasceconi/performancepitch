@@ -10,6 +10,21 @@
       "type": "string",
       "description": "Nombre del ejercicio"
     },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Posesi\u00f3n",
+        "Pressing",
+        "Finalizaci\u00f3n",
+        "Transici\u00f3n",
+        "F\u00edsico",
+        "T\u00e1ctica",
+        "Rondo",
+        "Pelota parada",
+        "Otro"
+      ],
+      "description": "Categor\u00eda del ejercicio"
+    },
     "description": {
       "type": "string",
       "description": "Descripci\u00f3n del ejercicio"

@@ -100,6 +100,23 @@ function parseCatapultCSV(text) {
   return { rows };
 }
 
+const CATEGORIES = [
+  "Posesión", "Pressing", "Finalización", "Transición",
+  "Físico", "Táctica", "Rondo", "Pelota parada", "Otro"
+];
+
+const CATEGORY_COLORS = {
+  "Posesión":      "bg-blue-500/20 text-blue-400 border-blue-500/30",
+  "Pressing":      "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  "Finalización":  "bg-red-500/20 text-red-400 border-red-500/30",
+  "Transición":    "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  "Físico":        "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+  "Táctica":       "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  "Rondo":         "bg-emerald-500/20 text-emerald-400 border-emerald-500/30",
+  "Pelota parada": "bg-pink-500/20 text-pink-400 border-pink-500/30",
+  "Otro":          "bg-zinc-700/50 text-zinc-400 border-zinc-600",
+};
+
 const METRICS = [
   { key: "total_distance",  label: "Distancia (m)",      fmt: (v) => Math.round(v) },
   { key: "distance_hsr",   label: "19.8-25 km/h (m)",   fmt: (v) => Math.round(v) },
@@ -363,6 +380,7 @@ function ExerciseCard({ exercise, session, onDelete }) {
   const [csvLabel, setCsvLabel] = useState(exercise.external_csv_label || null);
   const [csvRows, setCsvRows] = useState(null);
   const [imageUrl, setImageUrl] = useState(exercise.image_url || null);
+  const [category, setCategory] = useState(exercise.category || "");
   const fileRef = useRef();
   const imgRef = useRef();
   const { toast } = useToast();
@@ -438,7 +456,14 @@ function ExerciseCard({ exercise, session, onDelete }) {
         className="w-full flex items-center gap-3 p-4 hover:bg-zinc-800/30 transition-colors text-left"
       >
         <div className="flex-1 min-w-0">
-          <p className="text-white font-semibold text-sm">{exercise.name}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-white font-semibold text-sm">{exercise.name}</p>
+            {category && (
+              <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${CATEGORY_COLORS[category] || CATEGORY_COLORS["Otro"]}`}>
+                {category}
+              </span>
+            )}
+          </div>
           <div className="flex flex-wrap gap-3 mt-1 text-xs text-zinc-500">
             {session && (
               <span className="text-zinc-600">
@@ -544,6 +569,30 @@ function ExerciseCard({ exercise, session, onDelete }) {
             </div>
           )}
 
+          {/* Categoría */}
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-zinc-500 shrink-0">Categoría:</span>
+            <div className="flex flex-wrap gap-1.5">
+              {CATEGORIES.map((cat) => (
+                <button
+                  key={cat}
+                  onClick={async () => {
+                    const newCat = cat === category ? "" : cat;
+                    setCategory(newCat);
+                    await base44.entities.FieldExercise.update(exercise.id, { category: newCat || null });
+                  }}
+                  className={`text-xs px-2.5 py-1 rounded-full border font-medium transition-colors ${
+                    category === cat
+                      ? CATEGORY_COLORS[cat] || CATEGORY_COLORS["Otro"]
+                      : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500"
+                  }`}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Interacción individual */}
           <ExercisePlayerLogs exerciseId={exercise.id} />
 
@@ -635,6 +684,7 @@ export default function ExercisesLibrary() {
   const [sessions, setSessions] = useState({});
   const [loading, setLoading] = useState(true);
   const [filterSession, setFilterSession] = useState("all");
+  const [filterCategory, setFilterCategory] = useState("all");
   const [search, setSearch] = useState("");
 
   useEffect(() => {
@@ -659,8 +709,9 @@ export default function ExercisesLibrary() {
 
   const filtered = exercises.filter((ex) => {
     const matchSession = filterSession === "all" || ex.session_id === filterSession;
+    const matchCategory = filterCategory === "all" || ex.category === filterCategory;
     const matchSearch = !search || ex.name.toLowerCase().includes(search.toLowerCase());
-    return matchSession && matchSearch;
+    return matchSession && matchCategory && matchSearch;
   });
 
   if (loading) return (
@@ -677,26 +728,54 @@ export default function ExercisesLibrary() {
       </div>
 
       {/* Filtros */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Buscar ejercicio..."
-          className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-1.5 outline-none focus:border-zinc-500 w-56"
-        />
-        <select
-          value={filterSession}
-          onChange={(e) => setFilterSession(e.target.value)}
-          className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-zinc-500"
-        >
-          <option value="all">Todas las sesiones</option>
-          {uniqueSessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.title} ({moment(s.date).format("DD/MM/YY")})
-            </option>
+      <div className="space-y-2">
+        <div className="flex flex-wrap gap-3 items-center">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar ejercicio..."
+            className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-1.5 outline-none focus:border-zinc-500 w-56"
+          />
+          <select
+            value={filterSession}
+            onChange={(e) => setFilterSession(e.target.value)}
+            className="bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm rounded-lg px-3 py-1.5 outline-none focus:border-zinc-500"
+          >
+            <option value="all">Todas las sesiones</option>
+            {uniqueSessions.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.title} ({moment(s.date).format("DD/MM/YY")})
+              </option>
+            ))}
+          </select>
+          <span className="text-xs text-zinc-600">{filtered.length} ejercicios</span>
+        </div>
+        {/* Filtro rápido por categoría */}
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            onClick={() => setFilterCategory("all")}
+            className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+              filterCategory === "all"
+                ? "bg-white text-zinc-900 border-white"
+                : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500"
+            }`}
+          >
+            Todas
+          </button>
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setFilterCategory(filterCategory === cat ? "all" : cat)}
+              className={`text-xs px-3 py-1 rounded-full border font-medium transition-colors ${
+                filterCategory === cat
+                  ? CATEGORY_COLORS[cat] || CATEGORY_COLORS["Otro"]
+                  : "bg-zinc-800 text-zinc-500 border-zinc-700 hover:border-zinc-500"
+              }`}
+            >
+              {cat}
+            </button>
           ))}
-        </select>
-        <span className="text-xs text-zinc-600">{filtered.length} ejercicios</span>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
