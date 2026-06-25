@@ -212,6 +212,9 @@ function ExerciseBlock({ exercise, players, onDelete, onUpdate }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
       <div className="flex items-center gap-2 p-4">
+        {exercise.image_url && (
+          <img src={exercise.image_url} alt="Ejercicio" className="h-14 w-20 object-cover rounded-lg border border-zinc-700 shrink-0" />
+        )}
         <button
           onClick={() => setOpen((v) => !v)}
           className="flex-1 min-w-0 flex items-center gap-3 text-left"
