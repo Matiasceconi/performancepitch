@@ -265,7 +265,7 @@ function TabCarga({ player }) {
   useEffect(() => {
     async function load() {
       try {
-        const gps = await base44.entities.GPSRecord.filter({ player_id: player.id }, "-date", 100);
+        const gps = await base44.entities.CatapultReport.filter({ player_name: player.name }, "-date", 100);
         setGpsRecords(gps || []);
       } catch (e) {
         console.error("Error loading GPS records:", e);
