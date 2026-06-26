@@ -14,7 +14,6 @@ import moment from "moment";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
 const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Subio a primera", "Bajo a juveniles", "Subio de juveniles", "Bajo de primera", "Sparring"];
-const divisions = ["Primera", "Reserva", "Cuarta División", "Quinta División"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
 const seasonPeriods = ["En competencia", "Pretemporada", "Transitorio"];
 
@@ -48,6 +47,7 @@ function calcAge(birth_date) {
 
 export default function Squad() {
   const [players, setPlayers] = useState([]);
+  const [divisions, setDivisions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -59,14 +59,31 @@ export default function Squad() {
   const [search, setSearch] = useState("");
   const [filterPosition, setFilterPosition] = useState(null);
   const [showImport, setShowImport] = useState(false);
+  const [showNewDivision, setShowNewDivision] = useState(false);
+  const [newDivisionName, setNewDivisionName] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => { loadPlayers(); }, []);
+  useEffect(() => { loadPlayers(); loadDivisions(); }, []);
 
   async function loadPlayers() {
     const data = await base44.entities.Player.list("-created_date", 100);
     setPlayers(data);
     setLoading(false);
+  }
+
+  async function loadDivisions() {
+    const data = await base44.entities.Division.list("-created_date", 100);
+    setDivisions(data);
+  }
+
+  async function handleAddDivision(e) {
+    e.preventDefault();
+    if (!newDivisionName.trim()) return;
+    await base44.entities.Division.create({ name: newDivisionName.trim() });
+    toast({ title: "División creada" });
+    setNewDivisionName("");
+    setShowNewDivision(false);
+    await loadDivisions();
   }
 
   function openNew() {
@@ -133,18 +150,12 @@ export default function Squad() {
   }
 
   function filterByTab(tab) {
-    const divisionMap = {
-      "reserva": "Reserva",
-      "primera": "Primera",
-      "cuarta": "Cuarta División",
-      "quinta": "Quinta División",
-    };
-    const targetDivision = divisionMap[tab];
-    return players.filter((p) => (p.division || "Reserva") === targetDivision);
+    const division = divisions.find((d) => d.id === tab);
+    return players.filter((p) => p.division === (division?.name || "Reserva"));
   }
 
   const activePlayers = filterByTab(activeTab)
-    .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((p) => !search || p.full_name.toLowerCase().includes(search.toLowerCase()))
     .filter((p) => !filterPosition || p.position === filterPosition);
 
   const grouped = positions.map((pos) => ({
@@ -153,6 +164,12 @@ export default function Squad() {
   }));
 
   const countByTab = (tab) => filterByTab(tab).length;
+  const defaultTab = divisions.length > 0 ? divisions[0].id : null;
+  const activeTabId = activeTab || defaultTab;
+
+  useEffect(() => {
+    if (defaultTab && !activeTab) setActiveTab(defaultTab);
+  }, [defaultTab, activeTab]);
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
 
@@ -192,13 +209,43 @@ export default function Squad() {
 
       {/* Tabs */}
       <div className="flex flex-wrap gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
-        {TABS.map(({ id, label }) => (
+        {divisions.map(({ id, name }) => (
           <button key={id} onClick={() => setActiveTab(id)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-            {label} ({countByTab(id)})
+            {name} ({countByTab(id)})
           </button>
         ))}
+        <button onClick={() => setShowNewDivision(true)}
+          className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors">
+          +
+        </button>
       </div>
+
+      {/* Nueva división form */}
+      {showNewDivision && (
+        <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+          <form onSubmit={handleAddDivision} className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-zinc-400 mb-1 block">Nombre de la división</label>
+              <Input
+                value={newDivisionName}
+                onChange={(e) => setNewDivisionName(e.target.value)}
+                placeholder="Ej: Sexta División"
+                className="bg-zinc-900 border-zinc-700 text-white"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors">
+                Crear
+              </button>
+              <button type="button" onClick={() => { setShowNewDivision(false); setNewDivisionName(""); }} className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Posición filter */}
       <div>
@@ -287,14 +334,14 @@ export default function Squad() {
                             </SelectContent>
                           </Select>
                           <select 
-                            value={p.division || "Primera"} 
+                            value={p.division || "Reserva"} 
                             onChange={async (e) => {
                               const newDivision = e.target.value;
                               await base44.entities.Player.update(p.id, { division: newDivision });
                               await loadPlayers();
                             }}
                             className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 rounded px-2 py-1 hover:bg-zinc-700 transition-colors cursor-pointer">
-                            {divisions.map((d) => <option key={d} value={d}>{d}</option>)}
+                            {divisions.map((d) => <option key={d.id} value={d.name}>{d.name}</option>)}
                           </select>
                         </div>
                         <div className="flex items-center gap-1">
@@ -441,7 +488,7 @@ export default function Squad() {
                 <Select value={form.division} onValueChange={(v) => set("division", v)}>
                   <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {divisions.map((d) => <SelectItem key={d} value={d} className="text-white">{d}</SelectItem>)}
+                    {divisions.map((d) => <SelectItem key={d.id} value={d.name} className="text-white">{d.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>

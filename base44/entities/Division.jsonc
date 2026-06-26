@@ -1,0 +1,13 @@
+{
+  "name": "Division",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre de la divisi\u00f3n"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}
