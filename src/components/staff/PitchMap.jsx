@@ -173,7 +173,7 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
                 style={{ borderColor: chipColor, borderWidth: "3px", boxShadow: `0 0 20px ${chipColor}40, 0 4px 12px rgba(0,0,0,0.6)` }}
                 className="w-11 h-11 rounded-full overflow-hidden border transition-all group-hover:scale-130 block"
               >
-                <img src={player.photo_url} alt={player.name} className="w-full h-full object-cover" />
+                <img src={player.photo_url} alt={player.full_name} className="w-full h-full object-cover" />
               </div>
             ) : (
               <div
@@ -187,8 +187,8 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
             {/* Info del jugador */}
             <div className="mt-1.5 bg-black/80 rounded-md px-2 py-1 backdrop-blur-sm border border-white/40 text-center whitespace-nowrap shadow-lg">
               <div className="text-[9px] font-bold text-white leading-tight tracking-wide">
-                {player.number ? `${player.number}-` : ""}{player.name.split(" ").slice(-1)[0].toUpperCase()}
-              </div>
+                 {player.number ? `${player.number}-` : ""}{player.full_name?.split(" ").slice(-1)[0].toUpperCase() || "?"}
+               </div>
               <div className="text-[7px] text-yellow-200 leading-tight font-semibold">
                 {player.position?.substring(0, 3).toUpperCase()}
               </div>
