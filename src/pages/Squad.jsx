@@ -268,8 +268,8 @@ export default function Squad() {
                              {isToday && <Cake size={14} className="text-yellow-400" title="¡Cumpleaños hoy!" />}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                            {p.birth_date && <span className="text-xs text-zinc-600">{moment(p.birth_date).format("YYYY")}</span>}
                             {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
-                            {p.category && <span className="text-xs text-zinc-600">Cat. {p.category}</span>}
                             {p.dominant_foot && <span className="text-xs text-zinc-600">{p.dominant_foot}</span>}
                             {p.club_housing && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Pensión</span>}
                             {p.has_contract && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium">Contrato</span>}
@@ -372,8 +372,14 @@ export default function Squad() {
                 <Input type="number" value={form.number} onChange={(e) => set("number", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" placeholder="Opcional" />
               </div>
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Categoría</label>
-                <Input value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="Ej: 2005, Sub-20" className="bg-zinc-800 border-zinc-700 text-white" />
+                <label className="text-xs text-zinc-400 mb-1 block">Año de nacimiento</label>
+                <Input value={form.birth_date ? moment(form.birth_date).format("YYYY") : ""} onChange={(e) => {
+                  const year = e.target.value;
+                  if (year && form.birth_date) {
+                    const newDate = moment(form.birth_date).year(parseInt(year)).format("YYYY-MM-DD");
+                    set("birth_date", newDate);
+                  }
+                }} className="bg-zinc-800 border-zinc-700 text-white" placeholder="Ej: 2005" />
               </div>
             </div>
 
