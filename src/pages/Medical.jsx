@@ -145,15 +145,25 @@ export default function Medical() {
         <div className="grid gap-3">
           {displayed.map((r) => (
             <div key={r.id} className={`bg-zinc-900 border rounded-xl p-4 flex items-start gap-4 ${
-              r.status === "Lesionado" ? "border-red-500/30" :
-              r.status === "En recuperación" ? "border-orange-500/30" :
-              r.status === "Seguimiento" ? "border-yellow-500/30" :
-              "border-zinc-800"
+            r.status === "Lesionado" ? "border-red-500/30" :
+            r.status === "En recuperación" ? "border-orange-500/30" :
+            r.status === "Seguimiento" ? "border-yellow-500/30" :
+            "border-zinc-800"
             }`}>
-              <div className="flex-1 min-w-0">
-                {/* Header */}
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-white font-semibold text-sm">{r.player_name}</span>
+            {(() => {
+              const playerData = players.find(p => p.id === r.player_id || p.name === r.player_name);
+              return playerData?.photo_url ? (
+                <img src={playerData.photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0 mt-0.5" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
+                  <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
+                </div>
+              );
+            })()}
+            <div className="flex-1 min-w-0">
+              {/* Header */}
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-white font-semibold text-sm">{r.player_name}</span>
                   {r.category_division && (
                     <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">{r.category_division}</span>
                   )}
