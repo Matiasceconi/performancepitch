@@ -63,6 +63,8 @@ import PitchMap from "@/components/staff/PitchMap";
 import TournamentTable from "@/components/staff/TournamentTable";
 import TournamentImporter from "@/components/staff/TournamentImporter";
 import moment from "moment";
+import "moment/locale/es";
+moment.locale("es");
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
