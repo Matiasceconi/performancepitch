@@ -61,6 +61,8 @@ export default function Squad() {
   const [showImport, setShowImport] = useState(false);
   const [showNewDivision, setShowNewDivision] = useState(false);
   const [newDivisionName, setNewDivisionName] = useState("");
+  const [editingDivision, setEditingDivision] = useState(null);
+  const [editingDivisionName, setEditingDivisionName] = useState("");
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); loadDivisions(); }, []);
@@ -101,6 +103,23 @@ export default function Squad() {
     toast({ title: "División creada" });
     setNewDivisionName("");
     setShowNewDivision(false);
+    await loadDivisions();
+  }
+
+  async function handleEditDivision(e) {
+    e.preventDefault();
+    if (!editingDivisionName.trim()) return;
+    await base44.entities.Division.update(editingDivision.id, { name: editingDivisionName.trim() });
+    toast({ title: "División actualizada" });
+    setEditingDivision(null);
+    setEditingDivisionName("");
+    await loadDivisions();
+  }
+
+  async function handleDeleteDivision(divisionId) {
+    if (!confirm("¿Eliminar esta división?")) return;
+    await base44.entities.Division.delete(divisionId);
+    toast({ title: "División eliminada" });
     await loadDivisions();
   }
 
@@ -228,12 +247,22 @@ export default function Squad() {
       {/* Tabs con reorden */}
       <div className="flex flex-wrap gap-2 items-center bg-zinc-900 border border-zinc-800 rounded-xl p-2 w-fit">
         {divisions.map(({ id, name }, idx) => (
-          <div key={id} className="flex items-center gap-1 bg-zinc-800 rounded-lg px-2 py-1">
+          <div key={id} className="flex items-center gap-1 bg-zinc-800 rounded-lg px-2 py-1 group">
             <button onClick={() => setActiveTab(id)}
               className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${activeTab === id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
               {name} ({countByTab(id)})
             </button>
             <div className="flex gap-0.5">
+              <button onClick={() => { setEditingDivision({ id, name }); setEditingDivisionName(name); }}
+                className="p-1 text-zinc-600 hover:text-yellow-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="Editar">
+                <Pencil size={12} />
+              </button>
+              <button onClick={() => handleDeleteDivision(id)}
+                className="p-1 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                title="Eliminar">
+                <Trash2 size={12} />
+              </button>
               <button onClick={() => handleMoveDivision(id, "up")} disabled={idx === 0}
                 className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors">
                 <ChevronUp size={14} />
@@ -250,6 +279,32 @@ export default function Squad() {
           +
         </button>
       </div>
+
+      {/* Editar división */}
+      {editingDivision && (
+        <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+          <form onSubmit={handleEditDivision} className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-zinc-400 mb-1 block">Editar nombre de la división</label>
+              <Input
+                value={editingDivisionName}
+                onChange={(e) => setEditingDivisionName(e.target.value)}
+                placeholder="Nombre de la división"
+                className="bg-zinc-900 border-zinc-700 text-white"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                Guardar
+              </button>
+              <button type="button" onClick={() => { setEditingDivision(null); setEditingDivisionName(""); }} className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
 
       {/* Nueva división form */}
       {showNewDivision && (
