@@ -2,11 +2,23 @@
   "name": "Player",
   "type": "object",
   "properties": {
-    "name": {
+    "first_name": {
       "type": "string",
-      "description": "Nombre completo del jugador"
+      "description": "Nombre del jugador"
     },
-    "number": {
+    "last_name": {
+      "type": "string",
+      "description": "Apellido del jugador"
+    },
+    "full_name": {
+      "type": "string",
+      "description": "Nombre completo (generado autom\u00e1ticamente)"
+    },
+    "normalized_name": {
+      "type": "string",
+      "description": "Nombre normalizado para b\u00fasqueda (min\u00fascula, sin tildes)"
+    },
+    "jersey_number": {
       "type": "number",
       "description": "N\u00famero de camiseta"
     },
@@ -22,18 +34,45 @@
         "Extremo",
         "Delantero Centro"
       ],
-      "description": "Posici\u00f3n del jugador"
+      "description": "Posici\u00f3n principal"
     },
-    "division": {
+    "secondary_position": {
+      "type": "string",
+      "description": "Posici\u00f3n secundaria"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda (ej: 2005, Sub-20, Juvenil)"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de nacimiento"
+    },
+    "age": {
+      "type": "number",
+      "description": "Edad calculada"
+    },
+    "dominant_leg": {
       "type": "string",
       "enum": [
-        "Primera",
-        "Reserva",
-        "Cuarta Divisi\u00f3n",
-        "Quinta Divisi\u00f3n"
+        "Derecha",
+        "Izquierda",
+        "Ambidiestro"
       ],
-      "default": "Primera",
-      "description": "Divisi\u00f3n a la que pertenece el jugador"
+      "description": "Pierna h\u00e1bil"
+    },
+    "height": {
+      "type": "number",
+      "description": "Altura en cm"
+    },
+    "weight": {
+      "type": "number",
+      "description": "Peso en kg"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Foto de perfil del jugador"
     },
     "status": {
       "type": "string",
@@ -48,49 +87,24 @@
       "default": "Disponible",
       "description": "Estado actual del jugador"
     },
-    "season_period": {
+    "division": {
       "type": "string",
       "enum": [
-        "En competencia",
-        "Pretemporada",
-        "Transitorio"
+        "Primera",
+        "Reserva",
+        "Cuarta Divisi\u00f3n",
+        "Quinta Divisi\u00f3n"
       ],
-      "description": "Per\u00edodo de la temporada del jugador"
+      "default": "Primera",
+      "description": "Divisi\u00f3n"
     },
-    "injury_detail": {
+    "notes": {
       "type": "string",
-      "description": "Detalle de la lesi\u00f3n o motivo de baja"
-    },
-    "expected_return": {
-      "type": "string",
-      "format": "date",
-      "description": "Fecha estimada de regreso"
-    },
-    "photo_url": {
-      "type": "string",
-      "description": "Foto del jugador"
-    },
-    "birth_date": {
-      "type": "string",
-      "format": "date",
-      "description": "Fecha de nacimiento"
-    },
-    "category": {
-      "type": "string",
-      "description": "Categor\u00eda del jugador (ej: 2005, Sub-20)"
+      "description": "Notas adicionales"
     },
     "document_number": {
       "type": "string",
-      "description": "N\u00famero de documento (DNI, pasaporte, etc.)"
-    },
-    "dominant_foot": {
-      "type": "string",
-      "enum": [
-        "Derecha",
-        "Izquierda",
-        "Ambidiestro"
-      ],
-      "description": "Pierna h\u00e1bil"
+      "description": "DNI / Documento"
     },
     "birth_place": {
       "type": "string",
@@ -98,21 +112,22 @@
     },
     "current_residence": {
       "type": "string",
-      "description": "Lugar de residencia actual"
+      "description": "Residencia actual"
     },
     "club_housing": {
       "type": "boolean",
       "default": false,
-      "description": "Reside en la pensi\u00f3n del club"
+      "description": "Reside en pensi\u00f3n"
     },
     "has_contract": {
       "type": "boolean",
       "default": false,
-      "description": "Tiene contrato con el club"
+      "description": "Tiene contrato"
     }
   },
   "required": [
-    "name",
+    "first_name",
+    "last_name",
     "position"
   ]
 }

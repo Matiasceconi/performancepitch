@@ -23,6 +23,7 @@ import Team from '@/pages/Team';
 import Schedule from '@/pages/Schedule';
 import Matches from '@/pages/Matches';
 import PlayerNameManagement from '@/pages/PlayerNameManagement';
+import PlantilDiagnostic from '@/pages/PlantilDiagnostic';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -66,6 +67,7 @@ const AuthenticatedApp = () => {
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/matches" element={<Matches />} />
           <Route path="/player-names" element={<PlayerNameManagement />} />
+          <Route path="/plantil-diagnostic" element={<PlantilDiagnostic />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
