@@ -70,7 +70,7 @@ import PlayerPhotoUpload from "@/components/staff/PlayerPhotoUpload";
 import PitchMap from "@/components/staff/PitchMap";
 import TournamentTable from "@/components/staff/TournamentTable";
 import TournamentImporter from "@/components/staff/TournamentImporter";
-import PlayerEditDialog from "@/components/staff/PlayerEditDialog";
+import PlayerFormModal from "@/components/staff/PlayerFormModal";
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
@@ -79,6 +79,7 @@ export default function Dashboard() {
   const [showMap, setShowMap] = useState(false);
   const [showStatusPanel, setShowStatusPanel] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [divisions, setDivisions] = useState([]);
   const [statuses, setStatuses] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [editingPlayer, setEditingPlayer] = useState(null);
@@ -89,16 +90,18 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [allPlayers, events, s, matchReports, sts] = await Promise.all([
+        const [allPlayers, events, s, matchReports, divs, sts] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.DayEvent.list("date", 200),
         base44.entities.TrainingSession.list("-date", 5),
         base44.entities.MatchReport.list("-date", 20),
+        base44.entities.Division.list("order", 100),
         base44.entities.Status.list("order", 50)]
         );
         const p = allPlayers.filter((pl) => pl.division === "Reserva" || pl.status === "Subio de juveniles");
         setPlayers(p);
         setSessions(s);
+        setDivisions(divs);
         setStatuses(sts);
         const today = moment().format("YYYY-MM-DD");
         const match = events.find((e) => e.type === "Partido" && e.date >= today);
@@ -433,8 +436,10 @@ export default function Dashboard() {
       )}
 
       {editingPlayer && (
-        <PlayerEditDialog
+        <PlayerFormModal
           player={editingPlayer}
+          divisions={divisions}
+          statuses={statuses}
           onClose={() => setEditingPlayer(null)}
           onSave={async (data) => {
             await base44.entities.Player.update(editingPlayer.id, data);
