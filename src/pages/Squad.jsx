@@ -246,17 +246,30 @@ export default function Squad() {
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
                           </div>
                         </div>
-                        <Select value={p.status || "Disponible"} onValueChange={async (v) => {
-                          await base44.entities.Player.update(p.id, { status: v });
-                          setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
-                        }}>
-                          <SelectTrigger className="h-auto py-0.5 px-2 border-0 bg-transparent text-xs w-auto focus:ring-0 shadow-none gap-1">
-                            <PlayerStatusBadge status={p.status || "Disponible"} />
-                          </SelectTrigger>
-                          <SelectContent className="bg-zinc-800 border-zinc-700">
-                            {statuses.map((s) => <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>)}
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Select value={p.status || "Disponible"} onValueChange={async (v) => {
+                            await base44.entities.Player.update(p.id, { status: v });
+                            setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
+                          }}>
+                            <SelectTrigger className="h-auto py-0.5 px-2 border-0 bg-transparent text-xs w-auto focus:ring-0 shadow-none gap-1">
+                              <PlayerStatusBadge status={p.status || "Disponible"} />
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-800 border-zinc-700">
+                              {statuses.map((s) => <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                          <Select value={p.division || "Primera"} onValueChange={async (v) => {
+                            await base44.entities.Player.update(p.id, { division: v });
+                            setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, division: v } : pl));
+                          }}>
+                            <SelectTrigger className="h-auto py-0.5 px-2 border-0 bg-transparent text-xs w-auto focus:ring-0 shadow-none gap-1">
+                              <span className="text-zinc-400 text-xs">{p.division || "Primera"}</span>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-800 border-zinc-700">
+                              {divisions.map((d) => <SelectItem key={d} value={d} className="text-white text-xs">{d}</SelectItem>)}
+                            </SelectContent>
+                          </Select>
+                        </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => openEdit(p)} className="p-1.5 text-zinc-600 hover:text-white transition-colors">
                             <Pencil size={14} />
