@@ -7,7 +7,7 @@ const navItems = [
 { label: "Dashboard", path: "/", icon: LayoutDashboard },
 { label: "Sesiones", path: "/sessions", icon: Video },
 { label: "Partidos", path: "/matches", icon: Trophy },
-{ label: "Estado del equipo", path: "/squad", icon: Users },
+{ label: "Plantel", path: "/squad", icon: Users },
 { label: "Mapa táctico", path: "/tactical", icon: Map },
 { label: "Rendimiento", path: "/performance", icon: TrendingUp },
 { label: "Calendario", path: "/schedule", icon: CalendarDays },

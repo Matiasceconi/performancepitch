@@ -45,6 +45,7 @@ export default function Squad() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activeTab, setActiveTab] = useState("primera");
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -112,9 +113,16 @@ export default function Squad() {
     loadPlayers();
   }
 
+  // Plantel principal: todos salvo los que tienen status "Juveniles"
+  const primeraPlayers = players.filter((p) => p.status !== "Juveniles");
+  // Plantel juveniles: los que tienen status "Juveniles"
+  const juvenilesPlayers = players.filter((p) => p.status === "Juveniles");
+
+  const activePlayers = activeTab === "primera" ? primeraPlayers : juvenilesPlayers;
+
   const grouped = positions.map((pos) => ({
     position: pos,
-    players: players.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
+    players: activePlayers.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
   }));
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
@@ -135,6 +143,18 @@ export default function Squad() {
         <Button onClick={openNew} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={16} className="mr-1.5" /> Agregar jugador
         </Button>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+        <button onClick={() => setActiveTab("primera")}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === "primera" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+          Primera ({primeraPlayers.length})
+        </button>
+        <button onClick={() => setActiveTab("juveniles")}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === "juveniles" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+          Juveniles ({juvenilesPlayers.length})
+        </button>
       </div>
 
       {/* Birthday alert */}
