@@ -26,7 +26,7 @@ const TABS = [
 ];
 
 const EMPTY_FORM = {
-  name: "", number: "", position: "Defensor", status: "Disponible",
+  first_name: "", last_name: "", number: "", position: "Defensor", status: "Disponible",
   division: "Primera",
   season_period: "",
   injury_detail: "", expected_return: "", photo_url: "",
@@ -78,7 +78,8 @@ export default function Squad() {
   function openEdit(p) {
     setEditing(p);
     setForm({
-      name: p.full_name || "",
+      first_name: p.first_name || "",
+      last_name: p.last_name || "",
       number: String(p.number || ""),
       position: p.position || "Defensor",
       status: p.status || "Disponible",
@@ -104,6 +105,10 @@ export default function Squad() {
   async function handleSubmit(e) {
     e.preventDefault();
     const payload = { ...form, number: form.number ? Number(form.number) : undefined };
+    // Generar full_name a partir de first_name y last_name
+    if (form.first_name || form.last_name) {
+      payload.full_name = `${form.first_name} ${form.last_name}`.trim();
+    }
     // clean empty strings
     Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
     if (editing) {
@@ -349,10 +354,16 @@ export default function Squad() {
               </div>
             </div>
 
-            {/* Nombre */}
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Nombre completo *</label>
-              <Input value={form.name} onChange={(e) => set("name", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
+            {/* Nombre y Apellido */}
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Nombre *</label>
+                <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Apellido *</label>
+                <Input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
