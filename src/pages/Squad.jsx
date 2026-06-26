@@ -126,13 +126,14 @@ export default function Squad() {
   }
 
   function filterByTab(tab) {
-    switch (tab) {
-      case "reserva": return players.filter((p) => (p.division || "Primera") === "Reserva");
-      case "primera": return players.filter((p) => (p.division || "Primera") === "Primera");
-      case "cuarta":  return players.filter((p) => p.division === "Cuarta División");
-      case "quinta":  return players.filter((p) => p.division === "Quinta División");
-      default: return [];
-    }
+    const divisionMap = {
+      "reserva": "Reserva",
+      "primera": "Primera",
+      "cuarta": "Cuarta División",
+      "quinta": "Quinta División",
+    };
+    const targetDivision = divisionMap[tab];
+    return players.filter((p) => (p.division || "Primera") === targetDivision);
   }
 
   const activePlayers = filterByTab(activeTab)
