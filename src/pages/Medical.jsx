@@ -73,7 +73,14 @@ export default function Medical() {
     setRecords((prev) => prev.filter((r) => r.id !== id));
   }
 
-  const lesiones = records.filter(r => r.record_type === "Lesión" || !r.record_type);
+  const lesiones = records
+    .filter(r => r.record_type === "Lesión" || !r.record_type)
+    .sort((a, b) => {
+      if (!a.injury_date && !b.injury_date) return 0;
+      if (!a.injury_date) return 1;
+      if (!b.injury_date) return -1;
+      return new Date(b.injury_date) - new Date(a.injury_date);
+    });
   const consultas = records.filter(r => r.record_type === "Consulta/Seguimiento");
   const displayed = activeTab === "lesiones" ? lesiones : consultas;
 
@@ -137,28 +144,73 @@ export default function Medical() {
       ) : (
         <div className="grid gap-3">
           {displayed.map((r) => (
-            <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex items-start gap-4">
+            <div key={r.id} className={`bg-zinc-900 border rounded-xl p-4 flex items-start gap-4 ${
+              r.status === "Lesionado" ? "border-red-500/30" :
+              r.status === "En recuperación" ? "border-orange-500/30" :
+              r.status === "Seguimiento" ? "border-yellow-500/30" :
+              "border-zinc-800"
+            }`}>
               <div className="flex-1 min-w-0">
+                {/* Header */}
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-white font-semibold text-sm">{r.player_name}</span>
-                  {r.category_division && <span className="text-xs text-zinc-500">{r.category_division}</span>}
+                  {r.category_division && (
+                    <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">{r.category_division}</span>
+                  )}
                   {r.status && (
                     <span className={`text-xs px-2 py-0.5 rounded border ${statusColors[r.status] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>{r.status}</span>
                   )}
-                </div>
-                <p className="text-zinc-300 text-sm mt-1">{r.diagnosis}</p>
-                <div className="flex flex-wrap gap-3 mt-1.5 text-xs text-zinc-500">
-                  {r.affected_limb && r.affected_limb !== "No corresponde" && <span>MMII: {r.affected_limb}</span>}
-                  {r.injury_date && <span>Inicio: {moment(r.injury_date).format("DD/MM/YYYY")}</span>}
-                  {r.expected_return && <span>Fin/Retorno: {moment(r.expected_return).format("DD/MM/YYYY")}</span>}
-                  {(r.days_lost !== undefined && r.days_lost !== null) && (
-                    <span className={r.days_lost > 0 ? "text-orange-400 font-medium" : ""}>{r.days_lost} días perdidos</span>
+                  {r.injury_date && (
+                    <span className="text-xs text-zinc-600 ml-auto">{moment(r.injury_date).format("DD/MM/YYYY")}</span>
                   )}
-                  {r.rehab_stage && <span className="text-blue-400">{r.rehab_stage}</span>}
                 </div>
-                {r.notes && <p className="text-xs text-zinc-600 mt-1">{r.notes}</p>}
+
+                {/* Diagnóstico */}
+                <p className="text-zinc-200 text-sm font-medium mt-1.5">{r.diagnosis}</p>
+
+                {/* Detalle grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">
+                  {r.affected_limb && r.affected_limb !== "No corresponde" && (
+                    <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
+                      <p className="text-xs text-zinc-500">MMII afectado</p>
+                      <p className="text-xs text-white font-medium mt-0.5">{r.affected_limb}</p>
+                    </div>
+                  )}
+                  {r.injury_date && (
+                    <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
+                      <p className="text-xs text-zinc-500">Inicio TTO</p>
+                      <p className="text-xs text-white font-medium mt-0.5">{moment(r.injury_date).format("DD MMM YYYY")}</p>
+                    </div>
+                  )}
+                  {r.expected_return && (
+                    <div className="bg-zinc-800/60 rounded-lg px-3 py-2">
+                      <p className="text-xs text-zinc-500">Fin / Retorno</p>
+                      <p className="text-xs text-white font-medium mt-0.5">{moment(r.expected_return).format("DD MMM YYYY")}</p>
+                    </div>
+                  )}
+                  {(r.days_lost !== undefined && r.days_lost !== null) && (
+                    <div className={`rounded-lg px-3 py-2 ${r.days_lost > 0 ? "bg-orange-500/10" : "bg-zinc-800/60"}`}>
+                      <p className="text-xs text-zinc-500">Días perdidos</p>
+                      <p className={`text-xs font-bold mt-0.5 ${r.days_lost > 0 ? "text-orange-400" : "text-zinc-400"}`}>{r.days_lost}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* Etapa RHB */}
+                {r.rehab_stage && (
+                  <div className="mt-2">
+                    <span className="text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded">
+                      RHB: {r.rehab_stage}
+                    </span>
+                  </div>
+                )}
+
+                {/* Notas */}
+                {r.notes && (
+                  <p className="text-xs text-zinc-500 mt-2 italic border-l-2 border-zinc-700 pl-2">{r.notes}</p>
+                )}
               </div>
-              <button onClick={() => deleteRecord(r.id)} className="text-zinc-700 hover:text-red-400 transition-colors shrink-0">
+              <button onClick={() => deleteRecord(r.id)} className="text-zinc-700 hover:text-red-400 transition-colors shrink-0 mt-1">
                 <Trash2 size={14} />
               </button>
             </div>
