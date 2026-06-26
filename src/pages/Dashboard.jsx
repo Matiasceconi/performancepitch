@@ -185,10 +185,10 @@ export default function Dashboard() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700">
-                      {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera"].map((s) =>
-                  <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
-                  )}
-                    </SelectContent>
+                       {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subio de juveniles", "Bajo de primera", "Sparring"].map((s) =>
+                    <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
+                    )}
+                     </SelectContent>
                   </Select>
                 </div>
             )}
