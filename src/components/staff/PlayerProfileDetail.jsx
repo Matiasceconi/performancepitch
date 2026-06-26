@@ -262,7 +262,7 @@ function TabCarga({ player }) {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("7");
 
-  // Normalizar nombre: remover tildes, espacios extras, convertir a minúsculas
+  // Normalizar nombre: remover tildes, espacios extras, convertir a minúsculas, extrae palabras
   const normalizeName = (name) => {
     return name
       .normalize("NFD")
@@ -272,12 +272,26 @@ function TabCarga({ player }) {
       .replace(/\s+/g, " ");
   };
 
+  // Obtener palabras del nombre (para matching flexible)
+  const getNameWords = (name) => {
+    return normalizeName(name).split(" ").filter(w => w.length > 2);
+  };
+
+  // Verificar si dos nombres coinciden (búsqueda flexible)
+  const namesMatch = (name1, name2) => {
+    const words1 = getNameWords(name1);
+    const words2 = getNameWords(name2);
+    if (words1.length === 0 || words2.length === 0) return false;
+    // Al menos 2 palabras deben coincidir (ej: "Tomas Escalante" ↔ "Escalante Tomas")
+    const matches = words1.filter(w => words2.includes(w)).length;
+    return matches >= Math.max(1, Math.min(words1.length, words2.length) - 1);
+  };
+
   useEffect(() => {
     async function load() {
       try {
         const allCatapult = await base44.entities.CatapultReport.list("-date", 200);
-        const playerNormalized = normalizeName(player.name);
-        const filtered = allCatapult.filter(r => normalizeName(r.player_name) === playerNormalized);
+        const filtered = allCatapult.filter(r => namesMatch(player.name, r.player_name));
         setGpsRecords(filtered || []);
       } catch (e) {
         console.error("Error loading GPS records:", e);
