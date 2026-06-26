@@ -82,6 +82,19 @@ export default function PlantilDiagnostic() {
     }
   }
 
+  async function assignMissingDivisions() {
+    setRunning(true);
+    try {
+      const response = await base44.functions.invoke('assignMissingDivisions', {});
+      toast({ title: response.data.message });
+      await runDiagnostic();
+    } catch (error) {
+      toast({ title: 'Error al asignar divisiones', variant: 'destructive' });
+    } finally {
+      setRunning(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -102,12 +115,20 @@ export default function PlantilDiagnostic() {
           <h1 className="text-2xl font-bold text-white">Control de Plantel</h1>
           <p className="text-zinc-500 text-sm mt-1">Diagnóstico de integridad de datos</p>
         </div>
-        <Button
-          onClick={fixNames}
-          disabled={running || issueCount === 0}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white">
-          {running ? 'Corrigiendo...' : 'Normalizar nombres'}
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            onClick={assignMissingDivisions}
+            disabled={running}
+            className="bg-blue-600 hover:bg-blue-700 text-white">
+            {running ? 'Procesando...' : 'Asignar divisiones'}
+          </Button>
+          <Button
+            onClick={fixNames}
+            disabled={running || issueCount === 0}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white">
+            {running ? 'Corrigiendo...' : 'Normalizar nombres'}
+          </Button>
+        </div>
       </div>
 
       {/* Resumen */}

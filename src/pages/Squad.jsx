@@ -133,7 +133,7 @@ export default function Squad() {
       "quinta": "Quinta División",
     };
     const targetDivision = divisionMap[tab];
-    return players.filter((p) => (p.division || "Primera") === targetDivision);
+    return players.filter((p) => (p.division || "Reserva") === targetDivision);
   }
 
   const activePlayers = filterByTab(activeTab)
