@@ -550,7 +550,7 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
           </div>
           <div className="flex items-center gap-2">
             {onEdit && (
-              <button onClick={() => { onEdit(player); onClose(); }} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors" title="Editar jugador">
+              <button onClick={() => onEdit(player)} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors" title="Editar jugador">
                 <Pencil size={18} />
               </button>
             )}
