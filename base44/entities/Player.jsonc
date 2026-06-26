@@ -82,7 +82,12 @@
         "En recuperaci\u00f3n",
         "Suspendido",
         "Permiso",
-        "Selecci\u00f3n"
+        "Selecci\u00f3n",
+        "Subio a primera",
+        "Bajo a juveniles",
+        "Subio de juveniles",
+        "Bajo de primera",
+        "Sparring"
       ],
       "default": "Disponible",
       "description": "Estado actual del jugador"
