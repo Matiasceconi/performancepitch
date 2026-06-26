@@ -117,10 +117,11 @@ export default function Dashboard() {
     const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
 
   const availablePlayers = players.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
-   const unavailablePlayers = players.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
-   const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
-   const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
-   const injured = players.filter((p) => p.status === "Lesionado").length;
+    const unavailablePlayers = players.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
+    const subioDJuveniles = players.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
+    const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
+    const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
+    const injured = players.filter((p) => p.status === "Lesionado").length;
 
   const stats = [
   { label: "Jugadores (Reserva)", value: players.length, icon: Users, color: "text-blue-400" },
@@ -266,13 +267,45 @@ export default function Dashboard() {
                     <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
                        <span className="text-sm text-white">{p.full_name}</span>
                        <span className="text-xs text-zinc-500">{p.position}</span>
-                     </div>
+                      </div>
                   </div>
               )}
               </div>
             }
           </div>
         </div>
+
+        {/* Subio de juveniles */}
+        {subioDJuveniles.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-fuchsia-500 inline-block" />
+              Subio de juveniles
+              <span className="text-xs text-fuchsia-400 font-normal">({subioDJuveniles.length})</span>
+            </h2>
+            <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+              Ver plantel <ChevronRight size={14} />
+            </Link>
+          </div>
+          <div className="p-4">
+            <div className="space-y-2 max-h-72 overflow-y-auto">
+                {subioDJuveniles.map((p) =>
+              <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
+                    <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
+                    <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
+                      <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
+                    </div>
+                    <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
+                       <span className="text-sm text-white">{p.full_name}</span>
+                       <span className="text-xs text-zinc-500">{p.position}</span>
+                      </div>
+                  </div>
+              )}
+              </div>
+          </div>
+        </div>
+        )}
 
         {/* No disponibles */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
