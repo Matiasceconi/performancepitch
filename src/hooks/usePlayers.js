@@ -1,12 +1,25 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { base44 } from "@/api/base44Client";
+import { useEffect } from "react";
 
 export function usePlayers() {
+  const queryClient = useQueryClient();
   const { data: players = [], isLoading } = useQuery({
     queryKey: ["players"],
     queryFn: () => base44.entities.Player.list("name", 100),
     staleTime: 1000 * 60 * 5, // 5 min cache
   });
+
+  // Suscribirse a cambios en Player para actualizar fotos en tiempo real
+  useEffect(() => {
+    const unsubscribe = base44.entities.Player.subscribe((event) => {
+      if (event.type === "update") {
+        // Invalidar el cache para refrescar la lista de jugadores
+        queryClient.invalidateQueries({ queryKey: ["players"] });
+      }
+    });
+    return unsubscribe;
+  }, [queryClient]);
 
   // Map by ID for O(1) lookup
   const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
