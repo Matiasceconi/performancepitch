@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -55,6 +55,7 @@ export default function Squad() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [activeTab, setActiveTab] = useState("reserva");
+  const [search, setSearch] = useState("");
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -134,7 +135,9 @@ export default function Squad() {
     }
   }
 
-  const activePlayers = filterByTab(activeTab);
+  const activePlayers = filterByTab(activeTab).filter((p) =>
+    !search || p.name.toLowerCase().includes(search.toLowerCase())
+  );
 
   const grouped = positions.map((pos) => ({
     position: pos,
@@ -161,6 +164,17 @@ export default function Squad() {
         <Button onClick={openNew} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={16} className="mr-1.5" /> Agregar jugador
         </Button>
+      </div>
+
+      {/* Search */}
+      <div className="relative">
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar jugador..."
+          className="bg-zinc-900 border-zinc-800 text-white pl-9 w-full max-w-sm"
+        />
       </div>
 
       {/* Tabs */}
