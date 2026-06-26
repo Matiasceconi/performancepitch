@@ -46,7 +46,7 @@ Deno.serve(async (req) => {
         DNI: { type: ['number', 'string'] },
         APELLIDO: { type: 'string' },
         NOMBRE: { type: 'string' },
-        FECHA_DE_NACIMIENTO: { type: 'string' }
+        'FECHA DE NACIMIENTO (DD.MM.AAAA)': { type: 'string' }
       }
     };
 
@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
       const firstName = (row.NOMBRE || '').trim();
       const fullName = `${firstName} ${lastName}`.trim();
       const normalizedName = normalize(fullName);
-      const birthDate = parseDate(row.FECHA_DE_NACIMIENTO);
+      const birthDate = parseDate(row['FECHA DE NACIMIENTO (DD.MM.AAAA)']);
 
       if (!firstName || !lastName) continue;
 
@@ -89,8 +89,8 @@ Deno.serve(async (req) => {
       if (dni) duplicatesByDni[dni] = 1;
 
       // Detectar fechas inválidas
-      if (row.FECHA_DE_NACIMIENTO && !birthDate) {
-        invalidDates.push({ name: fullName, value: row.FECHA_DE_NACIMIENTO });
+      if (row['FECHA DE NACIMIENTO (DD.MM.AAAA)'] && !birthDate) {
+        invalidDates.push({ name: fullName, value: row['FECHA DE NACIMIENTO (DD.MM.AAAA)'] });
         continue;
       }
 
@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
         normalized_name: normalizedName,
         birth_date: birthDate,
         document_number: dni,
+        position: 'Defensor Central',
         category: 'Reserva',
         status: 'Disponible',
         division: 'Reserva'
