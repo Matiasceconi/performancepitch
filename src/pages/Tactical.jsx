@@ -72,8 +72,8 @@ export default function Tactical() {
 
       {/* ── SQUAD MAP ── */}
       {tab === "squad" && (
-        <div className="grid lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-3">
+        <div className="grid lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-3 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-4">
             <PitchMap players={available} />
           </div>
           <div className="space-y-3">
@@ -113,9 +113,9 @@ export default function Tactical() {
 
       {/* ── SESSION MAP ── */}
       {tab === "session" && (
-        <div className="grid lg:grid-cols-3 gap-4">
-          <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-3">
-            <div className="flex items-center justify-between mb-2 px-1">
+        <div className="grid lg:grid-cols-4 gap-4">
+          <div className="lg:col-span-3 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-4">
+            <div className="flex items-center justify-between mb-3 px-1">
               <p className="text-xs text-zinc-500">
                 Hacé clic en un jugador para incluirlo o quitarlo de la sesión
               </p>
