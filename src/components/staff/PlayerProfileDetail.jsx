@@ -437,7 +437,7 @@ export default function PlayerProfileDetail({ player, onClose }) {
   async function handleAddMedical(e) {
     e.preventDefault();
     try {
-      await base44.entities.MedicalRecord.create({ ...medicalForm, player_id: player.id, player_name: player.name });
+      await base44.entities.MedicalRecord.create({ ...medicalForm, player_id: player.id, player_name: player.full_name });
       toast({ title: "Registro médico agregado" });
       setShowMedicalForm(false);
       setMedicalForm({ diagnosis: "", status: "Lesionado", injury_date: moment().format("YYYY-MM-DD"), expected_return: "", treatment: "", notes: "" });
@@ -461,14 +461,14 @@ export default function PlayerProfileDetail({ player, onClose }) {
         <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-4">
             {player.photo_url ? (
-              <img src={player.photo_url} alt={player.name} className="w-14 h-14 rounded-full object-cover border-2 border-zinc-700" />
-            ) : (
-              <div className="w-14 h-14 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center">
-                <span className="text-lg font-bold text-zinc-500">{player.name.charAt(0)}</span>
-              </div>
-            )}
-            <div>
-              <h2 className="text-xl font-bold text-white">{player.name}</h2>
+               <img src={player.photo_url} alt={player.full_name} className="w-14 h-14 rounded-full object-cover border-2 border-zinc-700" />
+             ) : (
+               <div className="w-14 h-14 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center">
+                 <span className="text-lg font-bold text-zinc-500">{player.full_name?.charAt(0)}</span>
+               </div>
+             )}
+             <div>
+               <h2 className="text-xl font-bold text-white">{player.full_name}</h2>
               <p className="text-sm text-zinc-500">{player.position}{player.number ? ` · #${player.number}` : ""}</p>
             </div>
           </div>
