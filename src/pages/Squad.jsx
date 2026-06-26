@@ -280,8 +280,7 @@ export default function Squad() {
                             onChange={async (e) => {
                               const newDivision = e.target.value;
                               await base44.entities.Player.update(p.id, { division: newDivision });
-                              const updatedPlayers = players.map((pl) => pl.id === p.id ? { ...pl, division: newDivision } : pl);
-                              setPlayers(updatedPlayers);
+                              await loadPlayers();
                             }}
                             className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 rounded px-2 py-1 hover:bg-zinc-700 transition-colors cursor-pointer">
                             {divisions.map((d) => <option key={d} value={d}>{d}</option>)}
