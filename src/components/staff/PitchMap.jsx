@@ -101,35 +101,49 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="none"
       >
-        {/* Grass base - más realistaa */}
+        {/* Grass base */}
         <defs>
           <linearGradient id="pitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" style={{stopColor: "#166534", stopOpacity: 1}} />
-            <stop offset="100%" style={{stopColor: "#15803d", stopOpacity: 1}} />
+            <stop offset="0%" style={{stopColor: "#15a34a", stopOpacity: 1}} />
+            <stop offset="100%" style={{stopColor: "#16a34a", stopOpacity: 1}} />
           </linearGradient>
         </defs>
         <rect width="100" height="62" fill="url(#pitchGrad)" />
-        {/* Grass stripes más suave */}
+        
+        {/* Grass stripes diagonales */}
         {[0,1,2,3,4,5,6,7].map((i) => (
           <rect key={i} x={i * 12.5} width="12.5" height="62"
-            fill={i % 2 === 0 ? "#134a2a" : "transparent"} opacity="0.4" />
+            fill={i % 2 === 0 ? "#22c55e" : "transparent"} opacity="0.08" />
         ))}
-        {/* Border */}
-        <rect x="2" y="2" width="96" height="58" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        {/* Centre circle */}
-        <circle cx="50" cy="31" r="9.15" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        <circle cx="50" cy="31" r="0.6" fill="rgba(255,255,255,0.7)" />
-        {/* Halfway line */}
-        <line x1="50" y1="2" x2="50" y2="60" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        {/* Penalty areas */}
-        <rect x="27.5" y="2" width="45" height="16" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        <rect x="27.5" y="44" width="45" height="16" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        {/* Goal areas */}
-        <rect x="36.5" y="2" width="27" height="5.5" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        <rect x="36.5" y="54.5" width="27" height="5.5" fill="none" stroke="rgba(255,255,255,0.7)" strokeWidth="0.5" />
-        {/* Goals */}
-        <circle cx="50" cy="2" r="0.8" fill="rgba(255,255,255,0.8)" />
-        <circle cx="50" cy="60" r="0.8" fill="rgba(255,255,255,0.8)" />
+
+        {/* Bordes exteriores */}
+        <rect x="2" y="2" width="96" height="58" fill="none" stroke="white" strokeWidth="0.6" />
+        
+        {/* Línea de mitad de cancha */}
+        <line x1="50" y1="2" x2="50" y2="60" stroke="white" strokeWidth="0.6" />
+        
+        {/* Círculo central */}
+        <circle cx="50" cy="31" r="8.9" fill="none" stroke="white" strokeWidth="0.6" />
+        <circle cx="50" cy="31" r="0.5" fill="white" />
+        
+        {/* Áreas de penal - Defensa */}
+        <rect x="28" y="2" width="44" height="16.5" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Área de meta - Defensa */}
+        <rect x="37" y="2" width="26" height="5.5" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Arco - Defensa */}
+        <path d="M 43 1 L 43 0 L 57 0 L 57 1" stroke="white" strokeWidth="0.6" fill="none" strokeLinecap="round" />
+        
+        {/* Áreas de penal - Ataque */}
+        <rect x="28" y="43.5" width="44" height="16.5" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Área de meta - Ataque */}
+        <rect x="37" y="54.5" width="26" height="5.5" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Arco - Ataque */}
+        <path d="M 43 61 L 43 62 L 57 62 L 57 61" stroke="white" strokeWidth="0.6" fill="none" strokeLinecap="round" />
+        
+        {/* Esquinas */}
+        {[[4, 4], [96, 4], [4, 58], [96, 58]].map((pos, i) => (
+          <circle key={i} cx={pos[0]} cy={pos[1]} r="0.4" fill="white" />
+        ))}
       </svg>
 
       {/* Player chips */}
@@ -141,7 +155,7 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
           : (colors.bg);
 
         return (
-          <button
+          <div
             key={player.id}
             onMouseDown={(e) => handleMouseDown(e, player)}
             onClick={() => onToggle && onToggle(player)}
@@ -153,28 +167,35 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
               zIndex: dragging === player.id ? 50 : 10,
               cursor: dragging === player.id ? "grabbing" : (onToggle ? "pointer" : "grab"),
             }}
-            className="flex flex-col items-center gap-0.5 group transition-transform"
-            title={player.name}
+            className="flex flex-col items-center group transition-transform"
           >
+            {/* Foto del jugador - más grande */}
             {player.photo_url ? (
-              <span
-                style={{ borderColor: chipColor }}
-                className="w-8 h-8 rounded-full overflow-hidden shadow-lg border-2.5 transition-transform group-hover:scale-125 block"
+              <div
+                style={{ borderColor: chipColor, borderWidth: "2.5px" }}
+                className="w-10 h-10 rounded-full overflow-hidden shadow-xl border transition-transform group-hover:scale-125 block"
               >
                 <img src={player.photo_url} alt={player.name} className="w-full h-full object-cover" />
-              </span>
+              </div>
             ) : (
-              <span
-                style={{ background: chipColor, color: "#fff" }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-bold shadow-lg border-2.5 border-white/40 transition-transform group-hover:scale-125"
+              <div
+                style={{ background: chipColor }}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-xl border-2.5 border-white/50 transition-transform group-hover:scale-125 text-white"
               >
                 {player.number}
-              </span>
+              </div>
             )}
-            <span className="text-[7px] font-bold text-white drop-shadow-md max-w-[60px] text-center leading-tight truncate bg-black/40 px-1 py-0.5 rounded">
-              {player.name.split(" ").slice(-1)[0]}
-            </span>
-          </button>
+            
+            {/* Info del jugador con fondo */}
+            <div className="mt-1 bg-black/70 rounded px-1.5 py-0.5 backdrop-blur-sm border border-white/30 text-center whitespace-nowrap">
+              <div className="text-[9px] font-bold text-white leading-tight">
+                {player.number ? `${player.number}-` : ""}{player.name.split(" ").slice(-1)[0].toUpperCase()}
+              </div>
+              <div className="text-[7px] text-gray-200 leading-tight">
+                {player.position?.substring(0, 3).toUpperCase()}
+              </div>
+            </div>
+          </div>
         );
       })}
     </div>
