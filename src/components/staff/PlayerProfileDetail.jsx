@@ -14,7 +14,7 @@ moment.locale("es");
 const medicalStatuses = ["Lesionado", "En recuperación", "Seguimiento", "Alta médica"];
 
 const TABS = [
-  { id: "info", label: "Info general", icon: User },
+  { id: "consolidado", label: "Vista consolidada", icon: User },
   { id: "rendimiento", label: "Rendimiento", icon: Activity },
   { id: "carga", label: "Carga externa", icon: Zap },
 ];
@@ -49,39 +49,67 @@ function InfoRow({ label, value, icon: Icon }) {
   );
 }
 
-// Tab: Info General
-function TabInfo({ player, medicalRecords, loadingRecords, showMedicalForm, setShowMedicalForm, medicalForm, setMedicalForm, handleAddMedical, deleteMedical }) {
+// Tab: Vista Consolidada (Info + GPS resumen)
+function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, loadingGps, showMedicalForm, setShowMedicalForm, medicalForm, setMedicalForm, handleAddMedical, deleteMedical }) {
   const age = player.birth_date ? moment().diff(moment(player.birth_date), "years") : null;
+  const avgGps = (field) => {
+    const vals = gpsRecords.filter(r => r[field] > 0).map(r => r[field]);
+    return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
+  };
 
   return (
     <div className="space-y-6">
-      {/* Datos personales */}
-      <div>
-        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Datos personales</h3>
-        <div className="bg-zinc-800/30 rounded-xl px-4 divide-y divide-zinc-800/60">
-          <InfoRow label="Edad" value={age !== null ? `${age} años` : null} icon={Calendar} />
-          <InfoRow label="Fecha de nacimiento" value={player.birth_date ? moment(player.birth_date).format("DD/MM/YYYY") : null} icon={Calendar} />
-          <InfoRow label="DNI / Documento" value={player.document_number} icon={FileText} />
-          <InfoRow label="Lugar de nacimiento" value={player.birth_place} icon={MapPin} />
-          <InfoRow label="Residencia actual" value={player.current_residence} icon={Home} />
-          <InfoRow label="Pierna hábil" value={player.dominant_foot} icon={Activity} />
-        </div>
-      </div>
+      {/* 2-col grid: Info personal + Métricas GPS */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        {/* Columna izquierda: Info personal */}
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Datos personales</h3>
+            <div className="bg-zinc-800/30 rounded-xl px-4 divide-y divide-zinc-800/60">
+              <InfoRow label="Edad" value={age !== null ? `${age} años` : null} icon={Calendar} />
+              <InfoRow label="Fecha de nacimiento" value={player.birth_date ? moment(player.birth_date).format("DD/MM/YYYY") : null} icon={Calendar} />
+              <InfoRow label="DNI / Documento" value={player.document_number} icon={FileText} />
+              <InfoRow label="Lugar de nacimiento" value={player.birth_place} icon={MapPin} />
+              <InfoRow label="Residencia actual" value={player.current_residence} icon={Home} />
+              <InfoRow label="Pierna hábil" value={player.dominant_foot} icon={Activity} />
+            </div>
+          </div>
 
-      {/* Datos del club */}
-      <div>
-        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Datos del club</h3>
-        <div className="bg-zinc-800/30 rounded-xl px-4 divide-y divide-zinc-800/60">
-          <InfoRow label="Categoría" value={player.category} icon={Shield} />
-          <InfoRow label="División" value={player.division} icon={Shield} />
-          <InfoRow label="Período de temporada" value={player.season_period} icon={Calendar} />
-          <InfoRow label="Pensión del club" value={player.club_housing ? "Sí" : "No"} icon={Home} />
-          <InfoRow label="Contrato" value={player.has_contract ? "Sí" : "No"} icon={FileText} />
+          <div>
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">Datos del club</h3>
+            <div className="bg-zinc-800/30 rounded-xl px-4 divide-y divide-zinc-800/60">
+              <InfoRow label="Categoría" value={player.category} icon={Shield} />
+              <InfoRow label="División" value={player.division} icon={Shield} />
+              <InfoRow label="Período de temporada" value={player.season_period} icon={Calendar} />
+              <InfoRow label="Pensión del club" value={player.club_housing ? "Sí" : "No"} icon={Home} />
+              <InfoRow label="Contrato" value={player.has_contract ? "Sí" : "No"} icon={FileText} />
+            </div>
+          </div>
         </div>
+
+        {/* Columna derecha: Resumen GPS */}
+        {loadingGps ? (
+          <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>
+        ) : gpsRecords.length === 0 ? (
+          <div className="bg-zinc-800/30 border border-zinc-800 rounded-xl p-6 text-center">
+            <Zap size={24} className="text-zinc-700 mx-auto mb-2" />
+            <p className="text-zinc-500 text-sm">Sin registros GPS</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">GPS — Promedios últimos 30 días</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <StatCard label="Dist. total prom." value={avgGps("total_distance") ? `${Math.round(avgGps("total_distance") / 100) / 10} km` : "—"} color="text-blue-400" />
+              <StatCard label="Vel. máx. prom." value={avgGps("max_speed") ? `${avgGps("max_speed")} km/h` : "—"} color="text-orange-400" />
+              <StatCard label="HSR prom." value={avgGps("high_speed_running") ? `${avgGps("high_speed_running")} m` : "—"} color="text-purple-400" />
+              <StatCard label="Player Load prom." value={avgGps("player_load")} color="text-emerald-400" />
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Historial médico */}
-      <div>
+      <div className="lg:col-span-2">
         <div className="flex items-center justify-between mb-3">
           <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
             <AlertCircle size={13} className="text-red-400" /> Historial médico
@@ -405,9 +433,11 @@ function TabCarga({ player }) {
 
 // Main component
 export default function PlayerProfileDetail({ player, onClose }) {
-  const [activeTab, setActiveTab] = useState("info");
+  const [activeTab, setActiveTab] = useState("consolidado");
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
+  const [gpsRecords, setGpsRecords] = useState([]);
+  const [loadingGps, setLoadingGps] = useState(true);
   const [showMedicalForm, setShowMedicalForm] = useState(false);
   const [medicalForm, setMedicalForm] = useState({
     diagnosis: "", status: "Lesionado",
@@ -416,15 +446,22 @@ export default function PlayerProfileDetail({ player, onClose }) {
   });
   const { toast } = useToast();
 
-  useEffect(() => { 
+  useEffect(() => {
     loadMedicalRecords();
+    loadGpsData();
     // Suscribirse a cambios en registros médicos para sincronización en tiempo real
-    const unsubscribe = base44.entities.MedicalRecord.subscribe((event) => {
+    const unsubMedical = base44.entities.MedicalRecord.subscribe((event) => {
       if (event.data?.player_id === player.id || event.old_data?.player_id === player.id) {
         loadMedicalRecords();
       }
     });
-    return unsubscribe;
+    const unsubGps = base44.entities.CatapultReport.subscribe(() => {
+      loadGpsData();
+    });
+    return () => {
+      unsubMedical();
+      unsubGps();
+    };
   }, [player.id]);
 
   async function loadMedicalRecords() {
@@ -432,6 +469,27 @@ export default function PlayerProfileDetail({ player, onClose }) {
     const records = await base44.entities.MedicalRecord.filter({ player_id: player.id }, "-injury_date", 100);
     setMedicalRecords(records);
     setLoadingRecords(false);
+  }
+
+  async function loadGpsData() {
+    setLoadingGps(true);
+    try {
+      const allCatapult = await base44.entities.CatapultReport.list("-date", 500);
+      const playerReports = allCatapult.filter(r => (r.data?.player_id || r.player_id) === player.id);
+      const deduped = {};
+      playerReports.forEach(r => {
+        const date = r.data?.date || r.date;
+        if (date && (!deduped[date] || new Date(r.updated_date) > new Date(deduped[date].updated_date))) {
+          deduped[date] = r;
+        }
+      });
+      setGpsRecords(Object.values(deduped) || []);
+    } catch (e) {
+      console.error("Error loading GPS records:", e);
+      setGpsRecords([]);
+    } finally {
+      setLoadingGps(false);
+    }
   }
 
   async function handleAddMedical(e) {
@@ -496,11 +554,13 @@ export default function PlayerProfileDetail({ player, onClose }) {
 
         {/* Tab content — scrollable */}
         <div className="flex-1 overflow-y-auto p-6">
-          {activeTab === "info" && (
-            <TabInfo
+          {activeTab === "consolidado" && (
+            <TabConsolidado
               player={player}
               medicalRecords={medicalRecords}
               loadingRecords={loadingRecords}
+              gpsRecords={gpsRecords}
+              loadingGps={loadingGps}
               showMedicalForm={showMedicalForm}
               setShowMedicalForm={setShowMedicalForm}
               medicalForm={medicalForm}
