@@ -292,7 +292,14 @@ function TabCarga({ player }) {
       try {
         const allCatapult = await base44.entities.CatapultReport.list("-date", 200);
         const filtered = allCatapult.filter(r => namesMatch(player.name, r.player_name));
-        setGpsRecords(filtered || []);
+        // Deduplicar por fecha: mantener el último (más reciente) de cada día
+        const deduped = {};
+        filtered.forEach(r => {
+          if (!deduped[r.date] || new Date(r.created_date) > new Date(deduped[r.date].created_date)) {
+            deduped[r.date] = r;
+          }
+        });
+        setGpsRecords(Object.values(deduped) || []);
       } catch (e) {
         console.error("Error loading GPS records:", e);
         setGpsRecords([]);
