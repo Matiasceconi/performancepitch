@@ -262,11 +262,23 @@ function TabCarga({ player }) {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("7");
 
+  // Normalizar nombre: remover tildes, espacios extras, convertir a minúsculas
+  const normalizeName = (name) => {
+    return name
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim()
+      .replace(/\s+/g, " ");
+  };
+
   useEffect(() => {
     async function load() {
       try {
-        const gps = await base44.entities.CatapultReport.filter({ player_name: player.name }, "-date", 100);
-        setGpsRecords(gps || []);
+        const allCatapult = await base44.entities.CatapultReport.list("-date", 200);
+        const playerNormalized = normalizeName(player.name);
+        const filtered = allCatapult.filter(r => normalizeName(r.player_name) === playerNormalized);
+        setGpsRecords(filtered || []);
       } catch (e) {
         console.error("Error loading GPS records:", e);
         setGpsRecords([]);
@@ -275,7 +287,7 @@ function TabCarga({ player }) {
       }
     }
     load();
-  }, [player.id]);
+  }, [player.id, player.name]);
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
