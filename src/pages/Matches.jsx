@@ -1,8 +1,80 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
+
+// ── Match CSV Panel ───────────────────────────────────────────────────────────
+function MatchCsvPanel({ match, onCsvSaved }) {
+  const [csvUrl, setCsvUrl] = useState(match.csv_url || null);
+  const [csvLabel, setCsvLabel] = useState(match.csv_label || null);
+  const [uploading, setUploading] = useState(false);
+  const { toast } = useToast();
+
+  async function handleUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+    setUploading(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      await base44.entities.MatchReport.update(match.id, { csv_url: file_url, csv_label: file.name });
+      setCsvUrl(file_url);
+      setCsvLabel(file.name);
+      onCsvSaved?.(file_url, file.name);
+      toast({ title: "CSV cargado correctamente" });
+    } catch {
+      toast({ title: "Error al cargar el CSV", variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function removeCsv() {
+    await base44.entities.MatchReport.update(match.id, { csv_url: null, csv_label: null });
+    setCsvUrl(null);
+    setCsvLabel(null);
+    onCsvSaved?.(null, null);
+    toast({ title: "CSV eliminado" });
+  }
+
+  return (
+    <div className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-sm font-semibold text-white flex items-center gap-2"><FileSpreadsheet size={14} className="text-green-400" /> Datos GPS del partido</p>
+          <p className="text-xs text-zinc-500 mt-0.5">CSV Catapult del partido</p>
+        </div>
+        {csvUrl && (
+          <div className="flex items-center gap-2">
+            <a href={csvUrl} target="_blank" rel="noopener noreferrer" className="text-zinc-500 hover:text-white p-1.5 rounded hover:bg-zinc-700 transition-colors"><ExternalLink size={13} /></a>
+            <button onClick={removeCsv} className="text-zinc-600 hover:text-red-400 p-1.5 rounded hover:bg-zinc-700 transition-colors"><X size={13} /></button>
+          </div>
+        )}
+      </div>
+      {!csvUrl ? (
+        <label className="cursor-pointer block">
+          <div className={`flex items-center justify-center gap-2 border border-dashed border-zinc-700 rounded-xl px-4 py-6 text-sm text-zinc-500 hover:text-zinc-300 hover:border-zinc-500 transition-colors ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+            {uploading ? <div className="w-4 h-4 border border-zinc-500 border-t-white rounded-full animate-spin" /> : <Upload size={16} />}
+            {uploading ? "Subiendo..." : "Cargar CSV del partido"}
+          </div>
+          <input type="file" accept=".csv,.txt" onChange={handleUpload} className="hidden" disabled={uploading} />
+        </label>
+      ) : (
+        <div className="flex items-center gap-2 bg-zinc-800 rounded-lg px-3 py-2">
+          <FileSpreadsheet size={13} className="text-green-400 shrink-0" />
+          <span className="text-xs text-zinc-300 flex-1 truncate">{csvLabel || "Archivo CSV"}</span>
+          <label className="cursor-pointer">
+            <span className={`text-xs text-zinc-500 hover:text-white transition-colors ${uploading ? "opacity-50 pointer-events-none" : ""}`}>
+              {uploading ? "Subiendo..." : "Reemplazar"}
+            </span>
+            <input type="file" accept=".csv,.txt" onChange={handleUpload} className="hidden" disabled={uploading} />
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
 
 const EMPTY = {
   date: "", rival: "", competition: "", location: "Local",
@@ -39,6 +111,7 @@ function YoutubeEmbed({ url, label }) {
 
 function MatchCard({ match, players, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
+  const [matchData, setMatchData] = useState(match);
   const hasResult = match.our_score != null && match.rival_score != null;
   const won = match.our_score > match.rival_score;
   const drew = match.our_score === match.rival_score;
@@ -123,6 +196,9 @@ function MatchCard({ match, players, onEdit, onDelete }) {
               <p className="text-zinc-400 text-sm">{match.notes}</p>
             </div>
           )}
+
+          {/* CSV GPS del partido */}
+          <MatchCsvPanel match={matchData} onCsvSaved={(url, label) => setMatchData((m) => ({ ...m, csv_url: url, csv_label: label }))} />
         </div>
       )}
     </div>

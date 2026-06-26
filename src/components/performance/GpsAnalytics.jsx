@@ -458,40 +458,54 @@ function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seas
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Otro"];
+const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Partido", "Otro"];
 const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
 
 export default function GpsAnalytics() {
   const [sessions, setSessions] = useState([]);
-  const [allRows, setAllRows] = useState([]);   // todos los registros de todos los CSVs
+  const [matches, setMatches] = useState([]);
+  const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingCsvs, setLoadingCsvs] = useState(false);
   const [tab, setTab] = useState("team");
 
   // Filtros globales
-  const [dateFrom, setDateFrom]       = useState("");
-  const [dateTo, setDateTo]           = useState("");
-  const [sessionType, setSessionType] = useState("");
+  const [dateFrom, setDateFrom]         = useState("");
+  const [dateTo, setDateTo]             = useState("");
+  const [sessionType, setSessionType]   = useState("");
   const [seasonPeriod, setSeasonPeriod] = useState("");
 
   const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod;
 
-  // 1. Carga las sesiones
+  // 1. Carga sesiones y partidos
   useEffect(() => {
-    base44.entities.TrainingSession.list("-date", 200)
-      .then(setSessions)
-      .finally(() => setLoading(false));
+    Promise.all([
+      base44.entities.TrainingSession.list("-date", 200),
+      base44.entities.MatchReport.list("-date", 100),
+    ]).then(([s, m]) => {
+      setSessions(s);
+      setMatches(m);
+    }).finally(() => setLoading(false));
   }, []);
 
-  // 2. Con las sesiones cargadas, descarga y parsea los CSVs
+  // 2. Con sesiones y partidos cargados, descarga y parsea los CSVs de ambos
   useEffect(() => {
-    if (!sessions.length) return;
-    const withCsv = sessions.filter((s) => s.csv_url);
-    if (!withCsv.length) return;
+    if (!sessions.length && !matches.length) return;
+
+    const sessionSources = sessions
+      .filter((s) => s.csv_url)
+      .map((s) => ({ csv_url: s.csv_url, id: s.id, title: s.title, date: s.date, session_type: s.session_type, season_period: s.season_period, source: "session" }));
+
+    const matchSources = matches
+      .filter((m) => m.csv_url)
+      .map((m) => ({ csv_url: m.csv_url, id: m.id, title: `vs. ${m.rival}`, date: m.date, session_type: "Partido", season_period: null, source: "match" }));
+
+    const sources = [...sessionSources, ...matchSources];
+    if (!sources.length) return;
 
     setLoadingCsvs(true);
     Promise.all(
-      withCsv.map(async (s) => {
+      sources.map(async (s) => {
         try {
           const text = await fetch(s.csv_url).then((r) => r.text());
           const rows = parseCatapultCSV(text);
@@ -503,6 +517,7 @@ export default function GpsAnalytics() {
             date:          s.date,
             session_type:  s.session_type,
             season_period: s.season_period,
+            source:        s.source,
           }));
         } catch {
           return [];
@@ -511,7 +526,7 @@ export default function GpsAnalytics() {
     ).then((results) => {
       setAllRows(results.flat());
     }).finally(() => setLoadingCsvs(false));
-  }, [sessions]);
+  }, [sessions, matches]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -519,7 +534,7 @@ export default function GpsAnalytics() {
     </div>
   );
 
-  const sessionsWithCsv = sessions.filter((s) => s.csv_url).length;
+  const sessionsWithCsv = sessions.filter((s) => s.csv_url).length + matches.filter((m) => m.csv_url).length;
 
   if (sessionsWithCsv === 0) {
     return (

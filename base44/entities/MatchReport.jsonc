@@ -73,6 +73,14 @@
     "notes": {
       "type": "string",
       "description": "Observaciones generales"
+    },
+    "csv_url": {
+      "type": "string",
+      "description": "URL del archivo CSV GPS del partido"
+    },
+    "csv_label": {
+      "type": "string",
+      "description": "Nombre del archivo CSV cargado"
     }
   },
   "required": [
