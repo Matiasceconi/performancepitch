@@ -255,6 +255,13 @@ export default function Dashboard() {
                 {availablePlayers.map((p) =>
               <div key={p.id} className="flex items-center gap-3">
                     <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
+                    {p.photo_url ? (
+                      <img src={p.photo_url} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
+                    ) : (
+                      <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                      </div>
+                    )}
                     <span className="text-sm text-white">{p.name}</span>
                     <span className="text-xs text-zinc-500 ml-auto">{p.position}</span>
                   </div>
@@ -285,6 +292,13 @@ export default function Dashboard() {
               <div key={p.id} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
+                      {p.photo_url ? (
+                        <img src={p.photo_url} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
+                      ) : (
+                        <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                        </div>
+                      )}
                       <span className="text-sm text-white">{p.name}</span>
                     </div>
                     <PlayerStatusBadge status={p.status} />
