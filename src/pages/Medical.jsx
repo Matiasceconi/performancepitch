@@ -140,24 +140,28 @@ export default function Medical() {
         </div>
       ) : (
         <div className="grid gap-3">
-          {displayed.map((r) => (
+          {displayed.map((r) => {
+            const playerData = getPlayer(r.player_id, r.player_name);
+            const displayName = playerData?.name || r.player_name;
+            const displayPhoto = playerData?.photo_url;
+            return (
             <div key={r.id} className={`bg-zinc-900 border rounded-xl p-4 flex items-start gap-4 ${
             r.status === "Lesionado" ? "border-red-500/30" :
             r.status === "En recuperación" ? "border-orange-500/30" :
             r.status === "Seguimiento" ? "border-yellow-500/30" :
             "border-zinc-800"
             }`}>
-            {getPlayer(r.player_id, r.player_name)?.photo_url ? (
-                <img src={getPlayer(r.player_id, r.player_name).photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0 mt-0.5" />
+            {displayPhoto ? (
+                <img src={displayPhoto} alt={displayName} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0 mt-0.5" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
-                  <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
+                  <span className="text-sm font-bold text-zinc-500">{displayName?.charAt(0)}</span>
                 </div>
               )}
             <div className="flex-1 min-w-0">
               {/* Header */}
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-white font-semibold text-sm">{r.player_name}</span>
+                <span className="text-white font-semibold text-sm">{displayName}</span>
                   {r.category_division && (
                     <span className="text-xs bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded">{r.category_division}</span>
                   )}
@@ -218,7 +222,8 @@ export default function Medical() {
                 <Trash2 size={14} />
               </button>
             </div>
-          ))}
+          );
+          })}
         </div>
       )}
 

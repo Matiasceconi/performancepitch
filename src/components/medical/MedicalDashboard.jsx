@@ -114,7 +114,7 @@ export default function MedicalDashboard() {
         const playerData = getPlayer(r.player_id, r.player_name);
         seen.set(key, {
           id: r.player_id,
-          name: r.player_name,
+          name: playerData?.name || r.player_name,
           photo_url: playerData?.photo_url || null,
           position: playerData?.position || "",
           number: playerData?.number || null,
@@ -182,25 +182,27 @@ export default function MedicalDashboard() {
             activeInjured.map(r => {
               const sc = statusColors[r.status] || statusColors["Lesionado"];
               const playerData = getPlayer(r.player_id, r.player_name);
+              const displayName = playerData?.name || r.player_name;
+              const displayPhoto = playerData?.photo_url;
               return (
                 <div key={r.id} className={`bg-zinc-900 border ${sc.border} rounded-xl p-4`}>
                   <div className="flex items-start gap-3">
                     <button
-                      onClick={() => setSelectedPlayer({ id: r.player_id, name: r.player_name, photo_url: playerData?.photo_url, position: playerData?.position, number: playerData?.number, category_division: r.category_division })}
+                      onClick={() => setSelectedPlayer({ id: r.player_id, name: displayName, photo_url: displayPhoto, position: playerData?.position, number: playerData?.number, category_division: r.category_division })}
                       className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                       title="Ver historial médico"
                     >
-                      {playerData?.photo_url ? (
-                        <img src={playerData.photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border-2 border-zinc-600 hover:border-white transition-all" />
+                      {displayPhoto ? (
+                        <img src={displayPhoto} alt={displayName} className="w-10 h-10 rounded-full object-cover border-2 border-zinc-600 hover:border-white transition-all" />
                       ) : (
                         <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-600 hover:border-white transition-all flex items-center justify-center">
-                          <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
+                          <span className="text-sm font-bold text-zinc-500">{displayName?.charAt(0)}</span>
                         </div>
                       )}
                     </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-white font-semibold text-sm">{r.player_name}</span>
+                        <span className="text-white font-semibold text-sm">{displayName}</span>
                         {r.category_division && <span className="text-xs text-zinc-500">{r.category_division}</span>}
                         <span className={`text-xs px-2 py-0.5 rounded border ${sc.bg} ${sc.text} ${sc.border}`}>{r.status}</span>
                       </div>

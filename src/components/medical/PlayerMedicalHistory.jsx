@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X, Heart, AlertCircle, Activity, CheckCircle, Clock, FileText } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
+import { usePlayers } from "@/hooks/usePlayers";
 moment.locale("es");
 
 const statusColors = {
@@ -23,6 +24,10 @@ export default function PlayerMedicalHistory({ player, onClose }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("all");
+  const { getPlayer } = usePlayers();
+  const playerData = getPlayer(player.id, player.name);
+  const displayName = playerData?.name || player.name;
+  const displayPhoto = playerData?.photo_url || player.photo_url;
 
   useEffect(() => {
     async function load() {
@@ -55,16 +60,16 @@ export default function PlayerMedicalHistory({ player, onClose }) {
         {/* Header */}
         <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 p-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            {player.photo_url ? (
-              <img src={player.photo_url} alt={player.name} className="w-12 h-12 rounded-full object-cover border border-zinc-700 shrink-0" />
+            {displayPhoto ? (
+              <img src={displayPhoto} alt={displayName} className="w-12 h-12 rounded-full object-cover border border-zinc-700 shrink-0" />
             ) : (
               <div className="w-12 h-12 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                <span className="text-lg font-bold text-zinc-500">{player.name?.charAt(0)}</span>
+                <span className="text-lg font-bold text-zinc-500">{displayName?.charAt(0)}</span>
               </div>
             )}
             <div>
-              <h2 className="text-lg font-bold text-white">{player.name}</h2>
-              <p className="text-xs text-zinc-500">{player.position}{player.number ? ` · #${player.number}` : ""}{player.category_division ? ` · ${player.category_division}` : ""}</p>
+              <h2 className="text-lg font-bold text-white">{displayName}</h2>
+              <p className="text-xs text-zinc-500">{playerData?.position || player.position}{(playerData?.number || player.number) ? ` · #${playerData?.number || player.number}` : ""}{player.category_division ? ` · ${player.category_division}` : ""}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors">
