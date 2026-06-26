@@ -232,12 +232,6 @@ export default function Squad() {
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
                           </div>
                         </div>
-                        {p.is_reserva && p.division === "Primera" && (
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-300 font-medium border border-yellow-500/30 whitespace-nowrap">En primera</span>
-                        )}
-                        {p.is_reserva && (p.division === "Cuarta División" || p.division === "Quinta División") && (
-                          <span className="text-xs px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-300 font-medium border border-yellow-500/30 whitespace-nowrap">En juveniles</span>
-                        )}
                         <Select value={p.status || "Disponible"} onValueChange={async (v) => {
                           await base44.entities.Player.update(p.id, { status: v });
                           setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
