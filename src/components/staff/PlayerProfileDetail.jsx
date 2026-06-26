@@ -440,7 +440,7 @@ function TabCarga({ player }) {
 }
 
 // Main component
-export default function PlayerProfileDetail({ player, onClose }) {
+export default function PlayerProfileDetail({ player, onClose, onEdit }) {
   const [activeTab, setActiveTab] = useState("consolidado");
   const [medicalRecords, setMedicalRecords] = useState([]);
   const [loadingRecords, setLoadingRecords] = useState(true);
@@ -549,9 +549,11 @@ export default function PlayerProfileDetail({ player, onClose }) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <a href="/squad" onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors" title="Editar jugador">
-              <Pencil size={18} />
-            </a>
+            {onEdit && (
+              <button onClick={() => { onEdit(player); onClose(); }} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors" title="Editar jugador">
+                <Pencil size={18} />
+              </button>
+            )}
             <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors">
               <X size={20} />
             </button>

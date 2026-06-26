@@ -799,6 +799,7 @@ export default function Squad() {
         <PlayerProfileDetail
           player={selectedPlayer}
           onClose={() => setSelectedPlayer(null)}
+          onEdit={(p) => openEdit(p)}
         />
       )}
 
