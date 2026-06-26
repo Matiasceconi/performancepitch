@@ -35,11 +35,6 @@
       "default": "Primera",
       "description": "Divisi\u00f3n a la que pertenece el jugador"
     },
-    "is_reserva": {
-      "type": "boolean",
-      "default": false,
-      "description": "Pertenece al plantel de reserva"
-    },
     "status": {
       "type": "string",
       "enum": [

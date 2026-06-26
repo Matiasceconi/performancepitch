@@ -26,7 +26,7 @@ const TABS = [
 
 const EMPTY_FORM = {
   name: "", number: "", position: "Defensor", status: "Disponible",
-  division: "Primera", is_reserva: false,
+  division: "Primera",
   season_period: "",
   injury_detail: "", expected_return: "", photo_url: "",
   birth_date: "", category: "", document_number: "",
@@ -81,7 +81,6 @@ export default function Squad() {
       position: p.position || "Defensor",
       status: p.status || "Disponible",
       division: p.division || "Primera",
-      is_reserva: p.is_reserva || false,
       season_period: p.season_period || "",
       injury_detail: p.injury_detail || "",
       expected_return: p.expected_return || "",
@@ -128,10 +127,10 @@ export default function Squad() {
 
   function filterByTab(tab) {
     switch (tab) {
-      case "reserva": return players.filter((p) => p.is_reserva);
-      case "primera": return players.filter((p) => !p.is_reserva && (p.division || "Primera") === "Primera");
-      case "cuarta":  return players.filter((p) => !p.is_reserva && p.division === "Cuarta División");
-      case "quinta":  return players.filter((p) => !p.is_reserva && p.division === "Quinta División");
+      case "reserva": return players.filter((p) => (p.division || "Primera") === "Reserva");
+      case "primera": return players.filter((p) => (p.division || "Primera") === "Primera");
+      case "cuarta":  return players.filter((p) => p.division === "Cuarta División");
+      case "quinta":  return players.filter((p) => p.division === "Quinta División");
       default: return [];
     }
   }
@@ -449,10 +448,6 @@ export default function Squad() {
             )}
 
             <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="is_reserva" checked={form.is_reserva} onChange={(e) => set("is_reserva", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
-                <label htmlFor="is_reserva" className="text-xs text-purple-300 cursor-pointer font-medium">Pertenece al plantel de Reserva</label>
-              </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="club_housing" checked={form.club_housing} onChange={(e) => set("club_housing", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
                 <label htmlFor="club_housing" className="text-xs text-zinc-400 cursor-pointer">Reside en la pensión del club</label>

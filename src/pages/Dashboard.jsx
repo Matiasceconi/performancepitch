@@ -116,8 +116,8 @@ export default function Dashboard() {
   const today = moment().format("MM-DD");
   const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
 
-  const availablePlayers = players.filter((p) => p.status === "Disponible" && p.is_reserva).sort((a, b) => (a.number || 0) - (b.number || 0));
-  const unavailablePlayers = players.filter((p) => p.status !== "Disponible" && p.is_reserva).sort((a, b) => (a.number || 0) - (b.number || 0));
+  const availablePlayers = players.filter((p) => p.status === "Disponible" && (p.division || "Primera") === "Reserva").sort((a, b) => (a.number || 0) - (b.number || 0));
+  const unavailablePlayers = players.filter((p) => p.status !== "Disponible" && (p.division || "Primera") === "Reserva").sort((a, b) => (a.number || 0) - (b.number || 0));
   const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
   const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
   const injured = players.filter((p) => p.status === "Lesionado").length;
