@@ -78,7 +78,7 @@ export default function Squad() {
   function openEdit(p) {
     setEditing(p);
     setForm({
-      name: p.name || "",
+      name: p.full_name || "",
       number: String(p.number || ""),
       position: p.position || "Defensor",
       status: p.status || "Disponible",
@@ -218,10 +218,10 @@ export default function Squad() {
           <Cake size={20} className="text-yellow-400 shrink-0" />
           <div>
             <p className="text-yellow-300 font-semibold text-sm">
-              🎉 ¡Hoy es el cumpleaños de {birthdayPlayers.map((p) => p.name).join(", ")}!
+              🎉 ¡Hoy es el cumpleaños de {birthdayPlayers.map((p) => p.full_name).join(", ")}!
             </p>
             <p className="text-yellow-400/70 text-xs mt-0.5">
-              {birthdayPlayers.map((p) => `${p.name} cumple ${calcAge(p.birth_date)} años`).join(" · ")}
+              {birthdayPlayers.map((p) => `${p.full_name} cumple ${calcAge(p.birth_date)} años`).join(" · ")}
             </p>
           </div>
         </div>
@@ -251,16 +251,16 @@ export default function Squad() {
                       <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors cursor-pointer ${isToday ? "bg-yellow-500/5" : ""}`}>
                         <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
                         {p.photo_url ? (
-                          <img src={p.photo_url} alt={p.name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
-                        ) : (
-                          <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                            <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
-                          </div>
-                        )}
+                           <img src={p.photo_url} alt={p.full_name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
+                         ) : (
+                           <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                             <span className="text-xs font-bold text-zinc-500">{p.full_name?.charAt(0)}</span>
+                           </div>
+                         )}
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-white font-medium">{p.name}</p>
-                            {isToday && <Cake size={14} className="text-yellow-400" title="¡Cumpleaños hoy!" />}
+                           <div className="flex items-center gap-2">
+                             <p className="text-sm text-white font-medium">{p.full_name}</p>
+                             {isToday && <Cake size={14} className="text-yellow-400" title="¡Cumpleaños hoy!" />}
                           </div>
                           <div className="flex items-center gap-3 mt-0.5 flex-wrap">
                             {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
@@ -477,7 +477,7 @@ export default function Squad() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
             <AlertDialogDescription className="text-zinc-400">
-              Se eliminará a {deleteTarget?.name} del plantel. Esta acción no se puede deshacer.
+              Se eliminará a {deleteTarget?.full_name} del plantel. Esta acción no se puede deshacer.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
