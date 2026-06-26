@@ -18,10 +18,10 @@ const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
 const seasonPeriods = ["En competencia", "Pretemporada", "Transitorio"];
 
 const TABS = [
-  { id: "Primera",        label: "Primera" },
-  { id: "Reserva",        label: "Reserva" },
-  { id: "Cuarta División", label: "4ª División" },
-  { id: "Quinta División", label: "5ª División" },
+  { id: "reserva",   label: "Reserva" },
+  { id: "primera",   label: "Primera" },
+  { id: "cuarta",    label: "4ª División" },
+  { id: "quinta",    label: "5ª División" },
 ];
 
 const EMPTY_FORM = {
@@ -54,7 +54,7 @@ export default function Squad() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [activeTab, setActiveTab] = useState("Primera");
+  const [activeTab, setActiveTab] = useState("reserva");
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -124,14 +124,24 @@ export default function Squad() {
     loadPlayers();
   }
 
-  const activePlayers = players.filter((p) => (p.division || "Primera") === activeTab);
+  function filterByTab(tab) {
+    switch (tab) {
+      case "reserva": return players.filter((p) => p.is_reserva);
+      case "primera": return players.filter((p) => !p.is_reserva && (p.division || "Primera") === "Primera");
+      case "cuarta":  return players.filter((p) => !p.is_reserva && p.division === "Cuarta División");
+      case "quinta":  return players.filter((p) => !p.is_reserva && p.division === "Quinta División");
+      default: return [];
+    }
+  }
+
+  const activePlayers = filterByTab(activeTab);
 
   const grouped = positions.map((pos) => ({
     position: pos,
     players: activePlayers.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
   }));
 
-  const countByDiv = (div) => players.filter((p) => (p.division || "Primera") === div).length;
+  const countByTab = (tab) => filterByTab(tab).length;
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
 
@@ -158,7 +168,7 @@ export default function Squad() {
         {TABS.map(({ id, label }) => (
           <button key={id} onClick={() => setActiveTab(id)}
             className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-            {label} ({countByDiv(id)})
+            {label} ({countByTab(id)})
           </button>
         ))}
       </div>
@@ -217,7 +227,9 @@ export default function Squad() {
                             {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
                             {p.category && <span className="text-xs text-zinc-600">Cat. {p.category}</span>}
                             {p.dominant_foot && <span className="text-xs text-zinc-600">{p.dominant_foot}</span>}
-                            {p.is_reserva && <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-medium border border-purple-500/30">Reserva</span>}
+                            {p.is_reserva && p.division && p.division !== "Reserva" && (
+                             <span className="text-xs px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-300 font-medium border border-orange-500/30">↑ {p.division}</span>
+                            )}
                             {p.club_housing && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Pensión</span>}
                             {p.has_contract && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium">Contrato</span>}
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
