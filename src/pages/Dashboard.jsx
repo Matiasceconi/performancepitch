@@ -81,12 +81,13 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [p, events, s, matchReports] = await Promise.all([
-        base44.entities.Player.filter({ division: "Reserva" }, "-created_date", 200),
+        const [allPlayers, events, s, matchReports] = await Promise.all([
+        base44.entities.Player.list("-created_date", 500),
         base44.entities.DayEvent.list("date", 200),
         base44.entities.TrainingSession.list("-date", 5),
         base44.entities.MatchReport.list("-date", 20)]
         );
+        const p = allPlayers.filter((pl) => pl.division === "Reserva" || pl.status === "Subio de juveniles");
         setPlayers(p);
         setSessions(s);
         const today = moment().format("YYYY-MM-DD");
