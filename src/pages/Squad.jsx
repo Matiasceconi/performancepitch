@@ -245,9 +245,7 @@ export default function Squad() {
           {grouped.map((g) =>
             g.players.length > 0 ? (
               <div key={g.position}>
-                <h2 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-2 pl-1">
-                  {g.position}s ({g.players.length})
-                </h2>
+
                 <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800/50">
                   {g.players.map((p) => {
                     const isToday = isBirthdayToday(p.birth_date);
