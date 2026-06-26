@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { X, Plus, Trash2, AlertCircle, User, Activity, Zap, MapPin, Home, FileText, Calendar, Shield } from "lucide-react";
+import { X, Plus, Trash2, AlertCircle, User, Activity, Zap, MapPin, Home, FileText, Calendar, Shield, Pencil } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -548,9 +548,14 @@ export default function PlayerProfileDetail({ player, onClose }) {
               <p className="text-sm text-zinc-500">{player.position}{player.number ? ` · #${player.number}` : ""}</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <a href="/squad" onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors" title="Editar jugador">
+              <Pencil size={18} />
+            </a>
+            <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Tab bar */}
