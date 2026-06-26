@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown, Search, Upload } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown, Search, Upload, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -72,8 +72,26 @@ export default function Squad() {
   }
 
   async function loadDivisions() {
-    const data = await base44.entities.Division.list("-created_date", 100);
+    const data = await base44.entities.Division.list("order", 100);
     setDivisions(data);
+  }
+
+  async function handleMoveDivision(divId, direction) {
+    const index = divisions.findIndex((d) => d.id === divId);
+    if (index === -1) return;
+    const targetIndex = direction === "up" ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= divisions.length) return;
+    
+    const div1 = divisions[index];
+    const div2 = divisions[targetIndex];
+    const newOrder1 = div2.order;
+    const newOrder2 = div1.order;
+    
+    await Promise.all([
+      base44.entities.Division.update(div1.id, { order: newOrder1 }),
+      base44.entities.Division.update(div2.id, { order: newOrder2 })
+    ]);
+    await loadDivisions();
   }
 
   async function handleAddDivision(e) {
@@ -207,13 +225,25 @@ export default function Squad() {
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex flex-wrap gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
-        {divisions.map(({ id, name }) => (
-          <button key={id} onClick={() => setActiveTab(id)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-            {name} ({countByTab(id)})
-          </button>
+      {/* Tabs con reorden */}
+      <div className="flex flex-wrap gap-2 items-center bg-zinc-900 border border-zinc-800 rounded-xl p-2 w-fit">
+        {divisions.map(({ id, name }, idx) => (
+          <div key={id} className="flex items-center gap-1 bg-zinc-800 rounded-lg px-2 py-1">
+            <button onClick={() => setActiveTab(id)}
+              className={`px-3 py-1 rounded-md text-sm font-medium transition-all ${activeTab === id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+              {name} ({countByTab(id)})
+            </button>
+            <div className="flex gap-0.5">
+              <button onClick={() => handleMoveDivision(id, "up")} disabled={idx === 0}
+                className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors">
+                <ChevronUp size={14} />
+              </button>
+              <button onClick={() => handleMoveDivision(id, "down")} disabled={idx === divisions.length - 1}
+                className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors">
+                <ChevronDown size={14} />
+              </button>
+            </div>
+          </div>
         ))}
         <button onClick={() => setShowNewDivision(true)}
           className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors">

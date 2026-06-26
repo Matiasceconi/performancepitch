@@ -5,6 +5,11 @@
     "name": {
       "type": "string",
       "description": "Nombre de la divisi\u00f3n"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden de visualizaci\u00f3n",
+      "default": 0
     }
   },
   "required": [
