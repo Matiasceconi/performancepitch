@@ -3,6 +3,9 @@ import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import moment from "moment";
+import "moment/locale/es";
+moment.locale("es");
 
 function NextMatchCard({ match, matchReport }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
@@ -62,9 +65,6 @@ import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
 import PitchMap from "@/components/staff/PitchMap";
 import TournamentTable from "@/components/staff/TournamentTable";
 import TournamentImporter from "@/components/staff/TournamentImporter";
-import moment from "moment";
-import "moment/locale/es";
-moment.locale("es");
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
