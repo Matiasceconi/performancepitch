@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, Trash2, Heart, Activity, LayoutDashboard } from "lucide-react";
 import MedicalDashboard from "@/components/medical/MedicalDashboard";
+import { usePlayers } from "@/hooks/usePlayers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,23 +29,19 @@ const EMPTY_FORM = {
 
 export default function Medical() {
   const [records, setRecords] = useState([]);
-  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [form, setForm] = useState(EMPTY_FORM);
   const { toast } = useToast();
+  const { players, getPlayer } = usePlayers();
 
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
     try {
-      const [recs, pls] = await Promise.all([
-        base44.entities.MedicalRecord.list("-injury_date", 200),
-        base44.entities.Player.list("name", 100),
-      ]);
+      const recs = await base44.entities.MedicalRecord.list("-injury_date", 200);
       setRecords(recs);
-      setPlayers(pls);
     } finally {
       setLoading(false);
     }
@@ -150,16 +147,13 @@ export default function Medical() {
             r.status === "Seguimiento" ? "border-yellow-500/30" :
             "border-zinc-800"
             }`}>
-            {(() => {
-              const playerData = players.find(p => p.id === r.player_id || p.name === r.player_name);
-              return playerData?.photo_url ? (
-                <img src={playerData.photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0 mt-0.5" />
+            {getPlayer(r.player_id, r.player_name)?.photo_url ? (
+                <img src={getPlayer(r.player_id, r.player_name).photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0 mt-0.5" />
               ) : (
                 <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 mt-0.5">
                   <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
                 </div>
-              );
-            })()}
+              )}
             <div className="flex-1 min-w-0">
               {/* Header */}
               <div className="flex items-center gap-2 flex-wrap">

@@ -4,6 +4,7 @@ import { Heart, AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, A
 import moment from "moment";
 import "moment/locale/es";
 import PlayerMedicalHistory from "@/components/medical/PlayerMedicalHistory";
+import { usePlayers } from "@/hooks/usePlayers";
 moment.locale("es");
 
 const statusColors = {
@@ -62,24 +63,18 @@ function DaysCounter({ injuryDate, expectedReturn }) {
 
 export default function MedicalDashboard() {
   const [records, setRecords] = useState([]);
-  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const { getPlayer } = usePlayers();
 
   useEffect(() => {
     async function load() {
-      const [recs, pls] = await Promise.all([
-        base44.entities.MedicalRecord.list("-injury_date", 200),
-        base44.entities.Player.list("name", 100),
-      ]);
+      const recs = await base44.entities.MedicalRecord.list("-injury_date", 200);
       setRecords(recs);
-      setPlayers(pls);
       setLoading(false);
     }
     load();
   }, []);
-
-  const playerMap = Object.fromEntries(players.map(p => [p.name?.trim().toLowerCase(), p]));
 
   // Active injured: Lesionado or En recuperación
   const activeInjured = records.filter(r =>
@@ -116,7 +111,7 @@ export default function MedicalDashboard() {
     records.forEach(r => {
       const key = r.player_id || r.player_name;
       if (!seen.has(key)) {
-        const playerData = playerMap[r.player_name?.trim().toLowerCase()];
+        const playerData = getPlayer(r.player_id, r.player_name);
         seen.set(key, {
           id: r.player_id,
           name: r.player_name,
@@ -186,7 +181,7 @@ export default function MedicalDashboard() {
           ) : (
             activeInjured.map(r => {
               const sc = statusColors[r.status] || statusColors["Lesionado"];
-              const playerData = playerMap[r.player_name?.trim().toLowerCase()];
+              const playerData = getPlayer(r.player_id, r.player_name);
               return (
                 <div key={r.id} className={`bg-zinc-900 border ${sc.border} rounded-xl p-4`}>
                   <div className="flex items-start gap-3">
