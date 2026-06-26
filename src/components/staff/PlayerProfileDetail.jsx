@@ -262,48 +262,13 @@ function TabCarga({ player }) {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("7");
 
-  // Normalizar nombre: remover tildes, espacios extras, convertir a minúsculas
-  const normalizeName = (name) => {
-    return name
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .toLowerCase()
-      .trim()
-      .replace(/\s+/g, " ");
-  };
-
-  // Obtener palabras del nombre (para matching flexible)
-  const getNameWords = (name) => {
-    return normalizeName(name).split(" ").filter(w => w.length > 2);
-  };
-
-  // Verificar si dos nombres coinciden (búsqueda flexible)
-  const namesMatch = (name1, name2) => {
-    const norm1 = normalizeName(name1);
-    const norm2 = normalizeName(name2);
-    
-    // Coincidencia exacta
-    if (norm1 === norm2) return true;
-    
-    const words1 = getNameWords(name1);
-    const words2 = getNameWords(name2);
-    if (words1.length === 0 || words2.length === 0) return false;
-    
-    // Contar coincidencias de palabras
-    const matches = words1.filter(w => words2.includes(w)).length;
-    // Al menos 1 palabra debe coincidir si hay pocas palabras, o más palabras si hay muchas
-    const minMatches = Math.max(1, Math.min(words1.length, words2.length) - 1);
-    return matches >= minMatches;
-  };
-
   useEffect(() => {
     async function load() {
       try {
-        const allCatapult = await base44.entities.CatapultReport.list("-date", 200);
-        const filtered = allCatapult.filter(r => namesMatch(player.name, r.player_name));
+        const allCatapult = await base44.entities.CatapultReport.filter({ player_id: player.id }, "-date", 200);
         // Deduplicar por fecha: mantener el último (más reciente) de cada día
         const deduped = {};
-        filtered.forEach(r => {
+        allCatapult.forEach(r => {
           if (!deduped[r.date] || new Date(r.created_date) > new Date(deduped[r.date].created_date)) {
             deduped[r.date] = r;
           }
@@ -323,7 +288,7 @@ function TabCarga({ player }) {
       load();
     });
     return unsubscribe;
-  }, [player.id, player.name]);
+  }, [player.id]);
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
