@@ -214,6 +214,8 @@ export default function SessionCsvPanel({ session }) {
   const [rows, setRows] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importLog, setImportLog] = useState(null);
   const fileRef = useRef();
   const { toast } = useToast();
 
@@ -262,7 +264,28 @@ export default function SessionCsvPanel({ session }) {
     setCsvUrl(null);
     setCsvLabel(null);
     setRows(null);
+    setImportLog(null);
     toast({ title: "CSV eliminado" });
+  }
+
+  async function handleImportCatapult() {
+    if (!csvUrl || !rows || rows.length === 0) return;
+    setImporting(true);
+    try {
+      const result = await base44.functions.invoke('importCatapultCSV', {
+        csv_url: csvUrl,
+        session_id: session.id,
+        session_date: session.date,
+        file_name: csvLabel,
+      });
+      setImportLog(result.data);
+      toast({ title: `✓ ${result.data.total_imported} registros importados` });
+    } catch (err) {
+      toast({ title: "Error en la importación", variant: "destructive" });
+      console.error(err);
+    } finally {
+      setImporting(false);
+    }
   }
 
   return (
@@ -314,7 +337,53 @@ export default function SessionCsvPanel({ session }) {
             </div>
           )}
           {error && <p className="text-red-400 text-xs mt-3">{error}</p>}
-          {rows && rows.length > 0 && <CsvVisualization rows={rows} />}
+          {rows && rows.length > 0 && (
+            <>
+              {!importLog && (
+                <button
+                  onClick={handleImportCatapult}
+                  disabled={importing}
+                  className="mt-4 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white text-sm rounded-lg font-medium transition-colors flex items-center gap-2"
+                >
+                  {importing ? (
+                    <>
+                      <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin" />
+                      Importando...
+                    </>
+                  ) : (
+                    "Importar a CatapultReport"
+                  )}
+                </button>
+              )}
+              {importLog && (
+                <div className="mt-4 bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 space-y-2 text-xs">
+                  <div className="flex items-start gap-2">
+                    <span className="text-emerald-400 font-bold">✓</span>
+                    <span><strong>Total importados:</strong> {importLog.total_imported}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-blue-400 font-bold">●</span>
+                    <span><strong>Vinculados a jugador:</strong> {importLog.total_matched}</span>
+                  </div>
+                  <div className="flex items-start gap-2">
+                    <span className="text-yellow-400 font-bold">!</span>
+                    <span><strong>No vinculados:</strong> {importLog.total_unmatched}</span>
+                  </div>
+                  {importLog.details?.unmatched && importLog.details.unmatched.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-zinc-700">
+                      <p className="text-zinc-400 mb-2">Jugadores GPS sin vinculación:</p>
+                      <div className="space-y-1 text-zinc-500">
+                        {importLog.details.unmatched.map((name, i) => (
+                          <div key={i}>• {name}</div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+              <CsvVisualization rows={rows} />
+            </>
+          )}
         </>
       )}
     </div>

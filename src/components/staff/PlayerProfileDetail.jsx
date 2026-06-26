@@ -265,12 +265,18 @@ function TabCarga({ player }) {
   useEffect(() => {
     async function load() {
       try {
-        const allCatapult = await base44.entities.CatapultReport.filter({ player_id: player.id }, "-date", 200);
+        // Obtener todos los CatapultReport y filtrar por player_id
+        const allCatapult = await base44.entities.CatapultReport.list("-date", 500);
+        const playerReports = allCatapult.filter(r => {
+          // Acceder a player_id desde data (donde se almacena)
+          return (r.data?.player_id || r.player_id) === player.id;
+        });
+        
         // Deduplicar por fecha: mantener el último (más reciente) de cada día
         const deduped = {};
-        allCatapult.forEach(r => {
-          const date = r.data?.date;
-          if (date && (!deduped[date] || new Date(r.created_date) > new Date(deduped[date].created_date))) {
+        playerReports.forEach(r => {
+          const date = r.data?.date || r.date;
+          if (date && (!deduped[date] || new Date(r.updated_date) > new Date(deduped[date].updated_date))) {
             deduped[date] = r;
           }
         });
@@ -294,19 +300,24 @@ function TabCarga({ player }) {
   if (loading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
   const cutoff = moment().subtract(Number(period), "days").format("YYYY-MM-DD");
-  const filtered = gpsRecords.filter(r => r.data?.date >= cutoff);
+  const filtered = gpsRecords.filter(r => {
+    const date = r.data?.date || r.date;
+    return date >= cutoff;
+  });
 
-  const sum = (field) => filtered.reduce((s, r) => s + (r.data?.[field] || 0), 0);
+  const getField = (r, field) => r.data?.[field] || r[field] || 0;
+
+  const sum = (field) => filtered.reduce((s, r) => s + getField(r, field), 0);
   const avg = (field) => {
-    const vals = filtered.filter(r => (r.data?.[field] || 0) > 0);
-    return vals.length ? Math.round(vals.reduce((s, r) => s + (r.data?.[field] || 0), 0) / vals.length) : null;
+    const vals = filtered.filter(r => getField(r, field) > 0);
+    return vals.length ? Math.round(vals.reduce((s, r) => s + getField(r, field), 0) / vals.length) : null;
   };
 
   const chartData = [...filtered].reverse().map(r => ({
-    label: moment(r.data?.date).format("DD/MM"),
-    dist: Math.round((r.data?.total_distance || 0) / 100) / 10,
-    hsr: (r.data?.distance_hsr || 0),
-    pl: (r.data?.player_load || 0),
+    label: moment(r.data?.date || r.date).format("DD/MM"),
+    dist: Math.round((getField(r, "total_distance") || 0) / 100) / 10,
+    hsr: getField(r, "distance_hsr"),
+    pl: getField(r, "player_load"),
   }));
 
   const periodLabels = { "7": "7 días", "14": "14 días", "30": "Último mes" };
@@ -375,11 +386,11 @@ function TabCarga({ player }) {
                 <tbody>
                   {filtered.map((r) => (
                     <tr key={r.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="px-3 py-2 text-zinc-300">{moment(r.data?.date).format("DD/MM")}</td>
-                      <td className="px-3 py-2 text-right text-white font-medium">{r.data?.total_distance ? `${Math.round(r.data.total_distance / 100) / 10}` : "—"}</td>
-                      <td className="px-3 py-2 text-right text-purple-300">{r.data?.distance_hsr || "—"}</td>
-                      <td className="px-3 py-2 text-right text-emerald-300">{r.data?.player_load || "—"}</td>
-                      <td className="px-3 py-2 text-right text-yellow-300">{r.data?.max_velocity ? `${r.data.max_velocity}` : "—"}</td>
+                      <td className="px-3 py-2 text-zinc-300">{moment(r.data?.date || r.date).format("DD/MM")}</td>
+                      <td className="px-3 py-2 text-right text-white font-medium">{getField(r, "total_distance") ? `${Math.round(getField(r, "total_distance") / 100) / 10}` : "—"}</td>
+                      <td className="px-3 py-2 text-right text-purple-300">{getField(r, "distance_hsr") || "—"}</td>
+                      <td className="px-3 py-2 text-right text-emerald-300">{getField(r, "player_load") || "—"}</td>
+                      <td className="px-3 py-2 text-right text-yellow-300">{getField(r, "max_velocity") ? `${getField(r, "max_velocity")}` : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -2,6 +2,19 @@
   "name": "CatapultReport",
   "type": "object",
   "properties": {
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del reporte"
+    },
     "session_id": {
       "type": "string",
       "description": "ID de la sesi\u00f3n asociada"
@@ -10,11 +23,6 @@
       "type": "string",
       "description": "Etiqueta de la sesi\u00f3n"
     },
-    "date": {
-      "type": "string",
-      "format": "date",
-      "description": "Fecha del reporte"
-    },
     "file_url": {
       "type": "string",
       "description": "URL del archivo CSV original"
@@ -22,10 +30,6 @@
     "pdf_url": {
       "type": "string",
       "description": "URL del informe PDF diario"
-    },
-    "player_name": {
-      "type": "string",
-      "description": "Nombre del jugador"
     },
     "total_duration": {
       "type": "number",
