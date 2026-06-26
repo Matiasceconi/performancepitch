@@ -16,6 +16,7 @@ export default function PlayerPhotoUpload({ player, onPhotoUpdate }) {
     try {
       const { file_url } = await base44.integrations.Core.UploadFile({ file });
       await base44.entities.Player.update(player.id, { photo_url: file_url });
+      player.photo_url = file_url;
       onPhotoUpdate?.();
       toast({ title: "Foto actualizada" });
     } catch (err) {
