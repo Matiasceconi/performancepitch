@@ -6,9 +6,10 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Obtener todos los jugadores y reportes GPS
+    // Obtener todos los jugadores, reportes GPS y tabla maestra
     const players = await base44.asServiceRole.entities.Player.list('', 500);
     const gpsReports = await base44.asServiceRole.entities.CatapultReport.list('', 500);
+    const mappings = await base44.asServiceRole.entities.PlayerNameMapping.list('', 500);
 
     // Función normalizar nombre
     const normalizeName = (name) => {
@@ -25,8 +26,22 @@ Deno.serve(async (req) => {
       return normalizeName(name).split(" ").filter(w => w.length > 2);
     };
 
-    // Función para buscar jugador por nombre flexible
+    // Función para buscar jugador: primero por mapping, luego por fuzzy match
     const findPlayerByName = (gpsName) => {
+      const normalizedGpsName = normalizeName(gpsName);
+
+      // 1. Buscar en la tabla maestra de mappings
+      for (const mapping of mappings) {
+        if (mapping.aliases) {
+          for (const alias of mapping.aliases) {
+            if (normalizeName(alias) === normalizedGpsName) {
+              return players.find(p => p.id === mapping.player_id);
+            }
+          }
+        }
+      }
+
+      // 2. Si no encuentra, buscar por fuzzy matching en nombres de jugadores
       const gpsWords = getNameWords(gpsName);
       if (gpsWords.length === 0) return null;
 
