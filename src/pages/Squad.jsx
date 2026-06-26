@@ -12,12 +12,21 @@ import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
 import moment from "moment";
 
 const positions = ["Arquero", "Defensor", "Mediocampista", "Delantero"];
-const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera"];
+const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección"];
+const divisions = ["Primera", "Reserva", "Cuarta División", "Quinta División"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
 const seasonPeriods = ["En competencia", "Pretemporada", "Transitorio"];
 
+const TABS = [
+  { id: "Primera",        label: "Primera" },
+  { id: "Reserva",        label: "Reserva" },
+  { id: "Cuarta División", label: "4ª División" },
+  { id: "Quinta División", label: "5ª División" },
+];
+
 const EMPTY_FORM = {
   name: "", number: "", position: "Defensor", status: "Disponible",
+  division: "Primera", is_reserva: false,
   season_period: "",
   injury_detail: "", expected_return: "", photo_url: "",
   birth_date: "", category: "", document_number: "",
@@ -45,7 +54,7 @@ export default function Squad() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [activeTab, setActiveTab] = useState("primera");
+  const [activeTab, setActiveTab] = useState("Primera");
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -69,6 +78,8 @@ export default function Squad() {
       number: String(p.number || ""),
       position: p.position || "Defensor",
       status: p.status || "Disponible",
+      division: p.division || "Primera",
+      is_reserva: p.is_reserva || false,
       season_period: p.season_period || "",
       injury_detail: p.injury_detail || "",
       expected_return: p.expected_return || "",
@@ -113,17 +124,14 @@ export default function Squad() {
     loadPlayers();
   }
 
-  // Plantel principal: todos salvo los que tienen status "Juveniles"
-  const primeraPlayers = players.filter((p) => p.status !== "Juveniles");
-  // Plantel juveniles: los que tienen status "Juveniles"
-  const juvenilesPlayers = players.filter((p) => p.status === "Juveniles");
-
-  const activePlayers = activeTab === "primera" ? primeraPlayers : juvenilesPlayers;
+  const activePlayers = players.filter((p) => (p.division || "Primera") === activeTab);
 
   const grouped = positions.map((pos) => ({
     position: pos,
     players: activePlayers.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
   }));
+
+  const countByDiv = (div) => players.filter((p) => (p.division || "Primera") === div).length;
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
 
@@ -146,15 +154,13 @@ export default function Squad() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
-        <button onClick={() => setActiveTab("primera")}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === "primera" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-          Primera ({primeraPlayers.length})
-        </button>
-        <button onClick={() => setActiveTab("juveniles")}
-          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === "juveniles" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-          Juveniles ({juvenilesPlayers.length})
-        </button>
+      <div className="flex flex-wrap gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+        {TABS.map(({ id, label }) => (
+          <button key={id} onClick={() => setActiveTab(id)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${activeTab === id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+            {label} ({countByDiv(id)})
+          </button>
+        ))}
       </div>
 
       {/* Birthday alert */}
@@ -211,6 +217,7 @@ export default function Squad() {
                             {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
                             {p.category && <span className="text-xs text-zinc-600">Cat. {p.category}</span>}
                             {p.dominant_foot && <span className="text-xs text-zinc-600">{p.dominant_foot}</span>}
+                            {p.is_reserva && <span className="text-xs px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-medium border border-purple-500/30">Reserva</span>}
                             {p.club_housing && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Pensión</span>}
                             {p.has_contract && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium">Contrato</span>}
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
@@ -353,17 +360,28 @@ export default function Squad() {
               </Select>
             </div>
 
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Estado</label>
-              <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  {statuses.map((s) => <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>)}
-                </SelectContent>
-              </Select>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">División</label>
+                <Select value={form.division} onValueChange={(v) => set("division", v)}>
+                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-800 border-zinc-700">
+                    {divisions.map((d) => <SelectItem key={d} value={d} className="text-white">{d}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <label className="text-xs text-zinc-400 mb-1 block">Estado</label>
+                <Select value={form.status} onValueChange={(v) => set("status", v)}>
+                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-800 border-zinc-700">
+                    {statuses.map((s) => <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
-            {form.status !== "Disponible" && form.status !== "Juveniles" && form.status !== "Primera" && (
+            {form.status !== "Disponible" && (
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Detalle</label>
@@ -377,6 +395,10 @@ export default function Squad() {
             )}
 
             <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <input type="checkbox" id="is_reserva" checked={form.is_reserva} onChange={(e) => set("is_reserva", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
+                <label htmlFor="is_reserva" className="text-xs text-purple-300 cursor-pointer font-medium">Pertenece al plantel de Reserva</label>
+              </div>
               <div className="flex items-center gap-2">
                 <input type="checkbox" id="club_housing" checked={form.club_housing} onChange={(e) => set("club_housing", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
                 <label htmlFor="club_housing" className="text-xs text-zinc-400 cursor-pointer">Reside en la pensión del club</label>

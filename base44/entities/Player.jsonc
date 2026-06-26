@@ -24,6 +24,22 @@
       ],
       "description": "Posici\u00f3n del jugador"
     },
+    "division": {
+      "type": "string",
+      "enum": [
+        "Primera",
+        "Reserva",
+        "Cuarta Divisi\u00f3n",
+        "Quinta Divisi\u00f3n"
+      ],
+      "default": "Primera",
+      "description": "Divisi\u00f3n a la que pertenece el jugador"
+    },
+    "is_reserva": {
+      "type": "boolean",
+      "default": false,
+      "description": "Pertenece al plantel de reserva"
+    },
     "status": {
       "type": "string",
       "enum": [
@@ -32,9 +48,7 @@
         "En recuperaci\u00f3n",
         "Suspendido",
         "Permiso",
-        "Selecci\u00f3n",
-        "Juveniles",
-        "Primera"
+        "Selecci\u00f3n"
       ],
       "default": "Disponible",
       "description": "Estado actual del jugador"
