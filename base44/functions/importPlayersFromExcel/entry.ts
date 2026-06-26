@@ -22,9 +22,9 @@ function parseDate(dateStr) {
     const parts = str.split(sep);
     if (parts.length === 3) {
       [day, month, year] = parts.map(p => p.trim());
-      const y = parseInt(year);
-      if (y < 100) year = y < 50 ? 2000 + y : 1900 + y;
-      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      let y = parseInt(year);
+      if (y < 100) y = y < 50 ? 2000 + y : 1900 + y;
+      return `${y}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
     }
   }
   return null;
