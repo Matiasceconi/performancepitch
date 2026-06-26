@@ -10,9 +10,17 @@
       "type": "string",
       "description": "Nombre del jugador"
     },
+    "category_division": {
+      "type": "string",
+      "description": "Categor\u00eda/Divisi\u00f3n (ej: 08/Reserva)"
+    },
     "diagnosis": {
       "type": "string",
-      "description": "Diagn\u00f3stico"
+      "description": "Diagn\u00f3stico / Lesi\u00f3n o consulta"
+    },
+    "affected_limb": {
+      "type": "string",
+      "description": "Miembro inferior afectado"
     },
     "status": {
       "type": "string",
@@ -27,12 +35,20 @@
     "injury_date": {
       "type": "string",
       "format": "date",
-      "description": "Fecha de la lesi\u00f3n"
+      "description": "Fecha de inicio de tratamiento"
     },
     "expected_return": {
       "type": "string",
       "format": "date",
-      "description": "Retorno estimado"
+      "description": "Fecha final de tratamiento / retorno estimado"
+    },
+    "days_lost": {
+      "type": "number",
+      "description": "D\u00edas perdidos"
+    },
+    "rehab_stage": {
+      "type": "string",
+      "description": "Etapa de la rehabilitaci\u00f3n"
     },
     "treatment": {
       "type": "string",
@@ -41,6 +57,15 @@
     "notes": {
       "type": "string",
       "description": "Observaciones"
+    },
+    "record_type": {
+      "type": "string",
+      "enum": [
+        "Lesi\u00f3n",
+        "Consulta/Seguimiento"
+      ],
+      "default": "Lesi\u00f3n",
+      "description": "Tipo de registro"
     }
   },
   "required": [
