@@ -308,6 +308,12 @@ function TabCarga({ player }) {
       }
     }
     load();
+
+    // Suscribirse a cambios en CatapultReport para actualizaciones en tiempo real
+    const unsubscribe = base44.entities.CatapultReport.subscribe((event) => {
+      load();
+    });
+    return unsubscribe;
   }, [player.id, player.name]);
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
