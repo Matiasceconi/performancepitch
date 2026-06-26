@@ -73,15 +73,16 @@ Deno.serve(async (req) => {
     for (const report of gpsReports) {
       if (report.player_id) continue; // Ya tiene player_id, saltar
 
-      const player = findPlayerByName(report.player_name);
+      const gpsPlayerName = report.data?.player_name || report.player_name;
+      const player = findPlayerByName(gpsPlayerName);
       if (player) {
         // Actualizar el reporte con el player_id
         await base44.asServiceRole.entities.CatapultReport.update(report.id, {
           player_id: player.id,
         });
-        updated.push({ gpsName: report.player_name, playerName: player.name, playerId: player.id });
+        updated.push({ gpsName: gpsPlayerName, playerName: player.name, playerId: player.id });
       } else {
-        notMatched.push(report.player_name);
+        notMatched.push(gpsPlayerName);
       }
     }
 
