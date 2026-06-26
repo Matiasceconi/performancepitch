@@ -227,17 +227,17 @@ export default function Squad() {
                             {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
                             {p.category && <span className="text-xs text-zinc-600">Cat. {p.category}</span>}
                             {p.dominant_foot && <span className="text-xs text-zinc-600">{p.dominant_foot}</span>}
-                            {p.is_reserva && p.division === "Primera" && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-medium border border-yellow-500/30">En primera</span>
-                            )}
-                            {p.is_reserva && (p.division === "Cuarta División" || p.division === "Quinta División") && (
-                              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/20 text-yellow-300 font-medium border border-yellow-500/30">En juveniles</span>
-                            )}
                             {p.club_housing && <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-medium">Pensión</span>}
                             {p.has_contract && <span className="text-xs px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 font-medium">Contrato</span>}
                             {p.injury_detail && <span className="text-xs text-zinc-500">{p.injury_detail}</span>}
                           </div>
                         </div>
+                        {p.is_reserva && p.division === "Primera" && (
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-300 font-medium border border-yellow-500/30 whitespace-nowrap">En primera</span>
+                        )}
+                        {p.is_reserva && (p.division === "Cuarta División" || p.division === "Quinta División") && (
+                          <span className="text-xs px-2.5 py-1 rounded-full bg-yellow-500/20 text-yellow-300 font-medium border border-yellow-500/30 whitespace-nowrap">En juveniles</span>
+                        )}
                         <Select value={p.status || "Disponible"} onValueChange={async (v) => {
                           await base44.entities.Player.update(p.id, { status: v });
                           setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
