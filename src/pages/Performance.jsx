@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Heart, Apple, FileSpreadsheet, Clock, Trophy, FileDown, TrendingUp } from "lucide-react";
 import Medical from "@/pages/Medical";
 import Nutrition from "@/pages/Nutrition";
-import Catapult from "@/pages/Catapult";
+import GpsAnalytics from "@/components/performance/GpsAnalytics";
 import PlayerMinutes from "@/pages/PlayerMinutes";
 import Matches from "@/pages/Matches";
 import MonthlyReport from "@/pages/MonthlyReport";
@@ -48,7 +48,7 @@ export default function Performance() {
       <div>
          {active === "medical" && <Medical />}
          {active === "nutrition" && <Nutrition />}
-         {active === "catapult" && <Catapult />}
+         {active === "catapult" && <GpsAnalytics />}
          {active === "positions" && <PositionAnalysis />}
          {active === "minutes" && <PlayerMinutes />}
          {active === "matches" && <Matches />}
