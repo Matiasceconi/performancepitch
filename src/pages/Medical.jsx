@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Trash2, Heart, Activity } from "lucide-react";
+import { Plus, Trash2, Heart, Activity, LayoutDashboard } from "lucide-react";
+import MedicalDashboard from "@/components/medical/MedicalDashboard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,7 +31,7 @@ export default function Medical() {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [activeTab, setActiveTab] = useState("lesiones");
+  const [activeTab, setActiveTab] = useState("dashboard");
   const [form, setForm] = useState(EMPTY_FORM);
   const { toast } = useToast();
 
@@ -78,10 +79,38 @@ export default function Medical() {
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
+  if (activeTab === "dashboard") return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+          <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all bg-white text-zinc-900">
+            <LayoutDashboard size={13} /> Dashboard
+          </button>
+          <button onClick={() => setActiveTab("lesiones")} className="px-4 py-1.5 rounded-md text-sm font-medium transition-all text-zinc-400 hover:text-white">
+            Lesiones ({lesiones.length})
+          </button>
+          <button onClick={() => setActiveTab("consultas")} className="px-4 py-1.5 rounded-md text-sm font-medium transition-all text-zinc-400 hover:text-white">
+            Consultas ({consultas.length})
+          </button>
+        </div>
+        <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
+          <Plus size={15} className="mr-1.5" /> Nuevo registro
+        </Button>
+      </div>
+      <MedicalDashboard />
+    </div>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+          <button
+            onClick={() => setActiveTab("dashboard")}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "dashboard" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
+          >
+            <LayoutDashboard size={13} /> Dashboard
+          </button>
           <button
             onClick={() => setActiveTab("lesiones")}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "lesiones" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
@@ -92,7 +121,7 @@ export default function Medical() {
             onClick={() => setActiveTab("consultas")}
             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "consultas" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
           >
-            Consultas / Seguimiento ({consultas.length})
+            Consultas ({consultas.length})
           </button>
         </div>
         <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
