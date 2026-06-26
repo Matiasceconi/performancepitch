@@ -3,6 +3,10 @@ import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
@@ -66,6 +70,7 @@ import PlayerPhotoUpload from "@/components/staff/PlayerPhotoUpload";
 import PitchMap from "@/components/staff/PitchMap";
 import TournamentTable from "@/components/staff/TournamentTable";
 import TournamentImporter from "@/components/staff/TournamentImporter";
+import PlayerEditDialog from "@/components/staff/PlayerEditDialog";
 
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
@@ -424,6 +429,18 @@ export default function Dashboard() {
           player={selectedPlayer}
           onClose={() => setSelectedPlayer(null)}
           onEdit={(p) => setEditingPlayer(p)}
+        />
+      )}
+
+      {editingPlayer && (
+        <PlayerEditDialog
+          player={editingPlayer}
+          onClose={() => setEditingPlayer(null)}
+          onSave={async (data) => {
+            await base44.entities.Player.update(editingPlayer.id, data);
+            setPlayers((prev) => prev.map((p) => p.id === editingPlayer.id ? { ...p, ...data } : p));
+            setEditingPlayer(null);
+          }}
         />
       )}
     </div>);
