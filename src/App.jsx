@@ -22,6 +22,7 @@ import Performance from '@/pages/Performance';
 import Team from '@/pages/Team';
 import Schedule from '@/pages/Schedule';
 import Matches from '@/pages/Matches';
+import PlayerNameManagement from '@/pages/PlayerNameManagement';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -64,6 +65,7 @@ const AuthenticatedApp = () => {
           <Route path="/team" element={<Team />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/matches" element={<Matches />} />
+          <Route path="/player-names" element={<PlayerNameManagement />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
