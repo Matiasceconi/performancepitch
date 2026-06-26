@@ -221,7 +221,7 @@ export default function Dashboard() {
           <div>
             <p className="text-yellow-300 font-semibold text-sm">¡Cumpleaños hoy! 🎂</p>
             <p className="text-yellow-200/80 text-sm mt-0.5">
-              {birthdayPlayers.map((p) => `${p.name} (${moment().diff(moment(p.birth_date), "years")} años)`).join(" · ")}
+              {birthdayPlayers.map((p) => `${p.full_name} (${moment().diff(moment(p.birth_date), "years")} años)`).join(" · ")}
             </p>
           </div>
         </div>
@@ -264,9 +264,9 @@ export default function Dashboard() {
                       <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
                     </div>
                     <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
-                      <span className="text-sm text-white">{p.name}</span>
-                      <span className="text-xs text-zinc-500">{p.position}</span>
-                    </div>
+                       <span className="text-sm text-white">{p.full_name}</span>
+                       <span className="text-xs text-zinc-500">{p.position}</span>
+                     </div>
                   </div>
               )}
               </div>
@@ -299,8 +299,8 @@ export default function Dashboard() {
                         <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
                       </div>
                       <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer flex-1">
-                        <span className="text-sm text-white">{p.name}</span>
-                      </div>
+                         <span className="text-sm text-white">{p.full_name}</span>
+                       </div>
                     </div>
                     <PlayerStatusBadge status={p.status} />
                   </div>
