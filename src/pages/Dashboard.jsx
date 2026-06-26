@@ -58,6 +58,7 @@ function NextMatchCard({ match, matchReport }) {
     </div>);
 }
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
+import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
 import PitchMap from "@/components/staff/PitchMap";
 import TournamentTable from "@/components/staff/TournamentTable";
 import TournamentImporter from "@/components/staff/TournamentImporter";
@@ -69,6 +70,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showMap, setShowMap] = useState(false);
   const [showStatusPanel, setShowStatusPanel] = useState(false);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   const [nextMatch, setNextMatch] = useState(null);
   const [nextMatchReport, setNextMatchReport] = useState(null);
@@ -253,7 +255,7 @@ export default function Dashboard() {
 
             <div className="space-y-2 max-h-72 overflow-y-auto">
                 {availablePlayers.map((p) =>
-              <div key={p.id} className="flex items-center gap-3">
+              <div key={p.id} onClick={() => setSelectedPlayer(p)} className="flex items-center gap-3 cursor-pointer hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
                     <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
                     {p.photo_url ? (
                       <img src={p.photo_url} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
@@ -289,7 +291,7 @@ export default function Dashboard() {
 
             <div className="space-y-2 max-h-72 overflow-y-auto">
                 {unavailablePlayers.map((p) =>
-              <div key={p.id} className="flex items-center justify-between">
+              <div key={p.id} onClick={() => setSelectedPlayer(p)} className="flex items-center justify-between cursor-pointer hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
                       {p.photo_url ? (
@@ -347,6 +349,13 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      {selectedPlayer && (
+        <PlayerProfileDetail
+          player={selectedPlayer}
+          onClose={() => setSelectedPlayer(null)}
+        />
+      )}
     </div>);
 
 }
