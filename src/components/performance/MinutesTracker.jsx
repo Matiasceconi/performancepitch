@@ -1,20 +1,57 @@
-import React, { useState, useEffect, useMemo } from "react";
-import { Search, Calendar } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 
-const PLAYER_NUMS = {
-  "Ayala Gaston": 1, "Blasquez Thomas": 2, "Cabrera Jonas": 3, "Cantero Emiliano": 4,
-  "Capponi Jose": 5, "Coria Alan": 6, "Ejea Joaquin": 7, "Gagliardi Ramiro": 8,
-  "Martinez Thiago": 9, "Neris Miño Sebastian": 10, "Pastrana Franco": 11, "Puchetta Juan": 12,
-  "Rodriguez Maximo": 13, "Sosa Joan": 14, "Almada Dylan": 16, "Retamoso Brian": 17,
-  "Guennin Alessandro": 18, "Lopez Mateo": 19, "Lopez Pablo": 20, "Loza Valentin": 21,
-  "Quiroga Lautaro": 22, "Vazquez Lautaro": 23, "Moreno Juan": 24, "Noguera Facundo": 25,
-  "Quintana Facundo": 26, "Ramos Uriel": 27, "Flores Patricio": 28,
-};
+// Datos estáticos de minutos por torneo
+const MINUTES_DATA = [
+  { num: 1,  name: "Ayala Gastón",        playerKey: "ayala gaston",          amistosos_res: 142, reserva: 1165, juveniles: 70 },
+  { num: 2,  name: "Blasquez Thomas",     playerKey: "thomas blasquez",        amistosos_res: 0,   reserva: 16,   juveniles: 160 },
+  { num: 3,  name: "Cabrera Jonás",       playerKey: "jonas cabrera",          amistosos_res: 126, reserva: 977,  juveniles: 0 },
+  { num: 4,  name: "Cantero Emiliano",    playerKey: "emiliano cantero",       amistosos_res: 143, reserva: 733,  juveniles: 285 },
+  { num: 5,  name: "Capponi José",        playerKey: "jose capponi",           amistosos_res: 155, reserva: 122,  juveniles: 541 },
+  { num: 6,  name: "Coria Alan",          playerKey: "alan coria",             amistosos_res: 182, reserva: 507,  juveniles: 0 },
+  { num: 7,  name: "Ejea Joaquín",        playerKey: "joaquin ejea",           amistosos_res: 170, reserva: 115,  juveniles: 525 },
+  { num: 8,  name: "Gagliardi Ramiro",    playerKey: "ramiro gagliardi",       amistosos_res: 98,  reserva: 649,  juveniles: 0 },
+  { num: 9,  name: "Martínez Thiago",     playerKey: "thiago martinez",        amistosos_res: 182, reserva: 1720, juveniles: 0 },
+  { num: 10, name: "Neris Miño Sebastián",playerKey: "sebastian neris miño",   amistosos_res: 0,   reserva: 90,   juveniles: 923 },
+  { num: 11, name: "Pastrana Franco",     playerKey: "franco pastrana",        amistosos_res: 163, reserva: 440,  juveniles: 257 },
+  { num: 12, name: "Puchetta Juan",       playerKey: "juan puchetta",          amistosos_res: 131, reserva: 131,  juveniles: 583 },
+  { num: 13, name: "Rodríguez Máximo",    playerKey: "maximo rodriguez",       amistosos_res: 182, reserva: 1624, juveniles: 0 },
+  { num: 14, name: "Sosa Joan",           playerKey: "joan sosa",              amistosos_res: 160, reserva: 1301, juveniles: 0 },
+  { num: 16, name: "Almada Dylan",        playerKey: "dylan almada",           amistosos_res: 120, reserva: 18,   juveniles: 669 },
+  { num: 17, name: "Retamoso Brian",      playerKey: "brian retamoso",         amistosos_res: 109, reserva: 291,  juveniles: 0 },
+  { num: 18, name: "Guennin Alessandro",  playerKey: "alessandro guennin",     amistosos_res: 164, reserva: 266,  juveniles: 752 },
+  { num: 19, name: "López Mateo",         playerKey: "mateo lopez",            amistosos_res: 182, reserva: 1184, juveniles: 0 },
+  { num: 20, name: "López Pablo",         playerKey: "lopez pablo",            amistosos_res: 120, reserva: 1183, juveniles: 0 },
+  { num: 21, name: "Loza Valentín",       playerKey: "loza valentin",          amistosos_res: 145, reserva: 663,  juveniles: 0 },
+  { num: 22, name: "Quiroga Lautaro",     playerKey: "lautaro quiroga",        amistosos_res: 161, reserva: 95,   juveniles: 362 },
+  { num: 23, name: "Vázquez Lautaro",     playerKey: "lautaro vazquez",        amistosos_res: 172, reserva: 348,  juveniles: 354 },
+  { num: 24, name: "Moreno Juan",         playerKey: "juan moreno",            amistosos_res: 172, reserva: 1080, juveniles: 0 },
+  { num: 25, name: "Noguera Facundo",     playerKey: "facundo noguera",        amistosos_res: 115, reserva: 1360, juveniles: 0 },
+  { num: 26, name: "Quintana Facundo",    playerKey: "facundo quintana",       amistosos_res: 115, reserva: 1727, juveniles: 0 },
+  { num: 27, name: "Uriel Ramos",         playerKey: "uriel ramos",            amistosos_res: 0,   reserva: 0,    juveniles: 381 },
+  { num: 28, name: "Patricio Flores",     playerKey: "patricio flores",        amistosos_res: 0,   reserva: 0,    juveniles: 663 },
+];
+
+const TORNEOS = [
+  { id: "all",       label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
+  { id: "reserva",   label: "Torneo Proyección Apertura 2026", res_total: 1727, juv_total: null },
+  { id: "juveniles", label: "Torneo Juveniles 2026",           res_total: null,  juv_total: 1252 },
+  { id: "amistosos", label: "Amistosos",                       res_total: 182,   juv_total: null },
+];
 
 function norm(s) {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+function getMinutes(p, torneoId) {
+  switch (torneoId) {
+    case "reserva":   return { res: p.reserva,       juv: null };
+    case "juveniles": return { res: null,             juv: p.juveniles };
+    case "amistosos": return { res: p.amistosos_res,  juv: null };
+    default:          return { res: p.reserva,        juv: p.juveniles };
+  }
 }
 
 function PctBar({ pct, color }) {
@@ -37,213 +74,110 @@ function getPctColor(pct) {
 }
 
 export default function MinutesTracker() {
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [sortBy, setSortBy] = useState("total");
+  const [sortBy, setSortBy] = useState("res");
+  const [torneoId, setTorneoId] = useState("all");
   const [photoMap, setPhotoMap] = useState({});
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
 
   useEffect(() => {
-    Promise.all([
-      base44.entities.MinutesRecord.filter({ tournament: "Juveniles" }, "match_date", 500),
-      base44.entities.Player.list("-created_date", 100),
-    ]).then(([recs, players]) => {
-      setRecords(recs);
+    base44.entities.Player.list("-created_date", 100).then((players) => {
       const map = {};
-      players.forEach((p) => { map[norm(p.name)] = p.photo_url || null; });
+      players.forEach((p) => {
+        map[norm(p.name)] = p.photo_url || null;
+      });
       setPhotoMap(map);
-      setLoading(false);
     });
   }, []);
 
-  function getPhoto(name) {
-    const key = norm(name);
-    if (photoMap[key]) return photoMap[key];
+  function getPhoto(playerKey) {
+    // Try exact key first, then partial match
+    if (photoMap[playerKey]) return photoMap[playerKey];
     const keys = Object.keys(photoMap);
-    const match = keys.find((k) => k.includes(key) || key.includes(k));
+    const match = keys.find((k) => k.includes(playerKey) || playerKey.includes(k));
     return match ? photoMap[match] : null;
   }
 
-  // Matches disponibles para mostrar en el selector de fecha
-  const allMatches = useMemo(() => {
-    const seen = new Set();
-    return records
-      .filter((r) => r.match_date)
-      .map((r) => ({ label: r.match_label, date: r.match_date }))
-      .filter((m) => { if (seen.has(m.date)) return false; seen.add(m.date); return true; })
-      .sort((a, b) => a.date.localeCompare(b.date));
-  }, [records]);
+  const torneo = TORNEOS.find((t) => t.id === torneoId);
+  const showRes = torneo.res_total !== null;
+  const showJuv = torneo.juv_total !== null;
 
-  // Fechas mín y máx para mostrar en las cards de resumen
-  const minDate = allMatches[0]?.date || "";
-  const maxDate = allMatches[allMatches.length - 1]?.date || "";
-
-  // Filtrar registros por rango de fechas
-  const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
-      if (!r.match_date) return true;
-      if (dateFrom && r.match_date < dateFrom) return false;
-      if (dateTo && r.match_date > dateTo) return false;
-      return true;
+  const display = MINUTES_DATA
+    .filter((p) => !search || norm(p.name).includes(norm(search)))
+    .map((p) => ({ ...p, ...getMinutes(p, torneoId) }))
+    .sort((a, b) => {
+      if (sortBy === "juv") return (b.juv || 0) - (a.juv || 0);
+      if (sortBy === "name") return a.name.localeCompare(b.name);
+      return (b.res || 0) - (a.res || 0);
     });
-  }, [records, dateFrom, dateTo]);
 
-  // Total de minutos disponibles en el período filtrado (partido con más minutos)
-  const maxAvailableByMatch = useMemo(() => {
-    const matchTotals = {};
-    filteredRecords.forEach((r) => {
-      if (!matchTotals[r.match_date] || r.minutes > matchTotals[r.match_date]) {
-        matchTotals[r.match_date] = r.minutes;
-      }
-    });
-    return Object.values(matchTotals).reduce((a, b) => a + b, 0);
-  }, [filteredRecords]);
-
-  // Contar partidos en el período
-  const matchCount = useMemo(() => {
-    return new Set(filteredRecords.map((r) => r.match_date)).size;
-  }, [filteredRecords]);
-
-  // Agrupar minutos por jugador
-  const playerData = useMemo(() => {
-    const map = {};
-    filteredRecords.forEach((r) => {
-      if (!map[r.player_name]) map[r.player_name] = 0;
-      map[r.player_name] += Number(r.minutes) || 0;
-    });
-    return map;
-  }, [filteredRecords]);
-
-  // Lista final ordenada
-  const display = useMemo(() => {
-    const names = Object.keys(playerData);
-    return names
-      .filter((n) => !search || norm(n).includes(norm(search)))
-      .map((n) => ({ name: n, num: PLAYER_NUMS[n] || 99, total: playerData[n] }))
-      .sort((a, b) => {
-        if (sortBy === "name") return a.name.localeCompare(b.name);
-        return b.total - a.total;
-      });
-  }, [playerData, search, sortBy]);
-
-  const activeFilters = dateFrom || dateTo;
-
-  if (loading) return (
-    <div className="flex items-center justify-center h-32">
-      <div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-    </div>
-  );
+  const cols = showRes && showJuv ? "2rem 2.5rem 1fr 1fr 1fr" : "2rem 2.5rem 1fr 1fr";
 
   return (
     <div className="space-y-5">
       {/* Stats cards */}
-      <div className="grid grid-cols-3 gap-4">
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total disponible</p>
-          <p className="text-2xl font-bold text-white">{maxAvailableByMatch}'</p>
-          <p className="text-xs text-zinc-500 mt-1">Torneo Juveniles 2026</p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Partidos en período</p>
-          <p className="text-2xl font-bold text-white">{matchCount}</p>
-          <p className="text-xs text-zinc-500 mt-1">{activeFilters ? "Según filtro aplicado" : "Total del torneo"}</p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-          <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Jugadores registrados</p>
-          <p className="text-2xl font-bold text-white">{display.length}</p>
-          <p className="text-xs text-zinc-500 mt-1">{activeFilters ? "Con minutos en el período" : "Plantel completo"}</p>
-        </div>
+      <div className="grid grid-cols-2 gap-4">
+        {showRes && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total disponible — Reserva</p>
+            <p className="text-2xl font-bold text-white">{torneo.res_total.toLocaleString()}'</p>
+            <p className="text-xs text-zinc-500 mt-1">{torneo.label}</p>
+          </div>
+        )}
+        {showJuv && (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total disponible — Juveniles</p>
+            <p className="text-2xl font-bold text-white">{torneo.juv_total.toLocaleString()}'</p>
+            <p className="text-xs text-zinc-500 mt-1">{torneo.label}</p>
+          </div>
+        )}
       </div>
 
       {/* Controles */}
-      <div className="flex flex-wrap gap-3 items-end justify-between">
-        <div className="flex flex-wrap gap-3 items-end">
-          {/* Buscar */}
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Buscar jugador..."
-              className="bg-zinc-900 border-zinc-800 text-white pl-8 w-48 h-8 text-sm"
-            />
-          </div>
-
-          {/* Filtro de fechas */}
-          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-1.5">
-            <Calendar size={13} className="text-zinc-500 shrink-0" />
-            <input
-              type="date"
-              value={dateFrom}
-              min={minDate}
-              max={dateTo || maxDate}
-              onChange={(e) => setDateFrom(e.target.value)}
-              className="bg-transparent text-white text-xs outline-none w-32 [color-scheme:dark]"
-              placeholder="Desde"
-            />
-            <span className="text-zinc-600 text-xs">—</span>
-            <input
-              type="date"
-              value={dateTo}
-              min={dateFrom || minDate}
-              max={maxDate}
-              onChange={(e) => setDateTo(e.target.value)}
-              className="bg-transparent text-white text-xs outline-none w-32 [color-scheme:dark]"
-              placeholder="Hasta"
-            />
-            {activeFilters && (
-              <button onClick={() => { setDateFrom(""); setDateTo(""); }}
-                className="ml-1 text-zinc-500 hover:text-red-400 text-xs transition-colors">✕</button>
-            )}
-          </div>
+      <div className="flex flex-wrap gap-3 items-center justify-between">
+        <div className="relative">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar jugador..."
+            className="bg-zinc-900 border-zinc-800 text-white pl-8 w-56 h-8 text-sm"
+          />
         </div>
-
-        {/* Ordenar */}
-        <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-          <button onClick={() => setSortBy("total")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "total" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Minutos</button>
-          <button onClick={() => setSortBy("name")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "name" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>A-Z</button>
+        <div className="flex flex-wrap gap-2">
+          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+            {TORNEOS.map((t) => (
+              <button key={t.id} onClick={() => { setTorneoId(t.id); setSortBy(t.res_total ? "res" : "juv"); }}
+                className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${torneoId === t.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+            {showRes && <button onClick={() => setSortBy("res")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "res" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Reserva</button>}
+            {showJuv && <button onClick={() => setSortBy("juv")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "juv" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Juv.</button>}
+            <button onClick={() => setSortBy("name")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "name" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>A-Z</button>
+          </div>
         </div>
       </div>
-
-      {/* Partidos en el rango (chips) */}
-      {allMatches.length > 0 && (
-        <div className="flex flex-wrap gap-1.5">
-          {allMatches.map((m) => {
-            const inRange = (!dateFrom || m.date >= dateFrom) && (!dateTo || m.date <= dateTo);
-            return (
-              <span key={m.date}
-                className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
-                  inRange
-                    ? "bg-blue-500/20 border-blue-500/40 text-blue-300"
-                    : "bg-zinc-800/50 border-zinc-700/50 text-zinc-600"
-                }`}>
-                {m.label} · {m.date.slice(5).replace("-", "/")}
-              </span>
-            );
-          })}
-        </div>
-      )}
 
       {/* Tabla */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
         <div className="grid text-xs text-zinc-500 uppercase tracking-wider px-4 py-2.5 border-b border-zinc-800"
-          style={{ gridTemplateColumns: "2rem 2.5rem 1fr 1fr" }}>
+          style={{ gridTemplateColumns: cols }}>
           <span>#</span>
           <span />
           <span>Jugador</span>
-          <span>Juveniles</span>
+          {showRes && <span>Reserva</span>}
+          {showJuv && <span>Juveniles</span>}
         </div>
 
         <div className="divide-y divide-zinc-800/50">
           {display.map((p) => {
-            const photo = getPhoto(p.name);
-            const pct = maxAvailableByMatch > 0 ? p.total / maxAvailableByMatch : 0;
+            const photo = getPhoto(p.playerKey);
             return (
-              <div key={p.name}
+              <div key={p.num}
                 className="grid items-center gap-4 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors"
-                style={{ gridTemplateColumns: "2rem 2.5rem 1fr 1fr" }}>
+                style={{ gridTemplateColumns: cols }}>
                 <span className="text-zinc-600 text-sm font-mono">{p.num}</span>
                 {photo ? (
                   <img src={photo} alt={p.name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
@@ -253,19 +187,29 @@ export default function MinutesTracker() {
                   </div>
                 )}
                 <p className="text-sm text-white font-medium">{p.name}</p>
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-white font-semibold text-sm">{p.total}'</span>
-                    <span className="text-zinc-500 text-xs">/ {maxAvailableByMatch}'</span>
+
+                {showRes && (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-white font-semibold text-sm">{p.res}'</span>
+                      <span className="text-zinc-500 text-xs">/ {torneo.res_total}'</span>
+                    </div>
+                    <PctBar pct={torneo.res_total > 0 ? p.res / torneo.res_total : 0} color={getPctColor(p.res / torneo.res_total)} />
                   </div>
-                  <PctBar pct={pct} color={getPctColor(pct)} />
-                </div>
+                )}
+
+                {showJuv && (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-white font-semibold text-sm">{p.juv}'</span>
+                      <span className="text-zinc-500 text-xs">/ {torneo.juv_total}'</span>
+                    </div>
+                    <PctBar pct={torneo.juv_total > 0 ? p.juv / torneo.juv_total : 0} color={getPctColor(p.juv / torneo.juv_total)} />
+                  </div>
+                )}
               </div>
             );
           })}
-          {display.length === 0 && (
-            <div className="text-center py-8 text-zinc-500 text-sm">Sin datos para el período seleccionado</div>
-          )}
         </div>
       </div>
 
