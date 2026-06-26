@@ -13,7 +13,6 @@ import PlayerImportDialog from "@/components/staff/PlayerImportDialog";
 import moment from "moment";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
-const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Subio a primera", "Bajo a juveniles", "Subio de juveniles", "Bajo de primera", "Sparring"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
 const seasonPeriods = ["En competencia", "Pretemporada", "Transitorio"];
 
@@ -48,6 +47,7 @@ function calcAge(birth_date) {
 export default function Squad() {
   const [players, setPlayers] = useState([]);
   const [divisions, setDivisions] = useState([]);
+  const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -63,9 +63,13 @@ export default function Squad() {
   const [newDivisionName, setNewDivisionName] = useState("");
   const [editingDivision, setEditingDivision] = useState(null);
   const [editingDivisionName, setEditingDivisionName] = useState("");
+  const [showNewStatus, setShowNewStatus] = useState(false);
+  const [newStatusName, setNewStatusName] = useState("");
+  const [editingStatus, setEditingStatus] = useState(null);
+  const [editingStatusName, setEditingStatusName] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => { loadPlayers(); loadDivisions(); }, []);
+  useEffect(() => { loadPlayers(); loadDivisions(); loadStatuses(); }, []);
 
   async function loadPlayers() {
     const data = await base44.entities.Player.list("-created_date", 100);
@@ -76,6 +80,11 @@ export default function Squad() {
   async function loadDivisions() {
     const data = await base44.entities.Division.list("order", 100);
     setDivisions(data);
+  }
+
+  async function loadStatuses() {
+    const data = await base44.entities.Status.list("order", 100);
+    setStatuses(data);
   }
 
   async function handleMoveDivision(divId, direction) {
@@ -121,6 +130,33 @@ export default function Squad() {
     await base44.entities.Division.delete(divisionId);
     toast({ title: "División eliminada" });
     await loadDivisions();
+  }
+
+  async function handleAddStatus(e) {
+    e.preventDefault();
+    if (!newStatusName.trim()) return;
+    await base44.entities.Status.create({ name: newStatusName.trim() });
+    toast({ title: "Estado creado" });
+    setNewStatusName("");
+    setShowNewStatus(false);
+    await loadStatuses();
+  }
+
+  async function handleEditStatus(e) {
+    e.preventDefault();
+    if (!editingStatusName.trim()) return;
+    await base44.entities.Status.update(editingStatus.id, { name: editingStatusName.trim() });
+    toast({ title: "Estado actualizado" });
+    setEditingStatus(null);
+    setEditingStatusName("");
+    await loadStatuses();
+  }
+
+  async function handleDeleteStatus(statusId) {
+    if (!confirm("¿Eliminar este estado?")) return;
+    await base44.entities.Status.delete(statusId);
+    toast({ title: "Estado eliminado" });
+    await loadStatuses();
   }
 
   function openNew() {
@@ -332,6 +368,86 @@ export default function Squad() {
         </div>
       )}
 
+      {/* Editar estado */}
+      {editingStatus && (
+        <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+          <form onSubmit={handleEditStatus} className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-zinc-400 mb-1 block">Editar nombre del estado</label>
+              <Input
+                value={editingStatusName}
+                onChange={(e) => setEditingStatusName(e.target.value)}
+                placeholder="Nombre del estado"
+                className="bg-zinc-900 border-zinc-700 text-white"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors">
+                Guardar
+              </button>
+              <button type="button" onClick={() => { setEditingStatus(null); setEditingStatusName(""); }} className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Nueva estado form */}
+      {showNewStatus && (
+        <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-4">
+          <form onSubmit={handleAddStatus} className="flex gap-3 items-end">
+            <div className="flex-1">
+              <label className="text-xs text-zinc-400 mb-1 block">Nombre del estado</label>
+              <Input
+                value={newStatusName}
+                onChange={(e) => setNewStatusName(e.target.value)}
+                placeholder="Ej: Convalecencia"
+                className="bg-zinc-900 border-zinc-700 text-white"
+                autoFocus
+              />
+            </div>
+            <div className="flex gap-2">
+              <button type="submit" className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-medium transition-colors">
+                Crear
+              </button>
+              <button type="button" onClick={() => { setShowNewStatus(false); setNewStatusName(""); }} className="px-4 py-2 bg-zinc-700 hover:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Estado manager tabs */}
+      <div>
+        <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2">Gestionar estados</p>
+        <div className="flex flex-wrap gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+          {statuses.map(({ id, name }) => (
+            <div key={id} className="flex items-center gap-1 bg-zinc-800 rounded-lg px-2 py-1 group">
+              <span className="px-2 py-1 text-xs font-medium text-zinc-300">{name}</span>
+              <div className="flex gap-0.5">
+                <button onClick={() => { setEditingStatus({ id, name }); setEditingStatusName(name); }}
+                  className="p-1 text-zinc-600 hover:text-yellow-400 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Editar">
+                  <Pencil size={12} />
+                </button>
+                <button onClick={() => handleDeleteStatus(id)}
+                  className="p-1 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                  title="Eliminar">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          ))}
+          <button onClick={() => setShowNewStatus(true)}
+            className="px-3 py-1.5 rounded-lg text-sm font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors">
+            +
+          </button>
+        </div>
+      </div>
+
       {/* Posición filter */}
       <div>
         <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2">Filtrar por posición</p>
@@ -415,7 +531,7 @@ export default function Squad() {
                               <PlayerStatusBadge status={p.status || "Disponible"} />
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-800 border-zinc-700">
-                              {statuses.map((s) => <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>)}
+                              {statuses.map((s) => <SelectItem key={s.id} value={s.name} className="text-white text-xs">{s.name}</SelectItem>)}
                             </SelectContent>
                           </Select>
                           <Select value={p.division || "Reserva"} onValueChange={async (v) => {
@@ -583,7 +699,7 @@ export default function Squad() {
                 <Select value={form.status} onValueChange={(v) => set("status", v)}>
                   <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {statuses.map((s) => <SelectItem key={s} value={s} className="text-white">{s}</SelectItem>)}
+                    {statuses.map((s) => <SelectItem key={s.id} value={s.name} className="text-white">{s.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
