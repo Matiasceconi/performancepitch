@@ -333,7 +333,12 @@ function TabCarga({ player }) {
     return date >= cutoff;
   });
 
-  const getField = (r, field) => r.data?.[field] || r[field] || 0;
+  const getField = (r, field) => {
+    // Intentar obtener del campo raíz primero, luego de data
+    if (r[field] !== undefined && r[field] !== null) return r[field];
+    if (r.data?.[field] !== undefined && r.data?.[field] !== null) return r.data[field];
+    return 0;
+  };
 
   const sum = (field) => filtered.reduce((s, r) => s + getField(r, field), 0);
   const avg = (field) => {
@@ -412,15 +417,18 @@ function TabCarga({ player }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
+                  {filtered.map((r) => {
+                    const rDate = r.date || r.data?.date;
+                    return (
                     <tr key={r.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="px-3 py-2 text-zinc-300">{moment(r.data?.date || r.date).format("DD/MM")}</td>
+                      <td className="px-3 py-2 text-zinc-300">{rDate ? moment(rDate).format("DD/MM") : "—"}</td>
                       <td className="px-3 py-2 text-right text-white font-medium">{getField(r, "total_distance") ? `${Math.round(getField(r, "total_distance") / 100) / 10}` : "—"}</td>
                       <td className="px-3 py-2 text-right text-purple-300">{getField(r, "distance_hsr") || "—"}</td>
                       <td className="px-3 py-2 text-right text-emerald-300">{getField(r, "player_load") || "—"}</td>
                       <td className="px-3 py-2 text-right text-yellow-300">{getField(r, "max_velocity") ? `${getField(r, "max_velocity")}` : "—"}</td>
                     </tr>
-                  ))}
+                  );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -474,16 +482,26 @@ export default function PlayerProfileDetail({ player, onClose }) {
   async function loadGpsData() {
     setLoadingGps(true);
     try {
-      const allCatapult = await base44.entities.CatapultReport.list("-date", 500);
-      const playerReports = allCatapult.filter(r => (r.data?.player_id || r.player_id) === player.id);
+      // Get all CatapultReport records (from session CSVs)
+      const allCatapult = await base44.entities.CatapultReport.list("-date", 1000);
+      
+      // Filter for this player
+      const playerReports = allCatapult.filter(r => {
+        const playerId = r.player_id || r.data?.player_id;
+        return playerId === player.id;
+      });
+      
+      // Deduplicate by date, keeping the most recent
       const deduped = {};
       playerReports.forEach(r => {
-        const date = r.data?.date || r.date;
-        if (date && (!deduped[date] || new Date(r.updated_date) > new Date(deduped[date].updated_date))) {
-          deduped[date] = r;
+        const date = r.date || r.data?.date;
+        if (date) {
+          if (!deduped[date] || new Date(r.updated_date) > new Date(deduped[date].updated_date)) {
+            deduped[date] = r;
+          }
         }
       });
-      setGpsRecords(Object.values(deduped) || []);
+      setGpsRecords(Object.values(deduped).sort((a, b) => new Date(b.date || b.data?.date) - new Date(a.date || a.data?.date)) || []);
     } catch (e) {
       console.error("Error loading GPS records:", e);
       setGpsRecords([]);
