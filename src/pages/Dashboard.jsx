@@ -74,6 +74,8 @@ export default function Dashboard() {
   const [showMap, setShowMap] = useState(false);
   const [showStatusPanel, setShowStatusPanel] = useState(false);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const [statuses, setStatuses] = useState([]);
+  const [selectedStatus, setSelectedStatus] = useState(null);
 
   const [nextMatch, setNextMatch] = useState(null);
   const [nextMatchReport, setNextMatchReport] = useState(null);
@@ -81,15 +83,17 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [allPlayers, events, s, matchReports] = await Promise.all([
+        const [allPlayers, events, s, matchReports, sts] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.DayEvent.list("date", 200),
         base44.entities.TrainingSession.list("-date", 5),
-        base44.entities.MatchReport.list("-date", 20)]
+        base44.entities.MatchReport.list("-date", 20),
+        base44.entities.Status.list("order", 50)]
         );
         const p = allPlayers.filter((pl) => pl.division === "Reserva" || pl.status === "Subio de juveniles");
         setPlayers(p);
         setSessions(s);
+        setStatuses(sts);
         const today = moment().format("YYYY-MM-DD");
         const match = events.find((e) => e.type === "Partido" && e.date >= today);
         setNextMatch(match || null);
@@ -117,12 +121,16 @@ export default function Dashboard() {
   const today = moment().format("MM-DD");
     const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
 
-  const availablePlayers = players.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
-    const unavailablePlayers = players.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
-    const subioDJuveniles = players.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
+  const filteredPlayers = selectedStatus 
+    ? players.filter((p) => p.status === selectedStatus)
+    : players;
+
+  const availablePlayers = filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
+    const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
+    const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
     const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
     const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
-    const injured = players.filter((p) => p.status === "Lesionado").length;
+    const injured = filteredPlayers.filter((p) => p.status === "Lesionado").length;
 
   const stats = [
   { label: "Jugadores (Reserva)", value: players.length, icon: Users, color: "text-blue-400" },
@@ -134,27 +142,54 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">ESTADO DEL EQUIPO</h1>
-          <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowStatusPanel(!showStatusPanel)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
-            
-            {showStatusPanel ? <X size={15} /> : <ClipboardList size={15} />}
-            {showStatusPanel ? "Cerrar estados" : "Estado del plantel"}
-          </button>
-          <button
-            onClick={() => setShowMap(!showMap)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
-            
-            {showMap ? <X size={15} /> : <Map size={15} />}
-            {showMap ? "Cerrar mapa" : "Ver mapa del día"}
-          </button>
-        </div>
-      </div>
+         <div>
+           <h1 className="text-2xl font-bold text-white tracking-tight">ESTADO DEL EQUIPO</h1>
+           <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
+         </div>
+         <div className="flex items-center gap-2">
+           <button
+             onClick={() => setShowStatusPanel(!showStatusPanel)}
+             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
+
+             {showStatusPanel ? <X size={15} /> : <ClipboardList size={15} />}
+             {showStatusPanel ? "Cerrar estados" : "Estado del plantel"}
+           </button>
+           <button
+             onClick={() => setShowMap(!showMap)}
+             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
+
+             {showMap ? <X size={15} /> : <Map size={15} />}
+             {showMap ? "Cerrar mapa" : "Ver mapa del día"}
+           </button>
+         </div>
+       </div>
+
+       {/* Filtro de estados */}
+       <div className="flex flex-wrap gap-2">
+         <button
+           onClick={() => setSelectedStatus(null)}
+           className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+             selectedStatus === null
+               ? "bg-white text-zinc-900"
+               : "bg-zinc-800 text-zinc-400 hover:text-white"
+           }`}
+         >
+           Todos
+         </button>
+         {statuses.map((status) => (
+           <button
+             key={status.id}
+             onClick={() => setSelectedStatus(status.name)}
+             className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+               selectedStatus === status.name
+                 ? "bg-white text-zinc-900"
+                 : "bg-zinc-800 text-zinc-400 hover:text-white"
+             }`}
+           >
+             {status.name}
+           </button>
+         ))}
+       </div>
 
       {showStatusPanel &&
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
