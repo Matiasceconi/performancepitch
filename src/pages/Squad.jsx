@@ -275,17 +275,15 @@ export default function Squad() {
                               {statuses.map((s) => <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>)}
                             </SelectContent>
                           </Select>
-                          <Select value={p.division || "Primera"} onValueChange={async (v) => {
-                            await base44.entities.Player.update(p.id, { division: v });
-                            setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, division: v } : pl));
-                          }}>
-                            <SelectTrigger className="h-auto py-0.5 px-2 border-0 bg-transparent text-xs w-auto focus:ring-0 shadow-none gap-1">
-                              <span className="text-zinc-400 text-xs">{p.division || "Primera"}</span>
-                            </SelectTrigger>
-                            <SelectContent className="bg-zinc-800 border-zinc-700">
-                              {divisions.map((d) => <SelectItem key={d} value={d} className="text-white text-xs">{d}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
+                          <select 
+                            value={p.division || "Primera"} 
+                            onChange={async (e) => {
+                              await base44.entities.Player.update(p.id, { division: e.target.value });
+                              setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, division: e.target.value } : pl));
+                            }}
+                            className="text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 rounded px-2 py-1 hover:bg-zinc-700 transition-colors cursor-pointer">
+                            {divisions.map((d) => <option key={d} value={d}>{d}</option>)}
+                          </select>
                         </div>
                         <div className="flex items-center gap-1">
                           <button onClick={() => openEdit(p)} className="p-1.5 text-zinc-600 hover:text-white transition-colors">
