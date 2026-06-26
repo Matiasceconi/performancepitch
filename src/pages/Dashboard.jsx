@@ -76,6 +76,7 @@ export default function Dashboard() {
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [statuses, setStatuses] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState(null);
+  const [editingPlayer, setEditingPlayer] = useState(null);
 
   const [nextMatch, setNextMatch] = useState(null);
   const [nextMatchReport, setNextMatchReport] = useState(null);
@@ -422,6 +423,7 @@ export default function Dashboard() {
         <PlayerProfileDetail
           player={selectedPlayer}
           onClose={() => setSelectedPlayer(null)}
+          onEdit={(p) => setEditingPlayer(p)}
         />
       )}
     </div>);
