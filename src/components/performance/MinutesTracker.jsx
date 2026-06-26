@@ -1,214 +1,56 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { base44 } from "@/api/base44Client";
 
-// Datos por torneo extraídos del Excel
-// Amistosos: 3 partidos (col 5,7,9) - Reserva: Torneo Proyección Apertura 2026 (fechas 1-18) - Juveniles: JUV F1-F15
-const PLAYERS_RAW = [
-  {
-    num: 1, name: "Ayala Gastón",
-    amistosos_res: 50+47+45, // 142 min en amistosos Reserva
-    reserva: 1165,
-    amistosos_juv: 0,
-    juveniles: 70,
-  },
-  {
-    num: 2, name: "Blasquez Thomas",
-    amistosos_res: 0,
-    reserva: 16,
-    amistosos_juv: 0+0+0,
-    juveniles: 160,
-  },
-  {
-    num: 3, name: "Cabrera Jonás",
-    amistosos_res: 50+43+33,
-    reserva: 977,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 4, name: "Cantero Emiliano",
-    amistosos_res: 41+42+60,
-    reserva: 733,
-    amistosos_juv: 0,
-    juveniles: 285,
-  },
-  {
-    num: 5, name: "Capponi José",
-    amistosos_res: 25+60+70,
-    reserva: 122,
-    amistosos_juv: 0,
-    juveniles: 541,
-  },
-  {
-    num: 6, name: "Coria Alan",
-    amistosos_res: 50+60+72,
-    reserva: 507,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 7, name: "Ejea Joaquín",
-    amistosos_res: 50+60+60,
-    reserva: 115,
-    amistosos_juv: 0,
-    juveniles: 525,
-  },
-  {
-    num: 8, name: "Gagliardi Ramiro",
-    amistosos_res: 0+60+38,
-    reserva: 649,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 9, name: "Martínez Thiago",
-    amistosos_res: 50+60+72,
-    reserva: 1720,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 10, name: "Neris Miño Sebastián",
-    amistosos_res: 0,
-    reserva: 90,
-    amistosos_juv: 0,
-    juveniles: 923,
-  },
-  {
-    num: 11, name: "Pastrana Franco",
-    amistosos_res: 50+45+68,
-    reserva: 440,
-    amistosos_juv: 0,
-    juveniles: 257,
-  },
-  {
-    num: 12, name: "Puchetta Juan",
-    amistosos_res: 43+48+40,
-    reserva: 131,
-    amistosos_juv: 0,
-    juveniles: 583,
-  },
-  {
-    num: 13, name: "Rodríguez Máximo",
-    amistosos_res: 50+60+72,
-    reserva: 1624,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 14, name: "Sosa Joan",
-    amistosos_res: 50+42+68,
-    reserva: 1301,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 16, name: "Almada Dylan",
-    amistosos_res: 43+42+35,
-    reserva: 18,
-    amistosos_juv: 0,
-    juveniles: 669,
-  },
-  {
-    num: 17, name: "Retamoso Brian",
-    amistosos_res: 36+30+43,
-    reserva: 291,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 18, name: "Guennin Alessandro",
-    amistosos_res: 36+60+68,
-    reserva: 266,
-    amistosos_juv: 0,
-    juveniles: 752,
-  },
-  {
-    num: 19, name: "López Mateo",
-    amistosos_res: 50+60+72,
-    reserva: 1184,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 20, name: "López Pablo",
-    amistosos_res: 25+60+35,
-    reserva: 1183,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 21, name: "Loza Valentín",
-    amistosos_res: 50+60+35,
-    reserva: 663,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 22, name: "Quiroga Lautaro",
-    amistosos_res: 50+55+56,
-    reserva: 95,
-    amistosos_juv: 0,
-    juveniles: 362,
-  },
-  {
-    num: 23, name: "Vázquez Lautaro",
-    amistosos_res: 60+40+72,
-    reserva: 348,
-    amistosos_juv: 0,
-    juveniles: 354,
-  },
-  {
-    num: 24, name: "Moreno Juan",
-    amistosos_res: 40+60+72,
-    reserva: 1080,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 25, name: "Noguera Facundo",
-    amistosos_res: 0+30+85,
-    reserva: 1360,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 26, name: "Quintana Facundo",
-    amistosos_res: 0+30+85,
-    reserva: 1727,
-    amistosos_juv: 0,
-    juveniles: 0,
-  },
-  {
-    num: 27, name: "Uriel Ramos",
-    amistosos_res: 0,
-    reserva: 0,
-    amistosos_juv: 0,
-    juveniles: 381,
-  },
-  {
-    num: 28, name: "Patricio Flores",
-    amistosos_res: 0,
-    reserva: 0,
-    amistosos_juv: 0,
-    juveniles: 663,
-  },
+// Datos estáticos de minutos por torneo
+const MINUTES_DATA = [
+  { num: 1,  name: "Ayala Gastón",        playerKey: "ayala gaston",          amistosos_res: 142, reserva: 1165, juveniles: 70 },
+  { num: 2,  name: "Blasquez Thomas",     playerKey: "thomas blasquez",        amistosos_res: 0,   reserva: 16,   juveniles: 160 },
+  { num: 3,  name: "Cabrera Jonás",       playerKey: "jonas cabrera",          amistosos_res: 126, reserva: 977,  juveniles: 0 },
+  { num: 4,  name: "Cantero Emiliano",    playerKey: "emiliano cantero",       amistosos_res: 143, reserva: 733,  juveniles: 285 },
+  { num: 5,  name: "Capponi José",        playerKey: "jose capponi",           amistosos_res: 155, reserva: 122,  juveniles: 541 },
+  { num: 6,  name: "Coria Alan",          playerKey: "alan coria",             amistosos_res: 182, reserva: 507,  juveniles: 0 },
+  { num: 7,  name: "Ejea Joaquín",        playerKey: "joaquin ejea",           amistosos_res: 170, reserva: 115,  juveniles: 525 },
+  { num: 8,  name: "Gagliardi Ramiro",    playerKey: "ramiro gagliardi",       amistosos_res: 98,  reserva: 649,  juveniles: 0 },
+  { num: 9,  name: "Martínez Thiago",     playerKey: "thiago martinez",        amistosos_res: 182, reserva: 1720, juveniles: 0 },
+  { num: 10, name: "Neris Miño Sebastián",playerKey: "sebastian neris miño",   amistosos_res: 0,   reserva: 90,   juveniles: 923 },
+  { num: 11, name: "Pastrana Franco",     playerKey: "franco pastrana",        amistosos_res: 163, reserva: 440,  juveniles: 257 },
+  { num: 12, name: "Puchetta Juan",       playerKey: "juan puchetta",          amistosos_res: 131, reserva: 131,  juveniles: 583 },
+  { num: 13, name: "Rodríguez Máximo",    playerKey: "maximo rodriguez",       amistosos_res: 182, reserva: 1624, juveniles: 0 },
+  { num: 14, name: "Sosa Joan",           playerKey: "joan sosa",              amistosos_res: 160, reserva: 1301, juveniles: 0 },
+  { num: 16, name: "Almada Dylan",        playerKey: "dylan almada",           amistosos_res: 120, reserva: 18,   juveniles: 669 },
+  { num: 17, name: "Retamoso Brian",      playerKey: "brian retamoso",         amistosos_res: 109, reserva: 291,  juveniles: 0 },
+  { num: 18, name: "Guennin Alessandro",  playerKey: "alessandro guennin",     amistosos_res: 164, reserva: 266,  juveniles: 752 },
+  { num: 19, name: "López Mateo",         playerKey: "mateo lopez",            amistosos_res: 182, reserva: 1184, juveniles: 0 },
+  { num: 20, name: "López Pablo",         playerKey: "lopez pablo",            amistosos_res: 120, reserva: 1183, juveniles: 0 },
+  { num: 21, name: "Loza Valentín",       playerKey: "loza valentin",          amistosos_res: 145, reserva: 663,  juveniles: 0 },
+  { num: 22, name: "Quiroga Lautaro",     playerKey: "lautaro quiroga",        amistosos_res: 161, reserva: 95,   juveniles: 362 },
+  { num: 23, name: "Vázquez Lautaro",     playerKey: "lautaro vazquez",        amistosos_res: 172, reserva: 348,  juveniles: 354 },
+  { num: 24, name: "Moreno Juan",         playerKey: "juan moreno",            amistosos_res: 172, reserva: 1080, juveniles: 0 },
+  { num: 25, name: "Noguera Facundo",     playerKey: "facundo noguera",        amistosos_res: 115, reserva: 1360, juveniles: 0 },
+  { num: 26, name: "Quintana Facundo",    playerKey: "facundo quintana",       amistosos_res: 115, reserva: 1727, juveniles: 0 },
+  { num: 27, name: "Uriel Ramos",         playerKey: "uriel ramos",            amistosos_res: 0,   reserva: 0,    juveniles: 381 },
+  { num: 28, name: "Patricio Flores",     playerKey: "patricio flores",        amistosos_res: 0,   reserva: 0,    juveniles: 663 },
 ];
 
 const TORNEOS = [
-  { id: "all",         label: "Todo el semestre",            res_total: 1727, juv_total: 1252 },
-  { id: "reserva",     label: "Torneo Proyección Apertura 2026", res_total: 1727, juv_total: null },
-  { id: "juveniles",   label: "Torneo Juveniles 2026",       res_total: null,  juv_total: 1252 },
-  { id: "amistosos",   label: "Amistosos",                   res_total: 182,   juv_total: null },
+  { id: "all",       label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
+  { id: "reserva",   label: "Torneo Proyección Apertura 2026", res_total: 1727, juv_total: null },
+  { id: "juveniles", label: "Torneo Juveniles 2026",           res_total: null,  juv_total: 1252 },
+  { id: "amistosos", label: "Amistosos",                       res_total: 182,   juv_total: null },
 ];
+
+function norm(s) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
 
 function getMinutes(p, torneoId) {
   switch (torneoId) {
-    case "reserva":   return { res: p.reserva,      juv: null };
-    case "juveniles": return { res: null,            juv: p.juveniles };
-    case "amistosos": return { res: p.amistosos_res, juv: p.amistosos_juv };
-    default:          return { res: p.reserva,       juv: p.juveniles };
+    case "reserva":   return { res: p.reserva,       juv: null };
+    case "juveniles": return { res: null,             juv: p.juveniles };
+    case "amistosos": return { res: p.amistosos_res,  juv: null };
+    default:          return { res: p.reserva,        juv: p.juveniles };
   }
 }
 
@@ -235,23 +77,40 @@ export default function MinutesTracker() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
+  const [photoMap, setPhotoMap] = useState({});
+
+  useEffect(() => {
+    base44.entities.Player.list("-created_date", 100).then((players) => {
+      const map = {};
+      players.forEach((p) => {
+        map[norm(p.name)] = p.photo_url || null;
+      });
+      setPhotoMap(map);
+    });
+  }, []);
+
+  function getPhoto(playerKey) {
+    // Try exact key first, then partial match
+    if (photoMap[playerKey]) return photoMap[playerKey];
+    const keys = Object.keys(photoMap);
+    const match = keys.find((k) => k.includes(playerKey) || playerKey.includes(k));
+    return match ? photoMap[match] : null;
+  }
 
   const torneo = TORNEOS.find((t) => t.id === torneoId);
   const showRes = torneo.res_total !== null;
   const showJuv = torneo.juv_total !== null;
 
-  const filtered = PLAYERS_RAW
-    .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+  const display = MINUTES_DATA
+    .filter((p) => !search || norm(p.name).includes(norm(search)))
     .map((p) => ({ ...p, ...getMinutes(p, torneoId) }))
-    .filter((p) => (showRes ? p.res > 0 : false) || (showJuv ? p.juv > 0 : false) || (!showRes && !showJuv))
     .sort((a, b) => {
       if (sortBy === "juv") return (b.juv || 0) - (a.juv || 0);
       if (sortBy === "name") return a.name.localeCompare(b.name);
       return (b.res || 0) - (a.res || 0);
     });
 
-  // Mostrar todos si ninguno tiene minutos (evitar lista vacía rara)
-  const display = filtered.length > 0 ? filtered : PLAYERS_RAW.map((p) => ({ ...p, ...getMinutes(p, torneoId) }));
+  const cols = showRes && showJuv ? "2rem 2.5rem 1fr 1fr 1fr" : "2rem 2.5rem 1fr 1fr";
 
   return (
     <div className="space-y-5">
@@ -285,16 +144,14 @@ export default function MinutesTracker() {
           />
         </div>
         <div className="flex flex-wrap gap-2">
-          {/* Filtro torneo */}
           <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
             {TORNEOS.map((t) => (
-              <button key={t.id} onClick={() => setTorneoId(t.id)}
+              <button key={t.id} onClick={() => { setTorneoId(t.id); setSortBy(t.res_total ? "res" : "juv"); }}
                 className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${torneoId === t.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
                 {t.label}
               </button>
             ))}
           </div>
-          {/* Sort */}
           <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
             {showRes && <button onClick={() => setSortBy("res")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "res" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Reserva</button>}
             {showJuv && <button onClick={() => setSortBy("juv")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "juv" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Juv.</button>}
@@ -305,43 +162,54 @@ export default function MinutesTracker() {
 
       {/* Tabla */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-        <div className={`grid text-xs text-zinc-500 uppercase tracking-wider px-4 py-2.5 border-b border-zinc-800`}
-          style={{ gridTemplateColumns: showRes && showJuv ? "2rem 1fr 1fr 1fr" : "2rem 1fr 1fr" }}>
+        <div className="grid text-xs text-zinc-500 uppercase tracking-wider px-4 py-2.5 border-b border-zinc-800"
+          style={{ gridTemplateColumns: cols }}>
           <span>#</span>
+          <span />
           <span>Jugador</span>
           {showRes && <span>Reserva</span>}
           {showJuv && <span>Juveniles</span>}
         </div>
 
         <div className="divide-y divide-zinc-800/50">
-          {display.map((p) => (
-            <div key={p.num}
-              className="grid items-center gap-4 px-4 py-3 hover:bg-zinc-800/30 transition-colors"
-              style={{ gridTemplateColumns: showRes && showJuv ? "2rem 1fr 1fr 1fr" : "2rem 1fr 1fr" }}>
-              <span className="text-zinc-600 text-sm font-mono">{p.num}</span>
-              <p className="text-sm text-white font-medium">{p.name}</p>
-
-              {showRes && (
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-white font-semibold text-sm">{p.res}'</span>
-                    <span className="text-zinc-500 text-xs">/ {torneo.res_total}'</span>
+          {display.map((p) => {
+            const photo = getPhoto(p.playerKey);
+            return (
+              <div key={p.num}
+                className="grid items-center gap-4 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors"
+                style={{ gridTemplateColumns: cols }}>
+                <span className="text-zinc-600 text-sm font-mono">{p.num}</span>
+                {photo ? (
+                  <img src={photo} alt={p.name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
                   </div>
-                  <PctBar pct={torneo.res_total > 0 ? p.res / torneo.res_total : 0} color={getPctColor(p.res / torneo.res_total)} />
-                </div>
-              )}
+                )}
+                <p className="text-sm text-white font-medium">{p.name}</p>
 
-              {showJuv && (
-                <div className="space-y-1">
-                  <div className="flex items-baseline gap-1.5">
-                    <span className="text-white font-semibold text-sm">{p.juv}'</span>
-                    <span className="text-zinc-500 text-xs">/ {torneo.juv_total}'</span>
+                {showRes && (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-white font-semibold text-sm">{p.res}'</span>
+                      <span className="text-zinc-500 text-xs">/ {torneo.res_total}'</span>
+                    </div>
+                    <PctBar pct={torneo.res_total > 0 ? p.res / torneo.res_total : 0} color={getPctColor(p.res / torneo.res_total)} />
                   </div>
-                  <PctBar pct={torneo.juv_total > 0 ? p.juv / torneo.juv_total : 0} color={getPctColor(p.juv / torneo.juv_total)} />
-                </div>
-              )}
-            </div>
-          ))}
+                )}
+
+                {showJuv && (
+                  <div className="space-y-1">
+                    <div className="flex items-baseline gap-1.5">
+                      <span className="text-white font-semibold text-sm">{p.juv}'</span>
+                      <span className="text-zinc-500 text-xs">/ {torneo.juv_total}'</span>
+                    </div>
+                    <PctBar pct={torneo.juv_total > 0 ? p.juv / torneo.juv_total : 0} color={getPctColor(p.juv / torneo.juv_total)} />
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
