@@ -269,8 +269,9 @@ function TabCarga({ player }) {
         // Deduplicar por fecha: mantener el último (más reciente) de cada día
         const deduped = {};
         allCatapult.forEach(r => {
-          if (!deduped[r.date] || new Date(r.created_date) > new Date(deduped[r.date].created_date)) {
-            deduped[r.date] = r;
+          const date = r.data?.date || r.date;
+          if (!deduped[date] || new Date(r.created_date) > new Date(deduped[date].created_date)) {
+            deduped[date] = r;
           }
         });
         setGpsRecords(Object.values(deduped) || []);
@@ -293,19 +294,19 @@ function TabCarga({ player }) {
   if (loading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
   const cutoff = moment().subtract(Number(period), "days").format("YYYY-MM-DD");
-  const filtered = gpsRecords.filter(r => r.date >= cutoff);
+  const filtered = gpsRecords.filter(r => (r.data?.date || r.date) >= cutoff);
 
-  const sum = (field) => filtered.reduce((s, r) => s + (r[field] || 0), 0);
+  const sum = (field) => filtered.reduce((s, r) => s + (r.data?.[field] || r[field] || 0), 0);
   const avg = (field) => {
-    const vals = filtered.filter(r => r[field] > 0);
-    return vals.length ? Math.round(vals.reduce((s, r) => s + r[field], 0) / vals.length) : null;
+    const vals = filtered.filter(r => (r.data?.[field] || r[field] || 0) > 0);
+    return vals.length ? Math.round(vals.reduce((s, r) => s + (r.data?.[field] || r[field] || 0), 0) / vals.length) : null;
   };
 
   const chartData = [...filtered].reverse().map(r => ({
-    label: moment(r.date).format("DD/MM"),
-    dist: Math.round((r.total_distance || 0) / 100) / 10,
-    hsr: r.high_speed_running || 0,
-    pl: r.player_load || 0,
+    label: moment(r.data?.date || r.date).format("DD/MM"),
+    dist: Math.round(((r.data?.total_distance || r.total_distance) || 0) / 100) / 10,
+    hsr: (r.data?.distance_hsr || r.distance_hsr) || 0,
+    pl: (r.data?.player_load || r.player_load) || 0,
   }));
 
   const periodLabels = { "7": "7 días", "14": "14 días", "30": "Último mes" };
@@ -334,10 +335,10 @@ function TabCarga({ player }) {
             <p className="text-xs text-zinc-500 mb-3">Resumen — últimos {period} días ({filtered.length} sesiones)</p>
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Dist. total acum." value={`${Math.round(sum("total_distance") / 100) / 10} km`} color="text-blue-400" />
-              <StatCard label="HSR acumulado" value={`${sum("high_speed_running")} m`} color="text-purple-400" />
+              <StatCard label="HSR acumulado" value={`${sum("distance_hsr")} m`} color="text-purple-400" />
               <StatCard label="Sprint acum." value={`${sum("sprint_distance")} m`} color="text-orange-400" />
               <StatCard label="Player Load total" value={Math.round(sum("player_load"))} color="text-emerald-400" />
-              <StatCard label="Vel. máx. prom." value={avg("max_speed") ? `${avg("max_speed")} km/h` : "—"} color="text-yellow-400" />
+              <StatCard label="Vel. máx. prom." value={avg("max_velocity") ? `${avg("max_velocity")} km/h` : "—"} color="text-yellow-400" />
               <StatCard label="Sesiones" value={filtered.length} color="text-white" />
             </div>
           </div>
@@ -372,15 +373,18 @@ function TabCarga({ player }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.map((r) => (
-                    <tr key={r.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
-                      <td className="px-3 py-2 text-zinc-300">{moment(r.date).format("DD/MM")}</td>
-                      <td className="px-3 py-2 text-right text-white font-medium">{r.total_distance ? `${Math.round(r.total_distance / 100) / 10}` : "—"}</td>
-                      <td className="px-3 py-2 text-right text-purple-300">{r.high_speed_running || "—"}</td>
-                      <td className="px-3 py-2 text-right text-emerald-300">{r.player_load || "—"}</td>
-                      <td className="px-3 py-2 text-right text-yellow-300">{r.max_speed ? `${r.max_speed}` : "—"}</td>
-                    </tr>
-                  ))}
+                  {filtered.map((r) => {
+                    const d = r.data || r;
+                    return (
+                      <tr key={r.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30">
+                        <td className="px-3 py-2 text-zinc-300">{moment(d.date).format("DD/MM")}</td>
+                        <td className="px-3 py-2 text-right text-white font-medium">{d.total_distance ? `${Math.round(d.total_distance / 100) / 10}` : "—"}</td>
+                        <td className="px-3 py-2 text-right text-purple-300">{d.distance_hsr || "—"}</td>
+                        <td className="px-3 py-2 text-right text-emerald-300">{d.player_load || "—"}</td>
+                        <td className="px-3 py-2 text-right text-yellow-300">{d.max_velocity ? `${d.max_velocity}` : "—"}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
