@@ -62,6 +62,7 @@ function NextMatchCard({ match, matchReport }) {
 }
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
+import PlayerPhotoUpload from "@/components/staff/PlayerPhotoUpload";
 import PitchMap from "@/components/staff/PitchMap";
 import TournamentTable from "@/components/staff/TournamentTable";
 import TournamentImporter from "@/components/staff/TournamentImporter";
@@ -257,17 +258,15 @@ export default function Dashboard() {
 
             <div className="space-y-2 max-h-72 overflow-y-auto">
                 {availablePlayers.map((p) =>
-              <div key={p.id} onClick={() => setSelectedPlayer(p)} className="flex items-center gap-3 cursor-pointer hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
+              <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
                     <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                    {p.photo_url ? (
-                      <img src={p.photo_url} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
-                    ) : (
-                      <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-zinc-500">{p.name.charAt(0)}</span>
-                      </div>
-                    )}
-                    <span className="text-sm text-white">{p.name}</span>
-                    <span className="text-xs text-zinc-500 ml-auto">{p.position}</span>
+                    <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
+                      <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
+                    </div>
+                    <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
+                      <span className="text-sm text-white">{p.name}</span>
+                      <span className="text-xs text-zinc-500">{p.position}</span>
+                    </div>
                   </div>
               )}
               </div>
@@ -293,17 +292,15 @@ export default function Dashboard() {
 
             <div className="space-y-2 max-h-72 overflow-y-auto">
                 {unavailablePlayers.map((p) =>
-              <div key={p.id} onClick={() => setSelectedPlayer(p)} className="flex items-center justify-between cursor-pointer hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
+              <div key={p.id} className="flex items-center justify-between hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
                     <div className="flex items-center gap-3">
                       <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                      {p.photo_url ? (
-                        <img src={p.photo_url} alt={p.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
-                      ) : (
-                        <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                          <span className="text-[10px] font-bold text-zinc-500">{p.name.charAt(0)}</span>
-                        </div>
-                      )}
-                      <span className="text-sm text-white">{p.name}</span>
+                      <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
+                        <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
+                      </div>
+                      <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer flex-1">
+                        <span className="text-sm text-white">{p.name}</span>
+                      </div>
                     </div>
                     <PlayerStatusBadge status={p.status} />
                   </div>
