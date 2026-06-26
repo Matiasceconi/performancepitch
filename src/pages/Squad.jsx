@@ -367,8 +367,8 @@ export default function Squad() {
                             await base44.entities.Player.update(p.id, { division: v });
                             await loadPlayers();
                           }}>
-                            <SelectTrigger className="h-auto py-0.5 px-2 border border-zinc-700 bg-zinc-800 text-xs w-auto focus:ring-0 shadow-none">
-                              <SelectValue placeholder={p.division || "Reserva"} />
+                            <SelectTrigger className="h-auto py-0.5 px-2 border border-zinc-700 bg-zinc-800 text-xs text-white w-auto focus:ring-0 shadow-none">
+                              {p.division || "Reserva"}
                             </SelectTrigger>
                             <SelectContent className="bg-zinc-800 border-zinc-700">
                               {divisions.map((d) => <SelectItem key={d.id} value={d.name} className="text-white text-xs">{d.name}</SelectItem>)}
