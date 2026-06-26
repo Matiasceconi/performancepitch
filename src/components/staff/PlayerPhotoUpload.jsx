@@ -45,12 +45,12 @@ export default function PlayerPhotoUpload({ player, onPhotoUpdate }) {
         {player.photo_url ? (
           <img
             src={player.photo_url}
-            alt={player.name}
+            alt={player.full_name}
             className="w-10 h-10 rounded-full object-cover border-2 border-zinc-700 group-hover:opacity-75 transition-opacity"
           />
         ) : (
           <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center group-hover:bg-zinc-700 transition-colors">
-            <span className="text-xs font-bold text-zinc-500">{player.name?.charAt(0) || "?"}</span>
+            <span className="text-xs font-bold text-zinc-500">{player.full_name?.charAt(0) || "?"}</span>
           </div>
         )}
         <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
