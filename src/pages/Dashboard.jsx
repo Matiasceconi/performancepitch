@@ -82,7 +82,7 @@ export default function Dashboard() {
     async function load() {
       try {
         const [p, events, s, matchReports] = await Promise.all([
-        base44.entities.Player.list("-created_date", 50),
+        base44.entities.Player.filter({ division: "Reserva" }, "-created_date", 200),
         base44.entities.DayEvent.list("date", 200),
         base44.entities.TrainingSession.list("-date", 5),
         base44.entities.MatchReport.list("-date", 20)]
@@ -114,17 +114,16 @@ export default function Dashboard() {
   }
 
   const today = moment().format("MM-DD");
-   const reservaPlayers = players.filter((p) => (p.division || "Primera") === "Reserva");
-   const birthdayPlayers = reservaPlayers.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
+    const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
 
-  const availablePlayers = reservaPlayers.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
-   const unavailablePlayers = reservaPlayers.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
+  const availablePlayers = players.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
+   const unavailablePlayers = players.filter((p) => p.status !== "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
    const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
    const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
-   const injured = reservaPlayers.filter((p) => p.status === "Lesionado").length;
+   const injured = players.filter((p) => p.status === "Lesionado").length;
 
   const stats = [
-  { label: "Jugadores (Reserva)", value: reservaPlayers.length, icon: Users, color: "text-blue-400" },
+  { label: "Jugadores (Reserva)", value: players.length, icon: Users, color: "text-blue-400" },
   { label: "Campo disp.", value: availableField, icon: Activity, color: "text-emerald-400" },
   { label: "Lesionados", value: injured, icon: AlertCircle, color: "text-red-400" },
   { label: "Arqueros disp.", value: availableGoalkeepers, icon: Shield, color: "text-yellow-400" }];
@@ -163,7 +162,7 @@ export default function Dashboard() {
           </div>
           <div className="p-4">
             <div className="grid gap-2">
-              {[...players].filter((p) => (p.division || "Primera") === "Reserva").sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
+              {[...players].sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
             <div key={p.id} className="flex items-center gap-3 py-1.5">
                   <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
                   {p.photo_url ?
