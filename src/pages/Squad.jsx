@@ -13,7 +13,7 @@ import PlayerImportDialog from "@/components/staff/PlayerImportDialog";
 import moment from "moment";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
-const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección"];
+const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Subio a primera", "Bajo a juveniles", "Subio de juveniles", "Bajo de primera", "Sparring"];
 const divisions = ["Primera", "Reserva", "Cuarta División", "Quinta División"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
 const seasonPeriods = ["En competencia", "Pretemporada", "Transitorio"];
