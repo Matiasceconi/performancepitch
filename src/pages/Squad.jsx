@@ -231,9 +231,10 @@ export default function Squad() {
     .filter((p) => !search || p.full_name.toLowerCase().includes(search.toLowerCase()))
     .filter((p) => !filterPosition || p.position === filterPosition);
 
+  const groupedNoJuveniles = activePlayers.filter((p) => p.status !== "Subio de juveniles");
   const grouped = positions.map((pos) => ({
     position: pos,
-    players: activePlayers.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
+    players: groupedNoJuveniles.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
   }));
 
   const countByTab = (tab) => filterByTab(tab).length;
@@ -245,6 +246,7 @@ export default function Squad() {
   }, [defaultTab, activeTab]);
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
+  const subioDJuvenilesPlayers = players.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -490,6 +492,48 @@ export default function Squad() {
         </div>
       ) : (
         <div className="space-y-4">
+          {subioDJuvenilesPlayers.length > 0 && (
+            <div>
+              <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2 px-1">Subio de juveniles</p>
+              <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800/50">
+                {subioDJuvenilesPlayers.map((p) => {
+                  const isToday = isBirthdayToday(p.birth_date);
+                  const age = calcAge(p.birth_date);
+                  return (
+                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors cursor-pointer ${isToday ? "bg-yellow-500/5" : ""}`}>
+                      <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
+                      {p.photo_url ? (
+                         <img src={p.photo_url} alt={p.full_name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
+                       ) : (
+                         <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                           <span className="text-xs font-bold text-zinc-500">{p.full_name?.charAt(0)}</span>
+                         </div>
+                       )}
+                      <div className="flex-1 min-w-0">
+                         <div className="flex items-center gap-2">
+                           <p className="text-sm text-white font-medium">{p.full_name}</p>
+                           {isToday && <Cake size={14} className="text-yellow-400" title="¡Cumpleaños hoy!" />}
+                        </div>
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          {p.birth_date && <span className="text-xs text-zinc-600">{moment(p.birth_date).format("YYYY")}</span>}
+                          {age !== null && <span className="text-xs text-zinc-500">{age} años</span>}
+                          {p.position && <span className="text-xs text-zinc-600">{p.position}</span>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <button onClick={() => openEdit(p)} className="p-1.5 text-zinc-600 hover:text-white transition-colors">
+                          <Pencil size={14} />
+                        </button>
+                        <button onClick={() => setDeleteTarget(p)} className="p-1.5 text-zinc-600 hover:text-red-400 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           {grouped.map((g) =>
             g.players.length > 0 ? (
               <div key={g.position}>
