@@ -56,6 +56,7 @@ export default function Squad() {
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [activeTab, setActiveTab] = useState("reserva");
   const [search, setSearch] = useState("");
+  const [filterPosition, setFilterPosition] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -135,9 +136,9 @@ export default function Squad() {
     }
   }
 
-  const activePlayers = filterByTab(activeTab).filter((p) =>
-    !search || p.name.toLowerCase().includes(search.toLowerCase())
-  );
+  const activePlayers = filterByTab(activeTab)
+    .filter((p) => !search || p.name.toLowerCase().includes(search.toLowerCase()))
+    .filter((p) => !filterPosition || p.position === filterPosition);
 
   const grouped = positions.map((pos) => ({
     position: pos,
@@ -185,6 +186,23 @@ export default function Squad() {
             {label} ({countByTab(id)})
           </button>
         ))}
+      </div>
+
+      {/* Posición filter */}
+      <div>
+        <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2">Filtrar por posición</p>
+        <div className="flex flex-wrap gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+          <button onClick={() => setFilterPosition(null)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${!filterPosition ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-white"}`}>
+            Todas
+          </button>
+          {positions.map((pos) => (
+            <button key={pos} onClick={() => setFilterPosition(pos)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${filterPosition === pos ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-white"}`}>
+              {pos}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Birthday alert */}
