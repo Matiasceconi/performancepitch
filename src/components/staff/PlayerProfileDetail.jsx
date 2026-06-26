@@ -262,7 +262,7 @@ function TabCarga({ player }) {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState("7");
 
-  // Normalizar nombre: remover tildes, espacios extras, convertir a minúsculas, extrae palabras
+  // Normalizar nombre: remover tildes, espacios extras, convertir a minúsculas
   const normalizeName = (name) => {
     return name
       .normalize("NFD")
@@ -279,12 +279,21 @@ function TabCarga({ player }) {
 
   // Verificar si dos nombres coinciden (búsqueda flexible)
   const namesMatch = (name1, name2) => {
+    const norm1 = normalizeName(name1);
+    const norm2 = normalizeName(name2);
+    
+    // Coincidencia exacta
+    if (norm1 === norm2) return true;
+    
     const words1 = getNameWords(name1);
     const words2 = getNameWords(name2);
     if (words1.length === 0 || words2.length === 0) return false;
-    // Al menos 2 palabras deben coincidir (ej: "Tomas Escalante" ↔ "Escalante Tomas")
+    
+    // Contar coincidencias de palabras
     const matches = words1.filter(w => words2.includes(w)).length;
-    return matches >= Math.max(1, Math.min(words1.length, words2.length) - 1);
+    // Al menos 1 palabra debe coincidir si hay pocas palabras, o más palabras si hay muchas
+    const minMatches = Math.max(1, Math.min(words1.length, words2.length) - 1);
+    return matches >= minMatches;
   };
 
   useEffect(() => {
