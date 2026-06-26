@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Heart, AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, Activity } from "lucide-react";
+import { Heart, AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, Activity, ChevronRight } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
+import PlayerMedicalHistory from "@/components/medical/PlayerMedicalHistory";
 moment.locale("es");
 
 const statusColors = {
@@ -63,6 +64,7 @@ export default function MedicalDashboard() {
   const [records, setRecords] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
 
   useEffect(() => {
     async function load() {
@@ -108,9 +110,34 @@ export default function MedicalDashboard() {
     .slice(0, 4)
     .map(([diag, count]) => ({ diag, count }));
 
+  // Build list of players with any medical record, for the history panel
+  const playersWithRecords = (() => {
+    const seen = new Map();
+    records.forEach(r => {
+      const key = r.player_id || r.player_name;
+      if (!seen.has(key)) {
+        const playerData = playerMap[r.player_name?.trim().toLowerCase()];
+        seen.set(key, {
+          id: r.player_id,
+          name: r.player_name,
+          photo_url: playerData?.photo_url || null,
+          position: playerData?.position || "",
+          number: playerData?.number || null,
+          category_division: r.category_division || "",
+          count: 0,
+          lastDate: r.injury_date || "",
+        });
+      }
+      seen.get(key).count += 1;
+    });
+    return Array.from(seen.values()).sort((a, b) => b.lastDate.localeCompare(a.lastDate));
+  })();
+
   if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
   return (
+    <>
+    {selectedPlayer && <PlayerMedicalHistory player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
     <div className="space-y-6">
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -163,13 +190,19 @@ export default function MedicalDashboard() {
               return (
                 <div key={r.id} className={`bg-zinc-900 border ${sc.border} rounded-xl p-4`}>
                   <div className="flex items-start gap-3">
-                    {playerData?.photo_url ? (
-                      <img src={playerData.photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0" />
-                    ) : (
-                      <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                        <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
-                      </div>
-                    )}
+                    <button
+                      onClick={() => setSelectedPlayer({ id: r.player_id, name: r.player_name, photo_url: playerData?.photo_url, position: playerData?.position, number: playerData?.number, category_division: r.category_division })}
+                      className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                      title="Ver historial médico"
+                    >
+                      {playerData?.photo_url ? (
+                        <img src={playerData.photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border-2 border-zinc-600 hover:border-white transition-all" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-600 hover:border-white transition-all flex items-center justify-center">
+                          <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
+                        </div>
+                      )}
+                    </button>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-white font-semibold text-sm">{r.player_name}</span>
@@ -242,6 +275,37 @@ export default function MedicalDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Historial médico por jugador */}
+      <div>
+        <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-2 mb-3">
+          <User size={13} className="text-zinc-500" />
+          Historial médico por jugador
+        </h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {playersWithRecords.map(p => (
+            <button
+              key={p.id || p.name}
+              onClick={() => setSelectedPlayer(p)}
+              className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 flex items-center gap-3 transition-all text-left group"
+            >
+              {p.photo_url ? (
+                <img src={p.photo_url} alt={p.name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-zinc-500">{p.name?.charAt(0)}</span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{p.name}</p>
+                <p className="text-zinc-500 text-xs">{p.count} registro{p.count !== 1 ? "s" : ""}</p>
+              </div>
+              <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 shrink-0 transition-colors" />
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
+    </>
   );
 }
