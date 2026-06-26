@@ -1,270 +1,264 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { FileSpreadsheet, Activity, TrendingUp, BarChart2 } from "lucide-react";
+import { FileSpreadsheet, TrendingUp, BarChart2, Activity, Filter } from "lucide-react";
 import moment from "moment";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, ReferenceLine, RadarChart, Radar, PolarGrid, PolarAngleAxis, Legend,
-  Cell,
+  LineChart, Line, ReferenceLine, Cell,
 } from "recharts";
 
+// ── CSV Parser ────────────────────────────────────────────────────────────────
+function matchColumn(raw) {
+  const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
+  if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
+  if (h === "total duration" || h === "tot dur") return "total_duration";
+  if (h.includes("total distance") || h === "tot dist (m)" || h === "tot dist") return "total_distance";
+  if (h.startsWith("d") && h.includes("19")) return "distance_hsr";
+  if ((h.startsWith("d+") || h.startsWith("d +")) && h.includes("25")) return "sprint_distance";
+  if (h === "sprint efforts" || h === "sprint effs") return "sprint_efforts";
+  if (h.includes("acc") && (h.includes("3mt") || h.includes("3 m"))) return "accelerations";
+  if (h.includes("dec") && (h.includes("3mt") || h.includes("3 m"))) return "decelerations";
+  if (h === "total player load" || h === "tot pl" || h === "player load") return "player_load";
+  if (h.includes("maximum velocity") || h === "max vel (km/h)" || h === "max velocity (km/h)") return "max_velocity";
+  if (h.includes("max vel") && h.includes("%")) return "max_velocity_percentage";
+  if (h === "metros x min" || h === "m/min" || h === "meters per minute") return "meters_per_minute";
+  return null;
+}
+function parseNum(val) {
+  if (val == null || val === "" || val === "-") return null;
+  const str = String(val).trim();
+  const hasCommaDecimal = /^\d+,\d+$/.test(str) || /^\d{1,3}(\.\d{3})*,\d+$/.test(str);
+  const cleaned = hasCommaDecimal ? str.replace(/\./g, "").replace(",", ".") : str.replace(",", ".");
+  const n = parseFloat(cleaned);
+  return isNaN(n) ? null : n;
+}
+function parseDuration(val) {
+  if (!val) return null;
+  const parts = String(val).trim().split(":").map(Number);
+  if (parts.length === 3) return parts[0] * 60 + parts[1] + parts[2] / 60;
+  if (parts.length === 2) return parts[0] + parts[1] / 60;
+  return parseNum(val);
+}
+function splitCSVLine(line, sep) {
+  const result = [];
+  let cur = "", inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (ch === '"') inQuotes = !inQuotes;
+    else if (ch === sep && !inQuotes) { result.push(cur.trim()); cur = ""; }
+    else cur += ch;
+  }
+  result.push(cur.trim());
+  return result;
+}
+function parseCatapultCSV(text) {
+  const clean = text.replace(/^\uFEFF/, "");
+  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
+  const firstSemi = lines[0].split(";").length;
+  const firstComma = lines[0].split(",").length;
+  const sep = firstSemi > firstComma ? ";" : ",";
+  let headerIdx = -1, headers = [];
+  for (let i = 0; i < Math.min(lines.length, 15); i++) {
+    const cols = splitCSVLine(lines[i], sep);
+    const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
+    const mapped = cols.filter((c) => matchColumn(c) !== null).length;
+    if (firstLow === "name" || firstLow === "jugador" || firstLow === "athlete" || mapped >= 3) {
+      headerIdx = i;
+      headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c);
+      break;
+    }
+  }
+  if (headerIdx === -1) return null;
+  const fieldMap = {};
+  headers.forEach((h, idx) => {
+    const field = matchColumn(h);
+    if (field) fieldMap[idx] = field;
+    else if (idx === 0) fieldMap[idx] = "player_name";
+  });
+  const rows = [];
+  for (let i = headerIdx + 1; i < lines.length; i++) {
+    const cols = splitCSVLine(lines[i], sep);
+    const obj = {};
+    Object.entries(fieldMap).forEach(([colIdx, field]) => {
+      const raw = cols[parseInt(colIdx)];
+      if (field === "player_name") obj[field] = raw || "";
+      else if (field === "total_duration") obj[field] = parseDuration(raw);
+      else obj[field] = parseNum(raw);
+    });
+    const name = (obj.player_name || "").trim();
+    if (!name) continue;
+    if (["total", "promedio", "average", "team", "totals"].includes(name.toLowerCase())) continue;
+    rows.push(obj);
+  }
+  return rows;
+}
+
+// ── Constantes ────────────────────────────────────────────────────────────────
 const METRICS = [
-  { key: "total_distance",   label: "Distancia Total (m)",  color: "#60a5fa", fmt: (v) => Math.round(v) },
-  { key: "distance_hsr",    label: "19.8-25 km/h (m)",     color: "#34d399", fmt: (v) => Math.round(v) },
-  { key: "sprint_distance", label: "+25 km/h (m)",          color: "#fbbf24", fmt: (v) => Math.round(v) },
-  { key: "player_load",     label: "Player Load",           color: "#a78bfa", fmt: (v) => v.toFixed(0)  },
-  { key: "max_velocity",    label: "Vel. Máx (km/h)",       color: "#f87171", fmt: (v) => v.toFixed(1)  },
-  { key: "accelerations",   label: "Aceleraciones",         color: "#fb923c", fmt: (v) => Math.round(v) },
-  { key: "decelerations",   label: "Desaceleraciones",      color: "#e879f9", fmt: (v) => Math.round(v) },
-  { key: "sprint_efforts",  label: "Sprint Efforts",        color: "#2dd4bf", fmt: (v) => Math.round(v) },
+  { key: "total_distance",   label: "Distancia (m)",      color: "#60a5fa", fmt: (v) => Math.round(v) },
+  { key: "distance_hsr",    label: "19.8-25 km/h (m)",   color: "#34d399", fmt: (v) => Math.round(v) },
+  { key: "sprint_distance", label: "+25 km/h (m)",         color: "#fbbf24", fmt: (v) => Math.round(v) },
+  { key: "player_load",     label: "Player Load",          color: "#a78bfa", fmt: (v) => v.toFixed(0)  },
+  { key: "max_velocity",    label: "Vel. Máx (km/h)",     color: "#f87171", fmt: (v) => v.toFixed(1)  },
+  { key: "accelerations",   label: "Aceleraciones",        color: "#fb923c", fmt: (v) => Math.round(v) },
+  { key: "decelerations",   label: "Desaceleraciones",     color: "#e879f9", fmt: (v) => Math.round(v) },
+  { key: "sprint_efforts",  label: "Sprint Efforts",       color: "#2dd4bf", fmt: (v) => Math.round(v) },
 ];
 
 const TABS = [
-  { id: "session",    label: "Por Sesión",   icon: BarChart2 },
-  { id: "evolution",  label: "Evolución",    icon: TrendingUp },
-  { id: "comparison", label: "Comparar",     icon: Activity },
+  { id: "team",       label: "Equipo",    icon: BarChart2  },
+  { id: "player",     label: "Jugador",   icon: TrendingUp },
+  { id: "comparison", label: "Comparar",  icon: Activity   },
 ];
 
+const COLORS = ["#60a5fa","#34d399","#fbbf24","#a78bfa","#f87171","#fb923c","#e879f9","#2dd4bf","#84cc16","#f97316"];
+
 function avg(arr) {
-  const vals = arr.filter((v) => v != null);
-  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  const v = arr.filter((x) => x != null);
+  return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
 }
 
-const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Otro"];
-const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
-
-// ── Filtros globales ─────────────────────────────────────────────────────────
-function GlobalFilters({ filters, onChange }) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-wrap gap-3 items-end">
-      <div className="flex flex-col gap-1">
-        <label className="text-zinc-500 text-xs">Desde</label>
-        <input type="date" value={filters.dateFrom} onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
-          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-zinc-500 text-xs">Hasta</label>
-        <input type="date" value={filters.dateTo} onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
-          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-zinc-500 text-xs">Tipo de sesión</label>
-        <select value={filters.sessionType} onChange={(e) => onChange({ ...filters, sessionType: e.target.value })}
-          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-          <option value="">Todos los tipos</option>
-          {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-        </select>
-      </div>
-      <div className="flex flex-col gap-1">
-        <label className="text-zinc-500 text-xs">Período de temporada</label>
-        <select value={filters.seasonPeriod} onChange={(e) => onChange({ ...filters, seasonPeriod: e.target.value })}
-          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-          <option value="">Todos los períodos</option>
-          {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-        </select>
-      </div>
-      {(filters.dateFrom || filters.dateTo || filters.sessionType || filters.seasonPeriod) && (
-        <button onClick={() => onChange({ dateFrom: "", dateTo: "", sessionType: "", seasonPeriod: "" })}
-          className="text-xs text-zinc-500 hover:text-white border border-zinc-700 px-3 py-2 rounded-lg transition-colors">
-          Limpiar filtros
-        </button>
-      )}
-    </div>
-  );
-}
-
-// ── TAB 1: Vista por Sesión ──────────────────────────────────────────────────
-function SessionView({ sessions, reports, filters }) {
-  // Sesiones con CSV cargado en la propia sesión (csv_url) o con CatapultReport, aplicando filtros
-  const allSessions = useMemo(() => {
-    const sessionMap = new Map();
-    sessions.forEach((s) => {
-      const hasReports = reports.some((r) => r.session_id === s.id);
-      const hasCsv = !!s.csv_url;
-      if (!hasReports && !hasCsv) return;
-      if (filters.dateFrom && s.date < filters.dateFrom) return;
-      if (filters.dateTo && s.date > filters.dateTo) return;
-      if (filters.sessionType && s.session_type !== filters.sessionType) return;
-      if (filters.seasonPeriod && s.season_period !== filters.seasonPeriod) return;
-      sessionMap.set(s.id, s);
-    });
-    return [...sessionMap.values()].sort((a, b) => b.date.localeCompare(a.date));
-  }, [sessions, reports, filters]);
-
-  const [selectedId, setSelectedId] = useState(allSessions[0]?.id || "");
+// ── Vista Equipo ──────────────────────────────────────────────────────────────
+function TeamView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
   const [activeMetric, setActiveMetric] = useState("total_distance");
 
-  const sessionReports = useMemo(
-    () => reports.filter((r) => r.session_id === selectedId),
-    [reports, selectedId]
-  );
+  const filtered = useMemo(() => allRows.filter((r) => {
+    if (dateFrom && r.date < dateFrom) return false;
+    if (dateTo && r.date > dateTo) return false;
+    if (sessionType && r.session_type !== sessionType) return false;
+    if (seasonPeriod && r.season_period !== seasonPeriod) return false;
+    return true;
+  }), [allRows, dateFrom, dateTo, sessionType, seasonPeriod]);
 
-  const selectedSession = sessions.find((s) => s.id === selectedId);
+  // Agrupar por jugador y promediar
+  const byPlayer = useMemo(() => {
+    const map = {};
+    filtered.forEach((r) => {
+      if (!map[r.player_name]) map[r.player_name] = [];
+      map[r.player_name].push(r);
+    });
+    return Object.entries(map).map(([name, rows]) => {
+      const out = { player_name: name };
+      METRICS.forEach(({ key }) => { out[key] = avg(rows.map((r) => r[key])); });
+      return out;
+    });
+  }, [filtered]);
+
+  const metric = METRICS.find((m) => m.key === activeMetric);
+  const chartData = useMemo(() =>
+    byPlayer
+      .filter((r) => r[activeMetric] != null)
+      .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
+      .map((r) => ({
+        name: r.player_name?.split(" ").slice(-1)[0] || r.player_name,
+        fullName: r.player_name,
+        value: r[activeMetric],
+      })),
+  [byPlayer, activeMetric]);
 
   const teamAvgs = useMemo(() => {
     const out = {};
-    METRICS.forEach(({ key }) => { out[key] = avg(sessionReports.map((r) => r[key])); });
+    METRICS.forEach(({ key }) => { out[key] = avg(filtered.map((r) => r[key])); });
     return out;
-  }, [sessionReports]);
+  }, [filtered]);
 
-  const metric = METRICS.find((m) => m.key === activeMetric);
-  const chartData = useMemo(
-    () =>
-      sessionReports
-        .filter((r) => r[activeMetric] != null)
-        .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
-        .map((r) => ({
-          name: r.player_name?.split(" ").slice(-1)[0] || r.player_name,
-          fullName: r.player_name,
-          value: r[activeMetric],
-        })),
-    [sessionReports, activeMetric]
-  );
-
-  const COLORS = ["#60a5fa","#34d399","#fbbf24","#a78bfa","#f87171","#fb923c","#e879f9","#2dd4bf"];
-
-  if (allSessions.length === 0) {
+  if (filtered.length === 0) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center">
-        <FileSpreadsheet size={40} className="text-zinc-700 mx-auto mb-3" />
-        <p className="text-zinc-500 text-sm">No hay datos GPS cargados todavía.</p>
-        <p className="text-zinc-600 text-xs mt-1">Cargá el CSV en cada sesión desde la sección Sesiones de Campo.</p>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+        <p className="text-zinc-500 text-sm">Sin datos para los filtros seleccionados.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
-      {/* Selector de sesión */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <select
-          value={selectedId}
-          onChange={(e) => setSelectedId(e.target.value)}
-          className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-zinc-500 flex-1 min-w-[200px]"
-        >
-          {allSessions.map((s) => (
-            <option key={s.id} value={s.id}>
-              {moment(s.date).format("DD/MM/YY")} — {s.title}
-              {s.match_day_code ? ` (${s.match_day_code})` : ""}
-            </option>
-          ))}
-        </select>
-        {selectedSession && (
-          <div className="flex gap-2 flex-wrap text-xs">
-            {selectedSession.session_type && <span className="bg-zinc-800 text-zinc-400 px-2 py-1 rounded-lg">{selectedSession.session_type}</span>}
-            {selectedSession.intensity && <span className="bg-zinc-800 text-zinc-400 px-2 py-1 rounded-lg">{selectedSession.intensity}</span>}
-            {selectedSession.match_day_code && <span className="bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded-lg">{selectedSession.match_day_code}</span>}
+      {/* KPIs promedio equipo */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {METRICS.filter(({ key }) => teamAvgs[key] != null).map(({ key, label, color, fmt }) => (
+          <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
+            <p className="text-zinc-500 text-xs">{label}</p>
+            <p className="font-bold text-lg mt-0.5" style={{ color }}>{fmt(teamAvgs[key])}</p>
+            <p className="text-zinc-600 text-xs">prom. equipo</p>
           </div>
-        )}
+        ))}
       </div>
 
-      {sessionReports.length === 0 ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center">
-          <p className="text-zinc-600 text-sm">Esta sesión tiene CSV registrado pero los datos aún no fueron importados como registros GPS.</p>
-          <p className="text-zinc-700 text-xs mt-1">Abrí la sesión y confirmá la importación desde el panel GPS.</p>
+      {/* Selector de métrica */}
+      <div className="flex flex-wrap gap-1.5">
+        {METRICS.map(({ key, label, color }) => (
+          <button key={key} onClick={() => setActiveMetric(key)}
+            className="text-xs px-3 py-1.5 rounded-full border font-medium transition-colors"
+            style={activeMetric === key
+              ? { backgroundColor: color, color: "#18181b", borderColor: color }
+              : { backgroundColor: "transparent", color: "#71717a", borderColor: "#3f3f46" }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Gráfico de barras por jugador */}
+      {chartData.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+          <p className="text-sm font-semibold text-white mb-4">{metric?.label} — promedio por jugador</p>
+          <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 32)}>
+            <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 55, top: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
+              <XAxis type="number" tick={{ fontSize: 10, fill: "#71717a" }} axisLine={false} tickLine={false} />
+              <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: "#d4d4d8" }} axisLine={false} tickLine={false} />
+              <Tooltip
+                contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }}
+                formatter={(val) => [metric?.fmt(val), metric?.label]}
+                labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ""}
+              />
+              <Bar dataKey="value" radius={[0, 4, 4, 0]}
+                label={{ position: "right", fontSize: 10, fill: "#a1a1aa", formatter: (v) => metric?.fmt(v) }}>
+                {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-      ) : (
-        <>
-          {/* KPIs promedio equipo */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {METRICS.filter(({ key }) => teamAvgs[key] != null).map(({ key, label, color, fmt }) => (
-              <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 text-center">
-                <p className="text-zinc-500 text-xs">{label}</p>
-                <p className="font-bold text-lg mt-1" style={{ color }}>{fmt(teamAvgs[key])}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* Selector de métrica */}
-          <div className="flex flex-wrap gap-1.5">
-            {METRICS.map(({ key, label, color }) => (
-              <button
-                key={key}
-                onClick={() => setActiveMetric(key)}
-                className="text-xs px-3 py-1.5 rounded-full border font-medium transition-colors"
-                style={activeMetric === key
-                  ? { backgroundColor: color, color: "#18181b", borderColor: color }
-                  : { backgroundColor: "transparent", color: "#71717a", borderColor: "#3f3f46" }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {/* Gráfico de barras por jugador */}
-          {chartData.length > 0 && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <p className="text-sm font-semibold text-white mb-4">{metric?.label} — por jugador</p>
-              <ResponsiveContainer width="100%" height={Math.max(200, chartData.length * 30)}>
-                <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 50, top: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
-                  <XAxis type="number" tick={{ fontSize: 10, fill: "#71717a" }} axisLine={false} tickLine={false} />
-                  <YAxis type="category" dataKey="name" width={90} tick={{ fontSize: 10, fill: "#d4d4d8" }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }}
-                    formatter={(val) => [metric?.fmt(val), metric?.label]}
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName || ""}
-                  />
-                  <Bar dataKey="value" radius={[0, 4, 4, 0]} label={{ position: "right", fontSize: 10, fill: "#a1a1aa", formatter: (v) => metric?.fmt(v) }}>
-                    {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-
-          {/* Tabla completa */}
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="bg-zinc-800/80">
-                  <th className="px-3 py-2.5 text-left text-zinc-400 font-semibold whitespace-nowrap">Jugador</th>
-                  {METRICS.filter(({ key }) => sessionReports.some((r) => r[key] != null)).map(({ key, label }) => (
-                    <th key={key} className="px-3 py-2.5 text-right text-zinc-400 font-semibold whitespace-nowrap">{label}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {sessionReports.map((row, ri) => (
-                  <tr key={ri} className={ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/30"}>
-                    <td className="px-3 py-2 text-zinc-200 font-medium whitespace-nowrap">{row.player_name}</td>
-                    {METRICS.filter(({ key }) => sessionReports.some((r) => r[key] != null)).map(({ key, fmt, color }) => (
-                      <td key={key} className="px-3 py-2 text-right whitespace-nowrap font-mono" style={{ color: row[key] != null ? color : undefined }}>
-                        {row[key] != null ? fmt(row[key]) : <span className="text-zinc-700">—</span>}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
       )}
+
+      {/* Tabla completa */}
+      <div className="overflow-x-auto rounded-xl border border-zinc-800">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="bg-zinc-800/80">
+              <th className="px-3 py-2.5 text-left text-zinc-400 font-semibold whitespace-nowrap sticky left-0 bg-zinc-800/80">Jugador</th>
+              {METRICS.filter(({ key }) => byPlayer.some((r) => r[key] != null)).map(({ key, label }) => (
+                <th key={key} className="px-3 py-2.5 text-right text-zinc-400 font-semibold whitespace-nowrap">{label}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {byPlayer.sort((a, b) => (b.total_distance || 0) - (a.total_distance || 0)).map((row, ri) => (
+              <tr key={ri} className={ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/30"}>
+                <td className="px-3 py-2 text-zinc-200 font-medium whitespace-nowrap sticky left-0 bg-inherit">{row.player_name}</td>
+                {METRICS.filter(({ key }) => byPlayer.some((r) => r[key] != null)).map(({ key, fmt, color }) => (
+                  <td key={key} className="px-3 py-2 text-right whitespace-nowrap font-mono"
+                    style={{ color: row[key] != null ? color : undefined }}>
+                    {row[key] != null ? fmt(row[key]) : <span className="text-zinc-700">—</span>}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <p className="text-zinc-600 text-xs text-center">{filtered.length} registros · {byPlayer.length} jugadores</p>
     </div>
   );
 }
 
-// ── TAB 2: Evolución por jugador ─────────────────────────────────────────────
-function EvolutionView({ reports, filters }) {
-  const filteredReports = useMemo(() => reports.filter((r) => {
-    if (filters.dateFrom && r.date < filters.dateFrom) return false;
-    if (filters.dateTo && r.date > filters.dateTo) return false;
-    return true;
-  }), [reports, filters]);
-
+// ── Vista Jugador (evolución) ─────────────────────────────────────────────────
+function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
   const allPlayers = useMemo(
-    () => [...new Set(filteredReports.map((r) => r.player_name).filter(Boolean))].sort(),
-    [filteredReports]
-  );
-
-  const allDates = useMemo(
-    () => [...new Set(filteredReports.map((r) => r.date).filter(Boolean))].sort(),
-    [filteredReports]
+    () => [...new Set(allRows.map((r) => r.player_name).filter(Boolean))].sort(),
+    [allRows]
   );
 
   const [player, setPlayer] = useState(allPlayers[0] || "");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
   const [activeMetrics, setActiveMetrics] = useState(["total_distance", "player_load"]);
 
   function toggle(key) {
@@ -272,69 +266,63 @@ function EvolutionView({ reports, filters }) {
   }
 
   const chartData = useMemo(() =>
-    filteredReports
-      .filter((r) => r.player_name === player && r.date >= (dateFrom || "") && r.date <= (dateTo || "9999"))
+    allRows
+      .filter((r) => {
+        if (r.player_name !== player) return false;
+        if (dateFrom && r.date < dateFrom) return false;
+        if (dateTo && r.date > dateTo) return false;
+        if (sessionType && r.session_type !== sessionType) return false;
+        if (seasonPeriod && r.season_period !== seasonPeriod) return false;
+        return true;
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((r) => ({
         date: moment(r.date).format("DD/MM"),
-        session: r.session_label || r.date,
+        session: r.session_title || r.date,
         ...Object.fromEntries(METRICS.map((m) => [m.key, r[m.key] ?? null])),
       })),
-    [reports, player, dateFrom, dateTo]
-  );
+  [allRows, player, dateFrom, dateTo, sessionType, seasonPeriod]);
 
   if (allPlayers.length === 0) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center">
-        <p className="text-zinc-500 text-sm">No hay datos GPS para el período seleccionado.</p>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+        <p className="text-zinc-500 text-sm">No hay datos GPS disponibles.</p>
       </div>
     );
   }
 
   return (
     <div className="space-y-5">
-      {/* Controles */}
+      {/* Selector jugador + métricas */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Jugador</label>
-            <select value={player} onChange={(e) => setPlayer(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none min-w-[180px]">
-              {allPlayers.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Desde</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Hasta</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none" />
-          </div>
-          <div className="pb-2">
-            <p className="text-zinc-500 text-xs">Sesiones</p>
-            <p className="text-white font-bold text-xl">{chartData.length}</p>
-          </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-zinc-500 text-xs">Jugador</label>
+          <select value={player} onChange={(e) => setPlayer(e.target.value)}
+            className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none max-w-xs">
+            {allPlayers.map((p) => <option key={p} value={p}>{p}</option>)}
+          </select>
         </div>
-        <div className="flex flex-wrap gap-1.5">
-          {METRICS.map(({ key, label, color }) => {
-            const on = activeMetrics.includes(key);
-            return (
-              <button key={key} onClick={() => toggle(key)}
-                className="text-xs px-3 py-1.5 rounded-full border font-medium transition-colors"
-                style={on ? { backgroundColor: color, color: "#18181b", borderColor: color } : { backgroundColor: "transparent", color: "#71717a", borderColor: "#3f3f46" }}>
-                {label}
-              </button>
-            );
-          })}
+        <div>
+          <p className="text-zinc-500 text-xs mb-2">Métricas a mostrar</p>
+          <div className="flex flex-wrap gap-1.5">
+            {METRICS.map(({ key, label, color }) => {
+              const on = activeMetrics.includes(key);
+              return (
+                <button key={key} onClick={() => toggle(key)}
+                  className="text-xs px-3 py-1.5 rounded-full border font-medium transition-colors"
+                  style={on ? { backgroundColor: color, color: "#18181b", borderColor: color }
+                           : { backgroundColor: "transparent", color: "#71717a", borderColor: "#3f3f46" }}>
+                  {label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
       {chartData.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center">
-          <p className="text-zinc-500 text-sm">Sin datos para el jugador y rango seleccionados.</p>
+          <p className="text-zinc-500 text-sm">Sin sesiones para {player} con los filtros actuales.</p>
         </div>
       ) : (
         activeMetrics.map((metricKey) => {
@@ -382,139 +370,148 @@ function EvolutionView({ reports, filters }) {
   );
 }
 
-// ── TAB 3: Comparar sesiones ─────────────────────────────────────────────────
-function ComparisonView({ sessions, reports, filters }) {
+// ── Vista Comparar sesiones ───────────────────────────────────────────────────
+function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
   const sessionOptions = useMemo(() => {
-    const ids = [...new Set(reports.map((r) => r.session_id).filter(Boolean))];
-    return ids
-      .map((id) => sessions.find((s) => s.id === id))
-      .filter(Boolean)
+    return sessions
       .filter((s) => {
-        if (filters.dateFrom && s.date < filters.dateFrom) return false;
-        if (filters.dateTo && s.date > filters.dateTo) return false;
-        if (filters.sessionType && s.session_type !== filters.sessionType) return false;
-        if (filters.seasonPeriod && s.season_period !== filters.seasonPeriod) return false;
+        if (!allRows.some((r) => r.session_id === s.id)) return false;
+        if (dateFrom && s.date < dateFrom) return false;
+        if (dateTo && s.date > dateTo) return false;
+        if (sessionType && s.session_type !== sessionType) return false;
+        if (seasonPeriod && s.season_period !== seasonPeriod) return false;
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [sessions, reports, filters]);
+  }, [sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod]);
 
   const [idA, setIdA] = useState(sessionOptions[0]?.id || "");
   const [idB, setIdB] = useState(sessionOptions[1]?.id || "");
 
-  const reportsA = useMemo(() => reports.filter((r) => r.session_id === idA), [reports, idA]);
-  const reportsB = useMemo(() => reports.filter((r) => r.session_id === idB), [reports, idB]);
-  const infoA = sessions.find((s) => s.id === idA);
-  const infoB = sessions.find((s) => s.id === idB);
+  const reportsA = useMemo(() => allRows.filter((r) => r.session_id === idA), [allRows, idA]);
+  const reportsB = useMemo(() => allRows.filter((r) => r.session_id === idB), [allRows, idB]);
 
   const avgA = useMemo(() => Object.fromEntries(METRICS.map(({ key }) => [key, avg(reportsA.map((r) => r[key]))])), [reportsA]);
   const avgB = useMemo(() => Object.fromEntries(METRICS.map(({ key }) => [key, avg(reportsB.map((r) => r[key]))])), [reportsB]);
 
-  const radarData = METRICS.map(({ key, label }) => {
-    const max = Math.max(avgA[key] || 0, avgB[key] || 0);
-    return {
-      metric: label.split(" ")[0],
-      A: max ? parseFloat(((avgA[key] || 0) / max * 100).toFixed(1)) : 0,
-      B: max ? parseFloat(((avgB[key] || 0) / max * 100).toFixed(1)) : 0,
-    };
-  });
+  const infoA = sessions.find((s) => s.id === idA);
+  const infoB = sessions.find((s) => s.id === idB);
 
   if (sessionOptions.length < 2) {
     return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center">
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
         <p className="text-zinc-500 text-sm">Necesitás al menos 2 sesiones con datos GPS para comparar.</p>
       </div>
     );
   }
 
-  const SessionSelect = ({ value, onChange, label, color }) => (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
-      <div className="flex items-center gap-2">
-        <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-        <span className="text-white font-semibold text-sm">{label}</span>
-      </div>
-      <select value={value} onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none">
-        {sessionOptions.map((s) => (
-          <option key={s.id} value={s.id}>{moment(s.date).format("DD/MM/YY")} — {s.title}</option>
-        ))}
-      </select>
-    </div>
-  );
-
   return (
     <div className="space-y-5">
       <div className="grid grid-cols-2 gap-4">
-        <SessionSelect value={idA} onChange={setIdA} label="Sesión A" color="#60a5fa" />
-        <SessionSelect value={idB} onChange={setIdB} label="Sesión B" color="#f87171" />
+        {[
+          { label: "Sesión A", color: "#60a5fa", value: idA, set: setIdA, info: infoA, avg: avgA },
+          { label: "Sesión B", color: "#f87171", value: idB, set: setIdB, info: infoB, avg: avgB },
+        ].map(({ label, color, value, set, info }) => (
+          <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-white font-semibold text-sm">{label}</span>
+            </div>
+            <select value={value} onChange={(e) => set(e.target.value)}
+              className="w-full bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none">
+              {sessionOptions.map((s) => (
+                <option key={s.id} value={s.id}>{moment(s.date).format("DD/MM/YY")} — {s.title}</option>
+              ))}
+            </select>
+            {info && <p className="text-xs text-zinc-500">{moment(info.date).format("DD [de] MMMM YYYY")}{info.match_day_code ? ` · ${info.match_day_code}` : ""}</p>}
+          </div>
+        ))}
       </div>
 
       {reportsA.length > 0 && reportsB.length > 0 && (
-        <>
-          {/* Radar */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <p className="text-sm font-semibold text-white mb-1">Comparación global (promedios equipo)</p>
-            <p className="text-zinc-500 text-xs mb-4">Valores normalizados — el mayor de cada métrica = 100</p>
-            <ResponsiveContainer width="100%" height={280}>
-              <RadarChart data={radarData}>
-                <PolarGrid stroke="#27272a" />
-                <PolarAngleAxis dataKey="metric" tick={{ fill: "#a1a1aa", fontSize: 11 }} />
-                <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 12 }}
-                  formatter={(v, name) => [v, name === "A" ? infoA?.title : infoB?.title]} />
-                <Legend formatter={(v) => v === "A" ? infoA?.title : infoB?.title} />
-                <Radar name="A" dataKey="A" stroke="#60a5fa" fill="#60a5fa" fillOpacity={0.25} strokeWidth={2} />
-                <Radar name="B" dataKey="B" stroke="#f87171" fill="#f87171" fillOpacity={0.2} strokeWidth={2} />
-              </RadarChart>
-            </ResponsiveContainer>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="p-4 border-b border-zinc-800 grid grid-cols-4 text-xs font-semibold text-zinc-400">
+            <span>Métrica</span>
+            <span className="text-center text-blue-400">{infoA?.title || "Sesión A"}</span>
+            <span className="text-center text-red-400">{infoB?.title || "Sesión B"}</span>
+            <span className="text-center">Diferencia</span>
           </div>
-
-          {/* Tabla comparativa */}
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800 grid grid-cols-4 text-xs font-semibold text-zinc-400">
-              <span>Métrica</span>
-              <span className="text-center text-blue-400">{infoA?.title || "Sesión A"}</span>
-              <span className="text-center text-red-400">{infoB?.title || "Sesión B"}</span>
-              <span className="text-center">Diferencia</span>
-            </div>
-            {METRICS.map(({ key, label, fmt }) => {
-              const a = avgA[key], b = avgB[key];
-              const diff = a != null && b != null ? a - b : null;
-              const up = diff != null && diff > 0;
-              return (
-                <div key={key} className="grid grid-cols-4 border-b border-zinc-800/60 hover:bg-zinc-800/20 px-4 py-3 items-center">
-                  <span className="text-zinc-300 text-xs font-medium">{label}</span>
-                  <span className="text-center text-white text-sm font-bold">{a != null ? fmt(a) : "—"}</span>
-                  <span className="text-center text-white text-sm font-bold">{b != null ? fmt(b) : "—"}</span>
-                  <span className={`text-center text-xs font-semibold ${diff == null ? "text-zinc-600" : up ? "text-green-400" : "text-red-400"}`}>
-                    {diff == null ? "—" : `${up ? "▲" : "▼"} ${fmt(Math.abs(diff))}`}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </>
+          {METRICS.map(({ key, label, fmt }) => {
+            const a = avgA[key], b = avgB[key];
+            const diff = a != null && b != null ? a - b : null;
+            const up = diff != null && diff > 0;
+            return (
+              <div key={key} className="grid grid-cols-4 border-b border-zinc-800/60 hover:bg-zinc-800/20 px-4 py-3 items-center">
+                <span className="text-zinc-300 text-xs font-medium">{label}</span>
+                <span className="text-center text-white text-sm font-bold">{a != null ? fmt(a) : "—"}</span>
+                <span className="text-center text-white text-sm font-bold">{b != null ? fmt(b) : "—"}</span>
+                <span className={`text-center text-xs font-semibold ${diff == null ? "text-zinc-600" : up ? "text-green-400" : "text-red-400"}`}>
+                  {diff == null ? "—" : `${up ? "▲" : "▼"} ${fmt(Math.abs(diff))}`}
+                </span>
+              </div>
+            );
+          })}
+        </div>
       )}
     </div>
   );
 }
 
-// ── Main Component ───────────────────────────────────────────────────────────
+// ── Main Component ────────────────────────────────────────────────────────────
+const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Otro"];
+const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
+
 export default function GpsAnalytics() {
   const [sessions, setSessions] = useState([]);
-  const [reports, setReports] = useState([]);
+  const [allRows, setAllRows] = useState([]);   // todos los registros de todos los CSVs
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("session");
-  const [filters, setFilters] = useState({ dateFrom: "", dateTo: "", sessionType: "", seasonPeriod: "" });
+  const [loadingCsvs, setLoadingCsvs] = useState(false);
+  const [tab, setTab] = useState("team");
 
+  // Filtros globales
+  const [dateFrom, setDateFrom]       = useState("");
+  const [dateTo, setDateTo]           = useState("");
+  const [sessionType, setSessionType] = useState("");
+  const [seasonPeriod, setSeasonPeriod] = useState("");
+
+  const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod;
+
+  // 1. Carga las sesiones
   useEffect(() => {
-    Promise.all([
-      base44.entities.TrainingSession.list("-date", 200),
-      base44.entities.CatapultReport.list("-date", 1000),
-    ]).then(([s, r]) => {
-      setSessions(s);
-      setReports(r);
-    }).finally(() => setLoading(false));
+    base44.entities.TrainingSession.list("-date", 200)
+      .then(setSessions)
+      .finally(() => setLoading(false));
   }, []);
+
+  // 2. Con las sesiones cargadas, descarga y parsea los CSVs
+  useEffect(() => {
+    if (!sessions.length) return;
+    const withCsv = sessions.filter((s) => s.csv_url);
+    if (!withCsv.length) return;
+
+    setLoadingCsvs(true);
+    Promise.all(
+      withCsv.map(async (s) => {
+        try {
+          const text = await fetch(s.csv_url).then((r) => r.text());
+          const rows = parseCatapultCSV(text);
+          if (!rows) return [];
+          return rows.map((row) => ({
+            ...row,
+            session_id:    s.id,
+            session_title: s.title,
+            date:          s.date,
+            session_type:  s.session_type,
+            season_period: s.season_period,
+          }));
+        } catch {
+          return [];
+        }
+      })
+    ).then((results) => {
+      setAllRows(results.flat());
+    }).finally(() => setLoadingCsvs(false));
+  }, [sessions]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -522,10 +519,70 @@ export default function GpsAnalytics() {
     </div>
   );
 
+  const sessionsWithCsv = sessions.filter((s) => s.csv_url).length;
+
+  if (sessionsWithCsv === 0) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center">
+        <FileSpreadsheet size={40} className="text-zinc-700 mx-auto mb-3" />
+        <p className="text-zinc-400 text-sm font-medium">No hay archivos GPS cargados</p>
+        <p className="text-zinc-600 text-xs mt-2 max-w-sm mx-auto">Cargá el CSV de Catapult en cada sesión desde la sección <span className="text-zinc-400">Sesiones de Campo</span>. Los datos aparecerán aquí automáticamente.</p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5">
-      {/* Filtros globales */}
-      <GlobalFilters filters={filters} onChange={setFilters} />
+      {/* Panel de filtros */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <Filter size={14} className="text-zinc-500" />
+          <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Filtros</span>
+          {hasFilters && (
+            <button onClick={() => { setDateFrom(""); setDateTo(""); setSessionType(""); setSeasonPeriod(""); }}
+              className="ml-auto text-xs text-zinc-500 hover:text-white border border-zinc-700 px-2 py-1 rounded-lg transition-colors">
+              Limpiar
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-zinc-500 text-xs">Desde</label>
+            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-zinc-500 text-xs">Hasta</label>
+            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-zinc-500 text-xs">Tipo de sesión</label>
+            <select value={sessionType} onChange={(e) => setSessionType(e.target.value)}
+              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+              <option value="">Todos</option>
+              {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-zinc-500 text-xs">Período</label>
+            <select value={seasonPeriod} onChange={(e) => setSeasonPeriod(e.target.value)}
+              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+              <option value="">Todos</option>
+              {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-800/60">
+          <span className="text-zinc-600 text-xs">{sessionsWithCsv} sesiones con GPS · {allRows.length} registros totales</span>
+          {loadingCsvs && (
+            <span className="flex items-center gap-1.5 text-zinc-500 text-xs">
+              <div className="w-3 h-3 border border-zinc-600 border-t-white rounded-full animate-spin" />
+              Cargando datos...
+            </span>
+          )}
+        </div>
+      </div>
 
       {/* Sub-tabs */}
       <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
@@ -540,9 +597,15 @@ export default function GpsAnalytics() {
         ))}
       </div>
 
-      {tab === "session"    && <SessionView sessions={sessions} reports={reports} filters={filters} />}
-      {tab === "evolution"  && <EvolutionView reports={reports} filters={filters} />}
-      {tab === "comparison" && <ComparisonView sessions={sessions} reports={reports} filters={filters} />}
+      {tab === "team" && (
+        <TeamView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} />
+      )}
+      {tab === "player" && (
+        <PlayerView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} />
+      )}
+      {tab === "comparison" && (
+        <ComparisonView sessions={sessions} allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} />
+      )}
     </div>
   );
 }
