@@ -7,6 +7,7 @@ import PlayerMinutes from "@/pages/PlayerMinutes";
 import Matches from "@/pages/Matches";
 import MonthlyReport from "@/pages/MonthlyReport";
 import PositionAnalysis from "@/components/performance/PositionAnalysis";
+import MinutesTracker from "@/components/performance/MinutesTracker";
 
 const tabs = [
   { id: "medical", label: "Médico", icon: Heart },
@@ -14,6 +15,7 @@ const tabs = [
   { id: "catapult", label: "Catapult GPS", icon: FileSpreadsheet },
   { id: "positions", label: "Por Posición", icon: TrendingUp },
   { id: "minutes", label: "Minutos", icon: Clock },
+  { id: "minutes_official", label: "Min. Oficiales 2026", icon: TrendingUp },
   { id: "matches", label: "Partidos", icon: Trophy },
   { id: "report", label: "Informe Mensual", icon: FileDown },
 ];
@@ -53,6 +55,7 @@ export default function Performance() {
          {active === "minutes" && <PlayerMinutes />}
          {active === "matches" && <Matches />}
          {active === "report" && <MonthlyReport />}
+         {active === "minutes_official" && <MinutesTracker />}
        </div>
     </div>
   );
