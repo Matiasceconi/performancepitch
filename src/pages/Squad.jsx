@@ -11,7 +11,7 @@ import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
 import moment from "moment";
 
-const positions = ["Arquero", "Defensor", "Mediocampista", "Delantero"];
+const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
 const statuses = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección"];
 const divisions = ["Primera", "Reserva", "Cuarta División", "Quinta División"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
