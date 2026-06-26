@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { ArrowLeft, Plus, Trash2, ChevronDown, ChevronUp, Play, Users, FileText, FileDown, Pencil, X, ImagePlus } from "lucide-react";
+import SessionCsvPanel from "@/components/staff/SessionCsvPanel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -645,6 +646,9 @@ export default function FieldSessionDetail({ session, onBack }) {
           })()}
         </div>
       )}
+
+      {/* GPS CSV Panel */}
+      <SessionCsvPanel session={session} />
 
       {/* Add exercise form */}
       {showForm && (
