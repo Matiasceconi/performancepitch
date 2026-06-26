@@ -10,12 +10,12 @@ import PositionAnalysis from "@/components/performance/PositionAnalysis";
 import MinutesTracker from "@/components/performance/MinutesTracker";
 
 const tabs = [
-  { id: "medical", label: "Médico", icon: Heart },
-  { id: "nutrition", label: "Nutrición", icon: Apple },
-  { id: "catapult", label: "Catapult GPS", icon: FileSpreadsheet },
+  { id: "medical", label: "Área Médica", icon: Heart },
+  { id: "nutrition", label: "Área de Nutrición", icon: Apple },
+  { id: "catapult", label: "Área de Carga Externa", icon: FileSpreadsheet },
+  { id: "minutes_official", label: "Minutos Jugados", icon: Clock },
   { id: "positions", label: "Por Posición", icon: TrendingUp },
-  { id: "minutes", label: "Minutos", icon: Clock },
-  { id: "minutes_official", label: "Min. Oficiales 2026", icon: TrendingUp },
+  { id: "minutes", label: "Minutos (Planilla)", icon: Clock },
   { id: "matches", label: "Partidos", icon: Trophy },
   { id: "report", label: "Informe Mensual", icon: FileDown },
 ];
