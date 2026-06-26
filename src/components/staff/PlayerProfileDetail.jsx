@@ -424,7 +424,16 @@ export default function PlayerProfileDetail({ player, onClose }) {
   });
   const { toast } = useToast();
 
-  useEffect(() => { loadMedicalRecords(); }, [player.id]);
+  useEffect(() => { 
+    loadMedicalRecords();
+    // Suscribirse a cambios en registros médicos para sincronización en tiempo real
+    const unsubscribe = base44.entities.MedicalRecord.subscribe((event) => {
+      if (event.data?.player_id === player.id || event.old_data?.player_id === player.id) {
+        loadMedicalRecords();
+      }
+    });
+    return unsubscribe;
+  }, [player.id]);
 
   async function loadMedicalRecords() {
     setLoadingRecords(true);
