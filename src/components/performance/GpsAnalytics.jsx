@@ -30,23 +30,66 @@ function avg(arr) {
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
 
-// ── TAB 1: Vista por Sesión ──────────────────────────────────────────────────
-function SessionView({ sessions, reports }) {
-  const sessionsWithData = useMemo(
-    () => sessions.filter((s) => reports.some((r) => r.session_id === s.id || r.date === s.date)),
-    [sessions, reports]
-  );
+const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Otro"];
+const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
 
-  // Sesiones con CSV cargado en la propia sesión (csv_url) o con CatapultReport
+// ── Filtros globales ─────────────────────────────────────────────────────────
+function GlobalFilters({ filters, onChange }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-wrap gap-3 items-end">
+      <div className="flex flex-col gap-1">
+        <label className="text-zinc-500 text-xs">Desde</label>
+        <input type="date" value={filters.dateFrom} onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })}
+          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-zinc-500 text-xs">Hasta</label>
+        <input type="date" value={filters.dateTo} onChange={(e) => onChange({ ...filters, dateTo: e.target.value })}
+          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-zinc-500 text-xs">Tipo de sesión</label>
+        <select value={filters.sessionType} onChange={(e) => onChange({ ...filters, sessionType: e.target.value })}
+          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+          <option value="">Todos los tipos</option>
+          {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+      </div>
+      <div className="flex flex-col gap-1">
+        <label className="text-zinc-500 text-xs">Período de temporada</label>
+        <select value={filters.seasonPeriod} onChange={(e) => onChange({ ...filters, seasonPeriod: e.target.value })}
+          className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+          <option value="">Todos los períodos</option>
+          {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </div>
+      {(filters.dateFrom || filters.dateTo || filters.sessionType || filters.seasonPeriod) && (
+        <button onClick={() => onChange({ dateFrom: "", dateTo: "", sessionType: "", seasonPeriod: "" })}
+          className="text-xs text-zinc-500 hover:text-white border border-zinc-700 px-3 py-2 rounded-lg transition-colors">
+          Limpiar filtros
+        </button>
+      )}
+    </div>
+  );
+}
+
+// ── TAB 1: Vista por Sesión ──────────────────────────────────────────────────
+function SessionView({ sessions, reports, filters }) {
+  // Sesiones con CSV cargado en la propia sesión (csv_url) o con CatapultReport, aplicando filtros
   const allSessions = useMemo(() => {
     const sessionMap = new Map();
     sessions.forEach((s) => {
       const hasReports = reports.some((r) => r.session_id === s.id);
       const hasCsv = !!s.csv_url;
-      if (hasReports || hasCsv) sessionMap.set(s.id, s);
+      if (!hasReports && !hasCsv) return;
+      if (filters.dateFrom && s.date < filters.dateFrom) return;
+      if (filters.dateTo && s.date > filters.dateTo) return;
+      if (filters.sessionType && s.session_type !== filters.sessionType) return;
+      if (filters.seasonPeriod && s.season_period !== filters.seasonPeriod) return;
+      sessionMap.set(s.id, s);
     });
     return [...sessionMap.values()].sort((a, b) => b.date.localeCompare(a.date));
-  }, [sessions, reports]);
+  }, [sessions, reports, filters]);
 
   const [selectedId, setSelectedId] = useState(allSessions[0]?.id || "");
   const [activeMetric, setActiveMetric] = useState("total_distance");
@@ -202,20 +245,26 @@ function SessionView({ sessions, reports }) {
 }
 
 // ── TAB 2: Evolución por jugador ─────────────────────────────────────────────
-function EvolutionView({ reports }) {
+function EvolutionView({ reports, filters }) {
+  const filteredReports = useMemo(() => reports.filter((r) => {
+    if (filters.dateFrom && r.date < filters.dateFrom) return false;
+    if (filters.dateTo && r.date > filters.dateTo) return false;
+    return true;
+  }), [reports, filters]);
+
   const allPlayers = useMemo(
-    () => [...new Set(reports.map((r) => r.player_name).filter(Boolean))].sort(),
-    [reports]
+    () => [...new Set(filteredReports.map((r) => r.player_name).filter(Boolean))].sort(),
+    [filteredReports]
   );
 
   const allDates = useMemo(
-    () => [...new Set(reports.map((r) => r.date).filter(Boolean))].sort(),
-    [reports]
+    () => [...new Set(filteredReports.map((r) => r.date).filter(Boolean))].sort(),
+    [filteredReports]
   );
 
   const [player, setPlayer] = useState(allPlayers[0] || "");
-  const [dateFrom, setDateFrom] = useState(allDates[0] || "");
-  const [dateTo, setDateTo] = useState(allDates[allDates.length - 1] || "");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [activeMetrics, setActiveMetrics] = useState(["total_distance", "player_load"]);
 
   function toggle(key) {
@@ -223,7 +272,7 @@ function EvolutionView({ reports }) {
   }
 
   const chartData = useMemo(() =>
-    reports
+    filteredReports
       .filter((r) => r.player_name === player && r.date >= (dateFrom || "") && r.date <= (dateTo || "9999"))
       .sort((a, b) => a.date.localeCompare(b.date))
       .map((r) => ({
@@ -237,7 +286,7 @@ function EvolutionView({ reports }) {
   if (allPlayers.length === 0) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center">
-        <p className="text-zinc-500 text-sm">No hay datos GPS cargados todavía.</p>
+        <p className="text-zinc-500 text-sm">No hay datos GPS para el período seleccionado.</p>
       </div>
     );
   }
@@ -334,14 +383,21 @@ function EvolutionView({ reports }) {
 }
 
 // ── TAB 3: Comparar sesiones ─────────────────────────────────────────────────
-function ComparisonView({ sessions, reports }) {
+function ComparisonView({ sessions, reports, filters }) {
   const sessionOptions = useMemo(() => {
     const ids = [...new Set(reports.map((r) => r.session_id).filter(Boolean))];
     return ids
       .map((id) => sessions.find((s) => s.id === id))
       .filter(Boolean)
+      .filter((s) => {
+        if (filters.dateFrom && s.date < filters.dateFrom) return false;
+        if (filters.dateTo && s.date > filters.dateTo) return false;
+        if (filters.sessionType && s.session_type !== filters.sessionType) return false;
+        if (filters.seasonPeriod && s.season_period !== filters.seasonPeriod) return false;
+        return true;
+      })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [sessions, reports]);
+  }, [sessions, reports, filters]);
 
   const [idA, setIdA] = useState(sessionOptions[0]?.id || "");
   const [idB, setIdB] = useState(sessionOptions[1]?.id || "");
@@ -448,6 +504,7 @@ export default function GpsAnalytics() {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("session");
+  const [filters, setFilters] = useState({ dateFrom: "", dateTo: "", sessionType: "", seasonPeriod: "" });
 
   useEffect(() => {
     Promise.all([
@@ -467,6 +524,9 @@ export default function GpsAnalytics() {
 
   return (
     <div className="space-y-5">
+      {/* Filtros globales */}
+      <GlobalFilters filters={filters} onChange={setFilters} />
+
       {/* Sub-tabs */}
       <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
         {TABS.map(({ id, label, icon: Icon }) => (
@@ -480,9 +540,9 @@ export default function GpsAnalytics() {
         ))}
       </div>
 
-      {tab === "session"    && <SessionView sessions={sessions} reports={reports} />}
-      {tab === "evolution"  && <EvolutionView reports={reports} />}
-      {tab === "comparison" && <ComparisonView sessions={sessions} reports={reports} />}
+      {tab === "session"    && <SessionView sessions={sessions} reports={reports} filters={filters} />}
+      {tab === "evolution"  && <EvolutionView reports={reports} filters={filters} />}
+      {tab === "comparison" && <ComparisonView sessions={sessions} reports={reports} filters={filters} />}
     </div>
   );
 }
