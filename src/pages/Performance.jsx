@@ -1,22 +1,16 @@
 import React, { useState } from "react";
-import { Heart, Apple, FileSpreadsheet, Clock, Trophy, FileDown, TrendingUp } from "lucide-react";
+import { Heart, Apple, FileSpreadsheet, Clock, FileDown } from "lucide-react";
 import Medical from "@/pages/Medical";
 import Nutrition from "@/pages/Nutrition";
 import GpsAnalytics from "@/components/performance/GpsAnalytics";
-import PlayerMinutes from "@/pages/PlayerMinutes";
-import Matches from "@/pages/Matches";
 import MonthlyReport from "@/pages/MonthlyReport";
-import PositionAnalysis from "@/components/performance/PositionAnalysis";
 import MinutesTracker from "@/components/performance/MinutesTracker";
 
 const tabs = [
   { id: "medical", label: "Área Médica", icon: Heart },
   { id: "nutrition", label: "Área de Nutrición", icon: Apple },
-  { id: "catapult", label: "Área de Carga Externa", icon: FileSpreadsheet },
+  { id: "catapult", label: "Carga Externa (GPS)", icon: FileSpreadsheet },
   { id: "minutes_official", label: "Minutos Jugados", icon: Clock },
-  { id: "positions", label: "Por Posición", icon: TrendingUp },
-  { id: "minutes", label: "Minutos (Planilla)", icon: Clock },
-  { id: "matches", label: "Partidos", icon: Trophy },
   { id: "report", label: "Informe Mensual", icon: FileDown },
 ];
 
@@ -51,9 +45,6 @@ export default function Performance() {
          {active === "medical" && <Medical />}
          {active === "nutrition" && <Nutrition />}
          {active === "catapult" && <GpsAnalytics />}
-         {active === "positions" && <PositionAnalysis />}
-         {active === "minutes" && <PlayerMinutes />}
-         {active === "matches" && <Matches />}
          {active === "report" && <MonthlyReport />}
          {active === "minutes_official" && <MinutesTracker />}
        </div>
