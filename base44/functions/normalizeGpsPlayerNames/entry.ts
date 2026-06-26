@@ -49,18 +49,19 @@ Deno.serve(async (req) => {
       let bestScore = 0;
 
       for (const player of players) {
-        const playerWords = getNameWords(player.name);
-        if (playerWords.length === 0) continue;
+         const playerFullName = player.full_name || player.name;
+         const playerWords = getNameWords(playerFullName);
+         if (playerWords.length === 0) continue;
 
-        // Contar coincidencias de palabras
-        const matches = gpsWords.filter(w => playerWords.includes(w)).length;
-        const score = matches / Math.max(gpsWords.length, playerWords.length);
+         // Contar coincidencias de palabras
+         const matches = gpsWords.filter(w => playerWords.includes(w)).length;
+         const score = matches / Math.max(gpsWords.length, playerWords.length);
 
-        if (score > bestScore) {
-          bestScore = score;
-          bestMatch = player;
-        }
-      }
+         if (score > bestScore) {
+           bestScore = score;
+           bestMatch = player;
+         }
+       }
 
       // Retornar si hay al menos 1 palabra coincidiendo
       return bestScore >= 0.5 ? bestMatch : null;
