@@ -11,14 +11,45 @@ export function usePlayers() {
   // Map by ID for O(1) lookup
   const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
 
-  // Also map by normalized name as fallback
-  const playerNameMap = Object.fromEntries(
-    players.map((p) => [p.name?.trim().toLowerCase(), p])
-  );
+  // Normalizar nombre: remover tildes y convertir a minúsculas
+  const normalizeName = (name) => {
+    return (name || "")
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLowerCase()
+      .trim();
+  };
+
+  // Obtener palabras clave del nombre (apellido + nombre)
+  const getNameWords = (name) => {
+    return normalizeName(name)
+      .split(/\s+/)
+      .filter(w => w.length > 2);
+  };
+
+  // Verificar si dos nombres coinciden (matching flexible)
+  const namesMatch = (name1, name2) => {
+    const words1 = getNameWords(name1);
+    const words2 = getNameWords(name2);
+    if (words1.length === 0 || words2.length === 0) return false;
+    // Al menos 2 palabras deben coincidir (maneja variaciones de formato)
+    const matches = words1.filter(w => words2.includes(w)).length;
+    return matches >= Math.max(1, Math.min(words1.length, words2.length) - 1);
+  };
 
   function getPlayer(player_id, player_name) {
     if (player_id && playerMap[player_id]) return playerMap[player_id];
-    if (player_name) return playerNameMap[player_name?.trim().toLowerCase()] || null;
+    if (player_name) {
+      // Buscar coincidencia exacta primero
+      const normalized = normalizeName(player_name);
+      for (const p of players) {
+        if (normalizeName(p.name) === normalized) return p;
+      }
+      // Si no encuentra exacta, buscar por matching flexible
+      for (const p of players) {
+        if (namesMatch(player_name, p.name)) return p;
+      }
+    }
     return null;
   }
 
