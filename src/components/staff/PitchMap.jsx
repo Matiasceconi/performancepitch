@@ -88,7 +88,7 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
   return (
     <div 
       ref={containerRef}
-      className="relative w-full select-none bg-gradient-to-br from-emerald-900 to-emerald-950"
+      className="relative w-full select-none bg-gradient-to-br from-green-700 via-green-800 to-green-900 rounded-lg overflow-hidden"
       style={{ paddingBottom: "62%" }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
@@ -104,8 +104,9 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
         {/* Grass base */}
         <defs>
           <linearGradient id="pitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" style={{stopColor: "#15a34a", stopOpacity: 1}} />
-            <stop offset="100%" style={{stopColor: "#16a34a", stopOpacity: 1}} />
+            <stop offset="0%" style={{stopColor: "#22c55e", stopOpacity: 1}} />
+            <stop offset="50%" style={{stopColor: "#16a34a", stopOpacity: 1}} />
+            <stop offset="100%" style={{stopColor: "#15803d", stopOpacity: 1}} />
           </linearGradient>
         </defs>
         <rect width="100" height="62" fill="url(#pitchGrad)" />
@@ -169,29 +170,29 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
             }}
             className="flex flex-col items-center group transition-transform"
           >
-            {/* Foto del jugador - más grande */}
+            {/* Foto del jugador */}
             {player.photo_url ? (
               <div
-                style={{ borderColor: chipColor, borderWidth: "2.5px" }}
-                className="w-10 h-10 rounded-full overflow-hidden shadow-xl border transition-transform group-hover:scale-125 block"
+                style={{ borderColor: chipColor, borderWidth: "3px", boxShadow: `0 0 20px ${chipColor}40, 0 4px 12px rgba(0,0,0,0.6)` }}
+                className="w-11 h-11 rounded-full overflow-hidden border transition-all group-hover:scale-130 block"
               >
                 <img src={player.photo_url} alt={player.name} className="w-full h-full object-cover" />
               </div>
             ) : (
               <div
-                style={{ background: chipColor }}
-                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shadow-xl border-2.5 border-white/50 transition-transform group-hover:scale-125 text-white"
+                style={{ background: chipColor, boxShadow: `0 0 20px ${chipColor}40, 0 4px 12px rgba(0,0,0,0.6)` }}
+                className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold border-3 border-white/60 transition-all group-hover:scale-130 text-white"
               >
                 {player.number}
               </div>
             )}
             
-            {/* Info del jugador con fondo */}
-            <div className="mt-1 bg-black/70 rounded px-1.5 py-0.5 backdrop-blur-sm border border-white/30 text-center whitespace-nowrap">
-              <div className="text-[9px] font-bold text-white leading-tight">
+            {/* Info del jugador */}
+            <div className="mt-1.5 bg-black/80 rounded-md px-2 py-1 backdrop-blur-sm border border-white/40 text-center whitespace-nowrap shadow-lg">
+              <div className="text-[9px] font-bold text-white leading-tight tracking-wide">
                 {player.number ? `${player.number}-` : ""}{player.name.split(" ").slice(-1)[0].toUpperCase()}
               </div>
-              <div className="text-[7px] text-gray-200 leading-tight">
+              <div className="text-[7px] text-yellow-200 leading-tight font-semibold">
                 {player.position?.substring(0, 3).toUpperCase()}
               </div>
             </div>
