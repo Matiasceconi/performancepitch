@@ -120,9 +120,6 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
         {/* Bordes exteriores */}
         <rect x="3" y="3" width="104" height="74" fill="none" stroke="white" strokeWidth="0.7" />
         
-        {/* Línea de mitad de cancha */}
-        <line x1="55" y1="3" x2="55" y2="77" stroke="white" strokeWidth="0.7" />
-        
         {/* Círculo central */}
         <circle cx="55" cy="40" r="9.5" fill="none" stroke="white" strokeWidth="0.7" />
         <circle cx="55" cy="40" r="0.6" fill="white" />
