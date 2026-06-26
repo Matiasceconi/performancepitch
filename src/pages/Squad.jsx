@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown, Search } from "lucide-react";
+import { Plus, Pencil, Trash2, Users, Camera, Cake, ChevronDown, Search, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from "@/components/ui/use-toast";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
+import PlayerImportDialog from "@/components/staff/PlayerImportDialog";
 import moment from "moment";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
@@ -57,6 +58,7 @@ export default function Squad() {
   const [activeTab, setActiveTab] = useState("reserva");
   const [search, setSearch] = useState("");
   const [filterPosition, setFilterPosition] = useState(null);
+  const [showImport, setShowImport] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => { loadPlayers(); }, []);
@@ -162,9 +164,14 @@ export default function Squad() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Plantel</h1>
           <p className="text-zinc-500 text-sm mt-1">Estado de disponibilidad de los jugadores</p>
         </div>
-        <Button onClick={openNew} className="bg-white text-zinc-900 hover:bg-zinc-200">
-          <Plus size={16} className="mr-1.5" /> Agregar jugador
-        </Button>
+        <div className="flex gap-2">
+          <Button onClick={() => setShowImport(true)} className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Upload size={16} className="mr-1.5" /> Importar desde Excel
+          </Button>
+          <Button onClick={openNew} className="bg-white text-zinc-900 hover:bg-zinc-200">
+            <Plus size={16} className="mr-1.5" /> Agregar jugador
+          </Button>
+        </div>
       </div>
 
       {/* Search */}
@@ -486,6 +493,16 @@ export default function Squad() {
           onClose={() => setSelectedPlayer(null)}
         />
       )}
+
+      <PlayerImportDialog
+        open={showImport}
+        onOpenChange={setShowImport}
+        onSuccess={() => {
+          setShowImport(false);
+          setLoading(true);
+          loadPlayers();
+        }}
+      />
     </div>
   );
 }
