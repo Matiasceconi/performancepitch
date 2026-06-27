@@ -119,7 +119,7 @@ function avg(arr) {
 }
 
 // ── Vista Equipo ──────────────────────────────────────────────────────────────
-function TeamView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
+function TeamView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode }) {
   const [activeMetric, setActiveMetric] = useState("total_distance");
 
   const filtered = useMemo(() => allRows.filter((r) => {
@@ -127,8 +127,15 @@ function TeamView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
     if (dateTo && r.date > dateTo) return false;
     if (sessionType && r.session_type !== sessionType) return false;
     if (seasonPeriod && r.season_period !== seasonPeriod) return false;
+    if (matchDayCode && r.match_day_code !== matchDayCode) return false;
     return true;
-  }), [allRows, dateFrom, dateTo, sessionType, seasonPeriod]);
+  }), [allRows, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode]);
+
+  const teamAvgs = useMemo(() => {
+    const out = {};
+    METRICS.forEach(({ key }) => { out[key] = avg(filtered.map((r) => r[key])); });
+    return out;
+  }, [filtered]);
 
   // Agrupar por jugador y promediar
   const byPlayer = useMemo(() => {
@@ -155,12 +162,6 @@ function TeamView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
         value: r[activeMetric],
       })),
   [byPlayer, activeMetric]);
-
-  const teamAvgs = useMemo(() => {
-    const out = {};
-    METRICS.forEach(({ key }) => { out[key] = avg(filtered.map((r) => r[key])); });
-    return out;
-  }, [filtered]);
 
   if (filtered.length === 0) {
     return (
@@ -252,7 +253,7 @@ function TeamView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
 }
 
 // ── Vista Jugador (evolución) ─────────────────────────────────────────────────
-function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
+function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode }) {
   const allPlayers = useMemo(
     () => [...new Set(allRows.map((r) => r.player_name).filter(Boolean))].sort(),
     [allRows]
@@ -273,6 +274,7 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
         if (dateTo && r.date > dateTo) return false;
         if (sessionType && r.session_type !== sessionType) return false;
         if (seasonPeriod && r.season_period !== seasonPeriod) return false;
+        if (matchDayCode && r.match_day_code !== matchDayCode) return false;
         return true;
       })
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -281,7 +283,7 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
         session: r.session_title || r.date,
         ...Object.fromEntries(METRICS.map((m) => [m.key, r[m.key] ?? null])),
       })),
-  [allRows, player, dateFrom, dateTo, sessionType, seasonPeriod]);
+  [allRows, player, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode]);
 
   if (allPlayers.length === 0) {
     return (
@@ -371,7 +373,7 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
 }
 
 // ── Vista Comparar sesiones ───────────────────────────────────────────────────
-function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod }) {
+function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode }) {
   const sessionOptions = useMemo(() => {
     return sessions
       .filter((s) => {
@@ -380,10 +382,11 @@ function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seas
         if (dateTo && s.date > dateTo) return false;
         if (sessionType && s.session_type !== sessionType) return false;
         if (seasonPeriod && s.season_period !== seasonPeriod) return false;
+        if (matchDayCode && s.match_day_code !== matchDayCode) return false;
         return true;
       })
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod]);
+  }, [sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode]);
 
   const [idA, setIdA] = useState(sessionOptions[0]?.id || "");
   const [idB, setIdB] = useState(sessionOptions[1]?.id || "");
@@ -460,6 +463,7 @@ function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seas
 // ── Main Component ────────────────────────────────────────────────────────────
 const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "Partido amistoso", "Partido", "Otro"];
 const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
+const MATCH_DAY_CODES = ["MD", "MD-1", "MD-2", "MD-3", "MD-4", "MD-5", "MD-6", "MD+1", "MD+2"];
 
 export default function GpsAnalytics() {
   const [sessions, setSessions] = useState([]);
@@ -474,8 +478,9 @@ export default function GpsAnalytics() {
   const [dateTo, setDateTo]             = useState("");
   const [sessionType, setSessionType]   = useState("");
   const [seasonPeriod, setSeasonPeriod] = useState("");
+  const [matchDayCode, setMatchDayCode] = useState("");
 
-  const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod;
+  const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod || matchDayCode;
 
   // 1. Carga sesiones y partidos
   useEffect(() => {
@@ -494,7 +499,7 @@ export default function GpsAnalytics() {
 
     const sessionSources = sessions
       .filter((s) => s.csv_url)
-      .map((s) => ({ csv_url: s.csv_url, id: s.id, title: s.title, date: s.date, session_type: s.session_type, season_period: s.season_period, source: "session" }));
+      .map((s) => ({ csv_url: s.csv_url, id: s.id, title: s.title, date: s.date, session_type: s.session_type, season_period: s.season_period, match_day_code: s.match_day_code, source: "session" }));
 
     const matchSources = matches
       .filter((m) => m.csv_url)
@@ -517,6 +522,7 @@ export default function GpsAnalytics() {
             date:          s.date,
             session_type:  s.session_type,
             season_period: s.season_period,
+            match_day_code: s.match_day_code,
             source:        s.source,
           }));
         } catch {
@@ -554,40 +560,48 @@ export default function GpsAnalytics() {
           <Filter size={14} className="text-zinc-500" />
           <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Filtros</span>
           {hasFilters && (
-            <button onClick={() => { setDateFrom(""); setDateTo(""); setSessionType(""); setSeasonPeriod(""); }}
+            <button onClick={() => { setDateFrom(""); setDateTo(""); setSessionType(""); setSeasonPeriod(""); setMatchDayCode(""); }}
               className="ml-auto text-xs text-zinc-500 hover:text-white border border-zinc-700 px-2 py-1 rounded-lg transition-colors">
               Limpiar
             </button>
           )}
         </div>
         <div className="flex flex-wrap gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Desde</label>
-            <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Hasta</label>
-            <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Tipo de sesión</label>
-            <select value={sessionType} onChange={(e) => setSessionType(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-              <option value="">Todos</option>
-              {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1">
-            <label className="text-zinc-500 text-xs">Período</label>
-            <select value={seasonPeriod} onChange={(e) => setSeasonPeriod(e.target.value)}
-              className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-              <option value="">Todos</option>
-              {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-            </select>
-          </div>
-        </div>
+           <div className="flex flex-col gap-1">
+             <label className="text-zinc-500 text-xs">Desde</label>
+             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+           </div>
+           <div className="flex flex-col gap-1">
+             <label className="text-zinc-500 text-xs">Hasta</label>
+             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+           </div>
+           <div className="flex flex-col gap-1">
+             <label className="text-zinc-500 text-xs">Tipo de sesión</label>
+             <select value={sessionType} onChange={(e) => setSessionType(e.target.value)}
+               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+               <option value="">Todos</option>
+               {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+             </select>
+           </div>
+           <div className="flex flex-col gap-1">
+             <label className="text-zinc-500 text-xs">Período</label>
+             <select value={seasonPeriod} onChange={(e) => setSeasonPeriod(e.target.value)}
+               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+               <option value="">Todos</option>
+               {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+             </select>
+           </div>
+           <div className="flex flex-col gap-1">
+             <label className="text-zinc-500 text-xs">Código de día</label>
+             <select value={matchDayCode} onChange={(e) => setMatchDayCode(e.target.value)}
+               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+               <option value="">Todos</option>
+               {MATCH_DAY_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
+             </select>
+           </div>
+         </div>
         <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-800/60">
           <span className="text-zinc-600 text-xs">{sessionsWithCsv} sesiones con GPS · {allRows.length} registros totales</span>
           {loadingCsvs && (
@@ -613,13 +627,13 @@ export default function GpsAnalytics() {
       </div>
 
       {tab === "team" && (
-        <TeamView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} />
+        <TeamView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
       {tab === "player" && (
-        <PlayerView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} />
+        <PlayerView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
       {tab === "comparison" && (
-        <ComparisonView sessions={sessions} allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} />
+        <ComparisonView sessions={sessions} allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
     </div>
   );
