@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { FileSpreadsheet, TrendingUp, BarChart2, Activity, Filter } from "lucide-react";
+import { FileSpreadsheet, TrendingUp, BarChart2, Activity, Filter, Clock } from "lucide-react";
 import moment from "moment";
+import LastSessionDashboard from "./LastSessionDashboard";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, ReferenceLine, Cell,
@@ -106,6 +107,7 @@ const METRICS = [
 ];
 
 const TABS = [
+  { id: "last",       label: "Última Sesión", icon: Clock      },
   { id: "team",       label: "Equipo",    icon: BarChart2  },
   { id: "player",     label: "Jugador",   icon: TrendingUp },
   { id: "comparison", label: "Comparar",  icon: Activity   },
@@ -482,6 +484,17 @@ export default function GpsAnalytics() {
 
   const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod || matchDayCode;
 
+  // Obtener última sesión con CSV
+  const lastSession = useMemo(() => {
+    const withData = sessions.filter(s => s.csv_url);
+    return withData.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
+  }, [sessions]);
+
+  const lastSessionRows = useMemo(() => 
+    lastSession ? allRows.filter(r => r.session_id === lastSession.id) : [],
+    [allRows, lastSession]
+  );
+
   // 1. Carga sesiones y partidos
   useEffect(() => {
     Promise.all([
@@ -626,6 +639,9 @@ export default function GpsAnalytics() {
         ))}
       </div>
 
+      {tab === "last" && (
+        <LastSessionDashboard session={lastSession} rows={lastSessionRows} />
+      )}
       {tab === "team" && (
         <TeamView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
