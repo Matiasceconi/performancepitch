@@ -130,11 +130,18 @@ export default function Dashboard() {
   const today = moment().format("MM-DD");
     const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
 
+  const positionOrder = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
+
   const filteredPlayers = selectedStatus 
     ? players.filter((p) => p.status === selectedStatus)
     : players;
 
-  const availablePlayers = filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => (a.number || 0) - (b.number || 0));
+  const availablePlayers = filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => {
+    const posA = positionOrder.indexOf(a.position || "");
+    const posB = positionOrder.indexOf(b.position || "");
+    if (posA === posB) return (a.number || 0) - (b.number || 0);
+    return posA - posB;
+  });
     const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
     const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
     const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
