@@ -496,6 +496,7 @@ export default function Squad() {
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
               <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-3 px-1">✨ Subio de juveniles — Nueva incorporación</p>
               <div className="bg-emerald-900/20 border border-emerald-500/20 rounded-lg divide-y divide-emerald-500/10">
+
                 {subioDJuvenilesPlayers.map((p) => {
                    const isToday = isBirthdayToday(p.birth_date);
                    const age = calcAge(p.birth_date);
@@ -605,7 +606,6 @@ export default function Squad() {
               </div>
             ) : null
             )}
-          </div>
         </div>
       )}
 
