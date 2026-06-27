@@ -103,7 +103,7 @@ export default function Dashboard() {
         base44.entities.Division.list("order", 100),
         base44.entities.Status.list("order", 50)]
         );
-        const p = allPlayers.filter((pl) => pl.division === "Reserva" || pl.status === "Subio de juveniles");
+        const p = allPlayers.filter((pl) => pl.division === "Reserva" || pl.status === "Subieron de juveniles");
         setPlayers(p);
         setSessions(s);
         setDivisions(divs);
@@ -169,11 +169,11 @@ export default function Dashboard() {
     if (posA === posB) return (a.number || 0) - (b.number || 0);
     return posA - posB;
   });
-    const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subio de juveniles").sort((a, b) => {
+    const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subieron de juveniles").sort((a, b) => {
       if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
       return (a.number || 0) - (b.number || 0);
     });
-    const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
+    const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
     const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
     const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
     const injured = filteredPlayers.filter((p) => p.status === "Lesionado").length;
@@ -284,7 +284,7 @@ export default function Dashboard() {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700">
-                       {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subio de juveniles", "Bajo de primera", "Sparring"].map((s) =>
+                       {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subieron de juveniles", "Bajo de primera", "Sparring"].map((s) =>
                     <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
                     )}
                      </SelectContent>
@@ -379,7 +379,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between p-4 border-b border-zinc-800">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-fuchsia-500 inline-block" />
-              Subio de juveniles
+              Subieron de juveniles
               <span className="text-xs text-fuchsia-400 font-normal">({subioDJuveniles.length})</span>
             </h2>
             <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">

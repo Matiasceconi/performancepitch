@@ -190,7 +190,7 @@ export default function Squad() {
     .filter((p) => !search || p.full_name.toLowerCase().includes(search.toLowerCase()))
     .filter((p) => !filterPosition || p.position === filterPosition);
 
-  const groupedNoJuveniles = activePlayers.filter((p) => p.status !== "Subio de juveniles");
+  const groupedNoJuveniles = activePlayers.filter((p) => p.status !== "Subieron de juveniles");
   const grouped = positions.map((pos) => ({
     position: pos,
     players: groupedNoJuveniles.filter((p) => p.position === pos).sort((a, b) => (a.number || 0) - (b.number || 0)),
@@ -205,7 +205,7 @@ export default function Squad() {
   }, [defaultTab, activeTab]);
 
   const birthdayPlayers = players.filter((p) => isBirthdayToday(p.birth_date));
-  const subioDJuvenilesPlayers = players.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
+  const subioDJuvenilesPlayers = players.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -453,7 +453,7 @@ export default function Squad() {
         <div className="space-y-6">
           {subioDJuvenilesPlayers.length > 0 && (
             <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
-              <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-3 px-1">✨ Subio de juveniles — Nueva incorporación</p>
+              <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-3 px-1">✨ Subieron de juveniles — Nueva incorporación</p>
               <div className="bg-emerald-900/20 border border-emerald-500/20 rounded-lg divide-y divide-emerald-500/10">
 
                 {subioDJuvenilesPlayers.map((p) => {

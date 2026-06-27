@@ -11,7 +11,7 @@ const statusConfig = {
   "Primera": { bg: "bg-yellow-500/15", text: "text-yellow-400", dot: "bg-yellow-400", label: "En primera" },
   "Subio a primera": { bg: "bg-lime-500/15", text: "text-lime-400", dot: "bg-lime-400" },
   "Bajo a juveniles": { bg: "bg-indigo-500/15", text: "text-indigo-400", dot: "bg-indigo-400" },
-  "Subio de juveniles": { bg: "bg-fuchsia-500/15", text: "text-fuchsia-400", dot: "bg-fuchsia-400" },
+  "Subieron de juveniles": { bg: "bg-fuchsia-500/15", text: "text-fuchsia-400", dot: "bg-fuchsia-400" },
   "Bajo de primera": { bg: "bg-rose-500/15", text: "text-rose-400", dot: "bg-rose-400" },
   "Sparring": { bg: "bg-teal-500/15", text: "text-teal-400", dot: "bg-teal-400" },
 };
