@@ -491,16 +491,16 @@ export default function Squad() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-6">
           {subioDJuvenilesPlayers.length > 0 && (
-            <div>
-              <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2 px-1">Subio de juveniles</p>
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl divide-y divide-zinc-800/50">
+            <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-xl p-4">
+              <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-3 px-1">✨ Subio de juveniles — Nueva incorporación</p>
+              <div className="bg-emerald-900/20 border border-emerald-500/20 rounded-lg divide-y divide-emerald-500/10">
                 {subioDJuvenilesPlayers.map((p) => {
-                  const isToday = isBirthdayToday(p.birth_date);
-                  const age = calcAge(p.birth_date);
-                  return (
-                    <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`flex items-center gap-4 p-3 hover:bg-zinc-800/30 transition-colors cursor-pointer ${isToday ? "bg-yellow-500/5" : ""}`}>
+                   const isToday = isBirthdayToday(p.birth_date);
+                   const age = calcAge(p.birth_date);
+                   return (
+                     <div key={p.id} onClick={() => setSelectedPlayer(p)} className={`flex items-center gap-4 p-3 hover:bg-emerald-500/10 transition-colors cursor-pointer ${isToday ? "bg-yellow-500/5" : ""}`}>
                       <span className="text-zinc-600 text-sm font-mono w-8 text-center">{p.number}</span>
                       {p.photo_url ? (
                          <img src={p.photo_url} alt={p.full_name} className="w-9 h-9 rounded-full object-cover border border-zinc-700 shrink-0" />
@@ -604,7 +604,8 @@ export default function Squad() {
                 </div>
               </div>
             ) : null
-          )}
+            )}
+          </div>
         </div>
       )}
 
