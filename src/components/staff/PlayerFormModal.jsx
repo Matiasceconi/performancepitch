@@ -89,13 +89,11 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
     }
   }
 
-  if (!player) return null;
-
   return (
     <Dialog open={true} onOpenChange={onClose}>
       <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-white">Editar jugador</DialogTitle>
+          <DialogTitle className="text-white">{player ? "Editar jugador" : "Agregar jugador"}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
           {/* Photo */}
@@ -244,14 +242,16 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-800" disabled={saving || deleting}>
-              <Trash2 size={16} /> Eliminar
-            </Button>
+            {player && (
+              <Button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-800" disabled={saving || deleting}>
+                <Trash2 size={16} /> Eliminar
+              </Button>
+            )}
             <Button type="button" onClick={onClose} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white" disabled={saving || deleting}>
               Cancelar
             </Button>
             <Button type="submit" className="flex-1 bg-white text-zinc-900 hover:bg-zinc-200" disabled={saving || deleting}>
-              {saving ? "Guardando..." : "Guardar cambios"}
+              {saving ? "Guardando..." : player ? "Guardar cambios" : "Crear jugador"}
             </Button>
           </div>
         </form>
