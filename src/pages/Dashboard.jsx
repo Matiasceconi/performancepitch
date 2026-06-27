@@ -142,7 +142,10 @@ export default function Dashboard() {
     if (posA === posB) return (a.number || 0) - (b.number || 0);
     return posA - posB;
   });
-    const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
+    const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subio de juveniles").sort((a, b) => {
+      if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
+      return (a.number || 0) - (b.number || 0);
+    });
     const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subio de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
     const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
     const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
