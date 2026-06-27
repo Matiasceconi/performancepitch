@@ -559,14 +559,17 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
 
   async function deleteMultipleMedical() {
     try {
-      for (const id of selectedMedicalRecords) {
+      const count = selectedMedicalRecords.size;
+      const ids = Array.from(selectedMedicalRecords);
+      for (const id of ids) {
         await base44.entities.MedicalRecord.delete(id);
       }
-      setMedicalRecords((prev) => prev.filter((r) => !selectedMedicalRecords.has(r.id)));
+      setMedicalRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
       setSelectedMedicalRecords(new Set());
       setShowDeleteConfirm(false);
-      toast({ title: `${selectedMedicalRecords.size} registro(s) eliminado(s)` });
+      toast({ title: `${count} registro(s) eliminado(s)` });
     } catch (error) {
+      console.error("Error al eliminar registros:", error);
       toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
     }
   }
