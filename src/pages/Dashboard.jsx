@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList } from "lucide-react";
+import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList, Trash2 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
@@ -83,9 +85,12 @@ export default function Dashboard() {
   const [statuses, setStatuses] = useState([]);
   const [selectedStatus, setSelectedStatus] = useState(null);
   const [editingPlayer, setEditingPlayer] = useState(null);
+  const [selectedPlayers, setSelectedPlayers] = useState(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const [nextMatch, setNextMatch] = useState(null);
   const [nextMatchReport, setNextMatchReport] = useState(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     async function load() {
@@ -124,8 +129,30 @@ export default function Dashboard() {
       <div className="flex items-center justify-center h-64">
         <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
       </div>);
-
   }
+
+  const handleToggleSelect = (playerId) => {
+    setSelectedPlayers(prev => {
+      const next = new Set(prev);
+      if (next.has(playerId)) next.delete(playerId);
+      else next.add(playerId);
+      return next;
+    });
+  };
+
+  const handleDeleteSelected = async () => {
+    try {
+      for (const playerId of selectedPlayers) {
+        await base44.entities.Player.delete(playerId);
+      }
+      setPlayers(prev => prev.filter(p => !selectedPlayers.has(p.id)));
+      setSelectedPlayers(new Set());
+      setShowDeleteConfirm(false);
+      toast({ title: `${selectedPlayers.size} jugador(es) eliminados`, variant: "default" });
+    } catch (error) {
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    }
+  };
 
   const today = moment().format("MM-DD");
     const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
@@ -212,14 +239,30 @@ export default function Dashboard() {
 
       {showStatusPanel &&
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-white">Estado del plantel</h2>
-            <p className="text-xs text-zinc-500 mt-0.5">Modificá el estado de cada jugador directamente</p>
+          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Estado del plantel</h2>
+              <p className="text-xs text-zinc-500 mt-0.5">Modificá el estado de cada jugador directamente</p>
+            </div>
+            {selectedPlayers.size > 0 && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-medium transition-colors"
+              >
+                <Trash2 size={14} />
+                Eliminar {selectedPlayers.size}
+              </button>
+            )}
           </div>
           <div className="p-4">
             <div className="grid gap-2">
               {[...players].sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
-            <div key={p.id} className="flex items-center gap-3 py-1.5">
+              <div key={p.id} className="flex items-center gap-3 py-1.5">
+                  <Checkbox 
+                    checked={selectedPlayers.has(p.id)}
+                    onCheckedChange={() => handleToggleSelect(p.id)}
+                    className="shrink-0"
+                  />
                   <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
                   {p.photo_url ?
                   <img src={p.photo_url} alt={p.full_name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" /> :
@@ -461,6 +504,26 @@ export default function Dashboard() {
           }}
         />
       )}
-    </div>);
 
-}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Eliminar {selectedPlayers.size} jugador(es)</AlertDialogTitle>
+            <AlertDialogDescription className="text-zinc-400">
+              Esta acción no se puede deshacer. Los jugadores seleccionados serán eliminados permanentemente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="flex gap-2 justify-end">
+            <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancelar</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteSelected}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              Eliminar
+            </AlertDialogAction>
+          </div>
+        </AlertDialogContent>
+      </AlertDialog>
+      </div>);
+
+      }
