@@ -21,7 +21,7 @@ const EMPTY_FORM = {
   dominant_foot: "", birth_place: "", current_residence: "", club_housing: false, has_contract: false,
 };
 
-export default function PlayerFormModal({ player, divisions, statuses, onClose, onSave }) {
+export default function PlayerFormModal({ player, divisions, statuses, onClose, onSave, onDelete }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -80,6 +80,7 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
       await base44.entities.Player.delete(player.id);
       toast({ title: "Jugador eliminado" });
       setShowDeleteConfirm(false);
+      if (onDelete) await onDelete(player.id);
       onClose();
     } catch (err) {
       toast({ title: "Error al eliminar", variant: "destructive" });

@@ -456,6 +456,9 @@ export default function Dashboard() {
             setPlayers((prev) => prev.map((p) => p.id === editingPlayer.id ? { ...p, ...data } : p));
             setEditingPlayer(null);
           }}
+          onDelete={async (playerId) => {
+            setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+          }}
         />
       )}
     </div>);
