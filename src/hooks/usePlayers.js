@@ -22,7 +22,7 @@ export function usePlayers() {
   }, [queryClient]);
 
   // Map by ID for O(1) lookup
-  const playerMap = Object.fromEntries(players.map((p) => [p.id, p]));
+  const playerMap = Object.fromEntries(players.map((p) => [p.id, { ...p, name: p.full_name || `${p.first_name} ${p.last_name}`.trim() }]));
 
   // Normalizar nombre: remover tildes y convertir a minúsculas
   const normalizeName = (name) => {
@@ -56,15 +56,19 @@ export function usePlayers() {
       // Buscar coincidencia exacta primero
       const normalized = normalizeName(player_name);
       for (const p of players) {
-        if (normalizeName(p.name) === normalized) return p;
+        const pName = p.full_name || `${p.first_name} ${p.last_name}`.trim();
+        if (normalizeName(pName) === normalized) return { ...p, name: pName };
       }
       // Si no encuentra exacta, buscar por matching flexible
       for (const p of players) {
-        if (namesMatch(player_name, p.name)) return p;
+        const pName = p.full_name || `${p.first_name} ${p.last_name}`.trim();
+        if (namesMatch(player_name, pName)) return { ...p, name: pName };
       }
     }
     return null;
   }
 
-  return { players, playerMap, getPlayer, isLoading };
+  const playersWithName = players.map((p) => ({ ...p, name: p.full_name || `${p.first_name} ${p.last_name}`.trim() }));
+
+  return { players: playersWithName, playerMap, getPlayer, isLoading };
 }
