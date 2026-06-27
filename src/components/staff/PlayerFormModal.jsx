@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
 import { base44 } from "@/api/base44Client";
-import { Camera } from "lucide-react";
+import { Camera, Trash2 } from "lucide-react";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
@@ -24,6 +25,8 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
   const [form, setForm] = useState(EMPTY_FORM);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -68,6 +71,20 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
       toast({ title: "Error al guardar", variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function handleDelete() {
+    setDeleting(true);
+    try {
+      await base44.entities.Player.delete(player.id);
+      toast({ title: "Jugador eliminado" });
+      setShowDeleteConfirm(false);
+      onClose();
+    } catch (err) {
+      toast({ title: "Error al eliminar", variant: "destructive" });
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -226,14 +243,36 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
           </div>
 
           <div className="flex gap-2 pt-2">
-            <Button type="button" onClick={onClose} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white" disabled={saving}>
+            <Button type="button" onClick={() => setShowDeleteConfirm(true)} className="flex-1 bg-red-900/40 hover:bg-red-900/60 text-red-400 border border-red-800" disabled={saving || deleting}>
+              <Trash2 size={16} /> Eliminar
+            </Button>
+            <Button type="button" onClick={onClose} className="flex-1 bg-zinc-700 hover:bg-zinc-600 text-white" disabled={saving || deleting}>
               Cancelar
             </Button>
-            <Button type="submit" className="flex-1 bg-white text-zinc-900 hover:bg-zinc-200" disabled={saving}>
+            <Button type="submit" className="flex-1 bg-white text-zinc-900 hover:bg-zinc-200" disabled={saving || deleting}>
               {saving ? "Guardando..." : "Guardar cambios"}
             </Button>
           </div>
         </form>
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">¿Eliminar jugador?</AlertDialogTitle>
+              <AlertDialogDescription className="text-zinc-400">
+                Esta acción no se puede deshacer. Se eliminará permanentemente a {form.first_name} {form.last_name}.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-2">
+              <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700" disabled={deleting}>
+                Cancelar
+              </AlertDialogCancel>
+              <AlertDialogAction className="bg-red-900 hover:bg-red-800 text-white" disabled={deleting} onClick={handleDelete}>
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+        </AlertDialog>
       </DialogContent>
     </Dialog>
   );
