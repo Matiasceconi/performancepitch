@@ -642,28 +642,28 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
           )}
           {activeTab === "rendimiento" && <TabRendimiento player={player} />}
           {activeTab === "carga" && <TabCarga player={player} />}
-        </div>
-        </div>
+          </div>
 
-        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-         <AlertDialogHeader>
-           <AlertDialogTitle className="text-white">Eliminar {selectedMedicalRecords.size} registro(s) médico(s)</AlertDialogTitle>
-           <AlertDialogDescription className="text-zinc-400">
-             Esta acción no se puede deshacer. Los registros seleccionados serán eliminados permanentemente.
-           </AlertDialogDescription>
-         </AlertDialogHeader>
-         <div className="flex gap-2 justify-end">
-           <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancelar</AlertDialogCancel>
-           <AlertDialogAction 
-             onClick={deleteMultipleMedical}
-             className="bg-red-600 hover:bg-red-700 text-white"
-           >
-             Eliminar
-           </AlertDialogAction>
-         </div>
-        </AlertDialogContent>
-        </AlertDialog>
-        </div>
-        );
-        }
+          <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+          <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+            <AlertDialogHeader>
+              <AlertDialogTitle className="text-white">Eliminar {selectedMedicalRecords.size} registro(s) médico(s)</AlertDialogTitle>
+              <AlertDialogDescription className="text-zinc-400">
+                Esta acción no se puede deshacer. Los registros seleccionados serán eliminados permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <div className="flex gap-2 justify-end">
+              <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={deleteMultipleMedical}
+                className="bg-red-600 hover:bg-red-700 text-white"
+              >
+                Eliminar
+              </AlertDialogAction>
+            </div>
+          </AlertDialogContent>
+          </AlertDialog>
+          </div>
+          </div>
+          );
+          }
