@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { Checkbox } from "@/components/ui/checkbox";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import moment from "moment";
 import "moment/locale/es";
@@ -50,7 +52,7 @@ function InfoRow({ label, value, icon: Icon }) {
 }
 
 // Tab: Vista Consolidada (Info + GPS resumen)
-function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, loadingGps, showMedicalForm, setShowMedicalForm, medicalForm, setMedicalForm, handleAddMedical, deleteMedical }) {
+function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, loadingGps, showMedicalForm, setShowMedicalForm, medicalForm, setMedicalForm, handleAddMedical, deleteMedical, selectedMedicalRecords, toggleSelectMedical, deleteMultipleMedical, showDeleteConfirm, setShowDeleteConfirm }) {
   const age = player.birth_date ? moment().diff(moment(player.birth_date), "years") : null;
   const avgGps = (field) => {
     const vals = gpsRecords.filter(r => r[field] > 0).map(r => r[field]);
@@ -109,18 +111,29 @@ function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, lo
       </div>
 
       {/* Historial médico */}
-      <div className="lg:col-span-2">
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
-            <AlertCircle size={13} className="text-red-400" /> Historial médico
-          </h3>
-          <button
-            onClick={() => setShowMedicalForm(!showMedicalForm)}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 rounded-lg transition-colors font-medium"
-          >
-            <Plus size={13} /> Nuevo
-          </button>
-        </div>
+       <div className="lg:col-span-2">
+         <div className="flex items-center justify-between mb-3">
+           <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider flex items-center gap-2">
+             <AlertCircle size={13} className="text-red-400" /> Historial médico
+           </h3>
+           <div className="flex items-center gap-2">
+             {selectedMedicalRecords.size > 0 && (
+               <button
+                 onClick={() => setShowDeleteConfirm(true)}
+                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-red-500/20 text-red-300 hover:bg-red-500/30 rounded-lg transition-colors font-medium"
+               >
+                 <Trash2 size={13} />
+                 Eliminar {selectedMedicalRecords.size}
+               </button>
+             )}
+             <button
+               onClick={() => setShowMedicalForm(!showMedicalForm)}
+               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-500/20 text-emerald-300 hover:bg-emerald-500/30 rounded-lg transition-colors font-medium"
+             >
+               <Plus size={13} /> Nuevo
+             </button>
+           </div>
+         </div>
 
         {showMedicalForm && (
           <form onSubmit={handleAddMedical} className="bg-zinc-800/50 border border-zinc-700 rounded-lg p-4 mb-4 space-y-3">
@@ -165,24 +178,27 @@ function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, lo
             <p className="text-zinc-500 text-sm">Sin registros médicos</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {medicalRecords.map((record) => (
-              <div key={record.id} className={`border rounded-lg p-3 ${statusColors[record.status] || "bg-zinc-800/50 border-zinc-700"}`}>
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-semibold text-sm">{record.diagnosis}</p>
-                    <p className="text-xs opacity-75 mt-0.5">{record.injury_date ? moment(record.injury_date).format("DD/MM/YYYY") : "Fecha no registrada"}</p>
-                    {record.expected_return && <p className="text-xs opacity-75">Retorno: {moment(record.expected_return).format("DD/MM/YYYY")}</p>}
-                    {record.notes && <p className="text-xs opacity-60 italic mt-1">"{record.notes}"</p>}
-                  </div>
-                  <button onClick={() => deleteMedical(record.id)} className="p-1.5 rounded hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+           <div className="space-y-2">
+             {medicalRecords.map((record) => (
+               <div key={record.id} className={`border rounded-lg p-3 flex items-start gap-3 ${statusColors[record.status] || "bg-zinc-800/50 border-zinc-700"}`}>
+                 <Checkbox 
+                   checked={selectedMedicalRecords.has(record.id)}
+                   onCheckedChange={() => toggleSelectMedical(record.id)}
+                   className="shrink-0 mt-0.5"
+                 />
+                 <div className="flex-1 min-w-0">
+                   <p className="font-semibold text-sm">{record.diagnosis}</p>
+                   <p className="text-xs opacity-75 mt-0.5">{record.injury_date ? moment(record.injury_date).format("DD/MM/YYYY") : "Fecha no registrada"}</p>
+                   {record.expected_return && <p className="text-xs opacity-75">Retorno: {moment(record.expected_return).format("DD/MM/YYYY")}</p>}
+                   {record.notes && <p className="text-xs opacity-60 italic mt-1">"{record.notes}"</p>}
+                 </div>
+                 <button onClick={() => deleteMedical(record.id)} className="p-1.5 rounded hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-colors shrink-0">
+                   <Trash2 size={13} />
+                 </button>
+               </div>
+             ))}
+           </div>
+         )}
       </div>
     </div>
   );
@@ -447,6 +463,8 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
   const [gpsRecords, setGpsRecords] = useState([]);
   const [loadingGps, setLoadingGps] = useState(true);
   const [showMedicalForm, setShowMedicalForm] = useState(false);
+  const [selectedMedicalRecords, setSelectedMedicalRecords] = useState(new Set());
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [medicalForm, setMedicalForm] = useState({
     diagnosis: "", status: "Lesionado",
     injury_date: moment().format("YYYY-MM-DD"),
@@ -530,6 +548,29 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
     toast({ title: "Registro eliminado" });
   }
 
+  function toggleSelectMedical(id) {
+    setSelectedMedicalRecords((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function deleteMultipleMedical() {
+    try {
+      for (const id of selectedMedicalRecords) {
+        await base44.entities.MedicalRecord.delete(id);
+      }
+      setMedicalRecords((prev) => prev.filter((r) => !selectedMedicalRecords.has(r.id)));
+      setSelectedMedicalRecords(new Set());
+      setShowDeleteConfirm(false);
+      toast({ title: `${selectedMedicalRecords.size} registro(s) eliminado(s)` });
+    } catch (error) {
+      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-2xl flex flex-col" style={{ maxHeight: "90vh" }}>
@@ -592,12 +633,37 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
               setMedicalForm={setMedicalForm}
               handleAddMedical={handleAddMedical}
               deleteMedical={deleteMedical}
+              selectedMedicalRecords={selectedMedicalRecords}
+              toggleSelectMedical={toggleSelectMedical}
+              deleteMultipleMedical={deleteMultipleMedical}
+              showDeleteConfirm={showDeleteConfirm}
+              setShowDeleteConfirm={setShowDeleteConfirm}
             />
           )}
           {activeTab === "rendimiento" && <TabRendimiento player={player} />}
           {activeTab === "carga" && <TabCarga player={player} />}
         </div>
-      </div>
-    </div>
-  );
-}
+        </div>
+
+        <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
+         <AlertDialogHeader>
+           <AlertDialogTitle className="text-white">Eliminar {selectedMedicalRecords.size} registro(s) médico(s)</AlertDialogTitle>
+           <AlertDialogDescription className="text-zinc-400">
+             Esta acción no se puede deshacer. Los registros seleccionados serán eliminados permanentemente.
+           </AlertDialogDescription>
+         </AlertDialogHeader>
+         <div className="flex gap-2 justify-end">
+           <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancelar</AlertDialogCancel>
+           <AlertDialogAction 
+             onClick={deleteMultipleMedical}
+             className="bg-red-600 hover:bg-red-700 text-white"
+           >
+             Eliminar
+           </AlertDialogAction>
+         </div>
+        </AlertDialogContent>
+        </AlertDialog>
+        </div>
+        );
+        }
