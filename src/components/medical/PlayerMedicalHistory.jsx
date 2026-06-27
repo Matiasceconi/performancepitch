@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X, Heart, AlertCircle, Activity, CheckCircle, Clock, FileText } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
+import { usePlayers } from "@/hooks/usePlayers";
 moment.locale("es");
 
 const statusColors = {
@@ -23,28 +24,26 @@ export default function PlayerMedicalHistory({ player, onClose }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState("all");
-  const [playerData, setPlayerData] = useState(null);
+  const { getPlayer } = usePlayers();
+  const playerData = getPlayer(player.id, player.name);
+  const displayName = playerData?.name || player.name;
+  const displayPhoto = playerData?.photo_url || player.photo_url;
 
   useEffect(() => {
     async function load() {
+      // Try by player_id first, fallback to player_name
       let recs = [];
-      let pData = null;
-
-      // Obtener datos del jugador por ID
       if (player.id) {
-        pData = await base44.entities.Player.get(player.id);
         recs = await base44.entities.MedicalRecord.filter({ player_id: player.id }, "-injury_date", 100);
       }
-
-      setPlayerData(pData);
+      if (recs.length === 0 && player.name) {
+        recs = await base44.entities.MedicalRecord.filter({ player_name: player.name }, "-injury_date", 100);
+      }
       setRecords(recs);
       setLoading(false);
     }
     load();
-  }, [player.id]);
-
-  const displayName = playerData?.full_name || player.name;
-  const displayPhoto = playerData?.photo_url || player.photo_url;
+  }, [player.id, player.name]);
 
   const lesiones = records.filter(r => r.record_type === "Lesión" || !r.record_type);
   const consultas = records.filter(r => r.record_type === "Consulta/Seguimiento");
@@ -70,7 +69,7 @@ export default function PlayerMedicalHistory({ player, onClose }) {
             )}
             <div>
               <h2 className="text-lg font-bold text-white">{displayName}</h2>
-              <p className="text-xs text-zinc-500">{playerData?.position || player.position}{playerData?.jersey_number ? ` · #${playerData.jersey_number}` : ""}{playerData?.division ? ` · ${playerData.division}` : ""}</p>
+              <p className="text-xs text-zinc-500">{playerData?.position || player.position}{(playerData?.number || player.number) ? ` · #${playerData?.number || player.number}` : ""}{player.category_division ? ` · ${player.category_division}` : ""}</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors">

@@ -10,10 +10,6 @@
       "type": "string",
       "description": "Nombre del jugador"
     },
-    "photo_url": {
-      "type": "string",
-      "description": "Foto del jugador"
-    },
     "category_division": {
       "type": "string",
       "description": "Categor\u00eda/Divisi\u00f3n (ej: 08/Reserva)"

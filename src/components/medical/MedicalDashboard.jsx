@@ -3,7 +3,8 @@ import { base44 } from "@/api/base44Client";
 import { Heart, AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, Activity, ChevronRight } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
-import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
+import PlayerMedicalHistory from "@/components/medical/PlayerMedicalHistory";
+import { usePlayers } from "@/hooks/usePlayers";
 moment.locale("es");
 
 const statusColors = {
@@ -64,6 +65,7 @@ export default function MedicalDashboard() {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const { getPlayer } = usePlayers();
 
   useEffect(() => {
     async function load() {
@@ -103,14 +105,20 @@ export default function MedicalDashboard() {
     .slice(0, 4)
     .map(([diag, count]) => ({ diag, count }));
 
-  // Build list of players with any medical record
+  // Build list of players with any medical record, for the history panel
   const playersWithRecords = (() => {
     const seen = new Map();
     records.forEach(r => {
       const key = r.player_id || r.player_name;
       if (!seen.has(key)) {
+        const playerData = getPlayer(r.player_id, r.player_name);
         seen.set(key, {
           id: r.player_id,
+          name: playerData?.name || r.player_name,
+          photo_url: playerData?.photo_url || null,
+          position: playerData?.position || "",
+          number: playerData?.number || null,
+          category_division: r.category_division || "",
           count: 0,
           lastDate: r.injury_date || "",
         });
@@ -124,7 +132,7 @@ export default function MedicalDashboard() {
 
   return (
     <>
-    {selectedPlayer && <PlayerProfileDetail player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
+    {selectedPlayer && <PlayerMedicalHistory player={selectedPlayer} onClose={() => setSelectedPlayer(null)} />}
     <div className="space-y-6">
       {/* Stats row */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -173,25 +181,29 @@ export default function MedicalDashboard() {
           ) : (
             activeInjured.map(r => {
               const sc = statusColors[r.status] || statusColors["Lesionado"];
+              const playerData = getPlayer(r.player_id, r.player_name);
+              const displayName = playerData?.name || r.player_name;
+              const displayPhoto = playerData?.photo_url;
               return (
                 <div key={r.id} className={`bg-zinc-900 border ${sc.border} rounded-xl p-4`}>
                   <div className="flex items-start gap-3">
                     <button
-                      onClick={() => setSelectedPlayer({ id: r.player_id })}
+                      onClick={() => setSelectedPlayer({ id: r.player_id, name: displayName, photo_url: displayPhoto, position: playerData?.position, number: playerData?.number, category_division: r.category_division })}
                       className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                      title="Ver perfil completo"
+                      title="Ver historial médico"
                     >
-                      {r.photo_url ? (
-                          <img src={r.photo_url} alt={r.player_name} className="w-10 h-10 rounded-full object-cover border-2 border-zinc-600 hover:border-white transition-all" />
-                        ) : (
-                          <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-600 hover:border-white transition-all flex items-center justify-center">
-                            <span className="text-sm font-bold text-zinc-500">{r.player_name?.charAt(0)}</span>
-                          </div>
-                        )}
+                      {displayPhoto ? (
+                        <img src={displayPhoto} alt={displayName} className="w-10 h-10 rounded-full object-cover border-2 border-zinc-600 hover:border-white transition-all" />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-600 hover:border-white transition-all flex items-center justify-center">
+                          <span className="text-sm font-bold text-zinc-500">{displayName?.charAt(0)}</span>
+                        </div>
+                      )}
                     </button>
                     <div className="flex-1 min-w-0">
-                       <div className="flex items-center gap-2 flex-wrap">
-                         <span className="text-white font-semibold text-sm">{r.player_name}</span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-white font-semibold text-sm">{displayName}</span>
+                        {r.category_division && <span className="text-xs text-zinc-500">{r.category_division}</span>}
                         <span className={`text-xs px-2 py-0.5 rounded border ${sc.bg} ${sc.text} ${sc.border}`}>{r.status}</span>
                       </div>
                       <p className="text-zinc-300 text-sm mt-0.5">{r.diagnosis}</p>
@@ -268,30 +280,26 @@ export default function MedicalDashboard() {
           Historial médico por jugador
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-           {playersWithRecords.map(p => {
-             // Obtener datos del jugador
-             const medRecord = records.find(r => r.player_id === p.id);
-             return (
-             <button
-               key={p.id}
-               onClick={() => setSelectedPlayer({ id: p.id })}
-               className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 flex items-center gap-3 transition-all text-left group"
-             >
-               {medRecord?.photo_url ? (
-                 <img src={medRecord.photo_url} alt={medRecord.player_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0" />
-               ) : (
-                 <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                   <span className="text-sm font-bold text-zinc-500">{medRecord?.player_name?.charAt(0)}</span>
-                 </div>
-               )}
-               <div className="flex-1 min-w-0">
-                 <p className="text-white text-xs font-medium truncate">{medRecord?.player_name}</p>
-                 <p className="text-zinc-500 text-xs">{p.count} registro{p.count !== 1 ? "s" : ""}</p>
-               </div>
-               <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 shrink-0 transition-colors" />
-             </button>
-             );
-           })}
+          {playersWithRecords.map(p => (
+            <button
+              key={p.id || p.name}
+              onClick={() => setSelectedPlayer(p)}
+              className="bg-zinc-900 border border-zinc-800 hover:border-zinc-600 rounded-xl p-3 flex items-center gap-3 transition-all text-left group"
+            >
+              {p.photo_url ? (
+                <img src={p.photo_url} alt={p.name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0" />
+              ) : (
+                <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                  <span className="text-sm font-bold text-zinc-500">{p.name?.charAt(0)}</span>
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-white text-xs font-medium truncate">{p.name}</p>
+                <p className="text-zinc-500 text-xs">{p.count} registro{p.count !== 1 ? "s" : ""}</p>
+              </div>
+              <ChevronRight size={14} className="text-zinc-600 group-hover:text-zinc-400 shrink-0 transition-colors" />
+            </button>
+          ))}
         </div>
       </div>
     </div>
