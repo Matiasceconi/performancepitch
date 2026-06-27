@@ -10,6 +10,7 @@ import { useToast } from "@/components/ui/use-toast";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
 import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
 import PlayerImportDialog from "@/components/staff/PlayerImportDialog";
+import PlayerFormModal from "@/components/staff/PlayerFormModal";
 import moment from "moment";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
@@ -46,15 +47,13 @@ function calcAge(birth_date) {
 
 export default function Squad() {
   const [players, setPlayers] = useState([]);
-  const [divisions, setDivisions] = useState([]);
-  const [statuses, setStatuses] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [deleteTarget, setDeleteTarget] = useState(null);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+   const [divisions, setDivisions] = useState([]);
+   const [statuses, setStatuses] = useState([]);
+   const [loading, setLoading] = useState(true);
+   const [showForm, setShowForm] = useState(false);
+   const [editing, setEditing] = useState(null);
+   const [deleteTarget, setDeleteTarget] = useState(null);
+   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const [activeTab, setActiveTab] = useState("reserva");
   const [search, setSearch] = useState("");
   const [filterPosition, setFilterPosition] = useState(null);
@@ -161,56 +160,16 @@ export default function Squad() {
 
   function openNew() {
     setEditing(null);
-    setForm(EMPTY_FORM);
     setShowForm(true);
   }
 
   function openEdit(p) {
     setEditing(p);
-    setForm({
-      first_name: p.first_name || "",
-      last_name: p.last_name || "",
-      number: String(p.number || ""),
-      position: p.position || "Defensor",
-      status: p.status || "Disponible",
-      division: p.division || "Primera",
-      season_period: p.season_period || "",
-      injury_detail: p.injury_detail || "",
-      expected_return: p.expected_return || "",
-      photo_url: p.photo_url || "",
-      birth_date: p.birth_date || "",
-      category: p.category || "",
-      document_number: p.document_number || "",
-      dominant_foot: p.dominant_foot || "",
-      birth_place: p.birth_place || "",
-      current_residence: p.current_residence || "",
-      club_housing: p.club_housing || false,
-      has_contract: p.has_contract || false,
-    });
     setShowForm(true);
   }
 
-  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    const payload = { ...form, number: form.number ? Number(form.number) : undefined };
-    // Generar full_name a partir de first_name y last_name
-    if (form.first_name || form.last_name) {
-      payload.full_name = `${form.first_name} ${form.last_name}`.trim();
-    }
-    // clean empty strings
-    Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
-    if (editing) {
-      await base44.entities.Player.update(editing.id, payload);
-      toast({ title: "Jugador actualizado" });
-    } else {
-      await base44.entities.Player.create(payload);
-      toast({ title: "Jugador agregado" });
-    }
-    setShowForm(false);
-    setLoading(true);
-    loadPlayers();
+  async function handleDeleteFromModal(playerId) {
+    setPlayers((prev) => prev.filter((p) => p.id !== playerId));
   }
 
   async function handleDelete() {
@@ -622,177 +581,36 @@ export default function Squad() {
         </div>
       )}
 
-      {/* FORM DIALOG */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="text-white">{editing ? "Editar jugador" : "Nuevo jugador"}</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {/* Photo */}
-            <div className="flex items-center gap-4">
-              {form.photo_url ? (
-                <img src={form.photo_url} alt="Foto" className="w-16 h-16 rounded-full object-cover border border-zinc-700" />
-              ) : (
-                <div className="w-16 h-16 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                  <Camera size={20} className="text-zinc-600" />
-                </div>
-              )}
-              <div className="flex-1">
-                <label className="text-xs text-zinc-400 mb-1 block">Foto del jugador</label>
-                <label className="cursor-pointer inline-flex items-center gap-2 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 transition-colors rounded-md px-3 py-1.5">
-                  {uploadingPhoto ? "Subiendo..." : "Subir imagen"}
-                  <input type="file" accept="image/*" className="hidden" disabled={uploadingPhoto}
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      setUploadingPhoto(true);
-                      const { file_url } = await base44.integrations.Core.UploadFile({ file });
-                      set("photo_url", file_url);
-                      setUploadingPhoto(false);
-                    }}
-                  />
-                </label>
-                {form.photo_url && (
-                  <button type="button" onClick={() => set("photo_url", "")} className="ml-2 text-xs text-zinc-600 hover:text-red-400 transition-colors">Quitar</button>
-                )}
-              </div>
-            </div>
-
-            {/* Nombre y Apellido */}
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Nombre *</label>
-                <Input value={form.first_name} onChange={(e) => set("first_name", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Apellido *</label>
-                <Input value={form.last_name} onChange={(e) => set("last_name", e.target.value)} required className="bg-zinc-800 border-zinc-700 text-white" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Número</label>
-                <Input type="number" value={form.number} onChange={(e) => set("number", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" placeholder="Opcional" />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Año de nacimiento</label>
-                <Input value={form.birth_date ? moment(form.birth_date).format("YYYY") : ""} onChange={(e) => {
-                  const year = e.target.value;
-                  if (year && form.birth_date) {
-                    const newDate = moment(form.birth_date).year(parseInt(year)).format("YYYY-MM-DD");
-                    set("birth_date", newDate);
-                  }
-                }} className="bg-zinc-800 border-zinc-700 text-white" placeholder="Ej: 2005" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Posición *</label>
-                <Select value={form.position} onValueChange={(v) => set("position", v)}>
-                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {positions.map((p) => <SelectItem key={p} value={p} className="text-white">{p}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Pierna hábil</label>
-                <Select value={form.dominant_foot} onValueChange={(v) => set("dominant_foot", v)}>
-                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar" /></SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {dominantFeet.map((f) => <SelectItem key={f} value={f} className="text-white">{f}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Fecha de nacimiento</label>
-                <Input type="date" value={form.birth_date} onChange={(e) => set("birth_date", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Nº de documento</label>
-                <Input value={form.document_number} onChange={(e) => set("document_number", e.target.value)} placeholder="DNI / Pasaporte" className="bg-zinc-800 border-zinc-700 text-white" />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Lugar de nacimiento</label>
-                <Input value={form.birth_place} onChange={(e) => set("birth_place", e.target.value)} placeholder="Ciudad, País" className="bg-zinc-800 border-zinc-700 text-white" />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Residencia actual</label>
-                <Input value={form.current_residence} onChange={(e) => set("current_residence", e.target.value)} placeholder="Ciudad, Barrio" className="bg-zinc-800 border-zinc-700 text-white" />
-              </div>
-            </div>
-
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Período de temporada</label>
-              <Select value={form.season_period || "__none__"} onValueChange={(v) => set("season_period", v === "__none__" ? "" : v)}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Sin período" /></SelectTrigger>
-                <SelectContent className="bg-zinc-800 border-zinc-700">
-                  <SelectItem value="__none__" className="text-zinc-400">Sin período</SelectItem>
-                  {seasonPeriods.map((p) => <SelectItem key={p} value={p} className="text-white">{p}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">División</label>
-                <Select value={form.division} onValueChange={(v) => set("division", v)}>
-                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {divisions.map((d) => <SelectItem key={d.id} value={d.name} className="text-white">{d.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Estado</label>
-                <Select value={form.status} onValueChange={(v) => set("status", v)}>
-                  <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
-                  <SelectContent className="bg-zinc-800 border-zinc-700">
-                    {statuses.map((s) => <SelectItem key={s.id} value={s.name} className="text-white">{s.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {form.status !== "Disponible" && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Detalle</label>
-                  <Input value={form.injury_detail} onChange={(e) => set("injury_detail", e.target.value)} placeholder="Ej: Desgarro isquiotibial" className="bg-zinc-800 border-zinc-700 text-white" />
-                </div>
-                <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Regreso estimado</label>
-                  <Input type="date" value={form.expected_return} onChange={(e) => set("expected_return", e.target.value)} className="bg-zinc-800 border-zinc-700 text-white" />
-                </div>
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="club_housing" checked={form.club_housing} onChange={(e) => set("club_housing", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
-                <label htmlFor="club_housing" className="text-xs text-zinc-400 cursor-pointer">Reside en la pensión del club</label>
-              </div>
-              <div className="flex items-center gap-2">
-                <input type="checkbox" id="has_contract" checked={form.has_contract} onChange={(e) => set("has_contract", e.target.checked)} className="w-4 h-4 rounded border-zinc-700" />
-                <label htmlFor="has_contract" className="text-xs text-zinc-400 cursor-pointer">Tiene contrato</label>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full bg-white text-zinc-900 hover:bg-zinc-200">
-              {editing ? "Guardar cambios" : "Agregar jugador"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+      {/* FORM MODAL */}
+      {showForm && (
+        <PlayerFormModal
+          player={editing}
+          divisions={divisions}
+          statuses={statuses}
+          onClose={() => {
+            setShowForm(false);
+            setEditing(null);
+          }}
+          onSave={async (data) => {
+            const payload = { ...data };
+            if (data.first_name || data.last_name) {
+              payload.full_name = `${data.first_name} ${data.last_name}`.trim();
+            }
+            Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
+            if (editing) {
+              await base44.entities.Player.update(editing.id, payload);
+              setPlayers((prev) => prev.map((p) => p.id === editing.id ? { ...p, ...payload } : p));
+              toast({ title: "Jugador actualizado" });
+            } else {
+              await base44.entities.Player.create(payload);
+              toast({ title: "Jugador agregado" });
+            }
+            setShowForm(false);
+            setEditing(null);
+          }}
+          onDelete={handleDeleteFromModal}
+        />
+      )}
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent className="bg-zinc-900 border-zinc-800">
