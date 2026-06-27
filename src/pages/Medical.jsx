@@ -34,7 +34,7 @@ export default function Medical() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [form, setForm] = useState(EMPTY_FORM);
   const { toast } = useToast();
-  const { players, getPlayer } = usePlayers();
+  const { players = [], getPlayer } = usePlayers();
 
   useEffect(() => { loadAll(); }, []);
 
@@ -83,57 +83,41 @@ export default function Medical() {
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
-  if (activeTab === "dashboard") return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
-          <button onClick={() => setActiveTab("dashboard")} className="flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all bg-white text-zinc-900">
-            <LayoutDashboard size={13} /> Dashboard
-          </button>
-          <button onClick={() => setActiveTab("lesiones")} className="px-4 py-1.5 rounded-md text-sm font-medium transition-all text-zinc-400 hover:text-white">
-            Lesiones ({lesiones.length})
-          </button>
-          <button onClick={() => setActiveTab("consultas")} className="px-4 py-1.5 rounded-md text-sm font-medium transition-all text-zinc-400 hover:text-white">
-            Consultas ({consultas.length})
-          </button>
-        </div>
-        <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
-          <Plus size={15} className="mr-1.5" /> Nuevo registro
-        </Button>
-      </div>
-      <MedicalDashboard />
+  const renderTabs = () => (
+    <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
+      <button
+        onClick={() => setActiveTab("dashboard")}
+        className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "dashboard" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
+      >
+        <LayoutDashboard size={13} /> Dashboard
+      </button>
+      <button
+        onClick={() => setActiveTab("lesiones")}
+        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "lesiones" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
+      >
+        Lesiones ({lesiones.length})
+      </button>
+      <button
+        onClick={() => setActiveTab("consultas")}
+        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "consultas" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
+      >
+        Consultas ({consultas.length})
+      </button>
     </div>
   );
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-lg p-1">
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "dashboard" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
-          >
-            <LayoutDashboard size={13} /> Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab("lesiones")}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "lesiones" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
-          >
-            Lesiones ({lesiones.length})
-          </button>
-          <button
-            onClick={() => setActiveTab("consultas")}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "consultas" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
-          >
-            Consultas ({consultas.length})
-          </button>
-        </div>
+        {renderTabs()}
         <Button onClick={() => setShowForm(true)} className="bg-white text-zinc-900 hover:bg-zinc-200">
           <Plus size={15} className="mr-1.5" /> Nuevo registro
         </Button>
       </div>
 
-      {displayed.length === 0 ? (
+      {activeTab === "dashboard" ? (
+        <MedicalDashboard />
+      ) : displayed.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
           <Heart size={36} className="text-zinc-700 mx-auto mb-3" />
           <p className="text-zinc-500 text-sm">Sin registros cargados</p>
@@ -246,9 +230,13 @@ export default function Medical() {
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Jugador</label>
               <Select value={form.player_id} onValueChange={(v) => setForm(f => ({ ...f, player_id: v }))}>
-                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder="Seleccionar jugador" /></SelectTrigger>
+                <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue placeholder={players.length > 0 ? "Seleccionar jugador" : "Cargando jugadores..."} /></SelectTrigger>
                 <SelectContent className="bg-zinc-800 border-zinc-700">
-                  {players.map((p) => <SelectItem key={p.id} value={p.id} className="text-white">{p.name}</SelectItem>)}
+                  {Array.isArray(players) && players.length > 0 ? (
+                    players.map((p) => <SelectItem key={p.id} value={p.id} className="text-white">{p.name}</SelectItem>)
+                  ) : (
+                    <SelectItem value="__none__" disabled className="text-zinc-500">Sin jugadores disponibles</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

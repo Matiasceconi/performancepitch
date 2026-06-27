@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 export function usePlayers() {
   const queryClient = useQueryClient();
-  const { data: players = [], isLoading } = useQuery({
+  const { data: rawPlayers = [], isLoading } = useQuery({
     queryKey: ["players"],
     queryFn: () => base44.entities.Player.list("name", 100),
     staleTime: 1000 * 60 * 5, // 5 min cache
@@ -12,17 +12,18 @@ export function usePlayers() {
 
   // Suscribirse a cambios en Player para actualizar fotos en tiempo real
   useEffect(() => {
-    const unsubscribe = base44.entities.Player.subscribe((event) => {
-      if (event.type === "update") {
-        // Invalidar el cache para refrescar la lista de jugadores
-        queryClient.invalidateQueries({ queryKey: ["players"] });
-      }
+    const unsubscribe = base44.entities.Player.subscribe(() => {
+      // Invalidar el cache para refrescar la lista de jugadores
+      queryClient.invalidateQueries({ queryKey: ["players"] });
     });
     return unsubscribe;
   }, [queryClient]);
 
+  // Helper para obtener nombre completo
+  const getFullName = (p) => p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
+
   // Map by ID for O(1) lookup
-  const playerMap = Object.fromEntries(players.map((p) => [p.id, { ...p, name: p.full_name || `${p.first_name} ${p.last_name}`.trim() }]));
+  const playerMap = Object.fromEntries(rawPlayers.map((p) => [p.id, { ...p, name: getFullName(p) }]));
 
   // Normalizar nombre: remover tildes y convertir a minúsculas
   const normalizeName = (name) => {
@@ -55,20 +56,24 @@ export function usePlayers() {
     if (player_name) {
       // Buscar coincidencia exacta primero
       const normalized = normalizeName(player_name);
-      for (const p of players) {
-        const pName = p.full_name || `${p.first_name} ${p.last_name}`.trim();
+      for (const p of rawPlayers) {
+        const pName = getFullName(p);
         if (normalizeName(pName) === normalized) return { ...p, name: pName };
       }
       // Si no encuentra exacta, buscar por matching flexible
-      for (const p of players) {
-        const pName = p.full_name || `${p.first_name} ${p.last_name}`.trim();
+      for (const p of rawPlayers) {
+        const pName = getFullName(p);
         if (namesMatch(player_name, pName)) return { ...p, name: pName };
       }
     }
     return null;
   }
 
-  const playersWithName = players.map((p) => ({ ...p, name: p.full_name || `${p.first_name} ${p.last_name}`.trim() }));
+  const players = rawPlayers.map((p) => ({
+    ...p,
+    name: getFullName(p),
+    id: p.id // Asegurar que el id está ahí
+  }));
 
-  return { players: playersWithName, playerMap, getPlayer, isLoading };
+  return { players, playerMap, getPlayer, isLoading };
 }
