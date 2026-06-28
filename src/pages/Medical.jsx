@@ -51,7 +51,7 @@ export default function Medical() {
     e.preventDefault();
     try {
       const player = players.find((p) => p.id === form.player_id);
-      const payload = { ...form, player_name: player?.name || form.player_name };
+      const payload = { ...form, player_name: player?.full_name || player?.name || form.player_name };
       if (!payload.expected_return) delete payload.expected_return;
       if (!payload.days_lost && payload.days_lost !== 0) delete payload.days_lost;
       else payload.days_lost = Number(payload.days_lost);

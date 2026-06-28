@@ -6,6 +6,10 @@
       "type": "string",
       "description": "ID del jugador (relaci\u00f3n con Player)"
     },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador en el CSV (para referencia)"
+    },
     "date": {
       "type": "string",
       "format": "date",
@@ -73,7 +77,6 @@
     }
   },
   "required": [
-    "player_id",
     "date"
   ]
 }

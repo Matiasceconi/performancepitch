@@ -112,17 +112,26 @@ Deno.serve(async (req) => {
 
     const rows = parseResult.rows;
 
-    // 3. Obtener lista de jugadores
-    const players = await base44.asServiceRole.entities.Player.list('', 500);
+    // 3. Obtener lista de jugadores y mapeos de nombres
+    const [players, mappings] = await Promise.all([
+      base44.asServiceRole.entities.Player.list('', 500),
+      base44.asServiceRole.entities.PlayerNameMapping.list('', 500),
+    ]);
 
-    // Función normalizar nombre
-    const normalizeName = (name) => {
-      return name
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .trim();
-    };
+    const normalizeName = (name) => (name || "")
+      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+    // Mapa player_id -> player
+    const playerById = Object.fromEntries(players.map(p => [p.id, p]));
+
+    // Mapa de alias normalizados -> player_id (de PlayerNameMapping)
+    const aliasMap = {};
+    mappings.forEach(m => {
+      const allNames = [m.player_name, ...(m.aliases || [])];
+      allNames.forEach(name => {
+        aliasMap[normalizeName(name)] = m.player_id;
+      });
+    });
 
     // 4. Procesar cada fila del CSV
     const imported = [];
@@ -131,31 +140,32 @@ Deno.serve(async (req) => {
 
     for (const row of rows) {
       const gpsName = (row.player_name || "").trim();
-      
-      // Buscar jugador por nombre (búsqueda exacta normalizada primero, luego fuzzy)
       let player = null;
-      
-      // Intento 1: búsqueda exacta normalizada
-      for (const p of players) {
-        if (normalizeName(p.data?.name || p.name) === normalizeName(gpsName)) {
-          player = p;
-          break;
+
+      // Intento 1: alias/mapping exacto
+      const aliasPlayerId = aliasMap[normalizeName(gpsName)];
+      if (aliasPlayerId && playerById[aliasPlayerId]) {
+        player = playerById[aliasPlayerId];
+      }
+
+      // Intento 2: búsqueda exacta normalizada por full_name
+      if (!player) {
+        for (const p of players) {
+          const pName = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
+          if (normalizeName(pName) === normalizeName(gpsName)) { player = p; break; }
         }
       }
-      
-      // Intento 2: fuzzy matching por palabras
+
+      // Intento 3: fuzzy matching por palabras
       if (!player) {
         const gpsWords = normalizeName(gpsName).split(" ").filter(w => w.length > 2);
         let bestScore = 0;
         for (const p of players) {
-          const playerName = p.data?.name || p.name;
-          const playerWords = normalizeName(playerName).split(" ").filter(w => w.length > 2);
+          const pName = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
+          const playerWords = normalizeName(pName).split(" ").filter(w => w.length > 2);
           const matches = gpsWords.filter(w => playerWords.includes(w)).length;
           const score = matches / Math.max(gpsWords.length, playerWords.length);
-          if (score > bestScore) {
-            bestScore = score;
-            player = score >= 0.5 ? p : null;
-          }
+          if (score > bestScore) { bestScore = score; player = score >= 0.5 ? p : null; }
         }
       }
 

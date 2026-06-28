@@ -102,8 +102,8 @@ function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, lo
             <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">GPS — Promedios últimos 30 días</h3>
             <div className="grid grid-cols-2 gap-3">
               <StatCard label="Dist. total prom." value={avgGps("total_distance") ? `${Math.round(avgGps("total_distance") / 100) / 10} km` : "—"} color="text-blue-400" />
-              <StatCard label="Vel. máx. prom." value={avgGps("max_speed") ? `${avgGps("max_speed")} km/h` : "—"} color="text-orange-400" />
-              <StatCard label="HSR prom." value={avgGps("high_speed_running") ? `${avgGps("high_speed_running")} m` : "—"} color="text-purple-400" />
+              <StatCard label="Vel. máx. prom." value={avgGps("max_velocity") ? `${avgGps("max_velocity")} km/h` : "—"} color="text-orange-400" />
+              <StatCard label="HSR prom." value={avgGps("distance_hsr") ? `${avgGps("distance_hsr")} m` : "—"} color="text-purple-400" />
               <StatCard label="Player Load prom." value={avgGps("player_load")} color="text-emerald-400" />
             </div>
           </div>
@@ -300,118 +300,31 @@ function TabRendimiento({ player }) {
   );
 }
 
-// Tab: Carga Externa GPS
+// Tab: Carga Externa GPS — filtrado por player_id en CatapultReport
 function TabCarga({ player }) {
-  const [sessions, setSessions] = useState([]); // TrainingSessions con csv_url
-  const [allRows, setAllRows] = useState([]);   // filas CSV parseadas (todas)
+  const [catapultReports, setCatapultReports] = useState([]);
+  const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(null); // fecha YYYY-MM-DD seleccionada
-  const [showPicker, setShowPicker] = useState(false);
+  const [selectedSessionId, setSelectedSessionId] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
-
-  // Mismo parser simplificado que GpsAnalytics
-  function matchColumn(raw) {
-    const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
-    if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
-    if (h === "total duration" || h === "tot dur") return "total_duration";
-    if (h.includes("total distance") || h === "tot dist (m)" || h === "tot dist") return "total_distance";
-    if (h.startsWith("d") && h.includes("19")) return "distance_hsr";
-    if ((h.startsWith("d+") || h.startsWith("d +")) && h.includes("25")) return "sprint_distance";
-    if (h === "sprint efforts" || h === "sprint effs") return "sprint_efforts";
-    if (h.includes("acc") && (h.includes("3mt") || h.includes("3 m"))) return "accelerations";
-    if (h.includes("dec") && (h.includes("3mt") || h.includes("3 m"))) return "decelerations";
-    if (h === "total player load" || h === "tot pl" || h === "player load") return "player_load";
-    if (h.includes("maximum velocity") || h === "max vel (km/h)" || h === "max velocity (km/h)") return "max_velocity";
-    if (h.includes("max vel") && h.includes("%")) return "max_velocity_percentage";
-    return null;
-  }
-  function parseNum(val) {
-    if (val == null || val === "" || val === "-") return null;
-    const str = String(val).trim();
-    const hasCommaDecimal = /^\d+,\d+$/.test(str) || /^\d{1,3}(\.\d{3})*,\d+$/.test(str);
-    const cleaned = hasCommaDecimal ? str.replace(/\./g, "").replace(",", ".") : str.replace(",", ".");
-    const n = parseFloat(cleaned);
-    return isNaN(n) ? null : n;
-  }
-  function splitCSVLine(line, sep) {
-    const result = []; let cur = "", inQuotes = false;
-    for (let i = 0; i < line.length; i++) {
-      const ch = line[i];
-      if (ch === '"') inQuotes = !inQuotes;
-      else if (ch === sep && !inQuotes) { result.push(cur.trim()); cur = ""; }
-      else cur += ch;
-    }
-    result.push(cur.trim());
-    return result;
-  }
-  function parseCatapultCSV(text) {
-    const clean = text.replace(/^\uFEFF/, "");
-    const lines = clean.split("\n").map(l => l.trim()).filter(Boolean);
-    const firstSemi = lines[0].split(";").length;
-    const firstComma = lines[0].split(",").length;
-    const sep = firstSemi > firstComma ? ";" : ",";
-    let headerIdx = -1, headers = [];
-    for (let i = 0; i < Math.min(lines.length, 15); i++) {
-      const cols = splitCSVLine(lines[i], sep);
-      const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
-      const mapped = cols.filter(c => matchColumn(c) !== null).length;
-      if (firstLow === "name" || firstLow === "jugador" || firstLow === "athlete" || mapped >= 3) {
-        headerIdx = i; headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c); break;
-      }
-    }
-    if (headerIdx === -1) return null;
-    const fieldMap = {};
-    headers.forEach((h, idx) => {
-      const field = matchColumn(h);
-      if (field) fieldMap[idx] = field;
-      else if (idx === 0) fieldMap[idx] = "player_name";
-    });
-    const rows = [];
-    for (let i = headerIdx + 1; i < lines.length; i++) {
-      const cols = splitCSVLine(lines[i], sep);
-      const obj = {};
-      Object.entries(fieldMap).forEach(([colIdx, field]) => {
-        const raw = cols[parseInt(colIdx)];
-        if (field === "player_name") obj[field] = raw || "";
-        else obj[field] = parseNum(raw);
-      });
-      const name = (obj.player_name || "").trim();
-      if (!name) continue;
-      if (["total", "promedio", "average", "team", "totals"].includes(name.toLowerCase())) continue;
-      rows.push(obj);
-    }
-    return rows;
-  }
-
-  function normalizeStr(s) {
-    return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-  }
-  function nameMatches(csvName, playerFullName) {
-    const a = normalizeStr(csvName);
-    const b = normalizeStr(playerFullName);
-    if (a === b) return true;
-    // apellido primero o último
-    const partsA = a.split(/\s+/);
-    const partsB = b.split(/\s+/);
-    return partsA.some(p => partsB.includes(p) && p.length > 3);
-  }
 
   useEffect(() => {
     async function load() {
       try {
-        const sessList = await base44.entities.TrainingSession.list("-date", 200);
-        const withCsv = sessList.filter(s => s.csv_url);
-        setSessions(withCsv);
-        // Parsear todos los CSVs
-        const results = await Promise.all(withCsv.map(async (s) => {
-          try {
-            const text = await fetch(s.csv_url).then(r => r.text());
-            const rows = parseCatapultCSV(text);
-            if (!rows) return [];
-            return rows.map(row => ({ ...row, session_id: s.id, session_title: s.title, date: s.date }));
-          } catch { return []; }
-        }));
-        setAllRows(results.flat());
+        const [reports, sessList] = await Promise.all([
+          base44.entities.CatapultReport.filter({ player_id: player.id }, "-date", 200),
+          base44.entities.TrainingSession.list("-date", 200),
+        ]);
+        // Deduplicar por session_id
+        const deduped = {};
+        reports.forEach(r => {
+          if (!r.session_id) return;
+          if (!deduped[r.session_id] || new Date(r.updated_date) > new Date(deduped[r.session_id].updated_date)) {
+            deduped[r.session_id] = r;
+          }
+        });
+        setCatapultReports(Object.values(deduped));
+        setSessions(sessList);
       } finally {
         setLoading(false);
       }
@@ -421,14 +334,11 @@ function TabCarga({ player }) {
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
-  // Sesiones que tienen datos para ESTE jugador
-  const sessionDatesWithData = new Set(
-    allRows.filter(r => nameMatches(r.player_name, player.full_name)).map(r => r.date)
-  );
+  const sessionIdsWithData = new Set(catapultReports.map(r => r.session_id).filter(Boolean));
+  const sessionsWithCsv = sessions.filter(s => s.csv_url);
 
-  // Agrupar sesiones por año y mes para el picker
   const sessionsByYearMonth = {};
-  sessions.forEach(s => {
+  sessionsWithCsv.forEach(s => {
     const yr = moment(s.date).format("YYYY");
     const mo = moment(s.date).format("MMM").toUpperCase();
     const key = `${yr}__${mo}`;
@@ -437,22 +347,11 @@ function TabCarga({ player }) {
   });
   const groupKeys = Object.keys(sessionsByYearMonth).sort((a, b) => b.localeCompare(a));
 
-  // Sesión seleccionada y sus datos GPS del jugador
-  const selectedSession = sessions.find(s => s.date === selectedDate);
-  const selectedRows = selectedDate
-    ? allRows.filter(r => r.date === selectedDate && nameMatches(r.player_name, player.full_name))
-    : [];
-
-  const playerRow = selectedRows[0] || null;
+  const selectedSession = sessions.find(s => s.id === selectedSessionId) || null;
+  const selectedDate = selectedSession?.date || null;
+  const playerRow = catapultReports.find(r => r.session_id === selectedSessionId) || null;
   const getF = (field) => playerRow?.[field] ?? null;
 
-  const dayLabel = (s) => {
-    const m = moment(s.date);
-    const dayAbbr = m.format("dd").charAt(0).toUpperCase() + m.format("dd").slice(1, 2);
-    return { dayAbbr, dayNum: m.format("D"), isToday: m.isSame(moment(), "day"), hasData: sessionDatesWithData.has(s.date) };
-  };
-
-  // Filtrar sesiones en el picker por búsqueda
   const filteredGroups = groupKeys.map(key => {
     const group = sessionsByYearMonth[key];
     const filteredSessions = group.sessions.filter(s => {
@@ -470,16 +369,11 @@ function TabCarga({ player }) {
         <div className="p-2 border-b border-zinc-800">
           <div className="flex items-center gap-1.5 bg-zinc-800 rounded-lg px-2 py-1.5">
             <svg className="w-3 h-3 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              placeholder="Buscar..."
-              className="bg-transparent text-white text-xs outline-none placeholder-zinc-600 w-full"
-            />
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder="Buscar..." className="bg-transparent text-white text-xs outline-none placeholder-zinc-600 w-full" />
           </div>
         </div>
         <div className="overflow-y-auto flex-1">
-          {sessions.length === 0 ? (
+          {sessionsWithCsv.length === 0 ? (
             <p className="text-zinc-600 text-xs text-center p-4">Sin sesiones con GPS</p>
           ) : filteredGroups.map(({ year, month, sessions: groupSessions }) => (
             <div key={`${year}-${month}`}>
@@ -489,33 +383,20 @@ function TabCarga({ player }) {
               </div>
               <div className="space-y-1 px-2 pb-2">
                 {groupSessions.map(s => {
-                  const { dayAbbr, dayNum, isToday, hasData } = dayLabel(s);
-                  const isSelected = selectedDate === s.date;
+                  const m = moment(s.date);
+                  const dayAbbr = m.format("dd").charAt(0).toUpperCase() + m.format("dd").slice(1, 2);
+                  const isSelected = selectedSessionId === s.id;
+                  const hasData = sessionIdsWithData.has(s.id);
                   return (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedDate(s.date)}
-                      className={`w-full flex items-center justify-between px-2 py-2 rounded-lg text-left transition-all border ${
-                        isSelected
-                          ? "bg-zinc-700 border-zinc-500"
-                          : "bg-zinc-900 border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800/60"
-                      }`}
-                    >
+                    <button key={s.id} onClick={() => setSelectedSessionId(s.id)}
+                      className={`w-full flex items-center justify-between px-2 py-2 rounded-lg text-left transition-all border ${isSelected ? "bg-zinc-700 border-zinc-500" : "bg-zinc-900 border-zinc-800 hover:border-zinc-600 hover:bg-zinc-800/60"}`}>
                       <span className="text-xs font-semibold">
-                        <span className={isToday ? "text-amber-400" : "text-zinc-400"}>{dayAbbr} </span>
-                        <span className={isToday ? "text-amber-400 font-bold" : "text-white"}>{dayNum}</span>
+                        <span className="text-zinc-400">{dayAbbr} </span>
+                        <span className="text-white">{m.format("D")}</span>
                       </span>
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${
-                        hasData
-                          ? (isSelected ? "bg-blue-500 border-blue-500" : "border-zinc-600 bg-zinc-800")
-                          : "border-zinc-700 bg-zinc-900"
-                      }`}>
-                        {hasData && isSelected && (
-                          <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                        )}
-                        {hasData && !isSelected && (
-                          <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />
-                        )}
+                      <div className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${hasData ? (isSelected ? "bg-blue-500 border-blue-500" : "border-zinc-600 bg-zinc-800") : "border-zinc-700 bg-zinc-900"}`}>
+                        {hasData && isSelected && <svg className="w-2.5 h-2.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        {hasData && !isSelected && <div className="w-1.5 h-1.5 rounded-full bg-blue-400" />}
                       </div>
                     </button>
                   );
@@ -528,14 +409,14 @@ function TabCarga({ player }) {
 
       {/* Panel de datos GPS */}
       <div className="flex-1 min-w-0">
-        {!selectedDate ? (
+        {!selectedSessionId ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center h-full flex flex-col items-center justify-center">
             <Zap size={32} className="text-zinc-700 mx-auto mb-3" />
             <p className="text-zinc-500 text-sm">Seleccioná una sesión para ver los datos GPS</p>
           </div>
         ) : !playerRow ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
-            <p className="text-zinc-600 text-sm font-semibold">{moment(selectedDate).format("dddd DD/MM/YYYY")}</p>
+            <p className="text-zinc-600 text-sm font-semibold">{selectedDate ? moment(selectedDate).format("dddd DD/MM/YYYY") : ""}</p>
             {selectedSession && <p className="text-zinc-500 text-xs mt-1">{selectedSession.title}</p>}
             <Zap size={28} className="text-zinc-700 mx-auto mt-4 mb-2" />
             <p className="text-zinc-500 text-sm">Sin datos GPS para {player.full_name} en esta sesión</p>
@@ -543,7 +424,7 @@ function TabCarga({ player }) {
         ) : (
           <div className="space-y-4">
             <div>
-              <p className="text-white font-semibold text-sm">{moment(selectedDate).format("dddd DD [de] MMMM YYYY")}</p>
+              <p className="text-white font-semibold text-sm">{selectedDate ? moment(selectedDate).format("dddd DD [de] MMMM YYYY") : ""}</p>
               {selectedSession && (
                 <p className="text-zinc-500 text-xs mt-0.5">
                   {selectedSession.title}
@@ -553,30 +434,14 @@ function TabCarga({ player }) {
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
-              {getF("total_distance") != null && (
-                <StatCard label="Distancia total" value={`${(getF("total_distance") / 1000).toFixed(2)} km`} color="text-blue-400" />
-              )}
-              {getF("player_load") != null && (
-                <StatCard label="Player Load" value={Math.round(getF("player_load"))} color="text-emerald-400" />
-              )}
-              {getF("max_velocity") != null && (
-                <StatCard label="Vel. máxima" value={`${getF("max_velocity")} km/h`} color="text-yellow-400" />
-              )}
-              {getF("distance_hsr") != null && (
-                <StatCard label="19.8-25 km/h" value={`${Math.round(getF("distance_hsr"))} m`} color="text-purple-400" />
-              )}
-              {getF("sprint_distance") != null && (
-                <StatCard label="+25 km/h (sprint)" value={`${Math.round(getF("sprint_distance"))} m`} color="text-orange-400" />
-              )}
-              {getF("accelerations") != null && (
-                <StatCard label="Aceleraciones" value={Math.round(getF("accelerations"))} color="text-pink-400" />
-              )}
-              {getF("decelerations") != null && (
-                <StatCard label="Desaceleraciones" value={Math.round(getF("decelerations"))} color="text-cyan-400" />
-              )}
-              {getF("sprint_efforts") != null && (
-                <StatCard label="Sprint Efforts" value={Math.round(getF("sprint_efforts"))} color="text-red-400" />
-              )}
+              {getF("total_distance") != null && <StatCard label="Distancia total" value={`${(getF("total_distance") / 1000).toFixed(2)} km`} color="text-blue-400" />}
+              {getF("player_load") != null && <StatCard label="Player Load" value={Math.round(getF("player_load"))} color="text-emerald-400" />}
+              {getF("max_velocity") != null && <StatCard label="Vel. máxima" value={`${getF("max_velocity")} km/h`} color="text-yellow-400" />}
+              {getF("distance_hsr") != null && <StatCard label="19.8-25 km/h" value={`${Math.round(getF("distance_hsr"))} m`} color="text-purple-400" />}
+              {getF("sprint_distance") != null && <StatCard label="+25 km/h (sprint)" value={`${Math.round(getF("sprint_distance"))} m`} color="text-orange-400" />}
+              {getF("accelerations") != null && <StatCard label="Aceleraciones" value={Math.round(getF("accelerations"))} color="text-pink-400" />}
+              {getF("decelerations") != null && <StatCard label="Desaceleraciones" value={Math.round(getF("decelerations"))} color="text-cyan-400" />}
+              {getF("sprint_efforts") != null && <StatCard label="Sprint Efforts" value={Math.round(getF("sprint_efforts"))} color="text-red-400" />}
             </div>
           </div>
         )}
@@ -630,28 +495,16 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
   async function loadGpsData() {
     setLoadingGps(true);
     try {
-      // Get all CatapultReport records (from session CSVs)
-      const allCatapult = await base44.entities.CatapultReport.list("-date", 1000);
-      
-      // Filter for this player
-      const playerReports = allCatapult.filter(r => {
-        const playerId = r.player_id || r.data?.player_id;
-        return playerId === player.id;
-      });
-      
-      // Deduplicate by date, keeping the most recent
+      const reports = await base44.entities.CatapultReport.filter({ player_id: player.id }, "-date", 200);
+      // Deduplicate by date
       const deduped = {};
-      playerReports.forEach(r => {
-        const date = r.date || r.data?.date;
-        if (date) {
-          if (!deduped[date] || new Date(r.updated_date) > new Date(deduped[date].updated_date)) {
-            deduped[date] = r;
-          }
+      reports.forEach(r => {
+        if (r.date && (!deduped[r.date] || new Date(r.updated_date) > new Date(deduped[r.date].updated_date))) {
+          deduped[r.date] = r;
         }
       });
-      setGpsRecords(Object.values(deduped).sort((a, b) => new Date(b.date || b.data?.date) - new Date(a.date || a.data?.date)) || []);
+      setGpsRecords(Object.values(deduped).sort((a, b) => new Date(b.date) - new Date(a.date)));
     } catch (e) {
-      console.error("Error loading GPS records:", e);
       setGpsRecords([]);
     } finally {
       setLoadingGps(false);
