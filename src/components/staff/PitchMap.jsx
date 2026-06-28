@@ -1,9 +1,10 @@
 import React, { useState, useRef } from "react";
 
-// Renders a football pitch with players placed by position rows
-// players: array of { name, number, position, status? }
-// highlight: optional set of player ids to highlight (for session map)
-// onToggle: optional callback(player) when clicking a player chip
+// PitchMap — 4-3-3 formation
+// players: array of player objects from DB (full_name, number, position, status, photo_url)
+// highlighted: set of player ids (for session toggle mode)
+// onToggle: optional callback(player)
+// emptyLabel: shown when no players
 
 const statusColors = {
   "Disponible":      { bg: "#22c55e", text: "#fff" },
@@ -14,7 +15,6 @@ const statusColors = {
   "Selección":       { bg: "#a855f7", text: "#fff" },
 };
 
-// Distribute players of a position row evenly
 function rowPositions(count, yPercent) {
   const positions = [];
   for (let i = 0; i < count; i++) {
@@ -24,40 +24,50 @@ function rowPositions(count, yPercent) {
   return positions;
 }
 
+// Assign players to 4-3-3 rows based on position
+function buildFormation433(players) {
+  const gk         = players.filter((p) => p.position === "Arquero");
+  const defenders  = players.filter((p) => ["Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Defensor"].includes(p.position));
+  const midfield   = players.filter((p) => ["Mediocampista Central", "Volante Interno", "Mediocampista"].includes(p.position));
+  // In 4-3-3, wingers (Extremo) go in the attacking line with the striker
+  const forwards   = players.filter((p) => ["Delantero Centro", "Delantero", "Extremo"].includes(p.position));
+  // Any unclassified player
+  const rest       = players.filter((p) =>
+    !gk.includes(p) && !defenders.includes(p) && !midfield.includes(p) && !forwards.includes(p)
+  );
+
+  return [
+    { group: gk,        y: 88 },
+    { group: defenders, y: 68 },
+    { group: midfield,  y: 47 },
+    { group: forwards,  y: 22 },
+    { group: rest,      y: 10 },
+  ];
+}
+
 export default function PitchMap({ players, highlighted = new Set(), onToggle, emptyLabel }) {
-  const [positions, setPositions] = React.useState({});
+  const [customPositions, setCustomPositions] = React.useState({});
   const [dragging, setDragging] = React.useState(null);
   const containerRef = React.useRef(null);
 
-  const arqueros       = players.filter((p) => p.position === "Arquero");
-  const defensores     = players.filter((p) => ["Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Defensor"].includes(p.position));
-  const mediocampistas = players.filter((p) => ["Mediocampista Central", "Volante Interno", "Mediocampista"].includes(p.position));
-  const extremos       = players.filter((p) => p.position === "Extremo");
-  const delanteros     = players.filter((p) => ["Delantero Centro", "Delantero"].includes(p.position));
-
-  const rows = [
-    { group: arqueros,       y: 88 },
-    { group: defensores,     y: 70 },
-    { group: mediocampistas, y: 50 },
-    { group: extremos,       y: 32 },
-    { group: delanteros,     y: 16 },
-  ];
+  const rows = buildFormation433(players);
 
   const allDots = [];
   rows.forEach(({ group, y }) => {
+    if (!group.length) return;
     const coords = rowPositions(group.length, y);
     group.forEach((p, i) => {
-      const customPos = positions[p.id];
-      allDots.push({ 
-        player: p, 
-        x: customPos ? customPos.x : coords[i].x, 
-        y: customPos ? customPos.y : y 
+      const custom = customPositions[p.id];
+      allDots.push({
+        player: p,
+        x: custom ? custom.x : coords[i].x,
+        y: custom ? custom.y : y,
       });
     });
   });
 
   const handleMouseDown = (e, player) => {
-    if (onToggle) return; // No drag si hay toggle
+    if (onToggle) return;
     e.preventDefault();
     setDragging(player.id);
   };
@@ -66,18 +76,17 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
     if (!dragging || !containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     const x = ((e.clientX - rect.left) / rect.width) * 100;
-    const y = ((e.clientY - rect.top) / rect.height) * 100 * 1.61; // 62% padding ratio
-    setPositions((prev) => ({
+    // Correct for the paddingBottom aspect ratio (78%)
+    const y = ((e.clientY - rect.top) / (rect.width * 0.78)) * 100;
+    setCustomPositions((prev) => ({
       ...prev,
-      [dragging]: { x: Math.max(2, Math.min(98, x)), y: Math.max(2, Math.min(60, y)) },
+      [dragging]: { x: Math.max(2, Math.min(98, x)), y: Math.max(2, Math.min(96, y)) },
     }));
   };
 
-  const handleMouseUp = () => {
-    setDragging(null);
-  };
+  const handleMouseUp = () => setDragging(null);
 
-  if (players.length === 0) {
+  if (!players || players.length === 0) {
     return (
       <div className="flex items-center justify-center h-64 text-zinc-600 text-sm">
         {emptyLabel || "Sin jugadores"}
@@ -86,60 +95,51 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
-      className="relative w-full select-none bg-gradient-to-br from-green-700 via-green-800 to-green-900 rounded-lg overflow-hidden"
+      className="relative w-full select-none rounded-lg overflow-hidden"
       style={{ paddingBottom: "78%" }}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}
       onMouseLeave={handleMouseUp}
     >
-      {/* Pitch background */}
+      {/* SVG Pitch */}
       <svg
         viewBox="0 0 110 80"
         xmlns="http://www.w3.org/2000/svg"
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="none"
       >
-        {/* Grass base */}
         <defs>
           <linearGradient id="pitchGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" style={{stopColor: "#22c55e", stopOpacity: 1}} />
-            <stop offset="50%" style={{stopColor: "#16a34a", stopOpacity: 1}} />
-            <stop offset="100%" style={{stopColor: "#15803d", stopOpacity: 1}} />
+            <stop offset="0%" style={{ stopColor: "#15803d", stopOpacity: 1 }} />
+            <stop offset="50%" style={{ stopColor: "#16a34a", stopOpacity: 1 }} />
+            <stop offset="100%" style={{ stopColor: "#15803d", stopOpacity: 1 }} />
           </linearGradient>
         </defs>
         <rect width="110" height="80" fill="url(#pitchGrad)" />
-        
         {/* Grass stripes */}
         {[0,1,2,3,4,5,6,7,8].map((i) => (
           <rect key={i} x={i * 13.75} width="13.75" height="80"
-            fill={i % 2 === 0 ? "#22c55e" : "transparent"} opacity="0.08" />
+            fill={i % 2 === 0 ? "#22c55e" : "transparent"} opacity="0.07" />
         ))}
-
-        {/* Bordes exteriores */}
-        <rect x="3" y="3" width="104" height="74" fill="none" stroke="white" strokeWidth="0.7" />
-        
-        {/* Círculo central */}
-        <circle cx="55" cy="40" r="9.5" fill="none" stroke="white" strokeWidth="0.7" />
-        <circle cx="55" cy="40" r="0.6" fill="white" />
-        
-        {/* Áreas de penal - Defensa */}
-        <rect x="29" y="3" width="52" height="19" fill="none" stroke="white" strokeWidth="0.7" />
-        {/* Área de meta - Defensa */}
-        <rect x="38" y="3" width="34" height="7" fill="none" stroke="white" strokeWidth="0.7" />
-        {/* Arco - Defensa */}
-        <path d="M 41 1.5 L 41 0 L 69 0 L 69 1.5" stroke="white" strokeWidth="0.7" fill="none" strokeLinecap="round" />
-        
-        {/* Áreas de penal - Ataque */}
-        <rect x="29" y="58" width="52" height="19" fill="none" stroke="white" strokeWidth="0.7" />
-        {/* Área de meta - Ataque */}
-        <rect x="38" y="70" width="34" height="7" fill="none" stroke="white" strokeWidth="0.7" />
-        {/* Arco - Ataque */}
-        <path d="M 41 78.5 L 41 80 L 69 80 L 69 78.5" stroke="white" strokeWidth="0.7" fill="none" strokeLinecap="round" />
-        
-        {/* Esquinas */}
-        {[[5, 5], [105, 5], [5, 75], [105, 75]].map((pos, i) => (
+        {/* Outer border */}
+        <rect x="3" y="3" width="104" height="74" fill="none" stroke="white" strokeWidth="0.6" />
+        {/* Center line */}
+        <line x1="3" y1="40" x2="107" y2="40" stroke="white" strokeWidth="0.5" />
+        {/* Center circle */}
+        <circle cx="55" cy="40" r="9.5" fill="none" stroke="white" strokeWidth="0.6" />
+        <circle cx="55" cy="40" r="0.7" fill="white" />
+        {/* Penalty area — top (defense) */}
+        <rect x="29" y="3" width="52" height="18" fill="none" stroke="white" strokeWidth="0.6" />
+        <rect x="38" y="3" width="34" height="7" fill="none" stroke="white" strokeWidth="0.6" />
+        <path d="M 41 1.5 L 41 0 L 69 0 L 69 1.5" stroke="white" strokeWidth="0.6" fill="none" />
+        {/* Penalty area — bottom (attack) */}
+        <rect x="29" y="59" width="52" height="18" fill="none" stroke="white" strokeWidth="0.6" />
+        <rect x="38" y="70" width="34" height="7" fill="none" stroke="white" strokeWidth="0.6" />
+        <path d="M 41 78.5 L 41 80 L 69 80 L 69 78.5" stroke="white" strokeWidth="0.6" fill="none" />
+        {/* Corner flags */}
+        {[[5,5],[105,5],[5,75],[105,75]].map((pos, i) => (
           <circle key={i} cx={pos[0]} cy={pos[1]} r="0.5" fill="white" />
         ))}
       </svg>
@@ -150,7 +150,9 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
         const colors = statusColors[player.status] || statusColors["Disponible"];
         const chipColor = onToggle
           ? (isHighlighted ? "#22c55e" : "#52525b")
-          : (colors.bg);
+          : colors.bg;
+
+        const photoUrl = player.photo_url;
 
         return (
           <div
@@ -163,34 +165,46 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
               top: `${y}%`,
               transform: "translate(-50%, -50%)",
               zIndex: dragging === player.id ? 50 : 10,
-              cursor: dragging === player.id ? "grabbing" : (onToggle ? "pointer" : "grab"),
+              cursor: onToggle ? "pointer" : (dragging === player.id ? "grabbing" : "grab"),
             }}
-            className="flex flex-col items-center group transition-transform"
+            className="flex flex-col items-center group"
           >
-            {/* Foto del jugador */}
-            {player.photo_url ? (
+            {photoUrl ? (
               <div
-                style={{ borderColor: chipColor, borderWidth: "3px", boxShadow: `0 0 20px ${chipColor}40, 0 4px 12px rgba(0,0,0,0.6)` }}
-                className="w-11 h-11 rounded-full overflow-hidden border transition-all group-hover:scale-130 block"
+                style={{
+                  borderColor: chipColor,
+                  borderWidth: "3px",
+                  borderStyle: "solid",
+                  boxShadow: `0 0 16px ${chipColor}60, 0 4px 12px rgba(0,0,0,0.7)`,
+                }}
+                className="w-10 h-10 rounded-full overflow-hidden transition-transform group-hover:scale-110"
               >
-                <img src={player.photo_url} alt={player.full_name} className="w-full h-full object-cover" />
+                <img
+                  src={photoUrl}
+                  alt={player.full_name || player.name || ""}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { e.target.style.display = "none"; e.target.parentNode.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${chipColor};color:#fff;font-weight:bold;font-size:14px">${player.number || "?"}</div>`; }}
+                />
               </div>
             ) : (
               <div
-                style={{ background: chipColor, boxShadow: `0 0 20px ${chipColor}40, 0 4px 12px rgba(0,0,0,0.6)` }}
-                className="w-11 h-11 rounded-full flex items-center justify-center text-sm font-bold border-3 border-white/60 transition-all group-hover:scale-130 text-white"
+                style={{
+                  background: chipColor,
+                  boxShadow: `0 0 16px ${chipColor}60, 0 4px 12px rgba(0,0,0,0.7)`,
+                }}
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white/50 transition-transform group-hover:scale-110 text-white"
               >
-                {player.number}
+                {player.number || "?"}
               </div>
             )}
-            
-            {/* Info del jugador */}
-            <div className="mt-1.5 bg-black/80 rounded-md px-2 py-1 backdrop-blur-sm border border-white/40 text-center whitespace-nowrap shadow-lg">
+
+            <div className="mt-1 bg-black/80 rounded px-1.5 py-0.5 border border-white/30 text-center whitespace-nowrap shadow-md">
               <div className="text-[9px] font-bold text-white leading-tight tracking-wide">
-                 {player.number ? `${player.number}-` : ""}{player.full_name?.split(" ").slice(-1)[0].toUpperCase() || "?"}
-               </div>
-              <div className="text-[7px] text-yellow-200 leading-tight font-semibold">
-                {player.position?.substring(0, 3).toUpperCase()}
+                {player.number ? `${player.number}·` : ""}
+                {(player.full_name || player.name || "?").split(" ").slice(-1)[0].toUpperCase()}
+              </div>
+              <div className="text-[7px] text-yellow-300 leading-tight font-semibold">
+                {(player.position || "").substring(0, 3).toUpperCase()}
               </div>
             </div>
           </div>

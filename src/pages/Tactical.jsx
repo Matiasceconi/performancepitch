@@ -85,8 +85,8 @@ export default function Tactical() {
                 {available.map((p) => (
                   <div key={p.id} className="flex items-center gap-2">
                     <span className="text-zinc-600 text-xs font-mono w-5 text-right">{p.number}</span>
-                    <span className="text-sm text-white flex-1">{p.name}</span>
-                    <span className="text-xs text-zinc-500">{p.position.slice(0,3)}</span>
+                    <span className="text-sm text-white flex-1">{p.full_name}</span>
+                    <span className="text-xs text-zinc-500">{(p.position || "").slice(0,3)}</span>
                   </div>
                 ))}
               </div>
@@ -100,7 +100,7 @@ export default function Tactical() {
                   {notAvailable.map((p) => (
                     <div key={p.id} className="flex items-center gap-2">
                       <span className="text-zinc-600 text-xs font-mono w-5 text-right">{p.number}</span>
-                      <span className="text-sm text-zinc-400 flex-1">{p.name}</span>
+                      <span className="text-sm text-zinc-400 flex-1">{p.full_name}</span>
                       <PlayerStatusBadge status={p.status} />
                     </div>
                   ))}
@@ -141,7 +141,7 @@ export default function Tactical() {
                 {sessionPlayers.map((p) => (
                   <div key={p.id} className="flex items-center gap-2">
                     <span className="text-zinc-600 text-xs font-mono w-5 text-right">{p.number}</span>
-                    <span className="text-sm text-white flex-1">{p.name}</span>
+                    <span className="text-sm text-white flex-1">{p.full_name}</span>
                     <button
                       onClick={() => toggleSession(p)}
                       className="text-xs text-zinc-600 hover:text-red-400 transition-colors"
@@ -160,7 +160,7 @@ export default function Tactical() {
                   {sessionOut.map((p) => (
                     <div key={p.id} className="flex items-center gap-2">
                       <span className="text-zinc-700 text-xs font-mono w-5 text-right">{p.number}</span>
-                      <span className="text-sm text-zinc-500 flex-1">{p.name}</span>
+                      <span className="text-sm text-zinc-500 flex-1">{p.full_name}</span>
                       <button
                         onClick={() => toggleSession(p)}
                         className="text-xs text-zinc-600 hover:text-emerald-400 transition-colors"
