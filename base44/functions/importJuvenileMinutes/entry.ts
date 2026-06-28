@@ -1,236 +1,133 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// Datos extraídos directamente de la planilla Excel
-// Partidos JUV F1-F15 con minutos por jugador
-// Solo se cargan los minutos > 0 del torneo Juveniles
+// Estructura exacta de la planilla leída:
+// Columnas de partidos (pares: col descripción RES, col minutos RES, col descripción JUV, col minutos JUV)
+// JUV F1=col20,col21  JUV F2=col24,col25  etc.
+// Filas de jugadores: rows 9-27 (índice 0)
 
-const PARTIDOS_JUV = [
-  { label: "JUV F1",  date: "2026-03-15", rival: "Juveniles F1",  location: "Visitante" },
-  { label: "JUV F2",  date: "2026-03-22", rival: "Juveniles F2",  location: "Local"    },
-  { label: "JUV F3",  date: "2026-03-28", rival: "Juveniles F3",  location: "Visitante" },
-  { label: "JUV F4",  date: "2026-04-02", rival: "Juveniles F4",  location: "Local"    },
-  { label: "JUV F5",  date: "2026-04-08", rival: "Juveniles F5",  location: "Local"    },
-  { label: "JUV F6",  date: "2026-04-11", rival: "Juveniles F6",  location: "Visitante" },
-  { label: "JUV F7",  date: "2026-04-15", rival: "Juveniles F7",  location: "Local"    },
-  { label: "JUV F8",  date: "2026-04-18", rival: "Juveniles F8",  location: "Visitante" },
-  { label: "JUV F9",  date: "2026-04-21", rival: "Juveniles F9",  location: "Local"    },
-  { label: "JUV F10", date: "2026-04-25", rival: "Juveniles F10", location: "Visitante" },
-  { label: "JUV 11",  date: "2026-04-28", rival: "Juveniles F11", location: "Local"    },
-  { label: "JUV 12",  date: "2026-05-02", rival: "Juveniles F12", location: "Visitante" },
-  { label: "JUV 13",  date: "2026-05-13", rival: "Juveniles F13", location: "Visitante" },
-  { label: "JUV 14",  date: "2026-05-20", rival: "Juveniles F14", location: "Local"    },
-  { label: "JUV F15", date: "2026-06-18", rival: "Juveniles F15", location: "Local"    },
+// Partidos Juveniles (15 fechas)
+const MATCHES = [
+  { label: "JUV F1",  date: "2026-03-15", rival: "Atletico Tucuman" },
+  { label: "JUV F2",  date: "2026-03-22", rival: "Independiente Rivadavia" },
+  { label: "JUV F3",  date: "2026-03-28", rival: "Vélez" },
+  { label: "JUV F4",  date: "2026-04-02", rival: "Ferro" },
+  { label: "JUV F5",  date: "2026-04-08", rival: "Banfield" },
+  { label: "JUV F6",  date: "2026-04-11", rival: "Lanús" },
+  { label: "JUV F7",  date: "2026-04-15", rival: "Racing" },
+  { label: "JUV F8",  date: "2026-04-18", rival: "Rosario Central" },
+  { label: "JUV F9",  date: "2026-04-21", rival: "Newell's" },
+  { label: "JUV F10", date: "2026-04-25", rival: "Godoy Cruz" },
+  { label: "JUV 11",  date: "2026-04-28", rival: "Platense" },
+  { label: "JUV 12",  date: "2026-05-02", rival: "Argentinos" },
+  { label: "JUV 13",  date: "2026-05-13", rival: "Independiente" },
+  { label: "JUV 14",  date: "2026-05-20", rival: "Tigre" },
+  { label: "JUV F15", date: "2026-06-18", rival: "River" },
 ];
 
-// Minutos por jugador por partido (índice = partido JUV 0..14)
-// Extraídos de la planilla: columnas pares con minutos (>0) para cada partido JUV
-// Formato: { playerName, partidoIdx, minutes }
-const MINUTOS_JUV = [
-  // Ayala Gaston - total 70 min JUV
-  { playerName: "Ayala Gaston",        partidoIdx: 0,  minutes: 96  },
-  { playerName: "Ayala Gaston",        partidoIdx: 3,  minutes: 73  },
-  { playerName: "Ayala Gaston",        partidoIdx: 9,  minutes: 27  },
-
-  // Blasquez Thomas - total 160 min JUV
-  { playerName: "Blasquez Thomas",     partidoIdx: 0,  minutes: 45  },
-  { playerName: "Blasquez Thomas",     partidoIdx: 1,  minutes: 45  },
-
-  // Cabrera Jonas
-  { playerName: "Cabrera Jonas",       partidoIdx: 0,  minutes: 45  },
-
-  // Cantero Emiliano - total 285 min JUV
-  { playerName: "Cantero Emiliano",    partidoIdx: 0,  minutes: 89  },
-  { playerName: "Cantero Emiliano",    partidoIdx: 2,  minutes: 97  },
-  { playerName: "Cantero Emiliano",    partidoIdx: 4,  minutes: 99  },
-
-  // Capponi Jose - total 541 min JUV
-  { playerName: "Capponi Jose",        partidoIdx: 0,  minutes: 95  },
-  { playerName: "Capponi Jose",        partidoIdx: 1,  minutes: 95  },
-  { playerName: "Capponi Jose",        partidoIdx: 2,  minutes: 97  },
-  { playerName: "Capponi Jose",        partidoIdx: 4,  minutes: 91  },
-  { playerName: "Capponi Jose",        partidoIdx: 12, minutes: 96  },
-
-  // Ejea Joaquin - total 525 min JUV
-  { playerName: "Ejea Joaquin",        partidoIdx: 0,  minutes: 89  },
-  { playerName: "Ejea Joaquin",        partidoIdx: 1,  minutes: 64  },
-  { playerName: "Ejea Joaquin",        partidoIdx: 2,  minutes: 46  },
-  { playerName: "Ejea Joaquin",        partidoIdx: 5,  minutes: 93  },
-  { playerName: "Ejea Joaquin",        partidoIdx: 7,  minutes: 45  },
-  { playerName: "Ejea Joaquin",        partidoIdx: 8,  minutes: 95  },
-  { playerName: "Ejea Joaquin",        partidoIdx: 9,  minutes: 93  },
-
-  // Gagliardi Ramiro
-  { playerName: "Gagliardi Ramiro",    partidoIdx: 0,  minutes: 45  },
-
-  // Neris Mino Sebastian - total 923 min JUV
-  { playerName: "Neris Mino Sebastian", partidoIdx: 1,  minutes: 80  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 2,  minutes: 97  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 3,  minutes: 94  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 4,  minutes: 91  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 5,  minutes: 93  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 7,  minutes: 93  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 9,  minutes: 45  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 10, minutes: 94  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 12, minutes: 95  },
-  { playerName: "Neris Mino Sebastian", partidoIdx: 13, minutes: 93  },
-
-  // Pastrana Franco - total 257 min JUV
-  { playerName: "Pastrana Franco",     partidoIdx: 0,  minutes: 62  },
-  { playerName: "Pastrana Franco",     partidoIdx: 2,  minutes: 45  },
-  { playerName: "Pastrana Franco",     partidoIdx: 9,  minutes: 80  },
-  { playerName: "Pastrana Franco",     partidoIdx: 14, minutes: 70  },
-
-  // Puchetta Juan - total 583 min JUV
-  { playerName: "Puchetta Juan",       partidoIdx: 0,  minutes: 74  },
-  { playerName: "Puchetta Juan",       partidoIdx: 1,  minutes: 72  },
-  { playerName: "Puchetta Juan",       partidoIdx: 2,  minutes: 73  },
-  { playerName: "Puchetta Juan",       partidoIdx: 3,  minutes: 99  },
-  { playerName: "Puchetta Juan",       partidoIdx: 4,  minutes: 65  },
-  { playerName: "Puchetta Juan",       partidoIdx: 5,  minutes: 93  },
-  { playerName: "Puchetta Juan",       partidoIdx: 6,  minutes: 62  },
-  { playerName: "Puchetta Juan",       partidoIdx: 8,  minutes: 45  },
-  { playerName: "Puchetta Juan",       partidoIdx: 10, minutes: 45  },
-
-  // Almada Dylan - total 669 min JUV
-  { playerName: "Almada Dylan",        partidoIdx: 0,  minutes: 96  },
-  { playerName: "Almada Dylan",        partidoIdx: 1,  minutes: 105 },
-  { playerName: "Almada Dylan",        partidoIdx: 2,  minutes: 53  },
-  { playerName: "Almada Dylan",        partidoIdx: 4,  minutes: 95  },
-  { playerName: "Almada Dylan",        partidoIdx: 7,  minutes: 78  },
-  { playerName: "Almada Dylan",        partidoIdx: 8,  minutes: 96  },
-  { playerName: "Almada Dylan",        partidoIdx: 9,  minutes: 94  },
-  { playerName: "Almada Dylan",        partidoIdx: 11, minutes: 88  },
-  { playerName: "Almada Dylan",        partidoIdx: 14, minutes: 60  },
-
-  // Brian Retamoso - total 0 min JUV (solo reserva)
-
-  // Guennin Alessandro - total 752 min JUV
-  { playerName: "Guennin Alessandro",  partidoIdx: 0,  minutes: 77  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 1,  minutes: 105 },
-  { playerName: "Guennin Alessandro",  partidoIdx: 3,  minutes: 99  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 4,  minutes: 96  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 5,  minutes: 93  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 8,  minutes: 95  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 9,  minutes: 95  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 11, minutes: 95  },
-  { playerName: "Guennin Alessandro",  partidoIdx: 14, minutes: 90  },
-
-  // Quiroga Lautaro - total 362 min JUV
-  { playerName: "Quiroga Lautaro",     partidoIdx: 0,  minutes: 65  },
-  { playerName: "Quiroga Lautaro",     partidoIdx: 1,  minutes: 93  },
-  { playerName: "Quiroga Lautaro",     partidoIdx: 2,  minutes: 64  },
-  { playerName: "Quiroga Lautaro",     partidoIdx: 3,  minutes: 94  },
-  { playerName: "Quiroga Lautaro",     partidoIdx: 14, minutes: 46  },
-
-  // Vazquez Lautaro - total 354 min JUV
-  { playerName: "Vazquez Lautaro",     partidoIdx: 0,  minutes: 95  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 1,  minutes: 10  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 2,  minutes: 97  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 3,  minutes: 33  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 4,  minutes: 69  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 5,  minutes: 93  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 6,  minutes: 93  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 8,  minutes: 96  },
-  { playerName: "Vazquez Lautaro",     partidoIdx: 9,  minutes: 98  },
-
-  // Uriel Ramos - total 381 min JUV
-  { playerName: "Uriel Ramos",         partidoIdx: 1,  minutes: 95  },
-  { playerName: "Uriel Ramos",         partidoIdx: 2,  minutes: 97  },
-  { playerName: "Uriel Ramos",         partidoIdx: 3,  minutes: 96  },
-  { playerName: "Uriel Ramos",         partidoIdx: 4,  minutes: 93  },
-  { playerName: "Uriel Ramos",         partidoIdx: 12, minutes: 0   },
-
-  // Patricio Flores - total 663 min JUV
-  { playerName: "Patricio Flores",     partidoIdx: 0,  minutes: 96  },
-  { playerName: "Patricio Flores",     partidoIdx: 2,  minutes: 93  },
-  { playerName: "Patricio Flores",     partidoIdx: 3,  minutes: 98  },
-  { playerName: "Patricio Flores",     partidoIdx: 4,  minutes: 96  },
-  { playerName: "Patricio Flores",     partidoIdx: 5,  minutes: 96  },
-  { playerName: "Patricio Flores",     partidoIdx: 6,  minutes: 93  },
-  { playerName: "Patricio Flores",     partidoIdx: 7,  minutes: 93  },
-  { playerName: "Patricio Flores",     partidoIdx: 9,  minutes: 0   },
-  { playerName: "Patricio Flores",     partidoIdx: 10, minutes: 0   },
-  { playerName: "Patricio Flores",     partidoIdx: 13, minutes: 93  },
+// Datos extraídos directamente de la planilla
+// Formato: [playerName, [minutos por partido JUV (15 valores, null=no participó)]]
+const PLAYER_DATA = [
+  // col_21, col_25, col_27, col_30, col_33, col_36, col_39, col_42, col_45, col_48, col_51, col_54, col_57, col_60, col_63
+  { name: "Gaston Ayala",       mins: [96, 95, 90, 92, 80, 96, 73, 20, 93, 83, 82, 46, 99, 27, null] },
+  { name: "Thomas Blasquez",    mins: [null, 9, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Jonas Cabrera",      mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Emiliano Cantero",   mins: [89, null, 97, 99, null, null, null, null, 80, 93, 86, 91, 99, 96, null] },
+  { name: "Jose Capponi",       mins: [null, null, null, 69, 91, 93, null, null, null, null, null, null, null, null, 96] },
+  { name: "Alan Coria",         mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Joaquin Ejea",       mins: [89, null, 64, 46, null, 93, null, 13, 13, 16, null, null, null, null, 95] },
+  { name: "Ramiro Gagliardi",   mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Thiago Martinez",    mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Sebastian Neris Miño", mins: [null, 80, 97, 94, 91, 93, 93, null, 93, 10, 94, 10, 95, 6, 93] },
+  { name: "Franco Pastrana",    mins: [null, 10, 62, null, null, null, null, 13, 3, 10, null, null, null, null, 70] },
+  { name: "Juan Puchetta",      mins: [74, 72, 73, 99, 65, 93, 62, null, null, 30, null, null, null, null, null] },
+  { name: "Maximo Rodriguez",   mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Joan Sosa",          mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Dylam Almada",       mins: [96, 105, 53, null, 95, null, null, 78, null, null, 88, null, null, null, 60] },
+  { name: "Brian Retamoso",     mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Alessandro Guennin", mins: [77, 105, 97, 99, 96, 93, null, null, null, 96, 98, null, null, 4, 90] },
+  { name: "Mateo Lopez",        mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Pablo Lopez",        mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Valentin Loza",      mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Lautaro Quiroga",    mins: [65, 93, 64, 94, null, null, null, null, null, null, null, 11, null, 17, 46] },
+  { name: "Gustavo Vazquez",    mins: [95, 10, 97, 69, 93, null, 93, null, 96, 98, null, null, null, null, null] },
+  { name: "Juan Moreno",        mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Facundo Noguera",    mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Facundo Quintana",   mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Uriel Ramos",        mins: [95, null, 97, 96, 93, null, null, null, null, null, null, null, null, null, null] },
+  { name: "Patricio Flores",    mins: [96, 93, 98, 96, 96, 93, null, 94, null, null, null, null, null, null, 93] },
+  { name: "Lautaro Vazquez",    mins: [95, null, 97, 69, 93, null, null, null, 96, 98, null, null, null, null, null] },
 ];
 
 function norm(s) {
-  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
 }
 
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Cargar todos los jugadores para intentar vincular por player_id
+    // Cargar jugadores para mapeo de IDs
     const players = await base44.asServiceRole.entities.Player.list("-created_date", 200);
     const playerMap = {};
     players.forEach(p => {
-      if (p.full_name) playerMap[norm(p.full_name)] = p;
+      playerMap[norm(p.full_name)] = p;
     });
 
-    // Verificar que no existan ya registros de juveniles importados (evitar duplicados)
-    const existing = await base44.asServiceRole.entities.MinutesRecord.filter(
-      { tournament: "Juveniles" }, "-created_date", 500
-    );
-    const existingKeys = new Set(existing.map(r => `${r.player_name}__${r.match_date}`));
+    // Crear/obtener MatchReport para cada partido juvenil
+    const existingMatches = await base44.asServiceRole.entities.MatchReport.filter({ competition: "Juveniles" }, "-date", 50);
+    const matchByDate = {};
+    existingMatches.forEach(m => { matchByDate[m.date] = m; });
 
+    const matchIds = {};
+    for (const m of MATCHES) {
+      if (!matchByDate[m.date]) {
+        const created = await base44.asServiceRole.entities.MatchReport.create({
+          date: m.date,
+          rival: m.rival,
+          competition: "Juveniles",
+          location: "Local",
+        });
+        matchIds[m.date] = created.id;
+      } else {
+        matchIds[m.date] = matchByDate[m.date].id;
+      }
+    }
+
+    // Insertar MinutesRecord
     let created = 0;
     let skipped = 0;
-    const errors = [];
 
-    for (const entry of MINUTOS_JUV) {
-      if (!entry.minutes || entry.minutes <= 0) continue;
-      const partido = PARTIDOS_JUV[entry.partidoIdx];
-      if (!partido) continue;
+    for (const pd of PLAYER_DATA) {
+      // Buscar player_id
+      const playerEntry = playerMap[norm(pd.name)];
+      const playerId = playerEntry?.id || null;
+      const playerName = playerEntry?.full_name || pd.name;
 
-      const key = `${entry.playerName}__${partido.date}`;
-      if (existingKeys.has(key)) { skipped++; continue; }
-
-      // Buscar player_id por nombre normalizado
-      const normName = norm(entry.playerName);
-      let matchedPlayer = playerMap[normName];
-      // Fallback: buscar por apellido
-      if (!matchedPlayer) {
-        const parts = normName.split(" ");
-        for (const p of Object.values(playerMap)) {
-          const pNorm = norm(p.full_name || "");
-          if (parts.length > 0 && pNorm.includes(parts[0])) {
-            matchedPlayer = p;
-            break;
-          }
-        }
-      }
-
-      const record = {
-        player_name: entry.playerName,
-        tournament: "Juveniles",
-        match_label: `vs ${partido.rival} ${partido.date.slice(5,10)} (Juv)`,
-        match_date: partido.date,
-        rival: partido.rival,
-        minutes: entry.minutes,
-      };
-      if (matchedPlayer) {
-        record.player_id = matchedPlayer.id;
-        record.player_name = matchedPlayer.full_name;
-        record.player_number = matchedPlayer.jersey_number;
-      }
-
-      try {
-        await base44.asServiceRole.entities.MinutesRecord.create(record);
+      for (let i = 0; i < MATCHES.length; i++) {
+        const mins = pd.mins[i];
+        if (mins === null || mins === undefined || mins === 0) { skipped++; continue; }
+        const m = MATCHES[i];
+        await base44.asServiceRole.entities.MinutesRecord.create({
+          player_id: playerId,
+          player_name: playerName,
+          tournament: "Juveniles",
+          match_label: `vs ${m.rival} ${m.date.slice(5).replace("-", "/")}`,
+          match_date: m.date,
+          rival: m.rival,
+          minutes: mins,
+        });
         created++;
-      } catch (e) {
-        errors.push(`${entry.playerName} @ ${partido.date}: ${e.message}`);
       }
     }
 
     return Response.json({
       success: true,
-      created,
+      matches_created: Object.keys(matchIds).length,
+      minutes_created: created,
       skipped,
-      errors,
-      message: `Importación completa: ${created} registros creados, ${skipped} omitidos (ya existían)`
+      message: `${created} registros de minutos y ${Object.keys(matchIds).length} partidos creados`
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

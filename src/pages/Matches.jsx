@@ -4,7 +4,7 @@ import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, 
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
-import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel";
+import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
