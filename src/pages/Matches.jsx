@@ -4,6 +4,7 @@ import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, 
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
+import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -590,6 +591,7 @@ function MatchForm({ initial, players, onSave, onCancel }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Matches() {
+  const [tab, setTab] = useState("reserva");
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -642,35 +644,59 @@ export default function Matches() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <p className="text-zinc-400 text-sm">{matches.length} partido{matches.length !== 1 ? "s" : ""}</p>
+      {/* Tabs Reserva / Juveniles */}
+      <div className="flex gap-0 border-b border-zinc-800">
         <button
-          onClick={() => { setEditing(null); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
+          onClick={() => setTab("reserva")}
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${tab === "reserva" ? "border-yellow-400 text-yellow-300" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
         >
-          <Plus size={15} /> Nuevo partido
+          Reserva
+        </button>
+        <button
+          onClick={() => setTab("juveniles")}
+          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${tab === "juveniles" ? "border-violet-400 text-violet-300" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
+        >
+          Juveniles
         </button>
       </div>
 
-      {showForm && (
-        <MatchForm
-          initial={editing}
-          players={players}
-          onSave={save}
-          onCancel={() => { setShowForm(false); setEditing(null); }}
-        />
+      {tab === "juveniles" && (
+        <JuvenileMatchPanel players={players} />
       )}
 
-      {matches.length === 0 && !showForm ? (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-          <p className="text-zinc-500 text-sm">No hay partidos registrados</p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          {matches.map(m => (
-            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} />
-          ))}
-        </div>
+      {tab === "reserva" && (
+        <>
+          <div className="flex items-center justify-between">
+            <p className="text-zinc-400 text-sm">{matches.length} partido{matches.length !== 1 ? "s" : ""}</p>
+            <button
+              onClick={() => { setEditing(null); setShowForm(true); }}
+              className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus size={15} /> Nuevo partido
+            </button>
+          </div>
+
+          {showForm && (
+            <MatchForm
+              initial={editing}
+              players={players}
+              onSave={save}
+              onCancel={() => { setShowForm(false); setEditing(null); }}
+            />
+          )}
+
+          {matches.length === 0 && !showForm ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+              <p className="text-zinc-500 text-sm">No hay partidos registrados</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {matches.map(m => (
+                <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} />
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   );
