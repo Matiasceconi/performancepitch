@@ -390,6 +390,14 @@ function MatchCard({ match, players, onEdit, onDelete }) {
               {won ? "W" : drew ? "D" : "L"}
             </span>
           )}
+          {match.competition && (
+            <span className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline-block ${
+              match.competition === "Amistosos" ? "bg-zinc-700/60 text-zinc-400" :
+              match.competition?.includes("Apertura") ? "bg-blue-900/30 text-blue-400" :
+              match.competition?.includes("Clausura") ? "bg-emerald-900/30 text-emerald-400" :
+              "bg-zinc-700/60 text-zinc-400"
+            }`}>{match.competition?.includes("Apertura") ? "Apertura" : match.competition?.includes("Clausura") ? "Clausura" : match.competition}</span>
+          )}
           {match.squad_names?.length > 0 && (
             <span className="text-zinc-500 text-xs flex items-center gap-1 hidden sm:flex"><Users size={11} />{match.squad_names.length}</span>
           )}
@@ -419,7 +427,14 @@ function MatchCard({ match, players, onEdit, onDelete }) {
                     {leftScore} — {rightScore}
                   </p>
                 ) : <p className="text-zinc-600 text-2xl font-bold">vs</p>}
-                {match.competition && <p className="text-xs text-zinc-500 mt-2">{match.competition}</p>}
+                {match.competition && (
+                  <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    match.competition === "Amistosos" ? "bg-zinc-700 text-zinc-300" :
+                    match.competition?.includes("Apertura") ? "bg-blue-900/40 text-blue-300" :
+                    match.competition?.includes("Clausura") ? "bg-emerald-900/40 text-emerald-300" :
+                    "bg-zinc-700 text-zinc-300"
+                  }`}>{match.competition}</span>
+                )}
                 <p className="text-xs text-zinc-600 mt-0.5">{moment(match.date).format("dddd DD [de] MMMM YYYY")}</p>
                 <p className="text-xs mt-1">
                   <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.location === "Local" ? "bg-green-900/40 text-green-400" : "bg-orange-900/40 text-orange-400"}`}>
@@ -517,8 +532,13 @@ function MatchForm({ initial, players, onSave, onCancel }) {
           <input type="date" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.date} onChange={e => set("date", e.target.value)} />
         </div>
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">Competencia</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" value={form.competition} onChange={e => set("competition", e.target.value)} />
+          <label className="text-xs text-zinc-400 mb-1 block">Torneo</label>
+          <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.competition || ""} onChange={e => set("competition", e.target.value)}>
+            <option value="">— Sin etiqueta —</option>
+            <option value="Torneo Proyección Apertura 2026">Torneo Proyección Apertura 2026</option>
+            <option value="Torneo Proyección Clausura 2026">Torneo Proyección Clausura 2026</option>
+            <option value="Amistosos">Amistosos</option>
+          </select>
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Condición</label>
