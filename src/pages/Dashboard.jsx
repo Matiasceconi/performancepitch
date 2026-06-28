@@ -40,30 +40,30 @@ function NextMatchCard({ match, matchReport }) {
             <p className="text-3xl font-black text-white leading-none">{daysLeft}</p>
             <p className="text-xs text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
           </div>
-          {matchReport && matchReport.squad_names && matchReport.squad_names.length > 0 && (
-            <button
-              onClick={() => setShowSquad(!showSquad)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 transition-colors font-medium"
-            >
+          {matchReport && matchReport.squad_names && matchReport.squad_names.length > 0 &&
+          <button
+            onClick={() => setShowSquad(!showSquad)}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 transition-colors font-medium">
+            
               <Users size={12} />
               Convocados ({matchReport.squad_names.length})
             </button>
-          )}
+          }
         </div>
       </div>
-      {showSquad && matchReport && (
-        <div className="border-t border-zinc-800 p-4">
+      {showSquad && matchReport &&
+      <div className="border-t border-zinc-800 p-4">
           <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Lista de convocados</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {matchReport.squad_names.map((name, i) => (
-              <div key={i} className="flex items-center gap-2 text-sm text-white">
+            {matchReport.squad_names.map((name, i) =>
+          <div key={i} className="flex items-center gap-2 text-sm text-white">
                 <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
                 {name}
               </div>
-            ))}
+          )}
           </div>
         </div>
-      )}
+      }
     </div>);
 }
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
@@ -132,10 +132,10 @@ export default function Dashboard() {
   }
 
   const handleToggleSelect = (playerId) => {
-    setSelectedPlayers(prev => {
+    setSelectedPlayers((prev) => {
       const next = new Set(prev);
-      if (next.has(playerId)) next.delete(playerId);
-      else next.add(playerId);
+      if (next.has(playerId)) next.delete(playerId);else
+      next.add(playerId);
       return next;
     });
   };
@@ -145,7 +145,7 @@ export default function Dashboard() {
       for (const playerId of selectedPlayers) {
         await base44.entities.Player.delete(playerId);
       }
-      setPlayers(prev => prev.filter(p => !selectedPlayers.has(p.id)));
+      setPlayers((prev) => prev.filter((p) => !selectedPlayers.has(p.id)));
       setSelectedPlayers(new Set());
       setShowDeleteConfirm(false);
       toast({ title: `${selectedPlayers.size} jugador(es) eliminados`, variant: "default" });
@@ -155,13 +155,13 @@ export default function Dashboard() {
   };
 
   const today = moment().format("MM-DD");
-    const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
+  const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
 
   const positionOrder = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
 
-  const filteredPlayers = selectedStatus 
-    ? players.filter((p) => p.status === selectedStatus)
-    : players;
+  const filteredPlayers = selectedStatus ?
+  players.filter((p) => p.status === selectedStatus) :
+  players;
 
   const availablePlayers = filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => {
     const posA = positionOrder.indexOf(a.position || "");
@@ -169,14 +169,14 @@ export default function Dashboard() {
     if (posA === posB) return (a.number || 0) - (b.number || 0);
     return posA - posB;
   });
-    const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subieron de juveniles").sort((a, b) => {
-      if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
-      return (a.number || 0) - (b.number || 0);
-    });
-    const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
-    const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
-    const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
-    const injured = filteredPlayers.filter((p) => p.status === "Lesionado").length;
+  const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subieron de juveniles").sort((a, b) => {
+    if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
+    return (a.number || 0) - (b.number || 0);
+  });
+  const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
+  const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
+  const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
+  const injured = filteredPlayers.filter((p) => p.status === "Lesionado").length;
 
   const stats = [
   { label: "Jugadores (Reserva)", value: players.length, icon: Users, color: "text-blue-400" },
@@ -194,15 +194,15 @@ export default function Dashboard() {
          </div>
          <div className="flex items-center gap-2">
            <button
-             onClick={() => setShowStatusPanel(!showStatusPanel)}
-             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
+            onClick={() => setShowStatusPanel(!showStatusPanel)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
 
              {showStatusPanel ? <X size={15} /> : <ClipboardList size={15} />}
              {showStatusPanel ? "Cerrar estados" : "Estado del plantel"}
            </button>
            <button
-             onClick={() => setShowMap(!showMap)}
-             className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
+            onClick={() => setShowMap(!showMap)}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
 
              {showMap ? <X size={15} /> : <Map size={15} />}
              {showMap ? "Cerrar mapa" : "Ver mapa del día"}
@@ -213,28 +213,28 @@ export default function Dashboard() {
        {/* Filtro de estados */}
        <div className="flex flex-wrap gap-2">
          <button
-           onClick={() => setSelectedStatus(null)}
-           className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
-             selectedStatus === null
-               ? "bg-white text-zinc-900"
-               : "bg-zinc-800 text-zinc-400 hover:text-white"
-           }`}
-         >
+          onClick={() => setSelectedStatus(null)}
+          className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+          selectedStatus === null ?
+          "bg-white text-zinc-900" :
+          "bg-zinc-800 text-zinc-400 hover:text-white"}`
+          }>
+          
            Todos
          </button>
-         {statuses.map((status) => (
-           <button
-             key={status.id}
-             onClick={() => setSelectedStatus(status.name)}
-             className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
-               selectedStatus === status.name
-                 ? "bg-white text-zinc-900"
-                 : "bg-zinc-800 text-zinc-400 hover:text-white"
-             }`}
-           >
+         {statuses.map((status) =>
+        <button
+          key={status.id}
+          onClick={() => setSelectedStatus(status.name)}
+          className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${
+          selectedStatus === status.name ?
+          "bg-white text-zinc-900" :
+          "bg-zinc-800 text-zinc-400 hover:text-white"}`
+          }>
+          
              {status.name}
            </button>
-         ))}
+        )}
        </div>
 
       {showStatusPanel &&
@@ -244,33 +244,33 @@ export default function Dashboard() {
               <h2 className="text-sm font-semibold text-white">Estado del plantel</h2>
               <p className="text-xs text-zinc-500 mt-0.5">Modificá el estado de cada jugador directamente</p>
             </div>
-            {selectedPlayers.size > 0 && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-medium transition-colors"
-              >
+            {selectedPlayers.size > 0 &&
+          <button
+            onClick={() => setShowDeleteConfirm(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-medium transition-colors">
+            
                 <Trash2 size={14} />
                 Eliminar {selectedPlayers.size}
               </button>
-            )}
+          }
           </div>
           <div className="p-4">
             <div className="grid gap-2">
               {[...players].sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
-              <div key={p.id} className="flex items-center gap-3 py-1.5">
-                  <Checkbox 
-                    checked={selectedPlayers.has(p.id)}
-                    onCheckedChange={() => handleToggleSelect(p.id)}
-                    className="shrink-0"
-                  />
+            <div key={p.id} className="flex items-center gap-3 py-1.5">
+                  <Checkbox
+                checked={selectedPlayers.has(p.id)}
+                onCheckedChange={() => handleToggleSelect(p.id)}
+                className="shrink-0" />
+              
                   <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
                   {p.photo_url ?
-                  <img src={p.photo_url} alt={p.full_name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" /> :
+              <img src={p.photo_url} alt={p.full_name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" /> :
 
-                  <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+              <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
                        <span className="text-xs font-bold text-zinc-500">{p.full_name?.charAt(0)}</span>
                      </div>
-                  }
+              }
                    <span className="text-sm text-white flex-1 min-w-0 truncate">{p.full_name}</span>
                   <span className="text-xs text-zinc-600 hidden sm:block">{p.position}</span>
                   <Select
@@ -285,8 +285,8 @@ export default function Dashboard() {
                     </SelectTrigger>
                     <SelectContent className="bg-zinc-800 border-zinc-700">
                        {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subieron de juveniles", "Bajo de primera", "Sparring"].map((s) =>
-                    <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
-                    )}
+                  <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
+                  )}
                      </SelectContent>
                   </Select>
                 </div>
@@ -374,7 +374,7 @@ export default function Dashboard() {
         </div>
 
         {/* Subio de juveniles */}
-        {subioDJuveniles.length > 0 && (
+        {subioDJuveniles.length > 0 &&
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
           <div className="flex items-center justify-between p-4 border-b border-zinc-800">
             <h2 className="text-sm font-semibold text-white flex items-center gap-2">
@@ -403,7 +403,7 @@ export default function Dashboard() {
               </div>
           </div>
         </div>
-        )}
+        }
 
         {/* No disponibles */}
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
@@ -469,7 +469,7 @@ export default function Dashboard() {
                       <p className="text-sm text-white">{s.title}</p>
                       <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
                     </div>
-                    <Link to="/performance?tab=last" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2">
+                    <Link to="/performance?tab=last" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2 hidden">
                       <Zap size={13} /> GPS
                     </Link>
                   </div>
@@ -480,30 +480,30 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {selectedPlayer && (
-        <PlayerProfileDetail
-          player={selectedPlayer}
-          onClose={() => setSelectedPlayer(null)}
-          onEdit={(p) => setEditingPlayer(p)}
-        />
-      )}
+      {selectedPlayer &&
+      <PlayerProfileDetail
+        player={selectedPlayer}
+        onClose={() => setSelectedPlayer(null)}
+        onEdit={(p) => setEditingPlayer(p)} />
 
-      {editingPlayer && (
-        <PlayerFormModal
-          player={editingPlayer}
-          divisions={divisions}
-          statuses={statuses}
-          onClose={() => setEditingPlayer(null)}
-          onSave={async (data) => {
-            await base44.entities.Player.update(editingPlayer.id, data);
-            setPlayers((prev) => prev.map((p) => p.id === editingPlayer.id ? { ...p, ...data } : p));
-            setEditingPlayer(null);
-          }}
-          onDelete={async (playerId) => {
-            setPlayers((prev) => prev.filter((p) => p.id !== playerId));
-          }}
-        />
-      )}
+      }
+
+      {editingPlayer &&
+      <PlayerFormModal
+        player={editingPlayer}
+        divisions={divisions}
+        statuses={statuses}
+        onClose={() => setEditingPlayer(null)}
+        onSave={async (data) => {
+          await base44.entities.Player.update(editingPlayer.id, data);
+          setPlayers((prev) => prev.map((p) => p.id === editingPlayer.id ? { ...p, ...data } : p));
+          setEditingPlayer(null);
+        }}
+        onDelete={async (playerId) => {
+          setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+        }} />
+
+      }
 
       <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
         <AlertDialogContent className="bg-zinc-900 border-zinc-800">
@@ -515,10 +515,10 @@ export default function Dashboard() {
           </AlertDialogHeader>
           <div className="flex gap-2 justify-end">
             <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancelar</AlertDialogCancel>
-            <AlertDialogAction 
+            <AlertDialogAction
               onClick={handleDeleteSelected}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
+              className="bg-red-600 hover:bg-red-700 text-white">
+              
               Eliminar
             </AlertDialogAction>
           </div>
@@ -526,4 +526,4 @@ export default function Dashboard() {
       </AlertDialog>
       </div>);
 
-      }
+}
