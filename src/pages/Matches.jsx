@@ -6,7 +6,69 @@ import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
 
-const DYJ_LOGO = "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Defensa_y_Justicia_logo.png/200px-Defensa_y_Justicia_logo.png";
+const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
+
+const CLUB_LOGOS = {
+  "aldosivi": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/8996d21df_aldosivi.png",
+  "argentinos": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/0e05a002a_argentinos.png",
+  "argentinos juniors": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/0e05a002a_argentinos.png",
+  "atletico tucuman": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/610e3b50e_atleticotucuman.png",
+  "atlético tucumán": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/610e3b50e_atleticotucuman.png",
+  "banfield": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/58c2bc7ed_banfield.png",
+  "barracas": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4fcdd62b6_barracas.png",
+  "barracas central": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4fcdd62b6_barracas.png",
+  "belgrano": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/67af3c8f1_belgrano.png",
+  "boca": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/276a7aa08_boca.png",
+  "boca juniors": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/276a7aa08_boca.png",
+  "central cordoba": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/e18f29c5d_centralcordoba.png",
+  "central córdoba": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/e18f29c5d_centralcordoba.png",
+  "defensa": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png",
+  "defensa y justicia": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png",
+  "estudiantes": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/3a3706975_estudiantes.png",
+  "estudiantes lp": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/3a3706975_estudiantes.png",
+  "estudiantes la plata": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/3a3706975_estudiantes.png",
+  "estudiantes (lp)": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/075a5dfb0_estudiantes2.png",
+  "estudiantes rc": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/82d92e869_estudiantesrc.png",
+  "estudiantes rio cuarto": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/82d92e869_estudiantesrc.png",
+  "gimnasia": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/6114df84b_gimnasia.png",
+  "gimnasia lp": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/6114df84b_gimnasia.png",
+  "gimnasia la plata": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/6114df84b_gimnasia.png",
+  "gimnasia mendoza": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/9488b9e24_gimnasiamendoza.png",
+  "huracan": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/933efb702_huracan.png",
+  "huracán": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/933efb702_huracan.png",
+  "independiente": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/a2a471da7_independiente.png",
+  "independiente rivadavia": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/9fabf18c5_independienteriv.png",
+  "instituto": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/a9ad926b0_instituto.png",
+  "lanus": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/99213e3ca_lanus.png",
+  "lanús": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/99213e3ca_lanus.png",
+  "newells": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/9050b34cc_newells.png",
+  "newell's": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/9050b34cc_newells.png",
+  "newell's old boys": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/9050b34cc_newells.png",
+  "platense": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/7ff5c5303_platense.png",
+  "racing": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/e0d6a6146_racing.png",
+  "racing club": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/e0d6a6146_racing.png",
+  "riestra": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/d8ac90e42_riestra.png",
+  "deportivo riestra": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/d8ac90e42_riestra.png",
+  "river": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/7efeaf539_river.png",
+  "river plate": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/7efeaf539_river.png",
+  "rosario central": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/724bdfba3_rosariocentral.png",
+  "san lorenzo": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/2b8112b77_sanlorenzo.png",
+  "sarmiento": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/db1e161fb_sarmiento.png",
+  "talleres": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/070c306fb_talleres.png",
+  "tigre": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/913703796_tigre.png",
+  "union": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/16e7a6924_union.png",
+  "unión": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/16e7a6924_union.png",
+  "union sf": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/16e7a6924_union.png",
+  "velez": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
+  "vélez": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
+  "velez sarsfield": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
+};
+
+function getLogoForRival(name) {
+  if (!name) return null;
+  const key = name.toLowerCase().trim();
+  return CLUB_LOGOS[key] || null;
+}
 
 // ── CSV Panel ─────────────────────────────────────────────────────────────────
 function MatchCsvPanel({ match, onCsvSaved }) {
@@ -421,7 +483,11 @@ function MatchForm({ initial, players, onSave, onCancel }) {
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Rival *</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Nombre del rival" value={form.rival} onChange={e => set("rival", e.target.value)} />
+          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Nombre del rival" value={form.rival} onChange={e => {
+            const val = e.target.value;
+            const autoLogo = getLogoForRival(val);
+            setForm(f => ({ ...f, rival: val, rival_logo_url: autoLogo || f.rival_logo_url }));
+          }} />
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
