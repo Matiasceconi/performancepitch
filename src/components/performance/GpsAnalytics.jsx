@@ -467,7 +467,7 @@ const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "
 const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
 const MATCH_DAY_CODES = ["MD", "MD-1", "MD-2", "MD-3", "MD-4", "MD-5", "MD-6", "MD+1", "MD+2"];
 
-export default function GpsAnalytics({ initialTab }) {
+export default function GpsAnalytics({ initialTab, initialDate }) {
   const [sessions, setSessions] = useState([]);
   const [matches, setMatches] = useState([]);
   const [allRows, setAllRows] = useState([]);
@@ -484,11 +484,15 @@ export default function GpsAnalytics({ initialTab }) {
 
   const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod || matchDayCode;
 
-  // Obtener última sesión con CSV
+  // Obtener sesión a mostrar en el Informe: si viene initialDate, buscar por fecha; sino la última con CSV
   const lastSession = useMemo(() => {
     const withData = sessions.filter(s => s.csv_url);
+    if (initialDate) {
+      const byDate = withData.find(s => s.date === initialDate);
+      if (byDate) return byDate;
+    }
     return withData.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-  }, [sessions]);
+  }, [sessions, initialDate]);
 
   const lastSessionRows = useMemo(() => 
     lastSession ? allRows.filter(r => r.session_id === lastSession.id) : [],

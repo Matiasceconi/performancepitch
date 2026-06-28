@@ -17,6 +17,7 @@ const tabs = [
 export default function Performance() {
   const urlParams = new URLSearchParams(window.location.search);
   const urlTab = urlParams.get("tab");
+  const urlDate = urlParams.get("date");
   const [active, setActive] = useState(urlTab === "last" ? "catapult" : "medical");
   const gpsInitialTab = urlTab === "last" ? "last" : undefined;
 
@@ -47,7 +48,7 @@ export default function Performance() {
       <div>
          {active === "medical" && <Medical />}
          {active === "nutrition" && <Nutrition />}
-         {active === "catapult" && <GpsAnalytics initialTab={gpsInitialTab} />}
+         {active === "catapult" && <GpsAnalytics initialTab={gpsInitialTab} initialDate={urlDate} />}
          {active === "report" && <MonthlyReport />}
          {active === "minutes_official" && <MinutesTracker />}
        </div>

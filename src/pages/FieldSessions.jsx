@@ -289,7 +289,7 @@ export default function FieldSessions() {
                     </a>
                   )}
                   <Link
-                    to="/catapult"
+                    to={`/performance?tab=last&date=${s.date}`}
                     onClick={(e) => e.stopPropagation()}
                     className="flex items-center gap-1 text-xs text-blue-400 hover:text-white bg-blue-500/15 hover:bg-blue-500/30 px-2.5 py-1.5 rounded-lg transition-colors font-medium"
                   >
