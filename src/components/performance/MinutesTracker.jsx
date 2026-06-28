@@ -1,59 +1,14 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 
-// Datos estáticos de minutos por torneo
-const MINUTES_DATA = [
-  { num: 1,  name: "Ayala Gastón",        playerKey: "ayala gaston",          amistosos_res: 142, reserva: 1165, juveniles: 70 },
-  { num: 2,  name: "Blasquez Thomas",     playerKey: "thomas blasquez",        amistosos_res: 0,   reserva: 16,   juveniles: 160 },
-  { num: 3,  name: "Cabrera Jonás",       playerKey: "jonas cabrera",          amistosos_res: 126, reserva: 977,  juveniles: 0 },
-  { num: 4,  name: "Cantero Emiliano",    playerKey: "emiliano cantero",       amistosos_res: 143, reserva: 733,  juveniles: 285 },
-  { num: 5,  name: "Capponi José",        playerKey: "jose capponi",           amistosos_res: 155, reserva: 122,  juveniles: 541 },
-  { num: 6,  name: "Coria Alan",          playerKey: "alan coria",             amistosos_res: 182, reserva: 507,  juveniles: 0 },
-  { num: 7,  name: "Ejea Joaquín",        playerKey: "joaquin ejea",           amistosos_res: 170, reserva: 115,  juveniles: 525 },
-  { num: 8,  name: "Gagliardi Ramiro",    playerKey: "ramiro gagliardi",       amistosos_res: 98,  reserva: 649,  juveniles: 0 },
-  { num: 9,  name: "Martínez Thiago",     playerKey: "thiago martinez",        amistosos_res: 182, reserva: 1720, juveniles: 0 },
-  { num: 10, name: "Neris Miño Sebastián",playerKey: "sebastian neris miño",   amistosos_res: 0,   reserva: 90,   juveniles: 923 },
-  { num: 11, name: "Pastrana Franco",     playerKey: "franco pastrana",        amistosos_res: 163, reserva: 440,  juveniles: 257 },
-  { num: 12, name: "Puchetta Juan",       playerKey: "juan puchetta",          amistosos_res: 131, reserva: 131,  juveniles: 583 },
-  { num: 13, name: "Rodríguez Máximo",    playerKey: "maximo rodriguez",       amistosos_res: 182, reserva: 1624, juveniles: 0 },
-  { num: 14, name: "Sosa Joan",           playerKey: "joan sosa",              amistosos_res: 160, reserva: 1301, juveniles: 0 },
-  { num: 16, name: "Almada Dylan",        playerKey: "dylan almada",           amistosos_res: 120, reserva: 18,   juveniles: 669 },
-  { num: 17, name: "Retamoso Brian",      playerKey: "brian retamoso",         amistosos_res: 109, reserva: 291,  juveniles: 0 },
-  { num: 18, name: "Guennin Alessandro",  playerKey: "alessandro guennin",     amistosos_res: 164, reserva: 266,  juveniles: 752 },
-  { num: 19, name: "López Mateo",         playerKey: "mateo lopez",            amistosos_res: 182, reserva: 1184, juveniles: 0 },
-  { num: 20, name: "López Pablo",         playerKey: "lopez pablo",            amistosos_res: 120, reserva: 1183, juveniles: 0 },
-  { num: 21, name: "Loza Valentín",       playerKey: "loza valentin",          amistosos_res: 145, reserva: 663,  juveniles: 0 },
-  { num: 22, name: "Quiroga Lautaro",     playerKey: "lautaro quiroga",        amistosos_res: 161, reserva: 95,   juveniles: 362 },
-  { num: 23, name: "Vázquez Lautaro",     playerKey: "lautaro vazquez",        amistosos_res: 172, reserva: 348,  juveniles: 354 },
-  { num: 24, name: "Moreno Juan",         playerKey: "juan moreno",            amistosos_res: 172, reserva: 1080, juveniles: 0 },
-  { num: 25, name: "Noguera Facundo",     playerKey: "facundo noguera",        amistosos_res: 115, reserva: 1360, juveniles: 0 },
-  { num: 26, name: "Quintana Facundo",    playerKey: "facundo quintana",       amistosos_res: 115, reserva: 1727, juveniles: 0 },
-  { num: 27, name: "Uriel Ramos",         playerKey: "uriel ramos",            amistosos_res: 0,   reserva: 0,    juveniles: 381 },
-  { num: 28, name: "Patricio Flores",     playerKey: "patricio flores",        amistosos_res: 0,   reserva: 0,    juveniles: 663 },
-];
-
 const TORNEOS = [
-  { id: "all",       label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
-  { id: "reserva",   label: "Torneo Proyección Apertura 2026", res_total: 1727, juv_total: null },
-  { id: "juveniles", label: "Torneo Juveniles 2026",           res_total: null,  juv_total: 1252 },
-  { id: "amistosos", label: "Amistosos",                       res_total: 182,   juv_total: null },
+  { id: "all",                  label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
+  { id: "Proyección Apertura",  label: "Torneo Proyección Apertura 2026", res_total: 1727, juv_total: null },
+  { id: "Juveniles",            label: "Torneo Juveniles 2026",           res_total: null,  juv_total: 1252 },
+  { id: "Amistosos",            label: "Amistosos",                       res_total: 182,   juv_total: null },
 ];
-
-function norm(s) {
-  if (!s) return "";
-  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-}
-
-function getMinutes(p, torneoId) {
-  switch (torneoId) {
-    case "reserva":   return { res: p.reserva,       juv: null };
-    case "juveniles": return { res: null,             juv: p.juveniles };
-    case "amistosos": return { res: p.amistosos_res,  juv: null };
-    default:          return { res: p.reserva,        juv: p.juveniles };
-  }
-}
 
 function PctBar({ pct, color }) {
   const width = Math.min(100, Math.round(pct * 100));
@@ -74,44 +29,99 @@ function getPctColor(pct) {
   return "bg-zinc-600";
 }
 
+function norm(s) {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
 export default function MinutesTracker() {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
-  const [photoMap, setPhotoMap] = useState({});
+  const [records, setRecords] = useState([]);
+  const [players, setPlayers] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    base44.entities.Player.list("-created_date", 100).then((players) => {
-      const map = {};
-      players.forEach((p) => {
-        map[norm(p.full_name || p.name)] = p.photo_url || null;
-      });
-      setPhotoMap(map);
-    });
+    Promise.all([
+      base44.entities.MinutesRecord.list("-created_date", 500),
+      base44.entities.Player.list("-created_date", 200),
+    ]).then(([recs, plrs]) => {
+      setRecords(recs);
+      setPlayers(plrs);
+    }).finally(() => setLoading(false));
   }, []);
 
-  function getPhoto(playerKey) {
-    // Try exact key first, then partial match
-    if (photoMap[playerKey]) return photoMap[playerKey];
-    const keys = Object.keys(photoMap);
-    const match = keys.find((k) => k.includes(playerKey) || playerKey.includes(k));
-    return match ? photoMap[match] : null;
-  }
+  // Mapa player_id -> foto
+  const photoMap = useMemo(() => {
+    const map = {};
+    players.forEach(p => { if (p.photo_url) map[p.id] = p.photo_url; });
+    return map;
+  }, [players]);
 
-  const torneo = TORNEOS.find((t) => t.id === torneoId);
+  // Mapa player_id -> jersey_number
+  const numberMap = useMemo(() => {
+    const map = {};
+    players.forEach(p => { if (p.jersey_number) map[p.id] = p.jersey_number; });
+    return map;
+  }, [players]);
+
+  // Consolidar registros por jugador (player_id o player_name como fallback)
+  const playerData = useMemo(() => {
+    const map = {};
+
+    records.forEach(r => {
+      const key = r.player_id || `name:${norm(r.player_name)}`;
+      if (!map[key]) {
+        map[key] = {
+          player_id: r.player_id || null,
+          player_name: r.player_name,
+          player_number: r.player_number,
+          reserva: 0,
+          juveniles: 0,
+          amistosos: 0,
+        };
+      }
+      const t = r.tournament;
+      const mins = r.minutes || 0;
+      if (t === "Proyección Apertura") map[key].reserva += mins;
+      else if (t === "Juveniles") map[key].juveniles += mins;
+      else if (t === "Amistosos") map[key].amistosos += mins;
+    });
+
+    return Object.values(map);
+  }, [records]);
+
+  const torneo = TORNEOS.find(t => t.id === torneoId);
   const showRes = torneo.res_total !== null;
   const showJuv = torneo.juv_total !== null;
 
-  const display = MINUTES_DATA
-    .filter((p) => !search || norm(p.name).includes(norm(search)))
-    .map((p) => ({ ...p, ...getMinutes(p, torneoId) }))
-    .sort((a, b) => {
-      if (sortBy === "juv") return (b.juv || 0) - (a.juv || 0);
-      if (sortBy === "name") return a.name.localeCompare(b.name);
-      return (b.res || 0) - (a.res || 0);
-    });
+  function getMinutes(p) {
+    switch (torneoId) {
+      case "Proyección Apertura": return { res: p.reserva,    juv: null };
+      case "Juveniles":           return { res: null,          juv: p.juveniles };
+      case "Amistosos":           return { res: p.amistosos,   juv: null };
+      default:                    return { res: p.reserva,     juv: p.juveniles };
+    }
+  }
+
+  const display = useMemo(() => {
+    return playerData
+      .filter(p => !search || norm(p.player_name).includes(norm(search)))
+      .map(p => ({ ...p, ...getMinutes(p) }))
+      .sort((a, b) => {
+        if (sortBy === "juv")  return (b.juv || 0) - (a.juv || 0);
+        if (sortBy === "name") return (a.player_name || "").localeCompare(b.player_name || "");
+        return (b.res || 0) - (a.res || 0);
+      });
+  }, [playerData, search, sortBy, torneoId]);
 
   const cols = showRes && showJuv ? "2rem 2.5rem 1fr 1fr 1fr" : "2rem 2.5rem 1fr 1fr";
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="space-y-5">
@@ -173,39 +183,40 @@ export default function MinutesTracker() {
         </div>
 
         <div className="divide-y divide-zinc-800/50">
-          {display.map((p) => {
-            const photo = getPhoto(p.playerKey);
+          {display.map((p, i) => {
+            const photo = p.player_id ? photoMap[p.player_id] : null;
+            const num = p.player_id ? (numberMap[p.player_id] || p.player_number) : p.player_number;
             return (
-              <div key={p.num}
+              <div key={p.player_id || p.player_name}
                 className="grid items-center gap-4 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors"
                 style={{ gridTemplateColumns: cols }}>
-                <span className="text-zinc-600 text-sm font-mono">{p.num}</span>
+                <span className="text-zinc-600 text-sm font-mono">{num || i + 1}</span>
                 {photo ? (
-                  <img src={photo} alt={p.name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
+                  <img src={photo} alt={p.player_name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-zinc-500">{p.name.charAt(0)}</span>
+                    <span className="text-xs font-bold text-zinc-500">{(p.player_name || "?").charAt(0)}</span>
                   </div>
                 )}
-                <p className="text-sm text-white font-medium">{p.name}</p>
+                <p className="text-sm text-white font-medium">{p.player_name}</p>
 
                 {showRes && (
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-white font-semibold text-sm">{p.res}'</span>
+                      <span className="text-white font-semibold text-sm">{p.res ?? 0}'</span>
                       <span className="text-zinc-500 text-xs">/ {torneo.res_total}'</span>
                     </div>
-                    <PctBar pct={torneo.res_total > 0 ? p.res / torneo.res_total : 0} color={getPctColor(p.res / torneo.res_total)} />
+                    <PctBar pct={torneo.res_total > 0 ? (p.res || 0) / torneo.res_total : 0} color={getPctColor((p.res || 0) / torneo.res_total)} />
                   </div>
                 )}
 
                 {showJuv && (
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-1.5">
-                      <span className="text-white font-semibold text-sm">{p.juv}'</span>
+                      <span className="text-white font-semibold text-sm">{p.juv ?? 0}'</span>
                       <span className="text-zinc-500 text-xs">/ {torneo.juv_total}'</span>
                     </div>
-                    <PctBar pct={torneo.juv_total > 0 ? p.juv / torneo.juv_total : 0} color={getPctColor(p.juv / torneo.juv_total)} />
+                    <PctBar pct={torneo.juv_total > 0 ? (p.juv || 0) / torneo.juv_total : 0} color={getPctColor((p.juv || 0) / torneo.juv_total)} />
                   </div>
                 )}
               </div>
