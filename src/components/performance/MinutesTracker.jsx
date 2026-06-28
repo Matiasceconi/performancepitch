@@ -42,7 +42,8 @@ const TORNEOS = [
 ];
 
 function norm(s) {
-  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+  if (!s) return "";
+  return String(s).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
 function getMinutes(p, torneoId) {
@@ -83,7 +84,7 @@ export default function MinutesTracker() {
     base44.entities.Player.list("-created_date", 100).then((players) => {
       const map = {};
       players.forEach((p) => {
-        map[norm(p.name)] = p.photo_url || null;
+        map[norm(p.full_name || p.name)] = p.photo_url || null;
       });
       setPhotoMap(map);
     });
