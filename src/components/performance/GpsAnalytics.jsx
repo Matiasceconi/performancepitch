@@ -107,7 +107,7 @@ const METRICS = [
 ];
 
 const TABS = [
-  { id: "last",       label: "Última Sesión", icon: Clock      },
+  { id: "last",       label: "Informe de Sesión", icon: Clock      },
   { id: "team",       label: "Equipo",    icon: BarChart2  },
   { id: "player",     label: "Jugador",   icon: TrendingUp },
   { id: "comparison", label: "Comparar",  icon: Activity   },
