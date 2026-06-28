@@ -64,10 +64,20 @@ const CLUB_LOGOS = {
   "velez sarsfield": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
 };
 
+function normalizeStr(str) {
+  return str.toLowerCase().trim()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .replace(/['']/g, "");
+}
+
 function getLogoForRival(name) {
   if (!name) return null;
-  const key = name.toLowerCase().trim();
-  return CLUB_LOGOS[key] || null;
+  const key = normalizeStr(name);
+  // Try normalized keys
+  for (const [k, v] of Object.entries(CLUB_LOGOS)) {
+    if (normalizeStr(k) === key) return v;
+  }
+  return null;
 }
 
 // ── CSV Panel ─────────────────────────────────────────────────────────────────
