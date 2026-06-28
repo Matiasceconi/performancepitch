@@ -62,6 +62,17 @@ const CLUB_LOGOS = {
   "velez": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
   "vélez": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
   "velez sarsfield": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/973c619a4_velez.png",
+  "san martin": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Club_Atl%C3%A9tico_San_Mart%C3%ADn_%28San_Juan%29_logo.svg/200px-Club_Atl%C3%A9tico_San_Mart%C3%ADn_%28San_Juan%29_logo.svg.png",
+  "san martín": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Club_Atl%C3%A9tico_San_Mart%C3%ADn_%28San_Juan%29_logo.svg/200px-Club_Atl%C3%A9tico_San_Mart%C3%ADn_%28San_Juan%29_logo.svg.png",
+  "colon": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Escudo_del_Club_Atl%C3%A9tico_Col%C3%B3n.svg/200px-Escudo_del_Club_Atl%C3%A9tico_Col%C3%B3n.svg.png",
+  "colón": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5b/Escudo_del_Club_Atl%C3%A9tico_Col%C3%B3n.svg/200px-Escudo_del_Club_Atl%C3%A9tico_Col%C3%B3n.svg.png",
+  "ferro": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Escudo_Ferro_Carril_Oeste.svg/200px-Escudo_Ferro_Carril_Oeste.svg.png",
+  "ferro carril oeste": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/Escudo_Ferro_Carril_Oeste.svg/200px-Escudo_Ferro_Carril_Oeste.svg.png",
+  "quilmes": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/Quilmes_Atletico_Club_logo.svg/200px-Quilmes_Atletico_Club_logo.svg.png",
+  "atletico rafaela": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Atletico_de_Rafaela_logo.svg/200px-Atletico_de_Rafaela_logo.svg.png",
+  "atlético rafaela": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b4/Atletico_de_Rafaela_logo.svg/200px-Atletico_de_Rafaela_logo.svg.png",
+  "estudiantes de rio cuarto": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/82d92e869_estudiantesrc.png",
+  "estudiantes de río cuarto": "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/82d92e869_estudiantesrc.png",
 };
 
 function normalizeStr(str) {
@@ -324,8 +335,9 @@ function MatchCard({ match, players, onEdit, onDelete }) {
   const drew = match.our_score === match.rival_score;
 
   const isLocal = match.location === "Local";
-  const leftLogo = isLocal ? DYJ_LOGO : (match.rival_logo_url || null);
-  const rightLogo = isLocal ? (match.rival_logo_url || null) : DYJ_LOGO;
+  const rivalLogo = match.rival_logo_url || getLogoForRival(match.rival);
+  const leftLogo = isLocal ? DYJ_LOGO : rivalLogo;
+  const rightLogo = isLocal ? rivalLogo : DYJ_LOGO;
   const leftName = isLocal ? "Defensa y Justicia" : match.rival;
   const rightName = isLocal ? match.rival : "Defensa y Justicia";
   const leftScore = isLocal ? match.our_score : match.rival_score;
