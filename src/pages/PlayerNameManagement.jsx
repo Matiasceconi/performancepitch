@@ -93,12 +93,12 @@ export default function PlayerNameManagement() {
                     {player.photo_url ? (
                       <img
                         src={player.photo_url}
-                        alt={player.name}
+                        alt={player.full_name || player.name}
                         className="w-16 h-16 rounded-full object-cover border-2 border-zinc-700"
                       />
                     ) : (
                       <div className="w-16 h-16 rounded-full bg-zinc-800 flex items-center justify-center border-2 border-zinc-700">
-                        <span className="text-xl font-bold text-zinc-500">{player.name.charAt(0)}</span>
+                        <span className="text-xl font-bold text-zinc-500">{(player.full_name || player.name || "?").charAt(0)}</span>
                       </div>
                     )}
                   </div>
@@ -141,7 +141,7 @@ export default function PlayerNameManagement() {
                       </div>
                     ) : (
                       <div>
-                        <h3 className="text-lg font-semibold text-white">{player.name}</h3>
+                        <h3 className="text-lg font-semibold text-white">{player.full_name || player.name || "—"}</h3>
                         <p className="text-xs text-zinc-500 mt-1">{player.position || "Sin posición"}</p>
 
                         {/* Variaciones encontradas */}
