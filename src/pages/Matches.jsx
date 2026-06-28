@@ -327,13 +327,36 @@ function YoutubeEmbed({ url, label }) {
   );
 }
 
+const COMPETITION_LABELS = {
+  "Torneo Proyección Apertura 2026": "T.Proyección Apertura 2026",
+  "Torneo Proyección Clausura 2026": "T.Proyección Clausura 2026",
+  "Campeonato de Reserva": "T.Proyección Apertura 2026",
+  "Amistosos": "Amistosos",
+};
+
+const COMPETITION_OPTIONS = [
+  "Torneo Proyección Apertura 2026",
+  "Torneo Proyección Clausura 2026",
+  "Amistosos",
+];
+
 // ── MatchCard ─────────────────────────────────────────────────────────────────
 function MatchCard({ match, players, onEdit, onDelete }) {
   const [expanded, setExpanded] = useState(false);
   const [matchData, setMatchData] = useState(match);
+  const [editingCompetition, setEditingCompetition] = useState(false);
+  const { toast } = useToast();
   const hasResult = match.our_score != null && match.rival_score != null;
   const won = match.our_score > match.rival_score;
   const drew = match.our_score === match.rival_score;
+
+  async function saveCompetition(value) {
+    await base44.entities.MatchReport.update(match.id, { competition: value });
+    setMatchData(m => ({ ...m, competition: value }));
+    match.competition = value;
+    setEditingCompetition(false);
+    toast({ title: "Etiqueta actualizada" });
+  }
 
   const isLocal = match.location === "Local";
   const rivalLogo = match.rival_logo_url || getLogoForRival(match.rival);
@@ -390,13 +413,35 @@ function MatchCard({ match, players, onEdit, onDelete }) {
               {won ? "W" : drew ? "D" : "L"}
             </span>
           )}
-          {match.competition && (
-            <span className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline-block ${
-              match.competition === "Amistosos" ? "bg-zinc-700/60 text-zinc-400" :
-              match.competition?.includes("Apertura") ? "bg-blue-900/30 text-blue-400" :
-              match.competition?.includes("Clausura") ? "bg-emerald-900/30 text-emerald-400" :
-              "bg-zinc-700/60 text-zinc-400"
-            }`}>{match.competition?.includes("Apertura") ? "Apertura" : match.competition?.includes("Clausura") ? "Clausura" : match.competition}</span>
+          {editingCompetition ? (
+            <select
+              autoFocus
+              className="text-xs bg-zinc-800 border border-zinc-600 rounded-lg px-2 py-0.5 text-white focus:outline-none focus:border-zinc-400 hidden sm:block"
+              defaultValue={match.competition || ""}
+              onBlur={() => setEditingCompetition(false)}
+              onChange={e => saveCompetition(e.target.value)}
+              onClick={e => e.stopPropagation()}
+            >
+              <option value="">— Sin etiqueta —</option>
+              {COMPETITION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
+          ) : (
+            <span
+              onClick={e => { e.stopPropagation(); setEditingCompetition(true); }}
+              title="Clic para cambiar etiqueta"
+              className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline-block cursor-pointer hover:opacity-80 transition-opacity ${
+                !match.competition ? "bg-zinc-700/40 text-zinc-500 border border-dashed border-zinc-600" :
+                match.competition === "Amistosos" ? "bg-zinc-700/60 text-zinc-400" :
+                match.competition?.includes("Apertura") ? "bg-blue-900/30 text-blue-400" :
+                match.competition?.includes("Clausura") ? "bg-emerald-900/30 text-emerald-400" :
+                "bg-zinc-700/60 text-zinc-300"
+              }`}>
+              {!match.competition ? "Etiquetar" :
+               COMPETITION_LABELS[match.competition] ||
+               (match.competition?.includes("Apertura") ? "T.Proyección Apertura 2026" :
+                match.competition?.includes("Clausura") ? "T.Proyección Clausura 2026" :
+                match.competition)}
+            </span>
           )}
           {match.squad_names?.length > 0 && (
             <span className="text-zinc-500 text-xs flex items-center gap-1 hidden sm:flex"><Users size={11} />{match.squad_names.length}</span>
@@ -427,13 +472,13 @@ function MatchCard({ match, players, onEdit, onDelete }) {
                     {leftScore} — {rightScore}
                   </p>
                 ) : <p className="text-zinc-600 text-2xl font-bold">vs</p>}
-                {match.competition && (
+                {matchData.competition && (
                   <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    match.competition === "Amistosos" ? "bg-zinc-700 text-zinc-300" :
-                    match.competition?.includes("Apertura") ? "bg-blue-900/40 text-blue-300" :
-                    match.competition?.includes("Clausura") ? "bg-emerald-900/40 text-emerald-300" :
+                    matchData.competition === "Amistosos" ? "bg-zinc-700 text-zinc-300" :
+                    matchData.competition?.includes("Apertura") ? "bg-blue-900/40 text-blue-300" :
+                    matchData.competition?.includes("Clausura") ? "bg-emerald-900/40 text-emerald-300" :
                     "bg-zinc-700 text-zinc-300"
-                  }`}>{match.competition}</span>
+                  }`}>{COMPETITION_LABELS[matchData.competition] || matchData.competition}</span>
                 )}
                 <p className="text-xs text-zinc-600 mt-0.5">{moment(match.date).format("dddd DD [de] MMMM YYYY")}</p>
                 <p className="text-xs mt-1">
