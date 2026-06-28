@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Heart, Apple, FileSpreadsheet, Clock, FileDown } from "lucide-react";
 import Medical from "@/pages/Medical";
 import Nutrition from "@/pages/Nutrition";
@@ -15,7 +15,10 @@ const tabs = [
 ];
 
 export default function Performance() {
-  const [active, setActive] = useState("medical");
+  const urlParams = new URLSearchParams(window.location.search);
+  const urlTab = urlParams.get("tab");
+  const [active, setActive] = useState(urlTab === "last" ? "catapult" : "medical");
+  const gpsInitialTab = urlTab === "last" ? "last" : undefined;
 
   return (
     <div className="space-y-6">
@@ -44,7 +47,7 @@ export default function Performance() {
       <div>
          {active === "medical" && <Medical />}
          {active === "nutrition" && <Nutrition />}
-         {active === "catapult" && <GpsAnalytics />}
+         {active === "catapult" && <GpsAnalytics initialTab={gpsInitialTab} />}
          {active === "report" && <MonthlyReport />}
          {active === "minutes_official" && <MinutesTracker />}
        </div>

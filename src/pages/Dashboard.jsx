@@ -469,7 +469,7 @@ export default function Dashboard() {
                       <p className="text-sm text-white">{s.title}</p>
                       <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
                     </div>
-                    <Link to="/performance" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2">
+                    <Link to="/performance?tab=last" className="flex items-center gap-1 text-xs text-blue-400 hover:text-blue-300 transition-colors shrink-0 ml-2">
                       <Zap size={13} /> GPS
                     </Link>
                   </div>

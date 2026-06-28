@@ -467,13 +467,13 @@ const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "
 const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
 const MATCH_DAY_CODES = ["MD", "MD-1", "MD-2", "MD-3", "MD-4", "MD-5", "MD-6", "MD+1", "MD+2"];
 
-export default function GpsAnalytics() {
+export default function GpsAnalytics({ initialTab }) {
   const [sessions, setSessions] = useState([]);
   const [matches, setMatches] = useState([]);
   const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingCsvs, setLoadingCsvs] = useState(false);
-  const [tab, setTab] = useState("team");
+  const [tab, setTab] = useState(initialTab || "team");
 
   // Filtros globales
   const [dateFrom, setDateFrom]         = useState("");
