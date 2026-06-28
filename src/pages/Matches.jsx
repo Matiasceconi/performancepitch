@@ -603,7 +603,7 @@ export default function Matches() {
 
   async function loadAll() {
     const [m, p] = await Promise.all([
-      base44.entities.MatchReport.list("-date", 100),
+      base44.entities.MatchReport.filter({ competition: { $ne: "Juveniles" } }, "-date", 100),
       base44.entities.Player.list("-created_date", 100),
     ]);
     setMatches(m);
