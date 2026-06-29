@@ -1,5 +1,5 @@
 import React from "react";
-import { POSITION_GROUPS } from "@/pages/DailySquad";
+import { POSITION_GROUPS } from "@/components/squad/squadConstants";
 import PlayerDayCard from "@/components/squad/PlayerDayCard";
 
 export default function DailySquadGrid({ players, getEffectiveStatus, applyChange, pendingChanges, selectedDate }) {

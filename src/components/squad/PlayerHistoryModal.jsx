@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { X, AlertCircle, Activity, ArrowUp, ArrowDown } from "lucide-react";
-import { STATUS_LABELS, STATUS_COLORS } from "@/pages/DailySquad";
+import { STATUS_LABELS, STATUS_COLORS } from "@/components/squad/squadConstants";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");

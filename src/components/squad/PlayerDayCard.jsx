@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { ChevronDown, Tag, FileText, Clock, X } from "lucide-react";
-import { STATUS_LABELS, STATUS_COLORS, ALL_TAGS } from "@/pages/DailySquad";
+import { STATUS_LABELS, STATUS_COLORS, ALL_TAGS } from "@/components/squad/squadConstants";
 import PlayerHistoryModal from "@/components/squad/PlayerHistoryModal";
 
 const STATUS_LIST = Object.keys(STATUS_LABELS);

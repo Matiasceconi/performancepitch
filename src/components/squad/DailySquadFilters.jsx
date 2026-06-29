@@ -1,6 +1,6 @@
 import React from "react";
 import { Search, X } from "lucide-react";
-import { STATUS_LABELS, ALL_TAGS } from "@/pages/DailySquad";
+import { STATUS_LABELS, ALL_TAGS } from "@/components/squad/squadConstants";
 
 export default function DailySquadFilters({ players, filters, setFilters, getEffectiveStatus }) {
   const set = (k, v) => setFilters(f => ({ ...f, [k]: v }));

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { X, Copy, Check } from "lucide-react";
-import { STATUS_LABELS } from "@/pages/DailySquad";
+import { STATUS_LABELS } from "@/components/squad/squadConstants";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
