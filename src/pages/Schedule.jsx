@@ -519,7 +519,11 @@ export default function Schedule() {
   }
 
   async function handleDelete(id) {
-    await base44.entities.DayEvent.delete(id);
+    try {
+      await base44.entities.DayEvent.delete(id);
+    } catch (e) {
+      // Si el evento ya no existe, ignorar el error
+    }
     await loadEvents();
   }
 
