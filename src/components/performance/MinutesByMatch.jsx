@@ -94,9 +94,12 @@ export default function MinutesByMatch({ selectedPlayer }) {
   }, [tournamentFilter, groupedMatches]);
 
   // Mapa de minutos: match_date+tournament -> { player_id/name -> minutes }
+  // Si hay duplicados con mismo key, se toma el registro más reciente (mayor minutos en caso de edición)
   const minutesMap = useMemo(() => {
     const map = {};
-    for (const r of minutesRecords) {
+    // Ordenar por created_date desc para que el más reciente gane en caso de duplicado
+    const sorted = [...minutesRecords].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
+    for (const r of sorted) {
       if (!r.minutes || r.minutes <= 0) continue;
       const date = r.match_date;
       const key = r.player_id || `name:${norm(r.player_name)}`;
@@ -104,7 +107,10 @@ export default function MinutesByMatch({ selectedPlayer }) {
       if (!map[date]) map[date] = {};
       if (!map[date]._byTourney) map[date]._byTourney = {};
       if (!map[date]._byTourney[t]) map[date]._byTourney[t] = {};
-      map[date]._byTourney[t][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
+      // Solo guardar si no existe ya (el más reciente gana)
+      if (!map[date]._byTourney[t][key]) {
+        map[date]._byTourney[t][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
+      }
     }
     return map;
   }, [minutesRecords]);

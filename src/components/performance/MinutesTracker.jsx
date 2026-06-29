@@ -74,14 +74,21 @@ export default function MinutesTracker({ onSelectPlayer }) {
     return map;
   }, [players]);
 
-  // Consolidar registros por jugador (player_id o player_name como fallback)
+  // Consolidar registros por jugador — deduplicar por (player_id/name + match_date + tournament)
   const playerData = useMemo(() => {
     const map = {};
+    // Deduplicar: para mismo jugador+fecha+torneo, solo contar el registro más reciente
+    const seen = new Set();
+    const sorted = [...records].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
 
-    records.forEach(r => {
-      const key = r.player_id || `name:${norm(r.player_name)}`;
-      if (!map[key]) {
-        map[key] = {
+    sorted.forEach(r => {
+      const playerKey = r.player_id || `name:${norm(r.player_name)}`;
+      const dedupKey = `${playerKey}|${r.match_date}|${(r.tournament || "").toLowerCase()}`;
+      if (seen.has(dedupKey)) return; // ignorar duplicados
+      seen.add(dedupKey);
+
+      if (!map[playerKey]) {
+        map[playerKey] = {
           player_id: r.player_id || null,
           player_name: r.player_name,
           player_number: r.player_number,
@@ -92,9 +99,9 @@ export default function MinutesTracker({ onSelectPlayer }) {
       }
       const t = r.tournament;
       const mins = r.minutes || 0;
-      if (t === "Proyección Apertura" || t === "Clausura") map[key].reserva += mins;
-      else if (t === "Juveniles") map[key].juveniles += mins;
-      else if (t === "Amistosos") map[key].amistosos += mins;
+      if (t === "Proyección Apertura" || t === "Clausura") map[playerKey].reserva += mins;
+      else if (t === "Juveniles") map[playerKey].juveniles += mins;
+      else if (t === "Amistosos") map[playerKey].amistosos += mins;
     });
 
     return Object.values(map);

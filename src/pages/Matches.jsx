@@ -191,11 +191,14 @@ function SquadMinutesPanel({ match, players, onMatchUpdated }) {
     async function load() {
       setLoading(true);
       try {
-        const records = await base44.entities.MinutesRecord.filter({ match_date: match.date }, "-created_date", 100);
+        const records = await base44.entities.MinutesRecord.filter({ match_date: match.date }, "-created_date", 200);
         setExistingRecords(records);
         const map = {};
+        // Solo tomar el registro más reciente por player_id (deduplicar)
         records.forEach(r => {
-          if (r.player_id) map[r.player_id] = r.minutes ?? "";
+          if (r.player_id && !(r.player_id in map)) {
+            map[r.player_id] = r.minutes ?? "";
+          }
         });
         setMinutesMap(map);
       } finally {
@@ -227,8 +230,16 @@ function SquadMinutesPanel({ match, players, onMatchUpdated }) {
     try {
       const matchLabel = `vs ${match.rival} ${moment(match.date).format("DD/MM/YY")}`;
       const tournament = getTournament();
+      // Mapa: player_id -> registro más reciente (deduplicado)
       const existingMap = {};
-      existingRecords.forEach(r => { if (r.player_id) existingMap[r.player_id] = r; });
+      existingRecords.forEach(r => {
+        if (r.player_id && !(r.player_id in existingMap)) existingMap[r.player_id] = r;
+      });
+      // Eliminar duplicados extra (mismo player_id, mismo match_date)
+      const duplicates = existingRecords.filter(r => r.player_id && existingMap[r.player_id]?.id !== r.id);
+      for (const dup of duplicates) {
+        await base44.entities.MinutesRecord.delete(dup.id);
+      }
 
       // Guardar minutos de todos los convocados actuales
       for (const player of convocados) {
