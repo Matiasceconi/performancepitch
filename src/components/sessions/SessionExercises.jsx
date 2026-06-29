@@ -41,7 +41,16 @@ export default function SessionExercises({ sessionId }) {
   const [showForm, setShowForm] = useState(false);
   const [expanded, setExpanded] = useState({});
   const [saving, setSaving] = useState(false);
+  const [uploadingImg, setUploadingImg] = useState(false);
   const { toast } = useToast();
+
+  async function handleImageUpload(file) {
+    if (!file) return;
+    setUploadingImg(true);
+    const { file_url } = await base44.integrations.Core.UploadFile({ file });
+    setF("image_url", file_url);
+    setUploadingImg(false);
+  }
 
   useEffect(() => {
     base44.entities.SessionExercise.filter({ session_id: sessionId }, "order", 100).then(exs => {
@@ -147,6 +156,11 @@ export default function SessionExercises({ sessionId }) {
         const isExpanded = expanded[ex.id];
         return (
           <div key={ex.id} className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
+            {/* Full-width image at top */}
+            {ex.image_url && (
+              <img src={ex.image_url} alt={ex.name}
+                className="w-full max-h-56 object-cover" />
+            )}
             {/* Card header */}
             <div className="flex items-center gap-3 p-4">
               {/* Order controls */}
@@ -217,10 +231,6 @@ export default function SessionExercises({ sessionId }) {
                 </div>
                 {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
                 {ex.notes && <p className="text-xs text-zinc-500 italic">{ex.notes}</p>}
-                {ex.image_url && (
-                  <img src={ex.image_url} alt={ex.name}
-                    className="max-h-48 rounded-lg border border-zinc-700 object-contain" />
-                )}
               </div>
             )}
           </div>
@@ -304,9 +314,23 @@ export default function SessionExercises({ sessionId }) {
                 rows={2} className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none resize-none" />
             </div>
             <div>
-              <label className="text-[10px] text-zinc-400 mb-1 block">URL imagen</label>
-              <input value={form.image_url} onChange={e => setF("image_url", e.target.value)} placeholder="https://..."
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+              <label className="text-[10px] text-zinc-400 mb-1 block">Imagen del ejercicio</label>
+              {form.image_url ? (
+                <div className="relative">
+                  <img src={form.image_url} alt="preview" className="w-full max-h-40 object-cover rounded-lg border border-zinc-600" />
+                  <button type="button" onClick={() => setF("image_url", "")}
+                    className="absolute top-1 right-1 bg-zinc-900/80 text-zinc-300 hover:text-red-400 rounded-full p-1 transition-colors">
+                    <X size={12} />
+                  </button>
+                </div>
+              ) : (
+                <label className={`flex items-center gap-2 px-3 py-2 bg-zinc-700 border border-zinc-600 rounded-lg text-xs text-zinc-300 cursor-pointer hover:bg-zinc-600 transition-colors ${uploadingImg ? "opacity-60 pointer-events-none" : ""}`}>
+                  <Image size={13} />
+                  {uploadingImg ? "Subiendo..." : "Subir imagen"}
+                  <input type="file" accept="image/*" className="hidden"
+                    onChange={e => handleImageUpload(e.target.files[0])} />
+                </label>
+              )}
             </div>
             <div>
               <label className="text-[10px] text-zinc-400 mb-1 block">URL video</label>
