@@ -280,10 +280,13 @@ export default function Dashboard() {
   // ── Filter DailySquadStatus by selected squad ──────────────────────────
   const filteredStatuses = useMemo(() => {
     if (!selectedSquadId) return dayStatuses;
-    // Show records where this squad is the target squad and player is active there
-    return dayStatuses.filter(ds =>
-      ds.target_squad_id === selectedSquadId && ds.active_in_target_squad !== false
-    );
+    // A record belongs to this squad if:
+    // - target_squad_id matches (explicitly set), OR
+    // - base_squad_id matches and the player has no active temporary movement to another squad
+    return dayStatuses.filter(ds => {
+      const effectiveSquad = ds.target_squad_id || ds.base_squad_id;
+      return effectiveSquad === selectedSquadId && ds.active_in_target_squad !== false;
+    });
   }, [dayStatuses, selectedSquadId]);
 
   // ── Group by status — everything driven from DailySquadStatus ─────────

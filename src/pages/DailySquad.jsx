@@ -162,6 +162,12 @@ export default function DailySquad() {
       const existing = statusMap[playerId];
       const player = players.find(p => p.id === playerId);
       const effective = getEffectiveStatus(player || { id: playerId });
+      // target_squad_id defaults to selectedSquadId (the squad being edited right now)
+      // so Dashboard can always filter by squad correctly
+      const currentSquad = squads.find(s => s.id === selectedSquadId);
+      const fallbackTargetId = effective.target_squad_id || selectedSquadId;
+      const fallbackTargetName = effective.target_squad_name || currentSquad?.name || "";
+
       const payload = {
         date: selectedDate,
         player_id: playerId,
@@ -169,10 +175,10 @@ export default function DailySquad() {
         position: player?.position || "",
         category: player?.category || "",
         updated_at: now,
-        base_squad_id: effective.base_squad_id,
-        base_squad_name: effective.base_squad_name,
-        target_squad_id: effective.target_squad_id,
-        target_squad_name: effective.target_squad_name,
+        base_squad_id: effective.base_squad_id || selectedSquadId,
+        base_squad_name: effective.base_squad_name || currentSquad?.name || "",
+        target_squad_id: fallbackTargetId,
+        target_squad_name: fallbackTargetName,
         movement_type: effective.movement_type,
         temporary: effective.temporary,
         active_in_target_squad: effective.active_in_target_squad,
