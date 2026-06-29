@@ -1,4 +1,4 @@
-import React, { useState, useEffect, Component } from "react";
+import React, { useState, useEffect, Component, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList, Trash2 } from "lucide-react";
@@ -82,11 +82,11 @@ function NextMatchCard({ match, matchReport }) {
           <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Lista de convocados</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {matchReport.squad_names.map((name, i) =>
-          <div key={i} className="flex items-center gap-2 text-sm text-white">
-                <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
-                {name}
-              </div>
-          )}
+            <div key={`squad-${name}-${i}`} className="flex items-center gap-2 text-sm text-white">
+              <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
+              {name}
+            </div>
+            )}
           </div>
         </div>
       }
@@ -240,24 +240,6 @@ export default function Dashboard() {
 
   const today = moment().format("MM-DD");
   const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
-
-  const positionOrder = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
-
-  const filteredPlayers = selectedStatus ?
-    players.filter((p) => p.status === selectedStatus) :
-    players;
-
-  const availablePlayers = filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => {
-    const posA = positionOrder.indexOf(a.position || "");
-    const posB = positionOrder.indexOf(b.position || "");
-    if (posA === posB) return (a.number || 0) - (b.number || 0);
-    return posA - posB;
-  });
-  const unavailablePlayers = filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subieron de juveniles").sort((a, b) => {
-    if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
-    return (a.number || 0) - (b.number || 0);
-  });
-  const subioDJuveniles = filteredPlayers.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0));
   const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
   const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
   const injured = filteredPlayers.filter((p) => p.status === "Lesionado").length;
@@ -321,19 +303,21 @@ export default function Dashboard() {
         </ErrorBoundary>
       }
 
-      <div className={showMap ? "" : "hidden"}>
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-white">Mapa del día — Jugadores disponibles</h2>
-              <p className="text-xs text-zinc-500 mt-0.5">{availablePlayers.length} jugadores disponibles hoy</p>
+      {showMap && (
+        <ErrorBoundary>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
+              <div>
+                <h2 className="text-sm font-semibold text-white">Mapa del día — Jugadores disponibles</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">{availablePlayers.length} jugadores disponibles hoy</p>
+              </div>
+            </div>
+            <div className="p-4">
+              <PitchMap players={availablePlayers} emptyLabel="No hay jugadores disponibles hoy" />
             </div>
           </div>
-          <div className="p-4">
-            <PitchMap players={availablePlayers} emptyLabel="No hay jugadores disponibles hoy" />
-          </div>
-        </div>
-      </div>
+        </ErrorBoundary>
+      )}
 
       {nextMatch &&
         <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />
@@ -365,138 +349,148 @@ export default function Dashboard() {
 
       <div className="grid lg:grid-cols-2 gap-4">
         {/* Disponibles */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-              Disponibles
-              <span className="text-xs text-emerald-400 font-normal">({availablePlayers.length})</span>
-            </h2>
-            <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-              Ver plantel <ChevronRight size={14} />
-            </Link>
-          </div>
-          <div className="p-4">
-            {availablePlayers.length === 0 ?
-              <p className="text-zinc-600 text-sm text-center py-6">Sin jugadores disponibles</p> :
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {availablePlayers.map((p) =>
-                  <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
-                    <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                    <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
-                      <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
-                    </div>
-                    <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
-                      <span className="text-sm text-white">{p.full_name}</span>
-                      <span className="text-xs text-zinc-500">{p.position}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            }
-          </div>
-        </div>
-
-        {/* Subieron de juveniles */}
-        {subioDJuveniles.length > 0 &&
+        <ErrorBoundary>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
             <div className="flex items-center justify-between p-4 border-b border-zinc-800">
               <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-fuchsia-500 inline-block" />
-                Subieron de juveniles
-                <span className="text-xs text-fuchsia-400 font-normal">({subioDJuveniles.length})</span>
+                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
+                Disponibles
+                <span className="text-xs text-emerald-400 font-normal">({availablePlayers.length})</span>
               </h2>
               <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
                 Ver plantel <ChevronRight size={14} />
               </Link>
             </div>
             <div className="p-4">
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {subioDJuveniles.map((p) =>
-                  <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
-                    <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                    <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
-                      <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
-                    </div>
-                    <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
-                      <span className="text-sm text-white">{p.full_name}</span>
-                      <span className="text-xs text-zinc-500">{p.position}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        }
-
-        {/* No disponibles */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-              No disponibles
-              <span className="text-xs text-red-400 font-normal">({unavailablePlayers.length})</span>
-            </h2>
-            <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-              Ver plantel <ChevronRight size={14} />
-            </Link>
-          </div>
-          <div className="p-4">
-            {unavailablePlayers.length === 0 ?
-              <p className="text-zinc-600 text-sm text-center py-6">Todos los jugadores están disponibles</p> :
-              <div className="space-y-2 max-h-72 overflow-y-auto">
-                {unavailablePlayers.map((p) =>
-                  <div key={p.id} className="flex items-center justify-between hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
-                    <div className="flex items-center gap-3">
+              {availablePlayers.length === 0 ?
+                <p className="text-zinc-600 text-sm text-center py-6">Sin jugadores disponibles</p> :
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {availablePlayers.map((p) =>
+                    <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
                       <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
                       <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
-                        <PlayerPhotoUpload player={p} onPhotoUpdate={() => setPlayers([...players])} />
+                        <PlayerPhotoUpload player={p} onPhotoUpdate={(url) => setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, photo_url: url } : pl))} />
                       </div>
-                      <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer flex-1">
+                      <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
                         <span className="text-sm text-white">{p.full_name}</span>
+                        <span className="text-xs text-zinc-500">{p.position}</span>
                       </div>
                     </div>
-                    <PlayerStatusBadge status={p.status} />
-                  </div>
-                )}
+                  )}
+                </div>
+              }
+            </div>
+          </div>
+        </ErrorBoundary>
+
+        {/* Subieron de juveniles */}
+        {subioDJuveniles.length > 0 && (
+          <ErrorBoundary>
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+              <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-fuchsia-500 inline-block" />
+                  Subieron de juveniles
+                  <span className="text-xs text-fuchsia-400 font-normal">({subioDJuveniles.length})</span>
+                </h2>
+                <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+                  Ver plantel <ChevronRight size={14} />
+                </Link>
               </div>
-            }
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-white">Clasificación — Torneo Proyección</h2>
-          </div>
-          <div className="p-4 space-y-4">
-            <TournamentImporter />
-            <TournamentTable />
-          </div>
-        </div>
-
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-          <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-            <h2 className="text-sm font-semibold text-white">Últimas sesiones</h2>
-            <Link to="/sessions" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-              Ver sesiones <ChevronRight size={14} />
-            </Link>
-          </div>
-          <div className="p-4">
-            {sessions.length === 0 ?
-              <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p> :
-              <div className="space-y-3">
-                {sessions.map((s) =>
-                  <div key={s.id} className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-white">{s.title}</p>
-                      <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
+              <div className="p-4">
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {subioDJuveniles.map((p) =>
+                    <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
+                      <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
+                      <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
+                        <PlayerPhotoUpload player={p} onPhotoUpdate={(url) => setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, photo_url: url } : pl))} />
+                      </div>
+                      <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
+                        <span className="text-sm text-white">{p.full_name}</span>
+                        <span className="text-xs text-zinc-500">{p.position}</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
+                </div>
               </div>
-            }
+            </div>
+          </ErrorBoundary>
+        )}
+
+        {/* No disponibles */}
+        <ErrorBoundary>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
+                No disponibles
+                <span className="text-xs text-red-400 font-normal">({unavailablePlayers.length})</span>
+              </h2>
+              <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+                Ver plantel <ChevronRight size={14} />
+              </Link>
+            </div>
+            <div className="p-4">
+              {unavailablePlayers.length === 0 ?
+                <p className="text-zinc-600 text-sm text-center py-6">Todos los jugadores están disponibles</p> :
+                <div className="space-y-2 max-h-72 overflow-y-auto">
+                  {unavailablePlayers.map((p) =>
+                    <div key={p.id} className="flex items-center justify-between hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
+                      <div className="flex items-center gap-3">
+                        <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
+                        <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
+                          <PlayerPhotoUpload player={p} onPhotoUpdate={(url) => setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, photo_url: url } : pl))} />
+                        </div>
+                        <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer flex-1">
+                          <span className="text-sm text-white">{p.full_name}</span>
+                        </div>
+                      </div>
+                      <PlayerStatusBadge status={p.status} />
+                    </div>
+                  )}
+                </div>
+              }
+            </div>
           </div>
-        </div>
+        </ErrorBoundary>
+
+        <ErrorBoundary>
+          <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold text-white">Clasificación — Torneo Proyección</h2>
+            </div>
+            <div className="p-4 space-y-4">
+              <TournamentImporter />
+              <TournamentTable />
+            </div>
+          </div>
+        </ErrorBoundary>
+
+        <ErrorBoundary>
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <h2 className="text-sm font-semibold text-white">Últimas sesiones</h2>
+              <Link to="/sessions" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+                Ver sesiones <ChevronRight size={14} />
+              </Link>
+            </div>
+            <div className="p-4">
+              {sessions.length === 0 ?
+                <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p> :
+                <div className="space-y-3">
+                  {sessions.map((s) =>
+                    <div key={s.id} className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-white">{s.title}</p>
+                        <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              }
+            </div>
+          </div>
+        </ErrorBoundary>
       </div>
 
       {selectedPlayer &&
