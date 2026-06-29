@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video, BookOpen } from "lucide-react";
+import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video } from "lucide-react";
 import moment from "moment";
 import SessionPlayerTable from "@/components/sessions/SessionPlayerTable";
 import SessionExercises from "@/components/sessions/SessionExercises";
 import SessionGPS from "@/components/sessions/SessionGPS";
 import SessionStrength from "@/components/sessions/SessionStrength";
-import FieldLibraryPanel from "@/components/sessions/FieldLibraryPanel";
-import StrengthLibraryPanel from "@/components/sessions/StrengthLibraryPanel";
+import SessionVideoObs from "@/components/sessions/SessionVideoObs";
 
 const INTENSITY_COLORS = { Baja: "text-emerald-400", Media: "text-yellow-400", Alta: "text-red-400" };
 const TYPE_COLORS = {
@@ -21,12 +20,11 @@ const TYPE_COLORS = {
 };
 
 const TABS = [
-  { key: "players",          label: "Jugadores",       icon: Users },
-  { key: "exercises",        label: "Ejercicios",      icon: Dumbbell },
-  { key: "field_library",    label: "Bibl. Campo",     icon: BookOpen },
-  { key: "strength",         label: "Fuerza",          icon: Zap },
-  { key: "strength_library", label: "Bibl. Fuerza",    icon: BookOpen },
-  { key: "gps",              label: "GPS",             icon: Zap },
+  { key: "players",    label: "Jugadores",   icon: Users },
+  { key: "exercises",  label: "Ejercicios",  icon: Dumbbell },
+  { key: "strength",   label: "Fuerza",      icon: Zap },
+  { key: "gps",        label: "GPS",         icon: Zap },
+  { key: "video",      label: "Video / Obs.", icon: Video },
 ];
 
 export default function SessionDetail({ session, onBack }) {
@@ -158,12 +156,11 @@ export default function SessionDetail({ session, onBack }) {
           </div>
         ) : (
           <>
-            {tab === "players"          && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} />}
-            {tab === "exercises"        && <SessionExercises sessionId={currentSession.id} />}
-            {tab === "field_library"    && <FieldLibraryPanel />}
-            {tab === "strength"         && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
-            {tab === "strength_library" && <StrengthLibraryPanel />}
-            {tab === "gps"              && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}
+            {tab === "players"   && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} />}
+            {tab === "exercises" && <SessionExercises sessionId={currentSession.id} />}
+            {tab === "strength"  && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
+            {tab === "gps"       && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}
+            {tab === "video"     && <SessionVideoObs session={currentSession} onUpdate={setCurrentSession} />}
           </>
         )}
       </div>

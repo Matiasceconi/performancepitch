@@ -27,6 +27,8 @@ import WeeklyPlanner from '@/pages/WeeklyPlanner';
 import AdminHub from '@/pages/AdminHub';
 import DailySquad from '@/pages/DailySquad';
 import SquadManager from '@/pages/SquadManager';
+import FieldLibrary from '@/pages/FieldLibrary';
+import StrengthLibrary from '@/pages/StrengthLibrary';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -74,6 +76,8 @@ const AuthenticatedApp = () => {
           <Route path="/admin" element={<AdminHub />} />
           <Route path="/daily-squad" element={<DailySquad />} />
           <Route path="/squad-manager" element={<SquadManager />} />
+          <Route path="/field-library" element={<FieldLibrary />} />
+          <Route path="/strength-library" element={<StrengthLibrary />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />

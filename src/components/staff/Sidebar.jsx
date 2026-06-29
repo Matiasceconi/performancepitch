@@ -1,11 +1,13 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck } from "lucide-react";
+import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen, Dumbbell } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
 { label: "Dashboard", path: "/", icon: LayoutDashboard },
 { label: "Sesiones", path: "/sessions", icon: Video },
+{ label: "Bibl. Campo", path: "/field-library", icon: BookOpen },
+{ label: "Bibl. Fuerza", path: "/strength-library", icon: Dumbbell },
 { label: "Partidos", path: "/matches", icon: Trophy },
 { label: "Mapa táctico", path: "/tactical", icon: Map },
 { label: "Rendimiento", path: "/performance", icon: TrendingUp },
