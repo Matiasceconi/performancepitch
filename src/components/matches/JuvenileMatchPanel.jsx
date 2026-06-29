@@ -411,9 +411,7 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                           <button
                             onClick={async (e) => {
                               e.stopPropagation();
-                              if (val.id) {
-                                await base44.entities.MinutesRecord.delete(val.id);
-                              }
+                              try { if (val.id) await base44.entities.MinutesRecord.delete(val.id); } catch {}
                               const newMap = { ...editMinutesMap };
                               delete newMap[key];
                               setEditMinutesMap(newMap);
