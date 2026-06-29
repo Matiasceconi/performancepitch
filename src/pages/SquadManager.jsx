@@ -155,67 +155,178 @@ function MovePlayerModal({ player, membership, squads, onSave, onClose }) {
   );
 }
 
-// ─── Add Player to Squad Modal ─────────────────────────────────────────────
+// ─── Assign Players Modal (full-featured) ──────────────────────────────────
 function AddPlayerModal({ squad, players, existingMemberships, onSave, onClose }) {
   const [search, setSearch] = useState("");
+  const [filterPos, setFilterPos] = useState("");
+  const [filterCat, setFilterCat] = useState("");
   const [selected, setSelected] = useState(new Set());
+  const [saving, setSaving] = useState(false);
+
+  // Players already ACTIVE in this squad
   const activePlayerIds = new Set(
     existingMemberships.filter(m => m.squad_id === squad.id && m.status === "activo").map(m => m.player_id)
   );
-  const filtered = players.filter(p =>
-    !activePlayerIds.has(p.id) &&
-    (p.full_name || "").toLowerCase().includes(search.toLowerCase())
-  );
+  // Players with an inactive/closed membership in this squad (can be reactivated)
+  const inactiveByPlayer = {};
+  existingMemberships.filter(m => m.squad_id === squad.id && m.status !== "activo").forEach(m => {
+    if (!inactiveByPlayer[m.player_id]) inactiveByPlayer[m.player_id] = m;
+  });
+
+  const positions = [...new Set(players.map(p => p.position).filter(Boolean))].sort();
+  const categories = [...new Set(players.map(p => p.category).filter(Boolean))].sort();
+
+  const q = search.toLowerCase();
+  const filtered = players.filter(p => {
+    if (activePlayerIds.has(p.id)) return false; // already active → skip
+    if (filterPos && p.position !== filterPos) return false;
+    if (filterCat && p.category !== filterCat) return false;
+    if (q) {
+      const haystack = `${p.full_name} ${p.dni || ""} ${p.position || ""} ${p.category || ""}`.toLowerCase();
+      if (!haystack.includes(q)) return false;
+    }
+    return true;
+  });
+
+  function toggleAll() {
+    if (selected.size === filtered.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filtered.map(p => p.id)));
+    }
+  }
+
+  function toggle(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
 
   async function handleAdd() {
+    setSaving(true);
     const today = moment().format("YYYY-MM-DD");
     for (const playerId of selected) {
       const player = players.find(p => p.id === playerId);
-      await onSave({
-        player_id: playerId,
-        player_name: player?.full_name || "",
-        squad_id: squad.id,
-        squad_name: squad.name,
-        status: "activo",
-        effective_from: today,
-      });
+      const prev = inactiveByPlayer[playerId];
+      if (prev) {
+        // Reactivate existing membership
+        await base44.entities.SquadMembership.update(prev.id, {
+          status: "activo",
+          effective_from: today,
+          effective_to: "",
+        });
+        onSave({ ...prev, status: "activo", effective_from: today, effective_to: "", _reactivated: true });
+      } else {
+        await onSave({
+          player_id: playerId,
+          player_name: player?.full_name || "",
+          squad_id: squad.id,
+          squad_name: squad.name,
+          status: "activo",
+          effective_from: today,
+        });
+      }
     }
+    setSaving(false);
     onClose();
   }
 
+  const allSelected = filtered.length > 0 && selected.size === filtered.length;
+
   return (
     <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md shadow-2xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-white font-semibold">Agregar jugadores a {squad.name}</h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl w-full max-w-xl flex flex-col" style={{ maxHeight: "90vh" }}>
+        {/* Header */}
+        <div className="flex items-center justify-between p-5 border-b border-zinc-800 shrink-0">
+          <div>
+            <h3 className="text-white font-semibold">Asignar jugadores</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Plantel: <span className="text-zinc-300 font-medium">{squad.name}</span></p>
+          </div>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
         </div>
-        <input value={search} onChange={e => setSearch(e.target.value)}
-          placeholder="Buscar jugador..."
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
-        <div className="max-h-64 overflow-y-auto space-y-1">
-          {filtered.length === 0
-            ? <p className="text-zinc-600 text-sm text-center py-4">Sin jugadores disponibles</p>
-            : filtered.map(p => (
-                <button key={p.id} onClick={() => setSelected(prev => {
-                  const next = new Set(prev);
-                  if (next.has(p.id)) next.delete(p.id); else next.add(p.id);
-                  return next;
-                })}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${selected.has(p.id) ? "bg-emerald-500/20 border border-emerald-500/30" : "hover:bg-zinc-800"}`}>
-                  {selected.has(p.id) && <Check size={14} className="text-emerald-400 shrink-0" />}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-white truncate">{p.full_name}</p>
-                    <p className="text-xs text-zinc-500">{p.position}{p.division ? ` · ${p.division}` : ""}</p>
+
+        {/* Filters */}
+        <div className="p-4 border-b border-zinc-800 space-y-2 shrink-0">
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar por nombre, apellido, DNI, posición o categoría..."
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
+          <div className="flex gap-2">
+            <select value={filterPos} onChange={e => setFilterPos(e.target.value)}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none">
+              <option value="">Todas las posiciones</option>
+              {positions.map(p => <option key={p} value={p}>{p}</option>)}
+            </select>
+            <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+              className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none">
+              <option value="">Todas las categorías</option>
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+
+        {/* Select all bar */}
+        <div className="px-4 py-2 border-b border-zinc-800 flex items-center justify-between shrink-0">
+          <button onClick={toggleAll} className="flex items-center gap-2 text-xs text-zinc-400 hover:text-white transition-colors">
+            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${allSelected ? "bg-emerald-500 border-emerald-500" : "border-zinc-600"}`}>
+              {allSelected && <Check size={10} className="text-white" />}
+            </div>
+            {allSelected ? "Deseleccionar todos" : `Seleccionar todos (${filtered.length})`}
+          </button>
+          {selected.size > 0 && (
+            <span className="text-xs text-emerald-400 font-medium">{selected.size} seleccionado{selected.size !== 1 ? "s" : ""}</span>
+          )}
+        </div>
+
+        {/* Player list */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          {filtered.length === 0 ? (
+            <p className="text-zinc-600 text-sm text-center py-8">Sin jugadores disponibles para asignar</p>
+          ) : (
+            filtered.map(p => {
+              const isSelected = selected.has(p.id);
+              const canReactivate = !!inactiveByPlayer[p.id];
+              return (
+                <button key={p.id} onClick={() => toggle(p.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all border ${
+                    isSelected ? "bg-emerald-500/15 border-emerald-500/30" : "border-transparent hover:bg-zinc-800/60"
+                  }`}>
+                  {/* Checkbox */}
+                  <div className={`w-4 h-4 rounded border shrink-0 flex items-center justify-center transition-colors ${isSelected ? "bg-emerald-500 border-emerald-500" : "border-zinc-600"}`}>
+                    {isSelected && <Check size={10} className="text-white" />}
                   </div>
+                  {/* Photo */}
+                  {p.photo_url
+                    ? <img src={p.photo_url} alt={p.full_name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
+                    : <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-zinc-500">{(p.full_name || "?").charAt(0)}</span>
+                      </div>}
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-white font-medium truncate">{p.full_name}</p>
+                    <p className="text-xs text-zinc-500 truncate">
+                      {p.position}
+                      {p.category ? ` · ${p.category}` : ""}
+                      {p.dni ? ` · DNI ${p.dni}` : ""}
+                      {p.division ? ` · ${p.division}` : ""}
+                    </p>
+                  </div>
+                  {canReactivate && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/20 text-sky-300 border border-sky-500/30 shrink-0">Reactivar</span>
+                  )}
                 </button>
-              ))}
+              );
+            })
+          )}
         </div>
-        <div className="flex gap-2 justify-end">
+
+        {/* Footer */}
+        <div className="p-4 border-t border-zinc-800 flex gap-2 justify-end shrink-0">
           <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800">Cancelar</button>
-          <button onClick={handleAdd} disabled={selected.size === 0}
-            className="px-4 py-2 text-sm bg-white text-zinc-900 font-semibold rounded-lg hover:bg-zinc-200 disabled:opacity-40">
-            Agregar {selected.size > 0 ? `(${selected.size})` : ""}
+          <button onClick={handleAdd} disabled={selected.size === 0 || saving}
+            className="px-5 py-2 text-sm bg-white text-zinc-900 font-semibold rounded-lg hover:bg-zinc-200 disabled:opacity-40 transition-colors">
+            {saving ? "Guardando..." : `Asignar ${selected.size > 0 ? `(${selected.size})` : ""}`}
           </button>
         </div>
       </div>
@@ -357,9 +468,15 @@ export default function SquadManager() {
   }
 
   async function handleAddMembership(data) {
-    const created = await base44.entities.SquadMembership.create(data);
-    setMemberships(prev => [...prev, created]);
-    toast({ title: `${data.player_name} agregado a ${data.squad_name}` });
+    if (data._reactivated) {
+      // Reactivation: modal already called update, just sync local state
+      setMemberships(prev => prev.map(m => m.id === data.id ? { ...m, status: "activo", effective_from: data.effective_from, effective_to: "" } : m));
+      toast({ title: `${data.player_name} reactivado en ${data.squad_name}` });
+    } else {
+      const created = await base44.entities.SquadMembership.create(data);
+      setMemberships(prev => [...prev, created]);
+      toast({ title: `${data.player_name} asignado a ${data.squad_name}` });
+    }
   }
 
   async function handleMovePlayer(data) {
