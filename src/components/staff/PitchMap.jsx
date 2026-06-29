@@ -183,6 +183,8 @@ export default function PitchMap({ players: rawPlayers, highlighted = EMPTY_SET,
           : colors.bg;
 
         const photoUrl = player.photo_url;
+        const displayNumber = player.jersey_number || player.number;
+        const displayName = player.full_name || player.name || "?";
 
         return (
           <div
@@ -200,7 +202,7 @@ export default function PitchMap({ players: rawPlayers, highlighted = EMPTY_SET,
             className="flex flex-col items-center group"
           >
             {photoUrl ? (
-              <PlayerChip chipColor={chipColor} photoUrl={photoUrl} player={player} />
+              <PlayerChip chipColor={chipColor} photoUrl={photoUrl} player={{ ...player, number: displayNumber, full_name: displayName }} />
             ) : (
               <div
                 style={{
@@ -209,14 +211,14 @@ export default function PitchMap({ players: rawPlayers, highlighted = EMPTY_SET,
                 }}
                 className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white/50 transition-transform group-hover:scale-110 text-white"
               >
-                {player.number || "?"}
+                {displayNumber || "?"}
               </div>
             )}
 
             <div className="mt-1 bg-black/80 rounded px-1.5 py-0.5 border border-white/30 text-center whitespace-nowrap shadow-md">
               <div className="text-[9px] font-bold text-white leading-tight tracking-wide">
-                {player.number ? `${player.number}·` : ""}
-                {((player.full_name || player.name || "?").split(" ").pop() || "?").toUpperCase()}
+                {displayNumber ? `${displayNumber}·` : ""}
+                {(displayName.split(" ").pop() || "?").toUpperCase()}
               </div>
               <div className="text-[7px] text-yellow-300 leading-tight font-semibold">
                 {(player.position || "").substring(0, 3).toUpperCase()}
