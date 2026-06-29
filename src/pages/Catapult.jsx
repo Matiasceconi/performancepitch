@@ -10,6 +10,7 @@ import PlayerEvolution from "@/components/catapult/PlayerEvolution";
 import SessionComparison from "@/components/catapult/SessionComparison";
 import MatchImport from "@/components/catapult/MatchImport";
 import TeamReport from "@/components/catapult/TeamReport";
+import WeeklyDashboard from "@/components/catapult/WeeklyDashboard";
 
 // ── Fuzzy column matcher: maps any header string to an entity field ──────────
 function matchColumn(raw) {
@@ -580,7 +581,7 @@ export default function Catapult() {
   const [sessions, setSessions] = useState([]);
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("training");
+  const [activeTab, setActiveTab] = useState("weekly");
   const { toast } = useToast();
 
   useEffect(() => { loadAll(); }, []);
@@ -615,9 +616,10 @@ export default function Catapult() {
       {/* Tabs */}
       <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
         {[
-          { key: "training", label: "Entrenamiento" },
-          { key: "matches",  label: "Partido" },
-          { key: "team",     label: "Informe de Equipo" },
+          { key: "weekly",    label: "Dashboard Semanal" },
+          { key: "training",  label: "Entrenamiento" },
+          { key: "matches",   label: "Partido" },
+          { key: "team",      label: "Informe de Equipo" },
           { key: "evolution", label: "Evolución" },
           { key: "comparison", label: "Comparar" },
         ].map((t) => (
@@ -632,6 +634,11 @@ export default function Catapult() {
           </button>
         ))}
       </div>
+
+      {/* ── TAB: WEEKLY DASHBOARD ─────────────────────────────────────── */}
+      {activeTab === "weekly" && (
+        <WeeklyDashboard sessions={sessions} reports={reports} />
+      )}
 
       {/* ── TAB: TRAINING ─────────────────────────────────────────────── */}
       {activeTab === "training" && (
