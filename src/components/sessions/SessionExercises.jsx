@@ -25,6 +25,9 @@ export default function SessionExercises({ sessionId }) {
       ...form,
       session_id: sessionId,
       order: exercises.length + 1,
+      sets: form.sets !== "" ? parseInt(form.sets) : undefined,
+      rest_seconds: form.rest_seconds !== "" ? parseInt(form.rest_seconds) : undefined,
+      duration_minutes: form.duration_minutes !== "" ? parseInt(form.duration_minutes) : undefined,
     });
     setExercises(prev => [...prev, ex]);
     setForm({ name: "", type: "Técnico", duration_minutes: "", objective: "", space: "", players: "", sets: "", rest_seconds: "", notes: "" });
