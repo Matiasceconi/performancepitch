@@ -80,7 +80,11 @@ function ClubLogo({ url, name, size = 10, onAddLogo }) {
   return <img src={url} alt={name} className={`w-${size} h-${size} object-contain shrink-0`} onError={() => setErr(true)} />;
 }
 
-function JuvMatchCard({ match, players, onDelete, onLogoUpdated }) {
+const EDIT_EMPTY = { date: "", rival: "", location: "Local", our_score: "", rival_score: "", rival_logo_url: "" };
+
+function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated }) {
+  const [editing, setEditing] = useState(false);
+  const [editForm, setEditForm] = useState(EDIT_EMPTY);
   const [expanded, setExpanded] = useState(false);
   const [minutesRecords, setMinutesRecords] = useState([]);
   const [editMinutesMap, setEditMinutesMap] = useState({});
@@ -208,6 +212,9 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated }) {
           {minutesRecords.length > 0 && (
             <span className="text-xs text-violet-400 font-mono">{minutesRecords.length}j</span>
           )}
+          <button onClick={e => { e.stopPropagation(); setEditForm({ ...match, our_score: match.our_score ?? "", rival_score: match.rival_score ?? "", rival_logo_url: match.rival_logo_url || "" }); setEditing(true); }} className="p-1.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors">
+            <Edit2 size={13} />
+          </button>
           <button onClick={e => { e.stopPropagation(); onDelete(match.id); }} className="p-1.5 rounded hover:bg-red-900/40 text-zinc-500 hover:text-red-400 transition-colors">
             <Trash2 size={13} />
           </button>
@@ -227,6 +234,78 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated }) {
           />
           <button onClick={e => { e.stopPropagation(); saveLogo(); }} className="px-3 py-1.5 bg-white text-zinc-900 rounded-lg text-sm font-medium">Guardar</button>
           <button onClick={e => { e.stopPropagation(); setEditingLogo(false); }} className="px-3 py-1.5 text-zinc-400 hover:text-white text-sm">Cancelar</button>
+        </div>
+      )}
+
+      {/* Panel de edición del partido */}
+      {editing && (
+        <div className="border-t border-zinc-800 p-4 bg-zinc-850 space-y-3" onClick={e => e.stopPropagation()}>
+          <p className="text-sm font-semibold text-white flex items-center gap-2"><Edit2 size={14} /> Editar partido</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Rival *</label>
+              <input className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500" value={editForm.rival} onChange={e => setEditForm(f => ({ ...f, rival: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Fecha</label>
+              <input type="date" className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500" value={editForm.date} onChange={e => setEditForm(f => ({ ...f, date: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Condición</label>
+              <select className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none" value={editForm.location} onChange={e => setEditForm(f => ({ ...f, location: e.target.value }))}>
+                <option>Local</option><option>Visitante</option><option>Neutral</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Escudo (URL)</label>
+              <div className="flex items-center gap-2">
+                {editForm.rival_logo_url && <img src={editForm.rival_logo_url} className="w-5 h-5 object-contain shrink-0" onError={e => e.target.style.display="none"} />}
+                <input className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500" placeholder="https://..." value={editForm.rival_logo_url || ""} onChange={e => setEditForm(f => ({ ...f, rival_logo_url: e.target.value }))} />
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Goles propios</label>
+              <input type="number" min="0" className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none" value={editForm.our_score} onChange={e => setEditForm(f => ({ ...f, our_score: e.target.value }))} />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Goles rival</label>
+              <input type="number" min="0" className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none" value={editForm.rival_score} onChange={e => setEditForm(f => ({ ...f, rival_score: e.target.value }))} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button onClick={() => setEditing(false)} className="px-3 py-1.5 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Cancelar</button>
+            <button onClick={async () => {
+              const autoLogo = editForm.rival_logo_url || getLogoForRival(editForm.rival);
+              await base44.entities.MatchReport.update(match.id, {
+                rival: editForm.rival,
+                date: editForm.date,
+                location: editForm.location,
+                rival_logo_url: autoLogo || null,
+                our_score: editForm.our_score !== "" ? Number(editForm.our_score) : null,
+                rival_score: editForm.rival_score !== "" ? Number(editForm.rival_score) : null,
+              });
+              onLogoUpdated?.(match.id, autoLogo);
+              onMatchUpdated?.(match.id, {
+                rival: editForm.rival,
+                date: editForm.date,
+                location: editForm.location,
+                rival_logo_url: autoLogo,
+                our_score: editForm.our_score !== "" ? Number(editForm.our_score) : null,
+                rival_score: editForm.rival_score !== "" ? Number(editForm.rival_score) : null,
+              });
+              setEditing(false);
+              toast({ title: "Partido actualizado" });
+              if (expanded) {
+                const records = await base44.entities.MinutesRecord.filter(
+                  { match_date: match.date, tournament: "Juveniles" }, "-created_date", 200
+                );
+                setMinutesRecords(records.filter(r => r.minutes > 0));
+              }
+            }} disabled={!editForm.rival || !editForm.date}
+              className="px-3 py-1.5 rounded-lg text-sm bg-violet-600 hover:bg-violet-500 text-white font-semibold disabled:opacity-40 transition-colors">
+              <Check size={14} className="inline mr-1" />Guardar
+            </button>
+          </div>
         </div>
       )}
 
@@ -401,6 +480,10 @@ export default function JuvenileMatchPanel({ players }) {
     setMatches(ms => ms.map(m => m.id === id ? { ...m, rival_logo_url: url } : m));
   }
 
+  function handleMatchUpdated(id, data) {
+    setMatches(ms => ms.map(m => m.id === id ? { ...m, ...data } : m));
+  }
+
   async function runImport() {
     setImporting(true);
     try {
@@ -487,7 +570,7 @@ export default function JuvenileMatchPanel({ players }) {
       ) : (
         <div className="space-y-3">
           {matches.map(m => (
-            <JuvMatchCard key={m.id} match={m} players={players} onDelete={deleteMatch} onLogoUpdated={handleLogoUpdated} />
+            <JuvMatchCard key={m.id} match={m} players={players} onDelete={deleteMatch} onLogoUpdated={handleLogoUpdated} onMatchUpdated={handleMatchUpdated} />
           ))}
         </div>
       )}
