@@ -3,6 +3,19 @@ import { base44 } from "@/api/base44Client";
 import { Upload, CheckCircle, AlertCircle, Eye, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { fmtMetric, fmtSmax } from "@/utils";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+
+// Métricas con sus colores de referencia
+const METRICS = [
+  { key: "total_distance", label: "Distancia (m)",        color: "#3b82f6" },
+  { key: "distance_19_8",  label: "19,8-25 km/h (m)",     color: "#10b981" },
+  { key: "distance_25",    label: "+25 km/h (m)",          color: "#f97316" },
+  { key: "player_load",    label: "Carga del jugador",     color: "#a855f7" },
+  { key: "smax",           label: "Vel. Máx (km/h)",       color: "#ef4444" },
+  { key: "acc_3",          label: "Aceleraciones",         color: "#f59e0b" },
+  { key: "dec_3",          label: "Desaceleraciones",      color: "#ec4899" },
+  { key: "sprints",        label: "Esfuerzos de sprint",   color: "#06b6d4" },
+];
 
 // ── Normalize player name for matching ──────────────────────────────────────
 function normalize(s) {
@@ -237,12 +250,20 @@ export default function SessionGPS({ session, sessionPlayers }) {
     toast({ title: `✓ Alias guardado para ${player.full_name}` });
   }
 
+  const [activeMetric, setActiveMetric] = useState("total_distance");
+
   // ── Stats ──────────────────────────────────────────────────────────────────
-  const withGPS = gpsRows.length;
-  const withoutGPS = sessionPlayers.filter(sp => !gpsRows.find(r => r.player_id === sp.player_id)).length;
-  const avgDistRaw = gpsRows.length ? gpsRows.reduce((s, r) => s + (r.total_distance || 0), 0) / gpsRows.length : null;
-  const avgMMinRaw = gpsRows.length ? gpsRows.reduce((s, r) => s + (r.m_min || 0), 0) / gpsRows.length : null;
-  const topSpeed = gpsRows.length ? gpsRows.reduce((a, b) => (b.smax || 0) > (a.smax || 0) ? b : a, gpsRows[0]) : null;
+  function avg(key) {
+    const vals = gpsRows.map(r => r[key] || 0);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  }
+  const activeMeta = METRICS.find(m => m.key === activeMetric) || METRICS[0];
+  const chartData = [...gpsRows]
+    .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
+    .map(r => ({
+      name: (r.player_name || "").split(" ")[0],
+      value: r[activeMetric] || 0,
+    }));
 
   return (
     <div className="space-y-6">
@@ -355,57 +376,98 @@ export default function SessionGPS({ session, sessionPlayers }) {
         <p className="text-zinc-600 text-sm text-center py-2">Sin datos GPS cargados</p>
       )}
 
-      {/* Summary cards */}
+      {/* Summary cards — 2 rows x 4 cols */}
       {gpsRows.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Con GPS", value: withGPS, color: "text-emerald-400" },
-            { label: "Sin GPS", value: withoutGPS, color: "text-zinc-500" },
-            { label: "Prom. distancia", value: avgDistRaw != null ? `${fmtMetric(avgDistRaw)}m` : "—", color: "text-blue-400" },
-            { label: "Mayor velocidad", value: topSpeed ? `${fmtSmax(topSpeed.smax)} km/h` : "—", color: "text-orange-400" },
-          ].map(s => (
-            <div key={s.label} className="bg-zinc-800/50 rounded-xl p-3 text-center">
-              <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
-              <p className="text-[10px] text-zinc-500 mt-0.5">{s.label}</p>
-            </div>
-          ))}
+          {METRICS.map(m => {
+            const a = avg(m.key);
+            const display = m.key === "smax" ? (a != null ? fmtSmax(a) : "—") : (a != null ? fmtMetric(a) : "—");
+            return (
+              <div key={m.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                <p className="text-[10px] text-zinc-500 mb-1">{m.label}</p>
+                <p className="text-xl font-bold" style={{ color: m.color }}>{display}</p>
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* GPS Table */}
       {gpsRows.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
-            <CheckCircle size={12} /> Jugadores con GPS ({gpsRows.length})
-          </p>
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-zinc-800">
-                  {["Jugador", "Duración", "Dist. (m)", "m/min", "D>19.8", "D>25", "Sprints", "ACC+3", "DEC+3", "P.Load", "Smax", "% Smax"].map(h => (
-                    <th key={h} className="text-left py-2 px-2 text-zinc-500 font-medium whitespace-nowrap">{h}</th>
+                  <th className="text-left py-3 px-4 text-zinc-400 font-medium whitespace-nowrap">Jugador</th>
+                  {METRICS.map(m => (
+                    <th key={m.key} className="text-right py-3 px-3 font-medium whitespace-nowrap" style={{ color: m.color }}>
+                      {m.label}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {gpsRows.map((r, i) => (
-                  <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
-                    <td className="py-2 px-2 text-white font-medium whitespace-nowrap">{r.player_name}</td>
-                    <td className="py-2 px-2 text-zinc-400">{r.duration ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.total_distance)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.m_min)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.distance_19_8)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.distance_25)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.sprints)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.acc_3)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.dec_3)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.player_load)}</td>
-                    <td className="py-2 px-2 text-orange-300 font-semibold">{fmtSmax(r.smax)}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.max_vel_percent != null ? `${fmtMetric(r.max_vel_percent)}%` : "—"}</td>
+                  <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-2.5 px-4 text-white font-semibold whitespace-nowrap">{r.player_name}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#3b82f6" }}>{fmtMetric(r.total_distance)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#10b981" }}>{fmtMetric(r.distance_19_8)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#f97316" }}>{fmtMetric(r.distance_25)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#a855f7" }}>{fmtMetric(r.player_load)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#ef4444" }}>{fmtSmax(r.smax)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#f59e0b" }}>{fmtMetric(r.acc_3)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#ec4899" }}>{fmtMetric(r.dec_3)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#06b6d4" }}>{fmtMetric(r.sprints)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Bar chart — metric selector + chart */}
+      {gpsRows.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
+          {/* Metric tabs */}
+          <div className="flex flex-wrap gap-2">
+            {METRICS.map(m => (
+              <button
+                key={m.key}
+                onClick={() => setActiveMetric(m.key)}
+                className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                  activeMetric === m.key
+                    ? "border-transparent text-zinc-900"
+                    : "bg-transparent border-zinc-700 text-zinc-400 hover:text-white"
+                }`}
+                style={activeMetric === m.key ? { backgroundColor: m.color } : {}}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Chart */}
+          <div>
+            <p className="text-xs text-zinc-400 mb-3 font-medium">{activeMeta.label} — por jugador</p>
+            <ResponsiveContainer width="100%" height={chartData.length * 32 + 20}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 60, right: 40, top: 0, bottom: 0 }}>
+                <XAxis type="number" hide />
+                <YAxis type="category" dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 11 }} width={60} />
+                <Tooltip
+                  contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 11 }}
+                  labelStyle={{ color: "#fff" }}
+                  itemStyle={{ color: activeMeta.color }}
+                  formatter={v => [activeMetric === "smax" ? fmtSmax(v) : fmtMetric(v), activeMeta.label]}
+                />
+                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  {chartData.map((_, idx) => (
+                    <Cell key={idx} fill={activeMeta.color} fillOpacity={0.85} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       )}
