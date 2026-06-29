@@ -244,7 +244,16 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Rival *</label>
-              <input className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500" value={editForm.rival} onChange={e => setEditForm(f => ({ ...f, rival: e.target.value }))} />
+              <div className="flex items-center gap-2">
+                {(editForm.rival_logo_url || getLogoForRival(editForm.rival)) && (
+                  <img src={editForm.rival_logo_url || getLogoForRival(editForm.rival)} className="w-5 h-5 object-contain shrink-0" onError={e => e.target.style.display="none"} />
+                )}
+                <input className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500" value={editForm.rival} onChange={e => {
+                  const val = e.target.value;
+                  const autoLogo = getLogoForRival(val);
+                  setEditForm(f => ({ ...f, rival: val, rival_logo_url: autoLogo || f.rival_logo_url }));
+                }} />
+              </div>
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Fecha</label>
