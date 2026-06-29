@@ -319,11 +319,11 @@ function EventCard({ event, onEdit, onDelete, onDownloadDay }) {
             {event.type && <p className="text-xs text-zinc-500">{event.type}</p>}
           </div>
           <div className="flex gap-1 shrink-0">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(event); }} className="p-1 rounded hover:bg-white/10 text-zinc-500 hover:text-white transition-colors">
-              <Pencil size={12} />
+            <button onClick={(e) => { e.stopPropagation(); onEdit(event); }} className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors">
+              <Pencil size={13} />
             </button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(event.id); }} className="p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors">
-              <Trash2 size={12} />
+            <button onClick={(e) => { e.stopPropagation(); onDelete(event.id); }} className="p-1.5 rounded-md bg-red-500/30 hover:bg-red-500/60 text-red-300 hover:text-white transition-colors">
+              <Trash2 size={13} />
             </button>
           </div>
         </div>
