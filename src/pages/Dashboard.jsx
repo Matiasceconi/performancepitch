@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
 import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList, Trash2 } from "lucide-react";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
@@ -286,22 +285,19 @@ export default function Dashboard() {
               }
                    <span className="text-sm text-white flex-1 min-w-0 truncate">{p.full_name}</span>
                   <span className="text-xs text-zinc-600 hidden sm:block">{p.position}</span>
-                  <Select
-                value={p.status || "Disponible"}
-                onValueChange={async (v) => {
-                  await base44.entities.Player.update(p.id, { status: v });
-                  setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
-                }}>
-                
-                    <SelectTrigger className="h-7 w-36 text-xs bg-zinc-800 border-zinc-700 text-white shrink-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-800 border-zinc-700">
-                       {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subieron de juveniles", "Bajo de primera", "Sparring"].map((s) =>
-                  <SelectItem key={s} value={s} className="text-white text-xs">{s}</SelectItem>
-                  )}
-                     </SelectContent>
-                  </Select>
+                  <select
+                    value={p.status || "Disponible"}
+                    onChange={async (e) => {
+                      const v = e.target.value;
+                      await base44.entities.Player.update(p.id, { status: v });
+                      setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
+                    }}
+                    className="h-7 w-36 text-xs bg-zinc-800 border border-zinc-700 text-white rounded-md px-2 focus:outline-none shrink-0"
+                  >
+                    {["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subieron de juveniles", "Bajo de primera", "Sparring"].map((s) =>
+                      <option key={s} value={s} className="bg-zinc-900">{s}</option>
+                    )}
+                  </select>
                 </div>
             )}
             </div>
