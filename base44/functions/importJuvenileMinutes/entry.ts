@@ -1,65 +1,92 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// Estructura exacta de la planilla leída:
-// Columnas de partidos (pares: col descripción RES, col minutos RES, col descripción JUV, col minutos JUV)
-// JUV F1=col20,col21  JUV F2=col24,col25  etc.
-// Filas de jugadores: rows 9-27 (índice 0)
+// Mapping exacto de nombres de la lista del usuario a player_id del plantel
+const PLAYER_IDS = {
+  "Juan Puchetta":          "6a3f0effd901e7856b03a918",
+  "Dylam Almada":           "6a3eef7270d826031108e316",
+  "Alessandro Guennin":     "6a3eef733f6057f6e213cab6",
+  "Patricio Flores":        "6a3eef72a61a01225d536269",
+  "Emiliano Cantero":       "6a3eef7307e048e9c9925a45",
+  "Jose Capponi":           "6a3f2745418de33154038772",
+  "Joaquin Ejea":           "6a3eef722df7aa69de71b255",
+  "Lautaro Quiroga":        "6a3eef7283dab3778fd32d1e",
+  "Lautaro Agustin Vazquez": "6a3eef73d805d51b063617c8",
+  "Uriel Ramos":            "6a3eef73e930b77bf695fc83",
+  "Sebastian Neris Miño":   "6a3eef72b5e6b95a6d015ecc",
+  "Franco Pastrana":        "6a3eef7312ba756ef5b69fa7",
+  "Gaston Ayala":           "6a3eef73d26521423882cb27",
+};
 
-// Partidos Juveniles (15 fechas)
-const MATCHES = [
-  { label: "JUV F1",  date: "2026-03-15", rival: "Atletico Tucuman" },
-  { label: "JUV F2",  date: "2026-03-22", rival: "Independiente Rivadavia" },
-  { label: "JUV F3",  date: "2026-03-28", rival: "Vélez" },
-  { label: "JUV F4",  date: "2026-04-02", rival: "Ferro" },
-  { label: "JUV F5",  date: "2026-04-08", rival: "Banfield" },
-  { label: "JUV F6",  date: "2026-04-11", rival: "Lanús" },
-  { label: "JUV F7",  date: "2026-04-15", rival: "Racing" },
-  { label: "JUV F8",  date: "2026-04-18", rival: "Rosario Central" },
-  { label: "JUV F9",  date: "2026-04-21", rival: "Newell's" },
-  { label: "JUV F10", date: "2026-04-25", rival: "Godoy Cruz" },
-  { label: "JUV 11",  date: "2026-04-28", rival: "Platense" },
-  { label: "JUV 12",  date: "2026-05-02", rival: "Argentinos" },
-  { label: "JUV 13",  date: "2026-05-13", rival: "Independiente" },
-  { label: "JUV 14",  date: "2026-05-20", rival: "Tigre" },
-  { label: "JUV F15", date: "2026-06-18", rival: "River" },
-];
-
-// Datos extraídos directamente de la planilla
-// Formato: [playerName, [minutos por partido JUV (15 valores, null=no participó)]]
-const PLAYER_DATA = [
-  // col_21, col_25, col_27, col_30, col_33, col_36, col_39, col_42, col_45, col_48, col_51, col_54, col_57, col_60, col_63
-  { name: "Gaston Ayala",       mins: [96, 95, 90, 92, 80, 96, 73, 20, 93, 83, 82, 46, 99, 27, null] },
-  { name: "Thomas Blasquez",    mins: [null, 9, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Jonas Cabrera",      mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Emiliano Cantero",   mins: [89, null, 97, 99, null, null, null, null, 80, 93, 86, 91, 99, 96, null] },
-  { name: "Jose Capponi",       mins: [null, null, null, 69, 91, 93, null, null, null, null, null, null, null, null, 96] },
-  { name: "Alan Coria",         mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Joaquin Ejea",       mins: [89, null, 64, 46, null, 93, null, 13, 13, 16, null, null, null, null, 95] },
-  { name: "Ramiro Gagliardi",   mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Thiago Martinez",    mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Sebastian Neris Miño", mins: [null, 80, 97, 94, 91, 93, 93, null, 93, 10, 94, 10, 95, 6, 93] },
-  { name: "Franco Pastrana",    mins: [null, 10, 62, null, null, null, null, 13, 3, 10, null, null, null, null, 70] },
-  { name: "Juan Puchetta",      mins: [74, 72, 73, 99, 65, 93, 62, null, null, 30, null, null, null, null, null] },
-  { name: "Maximo Rodriguez",   mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Joan Sosa",          mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Dylam Almada",       mins: [96, 105, 53, null, 95, null, null, 78, null, null, 88, null, null, null, 60] },
-  { name: "Brian Retamoso",     mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Alessandro Guennin", mins: [77, 105, 97, 99, 96, 93, null, null, null, 96, 98, null, null, 4, 90] },
-  { name: "Mateo Lopez",        mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Pablo Lopez",        mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Valentin Loza",      mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Lautaro Quiroga",    mins: [65, 93, 64, 94, null, null, null, null, null, null, null, 11, null, 17, 46] },
-  { name: "Gustavo Vazquez",    mins: [95, 10, 97, 69, 93, null, 93, null, 96, 98, null, null, null, null, null] },
-  { name: "Juan Moreno",        mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Facundo Noguera",    mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Facundo Quintana",   mins: [null, null, null, null, null, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Uriel Ramos",        mins: [95, null, 97, 96, 93, null, null, null, null, null, null, null, null, null, null] },
-  { name: "Patricio Flores",    mins: [96, 93, 98, 96, 96, 93, null, 94, null, null, null, null, null, null, 93] },
-  { name: "Lautaro Vazquez",    mins: [95, null, 97, 69, 93, null, null, null, 96, 98, null, null, null, null, null] },
+const FECHAS = [
+  { label: "JUV F1",  date: "2026-03-15", rival: "Atletico Tucuman", jugadores: [
+    ["Juan Puchetta", 74], ["Dylam Almada", 96], ["Alessandro Guennin", 77], ["Patricio Flores", 96],
+  ] },
+  { label: "JUV F2",  date: "2026-03-22", rival: "Independiente Rivadavia", jugadores: [
+    ["Thomas Blasquez", 45], ["Emiliano Cantero", 89], ["Jose Capponi", 95], ["Joaquin Ejea", 89],
+    ["Juan Puchetta", 72], ["Dylam Almada", 105], ["Alessandro Guennin", 105], ["Lautaro Quiroga", 65],
+    ["Lautaro Agustin Vazquez", 95], ["Uriel Ramos", 95],
+  ] },
+  { label: "JUV F3",  date: "2026-03-28", rival: "Vélez", jugadores: [
+    ["Thomas Blasquez", 45], ["Sebastian Neris Miño", 80], ["Dylam Almada", 53],
+    ["Lautaro Quiroga", 93], ["Patricio Flores", 93],
+  ] },
+  { label: "JUV F4",  date: "2026-04-02", rival: "Ferro", jugadores: [
+    ["Thomas Blasquez", 25], ["Emiliano Cantero", 97], ["Jose Capponi", 97], ["Joaquin Ejea", 64],
+    ["Sebastian Neris Miño", 97], ["Franco Pastrana", 62], ["Juan Puchetta", 73], ["Alessandro Guennin", 97],
+    ["Lautaro Quiroga", 64], ["Lautaro Agustin Vazquez", 97], ["Uriel Ramos", 97],
+  ] },
+  { label: "JUV F5",  date: "2026-04-08", rival: "Banfield", jugadores: [
+    ["Thomas Blasquez", 45], ["Emiliano Cantero", 99], ["Jose Capponi", 69], ["Sebastian Neris Miño", 94],
+    ["Juan Puchetta", 99], ["Alessandro Guennin", 99], ["Lautaro Quiroga", 94], ["Patricio Flores", 98],
+  ] },
+  { label: "JUV F6",  date: "2026-04-11", rival: "Lanús", jugadores: [
+    ["Jose Capponi", 91], ["Joaquin Ejea", 46], ["Sebastian Neris Miño", 91], ["Juan Puchetta", 65],
+    ["Alessandro Guennin", 96], ["Lautaro Agustin Vazquez", 69], ["Uriel Ramos", 96],
+  ] },
+  { label: "JUV F7",  date: "2026-04-15", rival: "Racing", jugadores: [
+    ["Jose Capponi", 93], ["Joaquin Ejea", 93], ["Sebastian Neris Miño", 93], ["Juan Puchetta", 93],
+    ["Alessandro Guennin", 93], ["Lautaro Agustin Vazquez", 93], ["Patricio Flores", 96],
+  ] },
+  { label: "JUV F8",  date: "2026-04-18", rival: "Rosario Central", jugadores: [
+    ["Sebastian Neris Miño", 93], ["Franco Pastrana", 45], ["Juan Puchetta", 62],
+    ["Dylam Almada", 95], ["Uriel Ramos", 93],
+  ] },
+  { label: "JUV F9",  date: "2026-04-21", rival: "Newell's", jugadores: [
+    ["Patricio Flores", 96],
+  ] },
+  { label: "JUV F10", date: "2026-04-25", rival: "Godoy Cruz", jugadores: [
+    ["Sebastian Neris Miño", 93], ["Dylam Almada", 78], ["Patricio Flores", 93],
+  ] },
+  { label: "JUV F11", date: "2026-04-28", rival: "Platense", jugadores: [
+    ["Sebastian Neris Miño", 45], ["Dylam Almada", 96], ["Patricio Flores", 93],
+  ] },
+  { label: "JUV F12", date: "2026-05-02", rival: "Argentinos", jugadores: [
+    ["Joaquin Ejea", 45], ["Sebastian Neris Miño", 94], ["Juan Puchetta", 45],
+    ["Dylam Almada", 94], ["Patricio Flores", 94],
+  ] },
+  { label: "JUV F13", date: "2026-05-13", rival: "Godoy Cruz", jugadores: [] },
+  { label: "JUV F14", date: "2026-05-20", rival: "Platense", jugadores: [
+    ["Joaquin Ejea", 95], ["Sebastian Neris Miño", 95], ["Franco Pastrana", 80],
+    ["Dylam Almada", 88], ["Alessandro Guennin", 95],
+  ] },
+  { label: "JUV F15", date: "2026-06-18", rival: "Argentinos", jugadores: [
+    ["Gaston Ayala", 70], ["Jose Capponi", 96], ["Joaquin Ejea", 93],
+    ["Sebastian Neris Miño", 93], ["Franco Pastrana", 70], ["Dylam Almada", 60],
+    ["Alessandro Guennin", 90], ["Lautaro Quiroga", 46], ["Patricio Flores", 93],
+  ] },
 ];
 
 function norm(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function resolve(nombre) {
+  if (PLAYER_IDS[nombre] !== undefined) return { id: PLAYER_IDS[nombre], name: nombre };
+  const n = norm(nombre);
+  for (const [k, v] of Object.entries(PLAYER_IDS)) {
+    if (norm(k) === n) return { id: v, name: k };
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {
@@ -68,66 +95,43 @@ Deno.serve(async (req) => {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 });
 
-    // Cargar jugadores para mapeo de IDs
-    const players = await base44.asServiceRole.entities.Player.list("-created_date", 200);
-    const playerMap = {};
-    players.forEach(p => {
-      playerMap[norm(p.full_name)] = p;
-    });
-
-    // Crear/obtener MatchReport para cada partido juvenil
-    const existingMatches = await base44.asServiceRole.entities.MatchReport.filter({ competition: "Juveniles" }, "-date", 50);
+    const existing = await base44.asServiceRole.entities.MatchReport.filter({ competition: "Juveniles" }, "-date", 50);
     const matchByDate = {};
-    existingMatches.forEach(m => { matchByDate[m.date] = m; });
+    existing.forEach(m => { matchByDate[m.date] = m; });
 
-    const matchIds = {};
-    for (const m of MATCHES) {
-      if (!matchByDate[m.date]) {
-        const created = await base44.asServiceRole.entities.MatchReport.create({
-          date: m.date,
-          rival: m.rival,
-          competition: "Juveniles",
-          location: "Local",
+    let insertados = 0;
+    let sinId = 0;
+
+    for (const fecha of FECHAS) {
+      const match = matchByDate[fecha.date];
+      if (!match) {
+        // crear solo si no existe
+        await base44.asServiceRole.entities.MatchReport.create({
+          date: fecha.date, rival: fecha.rival, competition: "Juveniles", location: "Local",
         });
-        matchIds[m.date] = created.id;
-      } else {
-        matchIds[m.date] = matchByDate[m.date].id;
       }
-    }
 
-    // Insertar MinutesRecord
-    let created = 0;
-    let skipped = 0;
-
-    for (const pd of PLAYER_DATA) {
-      // Buscar player_id
-      const playerEntry = playerMap[norm(pd.name)];
-      const playerId = playerEntry?.id || null;
-      const playerName = playerEntry?.full_name || pd.name;
-
-      for (let i = 0; i < MATCHES.length; i++) {
-        const mins = pd.mins[i];
-        if (mins === null || mins === undefined || mins === 0) { skipped++; continue; }
-        const m = MATCHES[i];
+      for (const [nombre, mins] of fecha.jugadores) {
+        const res = resolve(nombre);
         await base44.asServiceRole.entities.MinutesRecord.create({
-          player_id: playerId,
-          player_name: playerName,
+          player_id: res?.id || null,
+          player_name: res?.name || nombre,
           tournament: "Juveniles",
-          match_label: `vs ${m.rival} ${m.date.slice(5).replace("-", "/")}`,
-          match_date: m.date,
-          rival: m.rival,
+          match_label: fecha.label,
+          match_date: fecha.date,
+          rival: fecha.rival,
           minutes: mins,
         });
-        created++;
+        insertados++;
+        if (!res?.id) sinId++;
       }
     }
 
     return Response.json({
       success: true,
-      matches_created: Object.keys(matchIds).length,
-      minutes_created: created,
-      skipped,
-      message: `${created} registros de minutos y ${Object.keys(matchIds).length} partidos creados`
+      minutosInsertados: insertados,
+      sinPlayerId: sinId,
+      message: `${insertados} minutos registrados (${sinId} sin player_id - solo Thomas Blasquez)`
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
