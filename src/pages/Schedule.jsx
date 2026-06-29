@@ -22,7 +22,7 @@ const COLOR_LABELS = { blue:"Azul", green:"Verde", yellow:"Amarillo", orange:"Na
 
 const EMPTY_FORM = { date: "", time: "", title: "", type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival_logo_url: "" };
 
-const QUICK_TEMPLATES = [
+const DEFAULT_TEMPLATES = [
   { title: "Desayuno", time: "08:00", duration_minutes: 45, color: "yellow", type: "Comida" },
   { title: "Almuerzo", time: "13:00", duration_minutes: 60, color: "orange", type: "Comida" },
   { title: "Cena", time: "20:00", duration_minutes: 60, color: "orange", type: "Comida" },
@@ -33,6 +33,104 @@ const QUICK_TEMPLATES = [
   { title: "Recuperación", time: "11:00", duration_minutes: 60, color: "cyan", type: "Físico" },
   { title: "Viaje", time: "07:00", duration_minutes: 120, color: "purple", type: "Logística" },
 ];
+
+const STORAGE_KEY = "schedule_custom_templates";
+
+function loadCustomTemplates() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
+}
+function saveCustomTemplates(templates) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
+}
+
+const EMPTY_TEMPLATE = { title: "", time: "", duration_minutes: "", color: "blue", type: "" };
+
+function TemplateManagerModal({ open, onClose }) {
+  const [templates, setTemplates] = useState([]);
+  const [form, setForm] = useState(EMPTY_TEMPLATE);
+  const [adding, setAdding] = useState(false);
+
+  useEffect(() => {
+    if (open) { setTemplates(loadCustomTemplates()); setAdding(false); setForm(EMPTY_TEMPLATE); }
+  }, [open]);
+
+  if (!open) return null;
+
+  const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  function handleAdd() {
+    if (!form.title) return;
+    const next = [...templates, { ...form, duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined }];
+    setTemplates(next);
+    saveCustomTemplates(next);
+    setForm(EMPTY_TEMPLATE);
+    setAdding(false);
+  }
+
+  function handleDelete(idx) {
+    const next = templates.filter((_, i) => i !== idx);
+    setTemplates(next);
+    saveCustomTemplates(next);
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-sm mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-semibold text-sm">Gestionar plantillas</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+        </div>
+
+        {/* Existing custom templates */}
+        {templates.length === 0 && !adding && (
+          <p className="text-zinc-600 text-xs text-center py-4">No tenés plantillas personalizadas aún.</p>
+        )}
+        <div className="space-y-1.5 mb-3 max-h-48 overflow-y-auto">
+          {templates.map((t, idx) => {
+            const c = COLOR_MAP[t.color] || COLOR_MAP.blue;
+            return (
+              <div key={idx} className={`flex items-center justify-between px-3 py-2 rounded-lg border ${c.bg} ${c.border}`}>
+                <div>
+                  <span className={`text-xs font-semibold ${c.text}`}>{t.title}</span>
+                  {t.time && <span className="text-xs text-zinc-500 ml-2">{t.time}</span>}
+                  {t.duration_minutes && <span className="text-xs text-zinc-600 ml-1">· {t.duration_minutes}min</span>}
+                </div>
+                <button onClick={() => handleDelete(idx)} className="p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Add form */}
+        {adding ? (
+          <div className="space-y-2 border-t border-zinc-800 pt-3">
+            <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Título *" value={form.title} onChange={(e) => set("title", e.target.value)} />
+            <div className="grid grid-cols-2 gap-2">
+              <input className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Tipo (ej: Comida)" value={form.type} onChange={(e) => set("type", e.target.value)} />
+              <input type="time" className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.time} onChange={(e) => set("time", e.target.value)} />
+              <input type="number" className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Duración (min)" value={form.duration_minutes} onChange={(e) => set("duration_minutes", e.target.value)} />
+              <div className="flex gap-1.5 items-center">
+                {COLORS.map((c) => (
+                  <button key={c} onClick={() => set("color", c)} className={`w-5 h-5 rounded-full border-2 transition-all ${COLOR_MAP[c].dot} ${form.color === c ? "border-white scale-110" : "border-transparent opacity-50 hover:opacity-100"}`} />
+                ))}
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleAdd} disabled={!form.title} className="flex-1 px-3 py-1.5 rounded-lg text-xs bg-white text-zinc-900 font-semibold hover:bg-zinc-200 disabled:opacity-40 transition-colors">Guardar</button>
+              <button onClick={() => setAdding(false)} className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">Cancelar</button>
+            </div>
+          </div>
+        ) : (
+          <button onClick={() => setAdding(true)} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border border-dashed border-zinc-700 text-xs text-zinc-500 hover:text-white hover:border-zinc-500 transition-colors">
+            <Plus size={12} /> Nueva plantilla
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function EventCard({ event, onEdit, onDelete }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
@@ -78,10 +176,17 @@ function EventCard({ event, onEdit, onDelete }) {
 function EventModal({ open, onClose, onSave, initial, defaultDate }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [showTemplateManager, setShowTemplateManager] = useState(false);
+  const [customTemplates, setCustomTemplates] = useState([]);
 
   useEffect(() => {
-    if (open) setForm(initial ? { ...EMPTY_FORM, ...initial } : { ...EMPTY_FORM, date: defaultDate || "" });
+    if (open) {
+      setForm(initial ? { ...EMPTY_FORM, ...initial } : { ...EMPTY_FORM, date: defaultDate || "" });
+      setCustomTemplates(loadCustomTemplates());
+    }
   }, [open, initial, defaultDate]);
+
+  const allTemplates = [...DEFAULT_TEMPLATES, ...customTemplates];
 
   if (!open) return null;
 
@@ -105,13 +210,18 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
         </div>
         {/* Quick templates */}
         <div className="mb-4">
-          <p className="text-xs text-zinc-500 mb-2">Plantillas rápidas</p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs text-zinc-500">Plantillas rápidas</p>
+            <button type="button" onClick={() => setShowTemplateManager(true)} className="flex items-center gap-1 text-xs text-zinc-500 hover:text-white transition-colors px-2 py-0.5 rounded hover:bg-zinc-800">
+              <Plus size={11} /> Gestionar
+            </button>
+          </div>
           <div className="flex flex-wrap gap-1.5">
-            {QUICK_TEMPLATES.map((t) => (
+            {allTemplates.map((t, i) => (
               <button
-                key={t.title}
+                key={i}
                 type="button"
-                onClick={() => setForm((f) => ({ ...f, title: t.title, time: t.time, duration_minutes: t.duration_minutes, color: t.color, type: t.type }))}
+                onClick={() => setForm((f) => ({ ...f, title: t.title, time: t.time || f.time, duration_minutes: t.duration_minutes || f.duration_minutes, color: t.color, type: t.type || f.type }))}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${COLOR_MAP[t.color].bg} ${COLOR_MAP[t.color].text} ${COLOR_MAP[t.color].border} hover:opacity-80`}
               >
                 {t.title}
@@ -119,6 +229,7 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
             ))}
           </div>
         </div>
+        <TemplateManagerModal open={showTemplateManager} onClose={() => { setShowTemplateManager(false); setCustomTemplates(loadCustomTemplates()); }} />
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
