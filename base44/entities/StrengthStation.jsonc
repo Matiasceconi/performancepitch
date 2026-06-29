@@ -1,0 +1,104 @@
+{
+  "name": "StrengthStation",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID de la TrainingSession"
+    },
+    "station_number": {
+      "type": "number",
+      "description": "N\u00famero de estaci\u00f3n"
+    },
+    "order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden en la sesi\u00f3n"
+    },
+    "method": {
+      "type": "string",
+      "description": "M\u00e9todo (ej: Contraste, Potencia, Ondulatorio)"
+    },
+    "exercise_restore": {
+      "type": "string",
+      "description": "Ejercicio que restaura"
+    },
+    "exercise_compensate": {
+      "type": "string",
+      "description": "Ejercicio que compensa"
+    },
+    "sets": {
+      "type": "number",
+      "description": "Series"
+    },
+    "reps": {
+      "type": "string",
+      "description": "Repeticiones o tiempo"
+    },
+    "duration": {
+      "type": "string",
+      "description": "Tiempo (ej: 30s, 2min)"
+    },
+    "rest_time": {
+      "type": "string",
+      "description": "Pausa entre series"
+    },
+    "rir": {
+      "type": "string",
+      "description": "RIR (Repeticiones en Reserva)"
+    },
+    "emphasis_ce": {
+      "type": "string",
+      "enum": [
+        "\u2191",
+        "\u2193",
+        "\u2192",
+        ""
+      ],
+      "description": "\u00c9nfasis C.E."
+    },
+    "emphasis_velocity": {
+      "type": "string",
+      "enum": [
+        "\u2191",
+        "\u2193",
+        "\u2192",
+        ""
+      ],
+      "description": "\u00c9nfasis Velocidad"
+    },
+    "emphasis_time": {
+      "type": "string",
+      "enum": [
+        "\u2191",
+        "\u2193",
+        "\u2192",
+        ""
+      ],
+      "description": "\u00c9nfasis Tiempo"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "Imagen de la estaci\u00f3n"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "Video de la estaci\u00f3n"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n de la estaci\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    },
+    "library_exercise_id": {
+      "type": "string",
+      "description": "ID en StrengthExerciseLibrary (si viene de biblioteca)"
+    }
+  },
+  "required": [
+    "session_id"
+  ]
+}

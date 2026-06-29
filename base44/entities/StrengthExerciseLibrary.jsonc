@@ -1,0 +1,115 @@
+{
+  "name": "StrengthExerciseLibrary",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Nombre del ejercicio"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "Empuje",
+        "Tracci\u00f3n",
+        "Bisagra",
+        "Sentadilla",
+        "Cargada",
+        "Core",
+        "Potencia",
+        "Correctivo",
+        "Otro"
+      ],
+      "description": "Categor\u00eda del ejercicio"
+    },
+    "muscle_group": {
+      "type": "string",
+      "description": "Grupo muscular principal"
+    },
+    "vector_pattern": {
+      "type": "string",
+      "enum": [
+        "Horizontal",
+        "Vertical",
+        "Rotacional",
+        "Diagonal",
+        "Mixto"
+      ],
+      "description": "Patr\u00f3n vectorial"
+    },
+    "method": {
+      "type": "string",
+      "description": "M\u00e9todo de entrenamiento (ej: Contraste, Potencia, Ondulatorio)"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo del ejercicio"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del ejercicio"
+    },
+    "sets": {
+      "type": "number",
+      "description": "Series"
+    },
+    "reps": {
+      "type": "string",
+      "description": "Repeticiones o tiempo"
+    },
+    "rest_time": {
+      "type": "string",
+      "description": "Pausa"
+    },
+    "rir": {
+      "type": "string",
+      "description": "RIR (Repeticiones en Reserva)"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL de imagen"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "URL de video"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas"
+    },
+    "favorite": {
+      "type": "boolean",
+      "default": false,
+      "description": "Favorito"
+    },
+    "times_used": {
+      "type": "number",
+      "default": 1,
+      "description": "Veces utilizado"
+    },
+    "last_used_at": {
+      "type": "string",
+      "format": "date",
+      "description": "\u00daltima fecha de uso"
+    },
+    "first_created_at": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de creaci\u00f3n"
+    },
+    "created_from_session_id": {
+      "type": "string",
+      "description": "Sesi\u00f3n origen"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

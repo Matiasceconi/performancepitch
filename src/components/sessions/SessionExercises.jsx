@@ -1,7 +1,56 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Trash2, Edit2, Check, X, GripVertical, Video, Image, ChevronDown, ChevronUp } from "lucide-react";
+import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen, Search } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import moment from "moment";
+
+function normalize(s) {
+  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+
+async function syncToFieldLibrary(form, sessionId) {
+  const today = moment().format("YYYY-MM-DD");
+  const all = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
+  const match = all.find(e =>
+    normalize(e.name) === normalize(form.name) &&
+    e.length_m === (parseFloat(form.length_m) || undefined) &&
+    e.width_m === (parseFloat(form.width_m) || undefined)
+  );
+  if (match) {
+    await base44.entities.FieldExerciseLibrary.update(match.id, {
+      times_used: (match.times_used || 1) + 1,
+      last_used_at: today,
+    });
+  } else {
+    const l = parseFloat(form.length_m) || 0;
+    const w = parseFloat(form.width_m) || 0;
+    const p = parseFloat(form.players_count) || 0;
+    const total_area = l && w ? parseFloat((l * w).toFixed(1)) : undefined;
+    const eii = total_area && p ? parseFloat((total_area / p).toFixed(2)) : undefined;
+    await base44.entities.FieldExerciseLibrary.create({
+      name: form.name,
+      type: form.type || undefined,
+      objective: form.objective || undefined,
+      description: form.description || undefined,
+      length_m: parseFloat(form.length_m) || undefined,
+      width_m: parseFloat(form.width_m) || undefined,
+      total_area,
+      eii,
+      players_count: parseFloat(form.players_count) || undefined,
+      duration_min: parseFloat(form.duration_min) || undefined,
+      blocks: parseFloat(form.blocks) || undefined,
+      work_time: form.work_time || undefined,
+      rest_time: form.rest_time || undefined,
+      image_url: form.image_url || undefined,
+      video_url: form.video_url || undefined,
+      notes: form.notes || undefined,
+      times_used: 1,
+      first_created_at: today,
+      last_used_at: today,
+      created_from_session_id: sessionId,
+    });
+  }
+}
 
 const EXERCISE_TYPES = ["Activación", "Técnico", "Táctico", "Reducido", "Posesión", "Finalización", "Fuerza", "Regenerativo", "Otro"];
 
@@ -37,11 +86,14 @@ function num(v) { const n = parseFloat(v); return isNaN(n) ? undefined : n; }
 export default function SessionExercises({ sessionId }) {
   const [exercises, setExercises] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [editId, setEditId] = useState(null); // null = new, string = editing
+  const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [expanded, setExpanded] = useState({});
   const [saving, setSaving] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [libraryExercises, setLibraryExercises] = useState([]);
+  const [libSearch, setLibSearch] = useState("");
   const { toast } = useToast();
 
   async function handleImageUpload(file) {
@@ -109,6 +161,8 @@ export default function SessionExercises({ sessionId }) {
       const created = await base44.entities.SessionExercise.create(payload);
       setExercises(prev => [...prev, created]);
       toast({ title: "✓ Ejercicio agregado" });
+      // Sync automático a biblioteca de campo
+      await syncToFieldLibrary(form, sessionId);
     }
     setShowForm(false);
     setEditId(null);
@@ -120,6 +174,32 @@ export default function SessionExercises({ sessionId }) {
     if (!window.confirm("¿Eliminar ejercicio?")) return;
     await base44.entities.SessionExercise.delete(id);
     setExercises(prev => prev.filter(e => e.id !== id));
+  }
+
+  async function openLibrary() {
+    const data = await base44.entities.FieldExerciseLibrary.list("-times_used", 300);
+    setLibraryExercises(data);
+    setShowLibrary(true);
+  }
+
+  function addFromLibrary(ex) {
+    setForm({
+      name: ex.name || "", type: ex.type || "Técnico",
+      duration_min: ex.duration_min ?? "", blocks: ex.blocks ?? "",
+      work_time: ex.work_time || "", rest_time: ex.rest_time || "",
+      length_m: ex.length_m ?? "", width_m: ex.width_m ?? "",
+      players_count: ex.players_count ?? "", objective: ex.objective || "",
+      description: ex.description || "", image_url: ex.image_url || "",
+      video_url: ex.video_url || "", notes: ex.notes || "",
+    });
+    setEditId(null);
+    setShowLibrary(false);
+    setShowForm(true);
+    // Update library usage
+    base44.entities.FieldExerciseLibrary.update(ex.id, {
+      times_used: (ex.times_used || 1) + 1,
+      last_used_at: moment().format("YYYY-MM-DD"),
+    });
   }
 
   async function moveUp(idx) {
@@ -356,10 +436,59 @@ export default function SessionExercises({ sessionId }) {
           </div>
         </form>
       ) : (
-        <button onClick={openNew}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">
-          <Plus size={14} /> Agregar ejercicio
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={openNew}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white text-zinc-900 font-semibold text-sm hover:bg-zinc-200 transition-colors">
+            <Plus size={14} /> Nuevo ejercicio
+          </button>
+          <button onClick={openLibrary}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">
+            <BookOpen size={14} /> Desde Biblioteca
+          </button>
+        </div>
+      )}
+
+      {/* Library modal */}
+      {showLibrary && (
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+              <p className="text-sm font-semibold text-white">Biblioteca de Ejercicios de Campo</p>
+              <button onClick={() => setShowLibrary(false)} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+            </div>
+            <div className="p-3 border-b border-zinc-800">
+              <div className="relative">
+                <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+                <input value={libSearch} onChange={e => setLibSearch(e.target.value)} placeholder="Buscar ejercicio..."
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none" />
+              </div>
+            </div>
+            <div className="overflow-y-auto flex-1 p-3 space-y-2">
+              {libraryExercises
+                .filter(e => !libSearch || (e.name || "").toLowerCase().includes(libSearch.toLowerCase()))
+                .map(ex => (
+                <div key={ex.id}
+                  className="flex items-center gap-3 p-3 bg-zinc-800 border border-zinc-700 rounded-lg hover:border-zinc-500 cursor-pointer transition-colors"
+                  onClick={() => addFromLibrary(ex)}>
+                  {ex.image_url && <img src={ex.image_url} alt="" className="w-10 h-10 object-cover rounded shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">{ex.name}</p>
+                    {ex.objective && <p className="text-[10px] text-zinc-400 truncate">{ex.objective}</p>}
+                    <p className="text-[10px] text-zinc-600">✓ {ex.times_used || 1} usos</p>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 shrink-0 text-right">
+                    {ex.length_m && ex.width_m && <p>{ex.length_m}×{ex.width_m}m</p>}
+                    {ex.players_count && <p>{ex.players_count} jug.</p>}
+                    {ex.eii && <p className="text-amber-400">EII {ex.eii}</p>}
+                  </div>
+                </div>
+              ))}
+              {libraryExercises.length === 0 && (
+                <p className="text-zinc-600 text-sm text-center py-4">La biblioteca se construye al crear ejercicios nuevos.</p>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

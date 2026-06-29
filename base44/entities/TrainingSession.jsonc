@@ -69,11 +69,11 @@
     },
     "players_available": {
       "type": "number",
-      "description": "Jugadores disponibles al momento de crear la sesi\u00f3n"
+      "description": "Jugadores disponibles"
     },
     "players_selected": {
       "type": "number",
-      "description": "Jugadores seleccionados para entrenar"
+      "description": "Jugadores seleccionados"
     },
     "players_absent": {
       "type": "number",
@@ -102,6 +102,26 @@
     "created_by": {
       "type": "string",
       "description": "Usuario que cre\u00f3 la sesi\u00f3n"
+    },
+    "strength_microcycle": {
+      "type": "string",
+      "description": "Microciclo (m\u00f3dulo fuerza)"
+    },
+    "strength_session_number": {
+      "type": "string",
+      "description": "N\u00famero de sesi\u00f3n de fuerza"
+    },
+    "strength_purpose": {
+      "type": "string",
+      "description": "Prop\u00f3sito mec\u00e1nico de la sesi\u00f3n de fuerza"
+    },
+    "strength_session_type": {
+      "type": "string",
+      "description": "Tipo de sesi\u00f3n de fuerza"
+    },
+    "strength_vector_pattern": {
+      "type": "string",
+      "description": "Patr\u00f3n vectorial de la sesi\u00f3n de fuerza"
     }
   },
   "required": [

@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video } from "lucide-react";
+import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video, BookOpen } from "lucide-react";
 import moment from "moment";
 import SessionPlayerTable from "@/components/sessions/SessionPlayerTable";
 import SessionExercises from "@/components/sessions/SessionExercises";
 import SessionGPS from "@/components/sessions/SessionGPS";
+import SessionStrength from "@/components/sessions/SessionStrength";
+import FieldLibraryPanel from "@/components/sessions/FieldLibraryPanel";
+import StrengthLibraryPanel from "@/components/sessions/StrengthLibraryPanel";
 
 const INTENSITY_COLORS = { Baja: "text-emerald-400", Media: "text-yellow-400", Alta: "text-red-400" };
 const TYPE_COLORS = {
@@ -18,15 +21,21 @@ const TYPE_COLORS = {
 };
 
 const TABS = [
-  { key: "players", label: "Jugadores", icon: Users },
-  { key: "exercises", label: "Ejercicios", icon: Dumbbell },
-  { key: "gps", label: "GPS", icon: Zap },
+  { key: "players",          label: "Jugadores",       icon: Users },
+  { key: "exercises",        label: "Ejercicios",      icon: Dumbbell },
+  { key: "field_library",    label: "Bibl. Campo",     icon: BookOpen },
+  { key: "strength",         label: "Fuerza",          icon: Zap },
+  { key: "strength_library", label: "Bibl. Fuerza",    icon: BookOpen },
+  { key: "gps",              label: "GPS",             icon: Zap },
 ];
 
 export default function SessionDetail({ session, onBack }) {
   const [sessionPlayers, setSessionPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("players");
+  const [currentSession, setCurrentSession] = useState(session);
+
+  useEffect(() => { setCurrentSession(session); }, [session]);
 
   useEffect(() => {
     base44.entities.SessionPlayer.filter({ session_id: session.id }, "player_name", 200)
@@ -129,14 +138,14 @@ export default function SessionDetail({ session, onBack }) {
         )}
       </div>
 
-      {/* Tabs */}
-      <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1 w-fit">
-        {TABS.map(({ key, label, icon: Icon }) => (
+      {/* Tabs — scrollable on mobile */}
+      <div className="flex items-center bg-zinc-900 border border-zinc-800 rounded-xl p-1 gap-1 overflow-x-auto">
+        {TABS.map(({ key, label, icon: TabIcon }) => (
           <button key={key} onClick={() => setTab(key)}
-            className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium transition-all whitespace-nowrap ${
               tab === key ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
             }`}>
-            <Icon size={14} /> {label}
+            <TabIcon size={12} /> {label}
           </button>
         ))}
       </div>
@@ -149,9 +158,12 @@ export default function SessionDetail({ session, onBack }) {
           </div>
         ) : (
           <>
-            {tab === "players" && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={session.id} />}
-            {tab === "exercises" && <SessionExercises sessionId={session.id} />}
-            {tab === "gps" && <SessionGPS session={session} sessionPlayers={sessionPlayers} />}
+            {tab === "players"          && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} />}
+            {tab === "exercises"        && <SessionExercises sessionId={currentSession.id} />}
+            {tab === "field_library"    && <FieldLibraryPanel />}
+            {tab === "strength"         && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
+            {tab === "strength_library" && <StrengthLibraryPanel />}
+            {tab === "gps"              && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}
           </>
         )}
       </div>
