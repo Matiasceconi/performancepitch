@@ -11,103 +11,93 @@
       "format": "date",
       "description": "Fecha de la sesi\u00f3n"
     },
-    "match_day_code": {
+    "squad_id": {
       "type": "string",
-      "enum": [
-        "MD",
-        "MD-1",
-        "MD-2",
-        "MD-3",
-        "MD-4",
-        "MD-5",
-        "MD-6",
-        "MD+1",
-        "MD+2"
-      ],
-      "description": "C\u00f3digo de d\u00eda relativo al partido"
+      "description": "ID del plantel"
     },
-    "season_period": {
+    "squad_name": {
       "type": "string",
-      "enum": [
-        "En competencia",
-        "Pretemporada",
-        "Transitorio"
-      ],
-      "description": "Per\u00edodo de la temporada"
+      "description": "Nombre del plantel (desnormalizado)"
     },
     "session_type": {
       "type": "string",
       "enum": [
-        "Entrenamiento",
-        "T\u00e1ctica",
-        "F\u00edsico",
+        "Campo",
+        "Fuerza",
         "Regenerativo",
-        "Partido amistoso",
+        "Activaci\u00f3n",
+        "Partido reducido",
+        "Mixto",
         "Otro"
       ],
       "description": "Tipo de sesi\u00f3n"
     },
-    "focus_area": {
+    "match_day_code": {
       "type": "string",
       "enum": [
-        "Tensi\u00f3n",
-        "Duraci\u00f3n",
-        "Velocidad",
-        "Recuperaci\u00f3n"
+        "MD-4",
+        "MD-3",
+        "MD-2",
+        "MD-1",
+        "MD",
+        "MD+1",
+        "MD+2",
+        "Otro"
       ],
-      "description": "Foco principal de la sesi\u00f3n"
-    },
-    "players_count": {
-      "type": "number",
-      "description": "Cantidad de jugadores que participaron en la sesi\u00f3n"
-    },
-    "player_ids": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "IDs de los jugadores que participaron"
-    },
-    "player_names": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "description": "Nombres de jugadores participantes (desnormalizado)"
-    },
-    "video_url": {
-      "type": "string",
-      "description": "URL del video de la sesi\u00f3n"
-    },
-    "gps_pdf_url": {
-      "type": "string",
-      "description": "Link al informe PDF de GPS de la sesi\u00f3n"
-    },
-    "csv_url": {
-      "type": "string",
-      "description": "URL del archivo CSV GPS de la sesi\u00f3n"
-    },
-    "csv_label": {
-      "type": "string",
-      "description": "Nombre del archivo CSV cargado"
-    },
-    "notes": {
-      "type": "string",
-      "description": "Notas y observaciones"
-    },
-    "intensity": {
-      "type": "string",
-      "enum": [
-        "Baja",
-        "Media",
-        "Alta",
-        "Muy alta"
-      ],
-      "description": "Intensidad de la sesi\u00f3n"
+      "description": "C\u00f3digo relativo al partido"
     },
     "duration_minutes": {
       "type": "number",
       "description": "Duraci\u00f3n en minutos"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo de la sesi\u00f3n"
+    },
+    "location": {
+      "type": "string",
+      "description": "Lugar del entrenamiento"
+    },
+    "intensity_goal": {
+      "type": "string",
+      "enum": [
+        "Baja",
+        "Media",
+        "Alta"
+      ],
+      "description": "Intensidad objetivo"
+    },
+    "players_available": {
+      "type": "number",
+      "description": "Jugadores disponibles al momento de crear la sesi\u00f3n"
+    },
+    "players_selected": {
+      "type": "number",
+      "description": "Jugadores seleccionados para entrenar"
+    },
+    "players_absent": {
+      "type": "number",
+      "description": "Jugadores ausentes"
+    },
+    "players_differentiated": {
+      "type": "number",
+      "description": "Jugadores diferenciados"
+    },
+    "csv_url": {
+      "type": "string",
+      "description": "URL del CSV GPS de la sesi\u00f3n"
+    },
+    "csv_label": {
+      "type": "string",
+      "description": "Nombre del archivo CSV GPS"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones generales"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario que cre\u00f3 la sesi\u00f3n"
     }
   },
   "required": [

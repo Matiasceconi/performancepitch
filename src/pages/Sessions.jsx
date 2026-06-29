@@ -1,48 +1,92 @@
-import React, { useState } from "react";
-import { Dumbbell, TreePine, BookOpen } from "lucide-react";
-import FieldSessions from "@/pages/FieldSessions";
-import StrengthSessions from "@/pages/StrengthSessions";
-import ExercisesLibrary from "@/pages/ExercisesLibrary";
+import React, { useState, useEffect } from "react";
+import { base44 } from "@/api/base44Client";
+import { Plus, ClipboardList } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import SessionList from "@/components/sessions/SessionList";
+import SessionForm from "@/components/sessions/SessionForm";
+import SessionDetail from "@/components/sessions/SessionDetail";
 
 export default function Sessions() {
-  const [tab, setTab] = useState("field"); // "field" | "strength" | "exercises"
+  const [sessions, setSessions] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState("list"); // "list" | "new" | "detail"
+  const [selectedSession, setSelectedSession] = useState(null);
+  const { toast } = useToast();
 
-  const tabs = [
-    { key: "field",      label: "Campo",      icon: TreePine },
-    { key: "strength",   label: "Fuerza",     icon: Dumbbell },
-    { key: "exercises",  label: "Ejercicios", icon: BookOpen },
-  ];
+  useEffect(() => {
+    base44.entities.TrainingSession.list("-date", 200).then(s => {
+      setSessions(s);
+      setLoading(false);
+    });
+  }, []);
+
+  function handleCreated(session) {
+    setSessions(prev => [session, ...prev]);
+    setSelectedSession(session);
+    setView("detail");
+    toast({ title: "✓ Sesión creada" });
+  }
+
+  function handleSelect(session) {
+    setSelectedSession(session);
+    setView("detail");
+  }
+
+  async function handleDelete(id) {
+    if (!window.confirm("¿Eliminar esta sesión?")) return;
+    await base44.entities.TrainingSession.delete(id);
+    setSessions(prev => prev.filter(s => s.id !== id));
+    toast({ title: "Sesión eliminada" });
+  }
+
+  function handleBack() {
+    setSelectedSession(null);
+    setView("list");
+  }
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <img src="https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/8fd8abe30_Escudo_del_Club_Social_y_Deportivo_Defensa_y_Justiciasvg.png" alt="Escudo Defensa y Justicia" className="w-14 h-14 object-contain" />
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Sesiones</h1>
-          <p className="text-zinc-500 text-sm mt-1">Organizá y registrá los entrenamientos del equipo</p>
-        </div>
-      </div>
-
-      {/* Tab toggle */}
-      <div className="flex items-center bg-gradient-to-r from-zinc-800 to-zinc-900 rounded-lg p-1 gap-1 w-fit border border-zinc-700">
-        {tabs.map(({ key, label, icon: Icon }) => (
+      {/* Header */}
+      {view === "list" && (
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-4">
+            <ClipboardList size={22} className="text-zinc-400" />
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">Sesiones</h1>
+              <p className="text-zinc-500 text-sm mt-0.5">Registrá los entrenamientos del equipo</p>
+            </div>
+          </div>
           <button
-            key={key}
-            onClick={() => setTab(key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              tab === key ? "bg-accent text-zinc-900 shadow-lg" : "text-zinc-400 hover:text-white"
-            }`}
-          >
-            <Icon size={15} /> {label}
+            onClick={() => setView("new")}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white text-zinc-900 font-semibold text-sm hover:bg-zinc-200 transition-colors">
+            <Plus size={15} /> Nueva sesión
           </button>
-        ))}
-      </div>
+        </div>
+      )}
 
-      <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl p-6">
-        {tab === "field"     && <FieldSessions />}
-        {tab === "strength"  && <StrengthSessions />}
-        {tab === "exercises" && <ExercisesLibrary />}
-      </div>
+      {view === "new" && (
+        <>
+          <div>
+            <h1 className="text-2xl font-bold text-white tracking-tight">Nueva sesión</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">Los jugadores se cargan automáticamente desde Estado del Plantel</p>
+          </div>
+          <SessionForm onCreated={handleCreated} onCancel={handleBack} />
+        </>
+      )}
+
+      {view === "list" && (
+        loading ? (
+          <div className="flex justify-center py-20">
+            <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+          </div>
+        ) : (
+          <SessionList sessions={sessions} onSelect={handleSelect} onDelete={handleDelete} />
+        )
+      )}
+
+      {view === "detail" && selectedSession && (
+        <SessionDetail session={selectedSession} onBack={handleBack} />
+      )}
     </div>
   );
 }
