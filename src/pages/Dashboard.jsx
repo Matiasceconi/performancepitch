@@ -1,45 +1,54 @@
-import React, { useState, useEffect, Component, useMemo } from "react";
+import React, { useState, useEffect, useMemo, Component } from "react";
 import { base44 } from "@/api/base44Client";
 import { Link } from "react-router-dom";
-import { Users, Activity, ChevronRight, AlertCircle, Cake, Map, X, Shield, Zap, ClipboardList, Trash2 } from "lucide-react";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { useToast } from "@/components/ui/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Users, AlertCircle, Cake, Shield, ChevronRight,
+  Activity, ArrowUp, ArrowDown, UserCheck, UserX, Zap
+} from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
+import TournamentTable from "@/components/staff/TournamentTable";
+import TournamentImporter from "@/components/staff/TournamentImporter";
+import { STATUS_LABELS } from "@/components/squad/squadConstants";
+
 moment.locale("es");
 
-const DEFAULT_STATUSES = [
-  { id: "disponible", name: "Disponible" },
-  { id: "lesionado", name: "Lesionado" },
-  { id: "recuperacion", name: "En recuperación" },
-  { id: "suspendido", name: "Suspendido" },
-  { id: "permiso", name: "Permiso" },
-  { id: "seleccion", name: "Selección" },
-  { id: "subio", name: "Subio a primera" },
-  { id: "bajo", name: "Bajo a juveniles" },
-  { id: "sparring", name: "Sparring" },
-];
+// ─── Status color mapping ──────────────────────────────────────────────────
+const STATUS_CARD_COLORS = {
+  disponible:   { bg: "bg-emerald-500/15", border: "border-emerald-500/30", dot: "bg-emerald-400", text: "text-emerald-300" },
+  molestia:     { bg: "bg-yellow-500/15",  border: "border-yellow-500/30",  dot: "bg-yellow-400",  text: "text-yellow-300" },
+  diferenciado: { bg: "bg-amber-500/15",   border: "border-amber-500/30",   dot: "bg-amber-400",   text: "text-amber-300" },
+  lesionado:    { bg: "bg-red-500/15",     border: "border-red-500/30",     dot: "bg-red-400",     text: "text-red-300" },
+  convocado:    { bg: "bg-blue-500/15",    border: "border-blue-500/30",    dot: "bg-blue-400",    text: "text-blue-300" },
+  ausente:      { bg: "bg-zinc-700/30",    border: "border-zinc-700",       dot: "bg-zinc-500",    text: "text-zinc-400" },
+  "subió":      { bg: "bg-sky-500/15",     border: "border-sky-500/30",     dot: "bg-sky-400",     text: "text-sky-300" },
+  "bajó":       { bg: "bg-orange-500/15",  border: "border-orange-500/30",  dot: "bg-orange-400",  text: "text-orange-300" },
+  suspendido:   { bg: "bg-purple-500/15",  border: "border-purple-500/30",  dot: "bg-purple-400",  text: "text-purple-300" },
+  reintegro:    { bg: "bg-teal-500/15",    border: "border-teal-500/30",    dot: "bg-teal-400",    text: "text-teal-300" },
+  descanso:     { bg: "bg-zinc-600/20",    border: "border-zinc-600",       dot: "bg-zinc-400",    text: "text-zinc-300" },
+};
+const DEFAULT_COLOR = { bg: "bg-zinc-800/40", border: "border-zinc-700", dot: "bg-zinc-500", text: "text-zinc-400" };
 
-const PLAYER_STATUSES = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Juveniles", "Primera", "Subio a primera", "Bajo a juveniles", "Subieron de juveniles", "Bajo de primera", "Sparring"];
+function statusColor(status) {
+  return STATUS_CARD_COLORS[status] || DEFAULT_COLOR;
+}
 
+// ─── Error Boundary ────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
-  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  constructor(props) { super(props); this.state = { hasError: false }; }
+  static getDerivedStateFromError() { return { hasError: true }; }
   render() {
-    if (this.state.hasError) {
-      return (
-        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-          <p className="text-red-400 font-semibold text-sm">Error al cargar esta sección</p>
-          <p className="text-zinc-500 text-xs mt-1">{this.state.error?.message}</p>
-          <button onClick={() => this.setState({ hasError: false })} className="mt-3 text-xs text-red-300 underline">Reintentar</button>
-        </div>
-      );
-    }
+    if (this.state.hasError) return (
+      <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 text-center text-red-400 text-sm">
+        Error al cargar esta sección.
+        <button onClick={() => this.setState({ hasError: false })} className="ml-2 underline text-xs">Reintentar</button>
+      </div>
+    );
     return this.props.children;
   }
 }
 
+// ─── Next Match Card ───────────────────────────────────────────────────────
 function NextMatchCard({ match, matchReport }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
   const [logoError, setLogoError] = useState(false);
@@ -48,10 +57,9 @@ function NextMatchCard({ match, matchReport }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
       <div className="p-4 flex items-center gap-4">
         <div className="w-14 h-14 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
-          {match.rival_logo_url && !logoError ?
-          <img src={match.rival_logo_url} alt="Rival" className="w-full h-full object-contain p-1" onError={() => setLogoError(true)} /> :
-          <Shield size={24} className="text-zinc-500" />
-          }
+          {match.rival_logo_url && !logoError
+            ? <img src={match.rival_logo_url} alt="Rival" className="w-full h-full object-contain p-1" onError={() => setLogoError(true)} />
+            : <Shield size={24} className="text-zinc-500" />}
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-0.5">Próximo partido</p>
@@ -67,420 +75,353 @@ function NextMatchCard({ match, matchReport }) {
             <p className="text-3xl font-black text-white leading-none">{daysLeft}</p>
             <p className="text-xs text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
           </div>
-          {matchReport && matchReport.squad_names && matchReport.squad_names.length > 0 &&
-          <button
-            onClick={() => setShowSquad(!showSquad)}
-            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 transition-colors font-medium">
-              <Users size={12} />
-              Convocados ({matchReport.squad_names.length})
-            </button>
-          }
+          {matchReport?.squad_names?.length > 0 &&
+            <button onClick={() => setShowSquad(!showSquad)}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 transition-colors font-medium">
+              <Users size={12} /> Convocados ({matchReport.squad_names.length})
+            </button>}
         </div>
       </div>
       {showSquad && matchReport &&
-      <div className="border-t border-zinc-800 p-4">
+        <div className="border-t border-zinc-800 p-4">
           <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Lista de convocados</p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {matchReport.squad_names.map((name, i) =>
-            <div key={`squad-${name}-${i}`} className="flex items-center gap-2 text-sm text-white">
-              <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
-              {name}
-            </div>
-            )}
+              <div key={i} className="flex items-center gap-2 text-sm text-white">
+                <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
+                {name}
+              </div>)}
           </div>
-        </div>
-      }
-    </div>);
+        </div>}
+    </div>
+  );
 }
 
-import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
-import PlayerProfileDetail from "@/components/staff/PlayerProfileDetail";
-import PlayerPhotoUpload from "@/components/staff/PlayerPhotoUpload";
-import PitchMap from "@/components/staff/PitchMap";
-import TournamentTable from "@/components/staff/TournamentTable";
-import TournamentImporter from "@/components/staff/TournamentImporter";
-import PlayerFormModal from "@/components/staff/PlayerFormModal";
-
-// Panel de estado del plantel — aislado para que un crash no tire toda la página
-function StatusPanel({ players, setPlayers, selectedPlayers, handleToggleSelect, setShowDeleteConfirm }) {
+// ─── Summary stat card ─────────────────────────────────────────────────────
+function StatCard({ label, value, color, icon: Icon }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-      <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-white">Estado del plantel</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">Modificá el estado de cada jugador directamente</p>
-        </div>
-        {selectedPlayers.size > 0 &&
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs font-medium transition-colors">
-            <Trash2 size={14} />
-            Eliminar {selectedPlayers.size}
-          </button>
-        }
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+      <div className="flex items-center justify-between mb-2">
+        <Icon size={16} className={color} />
       </div>
-      <div className="p-4">
-        <div className="grid gap-2">
-          {[...players].filter(p => p && p.id).sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
-            <div key={p.id} className="flex items-center gap-3 py-1.5">
-              <Checkbox
-                checked={selectedPlayers.has(p.id)}
-                onCheckedChange={() => handleToggleSelect(p.id)}
-                className="shrink-0" />
-              <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-              {p.photo_url ?
-                <img src={p.photo_url} alt={p.full_name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" /> :
-                <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                  <span className="text-xs font-bold text-zinc-500">{p.full_name?.charAt(0)}</span>
-                </div>
-              }
-              <span className="text-sm text-white flex-1 min-w-0 truncate">{p.full_name}</span>
-              <span className="text-xs text-zinc-600 hidden sm:block">{p.position}</span>
-              <select
-                value={p.status || "Disponible"}
-                onChange={async (e) => {
-                  const v = e.target.value;
-                  await base44.entities.Player.update(p.id, { status: v });
-                  setPlayers((prev) => prev.map((pl) => pl.id === p.id ? { ...pl, status: v } : pl));
-                }}
-                className="h-7 w-36 text-xs bg-zinc-800 border border-zinc-700 text-white rounded-md px-2 focus:outline-none shrink-0"
-              >
-                {PLAYER_STATUSES.map((s) =>
-                  <option key={s} value={s} className="bg-zinc-900">{s}</option>
-                )}
-              </select>
-            </div>
-          )}
-        </div>
+      <p className={`text-2xl font-bold ${color}`}>{value}</p>
+      <p className="text-xs text-zinc-500 mt-0.5">{label}</p>
+    </div>
+  );
+}
+
+// ─── Player row (read-only) ────────────────────────────────────────────────
+function PlayerRow({ player, status, tags, notes }) {
+  const col = statusColor(status);
+  return (
+    <div className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${col.bg} ${col.border}`}>
+      {player.photo_url
+        ? <img src={player.photo_url} alt={player.full_name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
+        : <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
+            <span className="text-xs font-bold text-zinc-500">{(player.full_name || "?").charAt(0)}</span>
+          </div>}
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-white font-medium truncate">{player.full_name}</p>
+        <p className="text-xs text-zinc-500 truncate">{player.position}{player.category ? ` · ${player.category}` : ""}</p>
+        {notes && <p className="text-[10px] text-zinc-500 italic truncate">"{notes}"</p>}
+      </div>
+      <div className="flex flex-col items-end gap-1 shrink-0">
+        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${col.bg} ${col.text} border ${col.border}`}>
+          {STATUS_LABELS[status] || status}
+        </span>
+        {tags?.length > 0 && (
+          <div className="flex flex-wrap gap-0.5 justify-end">
+            {tags.slice(0, 2).map(t => (
+              <span key={t} className="text-[9px] px-1.5 py-0.5 bg-zinc-800 text-zinc-400 rounded-full border border-zinc-700">{t}</span>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
+// ─── Group list card ───────────────────────────────────────────────────────
+function GroupCard({ title, dotColor, players, statusMap, emptyText, linkTo }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+      <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+          <span className={`w-2 h-2 rounded-full ${dotColor} inline-block`} />
+          {title}
+          <span className={`text-xs font-normal ${dotColor.replace("bg-", "text-")}`}>({players.length})</span>
+        </h2>
+        {linkTo && (
+          <Link to={linkTo} className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+            Ver todos <ChevronRight size={14} />
+          </Link>
+        )}
+      </div>
+      <div className="p-3">
+        {players.length === 0
+          ? <p className="text-zinc-600 text-sm text-center py-5">{emptyText}</p>
+          : <div className="space-y-1.5 max-h-64 overflow-y-auto">
+              {players.map(p => {
+                const ds = statusMap[p.id] || {};
+                return <PlayerRow key={p.id} player={p} status={ds.status || "disponible"} tags={ds.tags} notes={ds.notes} />;
+              })}
+            </div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── Next training summary ─────────────────────────────────────────────────
+function NextTrainingPanel({ players, statusMap }) {
+  const groups = {
+    disponible: [],
+    diferenciado: [],
+    lesionado: [],
+    convocado: [],
+    "subió": [],
+    "bajó": [],
+  };
+  players.forEach(p => {
+    const status = statusMap[p.id]?.status || "disponible";
+    if (groups[status] !== undefined) groups[status].push(p);
+  });
+
+  const rows = [
+    { key: "disponible",   label: "Entrenan completo",   color: "text-emerald-400", icon: Activity },
+    { key: "diferenciado", label: "Diferenciados",        color: "text-amber-400",   icon: Zap },
+    { key: "lesionado",    label: "Lesionados (fuera)",   color: "text-red-400",     icon: AlertCircle },
+    { key: "convocado",    label: "Convocados",           color: "text-blue-400",    icon: UserCheck },
+    { key: "subió",        label: "Suben",                color: "text-sky-400",     icon: ArrowUp },
+    { key: "bajó",         label: "Bajan",                color: "text-orange-400",  icon: ArrowDown },
+  ];
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
+      <div className="p-4 border-b border-zinc-800">
+        <h2 className="text-sm font-semibold text-white">Próximo entrenamiento</h2>
+        <p className="text-xs text-zinc-500 mt-0.5">Resumen por estado del plantel</p>
+      </div>
+      <div className="p-4 space-y-3">
+        {rows.map(({ key, label, color, icon: Icon }) => (
+          <div key={key} className="flex items-start gap-3">
+            <Icon size={15} className={`${color} mt-0.5 shrink-0`} />
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-zinc-300">{label}</p>
+                <span className={`text-sm font-bold ${color}`}>{groups[key].length}</span>
+              </div>
+              {groups[key].length > 0 && (
+                <p className="text-[10px] text-zinc-500 truncate mt-0.5">
+                  {groups[key].map(p => p.full_name).join(", ")}
+                </p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ─── Main Dashboard ────────────────────────────────────────────────────────
 export default function Dashboard() {
   const [players, setPlayers] = useState([]);
+  const [statusMap, setStatusMap] = useState({}); // player_id -> DailySquadStatus
   const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [showMap, setShowMap] = useState(false);
-  const [showStatusPanel, setShowStatusPanel] = useState(false);
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
-  const [divisions, setDivisions] = useState([]);
-  const [statuses, setStatuses] = useState([]);
-  const [selectedStatus, setSelectedStatus] = useState(null);
-  const [editingPlayer, setEditingPlayer] = useState(null);
-  const [selectedPlayers, setSelectedPlayers] = useState(new Set());
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-
   const [nextMatch, setNextMatch] = useState(null);
   const [nextMatchReport, setNextMatchReport] = useState(null);
-  const { toast } = useToast();
+  const [loading, setLoading] = useState(true);
+  const today = moment().format("YYYY-MM-DD");
 
+  // Initial load
   useEffect(() => {
     async function load() {
-      try {
-        const today = moment().format("YYYY-MM-DD");
-        const [allPlayers, dayStatuses, events, s, matchReports, divs, sts] = await Promise.all([
-          base44.entities.Player.list("-created_date", 500),
-          base44.entities.DailySquadStatus.filter({ date: today }, "-updated_at", 500),
-          base44.entities.DayEvent.list("date", 200),
-          base44.entities.TrainingSession.list("-date", 5),
-          base44.entities.MatchReport.list("-date", 20),
-          base44.entities.Division.list("order", 100),
-          base44.entities.Status.list("order", 50),
-        ]);
-        // Build status map from today's DailySquadStatus
-        const statusMap = {};
-        dayStatuses.forEach(ds => { statusMap[ds.player_id] = ds.status; });
-        // Merge: use daily status if exists, fallback to Player.status
-        const merged = allPlayers.map(pl => ({
-          ...pl,
-          status: statusMap[pl.id] || pl.status || "Disponible",
-        }));
-        const p = merged.filter((pl) => pl.division === "Reserva" || pl.status === "Subieren de juveniles" || pl.status === "Subieron de juveniles" || pl.status === "subió");
-        setPlayers(p);
-        setSessions(s);
-        setDivisions(divs);
-        setStatuses(sts.length > 0 ? sts : DEFAULT_STATUSES);
-        const todayStr = moment().format("YYYY-MM-DD");
-        const match = events.find((e) => e.type === "Partido" && e.date >= todayStr);
-        setNextMatch(match || null);
-        if (match) {
-          const report = matchReports.find((r) => r.date === match.date);
-          setNextMatchReport(report || null);
-        }
-      } catch (e) {
-        console.error(e);
-        setStatuses(DEFAULT_STATUSES);
-      } finally {
-        setLoading(false);
+      const [allPlayers, dayStatuses, events, s, matchReports] = await Promise.all([
+        base44.entities.Player.list("-created_date", 500),
+        base44.entities.DailySquadStatus.filter({ date: today }, "-updated_at", 500),
+        base44.entities.DayEvent.list("date", 200),
+        base44.entities.TrainingSession.list("-date", 5),
+        base44.entities.MatchReport.list("-date", 20),
+      ]);
+
+      setPlayers(allPlayers.filter(p => p.active !== false));
+
+      const map = {};
+      dayStatuses.forEach(ds => { map[ds.player_id] = ds; });
+      setStatusMap(map);
+
+      setSessions(s);
+
+      const match = events.find(e => e.type === "Partido" && e.date >= today);
+      setNextMatch(match || null);
+      if (match) {
+        setNextMatchReport(matchReports.find(r => r.date === match.date) || null);
       }
+      setLoading(false);
     }
     load();
   }, []);
 
-  const positionOrder = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
-  const filteredPlayers = useMemo(() => selectedStatus ? players.filter((p) => p.status === selectedStatus) : players, [players, selectedStatus]);
-  const availablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status === "Disponible" || p.status === "disponible").sort((a, b) => {
-    const posA = positionOrder.indexOf(a.position || "");
-    const posB = positionOrder.indexOf(b.position || "");
-    if (posA === posB) return (a.number || 0) - (b.number || 0);
-    return posA - posB;
-  }), [filteredPlayers]);
-  const unavailablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "disponible" && p.status !== "Subieron de juveniles" && p.status !== "subió").sort((a, b) => {
-    if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
-    return (a.number || 0) - (b.number || 0);
-  }), [filteredPlayers]);
-  const subioDJuveniles = useMemo(() => filteredPlayers.filter((p) => p.status === "Subieron de juveniles" || p.status === "subió").sort((a, b) => (a.number || 0) - (b.number || 0)), [filteredPlayers]);
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-      </div>);
-  }
-
-  const handleToggleSelect = (playerId) => {
-    setSelectedPlayers((prev) => {
-      const next = new Set(prev);
-      if (next.has(playerId)) next.delete(playerId);
-      else next.add(playerId);
-      return next;
-    });
-  };
-
-  const handleDeleteSelected = async () => {
-    try {
-      for (const playerId of selectedPlayers) {
-        await base44.entities.Player.delete(playerId);
+  // Real-time subscription to DailySquadStatus changes
+  useEffect(() => {
+    const unsubscribe = base44.entities.DailySquadStatus.subscribe((event) => {
+      const ds = event.data;
+      if (!ds || ds.date !== today) return;
+      if (event.type === "delete") {
+        setStatusMap(prev => {
+          const next = { ...prev };
+          // remove by id
+          Object.keys(next).forEach(k => { if (next[k]?.id === ds.id) delete next[k]; });
+          return next;
+        });
+      } else {
+        setStatusMap(prev => ({ ...prev, [ds.player_id]: ds }));
       }
-      setPlayers((prev) => prev.filter((p) => !selectedPlayers.has(p.id)));
-      setSelectedPlayers(new Set());
-      setShowDeleteConfirm(false);
-      toast({ title: `${selectedPlayers.size} jugador(es) eliminados`, variant: "default" });
-    } catch (error) {
-      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
-    }
-  };
+    });
+    return unsubscribe;
+  }, [today]);
 
-  const today = moment().format("MM-DD");
-  const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
-  const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
-  const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
-  const injured = filteredPlayers.filter((p) => p.status === "Lesionado" || p.status === "lesionado").length;
+  // Derived data
+  const byStatus = useMemo(() => {
+    const groups = {
+      disponible: [], lesionado: [], molestia: [], diferenciado: [],
+      suspendido: [], convocado: [], "subió": [], "bajó": [], ausente: [], otros: [],
+    };
+    players.forEach(p => {
+      const status = statusMap[p.id]?.status || "disponible";
+      if (groups[status] !== undefined) groups[status].push(p);
+      else groups.otros.push(p);
+    });
+    return groups;
+  }, [players, statusMap]);
 
-  const stats = [
-    { label: "Jugadores (Reserva)", value: players.length, icon: Users, color: "text-blue-400" },
-    { label: "Campo disp.", value: availableField, icon: Activity, color: "text-emerald-400" },
-    { label: "Lesionados", value: injured, icon: AlertCircle, color: "text-red-400" },
-    { label: "Arqueros disp.", value: availableGoalkeepers, icon: Shield, color: "text-yellow-400" },
+  const birthdayPlayers = useMemo(() =>
+    players.filter(p => p.birth_date && moment(p.birth_date).format("MM-DD") === moment().format("MM-DD")),
+    [players]
+  );
+
+  const summaryStats = [
+    { label: "Total plantel",  value: players.length,                      icon: Users,     color: "text-blue-400" },
+    { label: "Disponibles",    value: byStatus.disponible.length,           icon: Activity,  color: "text-emerald-400" },
+    { label: "Lesionados",     value: byStatus.lesionado.length,            icon: AlertCircle, color: "text-red-400" },
+    { label: "Molestias",      value: byStatus.molestia.length,             icon: AlertCircle, color: "text-orange-400" },
+    { label: "Diferenciados",  value: byStatus.diferenciado.length,         icon: Zap,       color: "text-amber-400" },
+    { label: "Suspendidos",    value: byStatus.suspendido.length,           icon: UserX,     color: "text-purple-400" },
+    { label: "Convocados",     value: byStatus.convocado.length,            icon: UserCheck, color: "text-blue-300" },
+    { label: "Suben",          value: byStatus["subió"].length,             icon: ArrowUp,   color: "text-sky-400" },
+    { label: "Bajan",          value: byStatus["bajó"].length,              icon: ArrowDown, color: "text-orange-400" },
+    { label: "Ausentes",       value: byStatus.ausente.length,              icon: UserX,     color: "text-zinc-400" },
   ];
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      {/* Header */}
+      <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">ESTADO DEL EQUIPO</h1>
-          <p className="text-zinc-500 text-sm mt-1">{moment().format("dddd D [de] MMMM, YYYY")}</p>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+          <p className="text-zinc-500 text-sm mt-1 capitalize">{moment().format("dddd D [de] MMMM, YYYY")}</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowStatusPanel(!showStatusPanel)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
-            {showStatusPanel ? <X size={15} /> : <ClipboardList size={15} />}
-            {showStatusPanel ? "Cerrar estados" : "Estado del plantel"}
-          </button>
-          <button
-            onClick={() => setShowMap(!showMap)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
-            {showMap ? <X size={15} /> : <Map size={15} />}
-            {showMap ? "Cerrar mapa" : "Ver mapa del día"}
-          </button>
-        </div>
+        <Link to="/daily-squad"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
+          Gestionar estados <ChevronRight size={15} />
+        </Link>
       </div>
 
-      {/* Filtro de estados */}
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setSelectedStatus(null)}
-          className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedStatus === null ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
-          Todos
-        </button>
-        {statuses.map((status) =>
-          <button
-            key={status.id}
-            onClick={() => setSelectedStatus(status.name)}
-            className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${selectedStatus === status.name ? "bg-white text-zinc-900" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>
-            {status.name}
-          </button>
-        )}
+      {/* Summary cards */}
+      <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+        {summaryStats.map(s => (
+          <StatCard key={s.label} {...s} />
+        ))}
       </div>
 
-      {showStatusPanel &&
-        <ErrorBoundary>
-          <StatusPanel
-            players={players}
-            setPlayers={setPlayers}
-            selectedPlayers={selectedPlayers}
-            handleToggleSelect={handleToggleSelect}
-            setShowDeleteConfirm={setShowDeleteConfirm}
-          />
-        </ErrorBoundary>
-      }
-
-      {showMap && (
-        <ErrorBoundary>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-            <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
-              <div>
-                <h2 className="text-sm font-semibold text-white">Mapa del día — Jugadores disponibles</h2>
-                <p className="text-xs text-zinc-500 mt-0.5">{availablePlayers.length} jugadores disponibles hoy</p>
-              </div>
-            </div>
-            <div className="p-4">
-              <PitchMap players={availablePlayers} emptyLabel="No hay jugadores disponibles hoy" />
-            </div>
-          </div>
-        </ErrorBoundary>
-      )}
-
-      {nextMatch &&
-        <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />
-      }
-
-      {birthdayPlayers.length > 0 &&
+      {/* Birthday */}
+      {birthdayPlayers.length > 0 && (
         <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
           <Cake size={20} className="text-yellow-400 mt-0.5 shrink-0" />
           <div>
             <p className="text-yellow-300 font-semibold text-sm">¡Cumpleaños hoy! 🎂</p>
             <p className="text-yellow-200/80 text-sm mt-0.5">
-              {birthdayPlayers.map((p) => `${p.full_name} (${moment().diff(moment(p.birth_date), "years")} años)`).join(" · ")}
+              {birthdayPlayers.map(p => `${p.full_name} (${moment().diff(moment(p.birth_date), "years")} años)`).join(" · ")}
             </p>
           </div>
         </div>
-      }
+      )}
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {stats.map((s) =>
-          <div key={s.label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-2">
-              <s.icon size={18} className={s.color} />
-            </div>
-            <p className="text-2xl font-bold text-white">{s.value}</p>
-            <p className="text-xs text-zinc-500 mt-0.5">{s.label}</p>
-          </div>
-        )}
-      </div>
+      {/* Next match */}
+      {nextMatch && <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />}
 
-      <div className="grid lg:grid-cols-2 gap-4">
-        {/* Disponibles */}
+      {/* Player groups + next training */}
+      <div className="grid lg:grid-cols-3 gap-4">
         <ErrorBoundary>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block" />
-                Disponibles
-                <span className="text-xs text-emerald-400 font-normal">({availablePlayers.length})</span>
-              </h2>
-              <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-                Ver plantel <ChevronRight size={14} />
-              </Link>
-            </div>
-            <div className="p-4">
-              {availablePlayers.length === 0 ?
-                <p className="text-zinc-600 text-sm text-center py-6">Sin jugadores disponibles</p> :
-                <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {availablePlayers.map((p) =>
-                    <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
-                      <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                      <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
-                        <PlayerPhotoUpload player={p} onPhotoUpdate={(url) => setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, photo_url: url } : pl))} />
-                      </div>
-                      <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
-                        <span className="text-sm text-white">{p.full_name}</span>
-                        <span className="text-xs text-zinc-500">{p.position}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              }
-            </div>
-          </div>
+          <GroupCard
+            title="Disponibles" dotColor="bg-emerald-400"
+            players={byStatus.disponible} statusMap={statusMap}
+            emptyText="Sin jugadores disponibles" linkTo="/daily-squad"
+          />
         </ErrorBoundary>
 
-        {/* Subieron de juveniles */}
-        {subioDJuveniles.length > 0 && (
+        <ErrorBoundary>
+          <NextTrainingPanel players={players} statusMap={statusMap} />
+        </ErrorBoundary>
+
+        <ErrorBoundary>
+          <GroupCard
+            title="Lesionados" dotColor="bg-red-400"
+            players={byStatus.lesionado} statusMap={statusMap}
+            emptyText="Sin lesionados" linkTo="/daily-squad"
+          />
+        </ErrorBoundary>
+
+        {byStatus.diferenciado.length > 0 && (
           <ErrorBoundary>
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-              <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-                <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-fuchsia-500 inline-block" />
-                  Subieron de juveniles
-                  <span className="text-xs text-fuchsia-400 font-normal">({subioDJuveniles.length})</span>
-                </h2>
-                <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-                  Ver plantel <ChevronRight size={14} />
-                </Link>
-              </div>
-              <div className="p-4">
-                <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {subioDJuveniles.map((p) =>
-                    <div key={p.id} className="flex items-center gap-3 hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
-                      <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                      <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
-                        <PlayerPhotoUpload player={p} onPhotoUpdate={(url) => setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, photo_url: url } : pl))} />
-                      </div>
-                      <div onClick={() => setSelectedPlayer(p)} className="flex-1 cursor-pointer">
-                        <span className="text-sm text-white">{p.full_name}</span>
-                        <span className="text-xs text-zinc-500">{p.position}</span>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
+            <GroupCard
+              title="Diferenciados" dotColor="bg-amber-400"
+              players={byStatus.diferenciado} statusMap={statusMap}
+              emptyText="" linkTo="/daily-squad"
+            />
           </ErrorBoundary>
         )}
 
-        {/* No disponibles */}
-        <ErrorBoundary>
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-              <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-red-400 inline-block" />
-                No disponibles
-                <span className="text-xs text-red-400 font-normal">({unavailablePlayers.length})</span>
-              </h2>
-              <Link to="/squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
-                Ver plantel <ChevronRight size={14} />
-              </Link>
-            </div>
-            <div className="p-4">
-              {unavailablePlayers.length === 0 ?
-                <p className="text-zinc-600 text-sm text-center py-6">Todos los jugadores están disponibles</p> :
-                <div className="space-y-2 max-h-72 overflow-y-auto">
-                  {unavailablePlayers.map((p) =>
-                    <div key={p.id} className="flex items-center justify-between hover:bg-zinc-800/50 px-2 py-1.5 rounded transition-colors">
-                      <div className="flex items-center gap-3">
-                        <span className="text-zinc-600 text-xs font-mono w-6 text-center shrink-0">{p.number}</span>
-                        <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer">
-                          <PlayerPhotoUpload player={p} onPhotoUpdate={(url) => setPlayers(prev => prev.map(pl => pl.id === p.id ? { ...pl, photo_url: url } : pl))} />
-                        </div>
-                        <div onClick={() => setSelectedPlayer(p)} className="cursor-pointer flex-1">
-                          <span className="text-sm text-white">{p.full_name}</span>
-                        </div>
-                      </div>
-                      <PlayerStatusBadge status={p.status} />
-                    </div>
-                  )}
-                </div>
-              }
-            </div>
-          </div>
-        </ErrorBoundary>
+        {byStatus["subió"].length > 0 && (
+          <ErrorBoundary>
+            <GroupCard
+              title="Suben" dotColor="bg-sky-400"
+              players={byStatus["subió"]} statusMap={statusMap}
+              emptyText="" linkTo="/daily-squad"
+            />
+          </ErrorBoundary>
+        )}
 
+        {byStatus["bajó"].length > 0 && (
+          <ErrorBoundary>
+            <GroupCard
+              title="Bajan" dotColor="bg-orange-400"
+              players={byStatus["bajó"]} statusMap={statusMap}
+              emptyText="" linkTo="/daily-squad"
+            />
+          </ErrorBoundary>
+        )}
+
+        {byStatus.convocado.length > 0 && (
+          <ErrorBoundary>
+            <GroupCard
+              title="Convocados" dotColor="bg-blue-400"
+              players={byStatus.convocado} statusMap={statusMap}
+              emptyText="" linkTo="/daily-squad"
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Tournament table */}
         <ErrorBoundary>
           <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+            <div className="p-4 border-b border-zinc-800">
               <h2 className="text-sm font-semibold text-white">Clasificación — Torneo Proyección</h2>
             </div>
             <div className="p-4 space-y-4">
@@ -490,6 +431,7 @@ export default function Dashboard() {
           </div>
         </ErrorBoundary>
 
+        {/* Sessions */}
         <ErrorBoundary>
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
             <div className="flex items-center justify-between p-4 border-b border-zinc-800">
@@ -499,65 +441,20 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="p-4">
-              {sessions.length === 0 ?
-                <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p> :
-                <div className="space-y-3">
-                  {sessions.map((s) =>
-                    <div key={s.id} className="flex items-center justify-between">
-                      <div>
+              {sessions.length === 0
+                ? <p className="text-zinc-600 text-sm text-center py-6">No hay sesiones cargadas</p>
+                : <div className="space-y-3">
+                    {sessions.map(s => (
+                      <div key={s.id}>
                         <p className="text-sm text-white">{s.title}</p>
                         <p className="text-xs text-zinc-500">{moment(s.date).format("DD/MM/YYYY")} · {s.session_type}</p>
                       </div>
-                    </div>
-                  )}
-                </div>
-              }
+                    ))}
+                  </div>}
             </div>
           </div>
         </ErrorBoundary>
       </div>
-
-      {selectedPlayer &&
-        <PlayerProfileDetail
-          player={selectedPlayer}
-          onClose={() => setSelectedPlayer(null)}
-          onEdit={(p) => setEditingPlayer(p)} />
-      }
-
-      {editingPlayer &&
-        <PlayerFormModal
-          player={editingPlayer}
-          divisions={divisions}
-          statuses={statuses}
-          onClose={() => setEditingPlayer(null)}
-          onSave={async (data) => {
-            await base44.entities.Player.update(editingPlayer.id, data);
-            setPlayers((prev) => prev.map((p) => p.id === editingPlayer.id ? { ...p, ...data } : p));
-            setEditingPlayer(null);
-          }}
-          onDelete={async (playerId) => {
-            setPlayers((prev) => prev.filter((p) => p.id !== playerId));
-          }} />
-      }
-
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent className="bg-zinc-900 border-zinc-800">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-white">Eliminar {selectedPlayers.size} jugador(es)</AlertDialogTitle>
-            <AlertDialogDescription className="text-zinc-400">
-              Esta acción no se puede deshacer. Los jugadores seleccionados serán eliminados permanentemente.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="flex gap-2 justify-end">
-            <AlertDialogCancel className="bg-zinc-800 border-zinc-700 text-white hover:bg-zinc-700">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteSelected}
-              className="bg-red-600 hover:bg-red-700 text-white">
-              Eliminar
-            </AlertDialogAction>
-          </div>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
