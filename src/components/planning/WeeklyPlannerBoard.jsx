@@ -392,25 +392,69 @@ export default function WeeklyPlannerBoard() {
                 ))}
               </tr>
 
-              {/* Tarea 1 + Sesión de gimnasio */}
+              {/* Sesión gym + Tareas de campo (técnico) — fila unificada */}
               <tr className="border-t border-zinc-700 bg-zinc-900/60">
                 <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">
-                  Tarea 1<br />
-                  <span className="font-normal text-[10px] text-blue-400">Sesión gym</span>
+                  <span className="text-blue-400">Sesión gym</span>
+                  <br />
+                  <span className="font-normal text-[10px] text-emerald-400 mt-1 block">Tareas DT</span>
                 </td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                    <textarea rows={3} value={d.tarea1} onChange={e => handleChange(i, "tarea1", e.target.value)}
-                      placeholder="—"
-                      className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                    <div className="mt-1 mb-1">
-                      <span className="text-[9px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/40">Sesión de gimnasio</span>
-                    </div>
-                    <textarea rows={4} value={d.sesionGimnasio} onChange={e => handleChange(i, "sesionGimnasio", e.target.value)}
-                      placeholder="—"
-                      className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                  </td>
-                ))}
+                {days.map((d, i) => {
+                  const tareas = d.tareasTecnico || [""];
+                  const setTareas = (newTareas) => handleChange(i, "tareasTecnico", newTareas);
+                  return (
+                    <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
+                      {/* Sesión de gimnasio */}
+                      <div className="mb-1.5">
+                        <span className="text-[9px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/40">Sesión de gimnasio</span>
+                      </div>
+                      <textarea rows={4} value={d.sesionGimnasio} onChange={e => handleChange(i, "sesionGimnasio", e.target.value)}
+                        placeholder="—"
+                        className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
+
+                      {/* Divisor DT */}
+                      <div className="border-t border-emerald-800/50 mt-2 mb-1.5 pt-1.5">
+                        <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Director Técnico</span>
+                      </div>
+
+                      {/* Tareas del técnico */}
+                      <div className="space-y-1.5">
+                        {tareas.map((t, ti) => (
+                          <div key={ti} className="flex items-start gap-1">
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-[9px] text-emerald-500 font-semibold mb-0.5">Tarea {ti + 1}</span>
+                              <textarea
+                                rows={2}
+                                value={t}
+                                onChange={e => {
+                                  const next = [...tareas];
+                                  next[ti] = e.target.value;
+                                  setTareas(next);
+                                }}
+                                placeholder="—"
+                                className="w-full bg-emerald-900/10 border border-emerald-800/30 rounded text-white text-[10px] resize-none focus:outline-none focus:border-emerald-600/50 placeholder-zinc-600 px-1 py-0.5"
+                              />
+                            </div>
+                            {tareas.length > 1 && (
+                              <button
+                                onClick={() => setTareas(tareas.filter((_, idx) => idx !== ti))}
+                                className="mt-4 text-zinc-600 hover:text-red-400 transition-colors shrink-0"
+                              >
+                                <X size={11} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => setTareas([...tareas, ""])}
+                          className="flex items-center gap-1 text-[9px] text-emerald-500 hover:text-emerald-300 transition-colors mt-1"
+                        >
+                          <Plus size={10} /> Agregar tarea
+                        </button>
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
 
               {/* Trabajo compensatorio */}
@@ -459,61 +503,7 @@ export default function WeeklyPlannerBoard() {
                 ))}
               </tr>
 
-              {/* ── Separador Director Técnico ── */}
-              <tr>
-                <td colSpan={8} className="px-3 py-2 bg-emerald-900/70 border-t-2 border-emerald-600" style={{ colSpan: 8 }}>
-                  <span className="text-xs font-bold text-emerald-300 uppercase tracking-widest">Director Técnico</span>
-                </td>
-              </tr>
 
-              {/* Tareas del técnico (dinámicas) */}
-              <tr className="border-t border-zinc-700 bg-zinc-900/60">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">
-                  Tareas
-                </td>
-                {days.map((d, i) => {
-                  const tareas = d.tareasTecnico || [""];
-                  function setTareas(newTareas) { handleChange(i, "tareasTecnico", newTareas); }
-                  return (
-                    <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                      <div className="space-y-1.5">
-                        {tareas.map((t, ti) => (
-                          <div key={ti} className="flex items-start gap-1 group">
-                            <div className="flex flex-col flex-1 min-w-0">
-                              <span className="text-[9px] text-emerald-400 font-semibold mb-0.5">Tarea {ti + 1}</span>
-                              <textarea
-                                rows={2}
-                                value={t}
-                                onChange={e => {
-                                  const next = [...tareas];
-                                  next[ti] = e.target.value;
-                                  setTareas(next);
-                                }}
-                                placeholder="—"
-                                className="w-full bg-emerald-900/10 border border-emerald-800/30 rounded text-white text-[10px] resize-none focus:outline-none focus:border-emerald-600/50 placeholder-zinc-600 px-1 py-0.5"
-                              />
-                            </div>
-                            {tareas.length > 1 && (
-                              <button
-                                onClick={() => setTareas(tareas.filter((_, idx) => idx !== ti))}
-                                className="mt-4 text-zinc-600 hover:text-red-400 transition-colors shrink-0"
-                              >
-                                <X size={11} />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                        <button
-                          onClick={() => setTareas([...tareas, ""])}
-                          className="flex items-center gap-1 text-[9px] text-emerald-500 hover:text-emerald-300 transition-colors mt-1"
-                        >
-                          <Plus size={10} /> Agregar tarea
-                        </button>
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
             </tbody>
           </table>
         </div>
