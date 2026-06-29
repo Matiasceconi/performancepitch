@@ -150,7 +150,7 @@ export default function MatchGpsReport({ match }) {
       byPlayer[r.player_name].push(r);
     });
     return Object.entries(byPlayer).map(([name, prows]) => {
-      const out = { player_name: name, shortName: name.split(" ").slice(-1)[0] };
+      const out = { player_name: name, shortName: name };
       METRICS.forEach(({ key }) => { out[key] = avg(prows.map((r) => r[key])); });
       return out;
     });
