@@ -25,9 +25,7 @@ import Matches from '@/pages/Matches';
 import PlayerNameManagement from '@/pages/PlayerNameManagement';
 import PlantilDiagnostic from '@/pages/PlantilDiagnostic';
 import WeeklyPlanner from '@/pages/WeeklyPlanner';
-import PlayerAdmin from '@/pages/PlayerAdmin';
-import DataCrossing from '@/pages/DataCrossing';
-import PlayerIdentity from '@/pages/PlayerIdentity';
+import AdminHub from '@/pages/AdminHub';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -73,9 +71,7 @@ const AuthenticatedApp = () => {
           <Route path="/player-names" element={<PlayerNameManagement />} />
           <Route path="/plantil-diagnostic" element={<PlantilDiagnostic />} />
           <Route path="/weekly-planner" element={<WeeklyPlanner />} />
-          <Route path="/player-admin" element={<PlayerAdmin />} />
-          <Route path="/data-crossing" element={<DataCrossing />} />
-          <Route path="/identity" element={<PlayerIdentity />} />
+          <Route path="/admin" element={<AdminHub />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
