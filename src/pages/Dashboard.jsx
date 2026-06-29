@@ -178,21 +178,31 @@ export default function Dashboard() {
   useEffect(() => {
     async function load() {
       try {
-        const [allPlayers, events, s, matchReports, divs, sts] = await Promise.all([
+        const today = moment().format("YYYY-MM-DD");
+        const [allPlayers, dayStatuses, events, s, matchReports, divs, sts] = await Promise.all([
           base44.entities.Player.list("-created_date", 500),
+          base44.entities.DailySquadStatus.filter({ date: today }, "-updated_at", 500),
           base44.entities.DayEvent.list("date", 200),
           base44.entities.TrainingSession.list("-date", 5),
           base44.entities.MatchReport.list("-date", 20),
           base44.entities.Division.list("order", 100),
           base44.entities.Status.list("order", 50),
         ]);
-        const p = allPlayers.filter((pl) => pl.division === "Reserva" || pl.status === "Subieron de juveniles");
+        // Build status map from today's DailySquadStatus
+        const statusMap = {};
+        dayStatuses.forEach(ds => { statusMap[ds.player_id] = ds.status; });
+        // Merge: use daily status if exists, fallback to Player.status
+        const merged = allPlayers.map(pl => ({
+          ...pl,
+          status: statusMap[pl.id] || pl.status || "Disponible",
+        }));
+        const p = merged.filter((pl) => pl.division === "Reserva" || pl.status === "Subieren de juveniles" || pl.status === "Subieron de juveniles" || pl.status === "subió");
         setPlayers(p);
         setSessions(s);
         setDivisions(divs);
         setStatuses(sts.length > 0 ? sts : DEFAULT_STATUSES);
-        const today = moment().format("YYYY-MM-DD");
-        const match = events.find((e) => e.type === "Partido" && e.date >= today);
+        const todayStr = moment().format("YYYY-MM-DD");
+        const match = events.find((e) => e.type === "Partido" && e.date >= todayStr);
         setNextMatch(match || null);
         if (match) {
           const report = matchReports.find((r) => r.date === match.date);
@@ -210,17 +220,17 @@ export default function Dashboard() {
 
   const positionOrder = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
   const filteredPlayers = useMemo(() => selectedStatus ? players.filter((p) => p.status === selectedStatus) : players, [players, selectedStatus]);
-  const availablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => {
+  const availablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status === "Disponible" || p.status === "disponible").sort((a, b) => {
     const posA = positionOrder.indexOf(a.position || "");
     const posB = positionOrder.indexOf(b.position || "");
     if (posA === posB) return (a.number || 0) - (b.number || 0);
     return posA - posB;
   }), [filteredPlayers]);
-  const unavailablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subieron de juveniles").sort((a, b) => {
+  const unavailablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "disponible" && p.status !== "Subieron de juveniles" && p.status !== "subió").sort((a, b) => {
     if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
     return (a.number || 0) - (b.number || 0);
   }), [filteredPlayers]);
-  const subioDJuveniles = useMemo(() => filteredPlayers.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0)), [filteredPlayers]);
+  const subioDJuveniles = useMemo(() => filteredPlayers.filter((p) => p.status === "Subieron de juveniles" || p.status === "subió").sort((a, b) => (a.number || 0) - (b.number || 0)), [filteredPlayers]);
 
   if (loading) {
     return (
@@ -256,7 +266,7 @@ export default function Dashboard() {
   const birthdayPlayers = players.filter((p) => p.birth_date && moment(p.birth_date).format("MM-DD") === today);
   const availableField = availablePlayers.filter((p) => p.position !== "Arquero").length;
   const availableGoalkeepers = availablePlayers.filter((p) => p.position === "Arquero").length;
-  const injured = filteredPlayers.filter((p) => p.status === "Lesionado").length;
+  const injured = filteredPlayers.filter((p) => p.status === "Lesionado" || p.status === "lesionado").length;
 
   const stats = [
     { label: "Jugadores (Reserva)", value: players.length, icon: Users, color: "text-blue-400" },
