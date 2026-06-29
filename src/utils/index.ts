@@ -17,10 +17,7 @@ export function fmtMetric(value: number | undefined | null): string {
     if (value === undefined || value === null) return "—";
     const n = typeof value === "number" ? value : parseFloat(value as any);
     if (isNaN(n)) return "—";
-    // Use fixed with enough decimal places, then strip trailing zeros
-    let s = n.toFixed(10);           // e.g. "3251.2818000000"
-    s = s.replace(/\.?0+$/, "");     // strip trailing zeros and dot
-    return s || "0";
+    return Math.round(n).toString();
 }
 
 /**
