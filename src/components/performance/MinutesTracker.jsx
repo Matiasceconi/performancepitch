@@ -53,11 +53,15 @@ export default function MinutesTracker({ onSelectPlayer }) {
       setPlayers(plrs);
     }).finally(() => setLoading(false));
 
-    // Suscripción en tiempo real: refresca cuando cambia cualquier MinutesRecord
+    // Suscripción en tiempo real con debounce para evitar rate limit
+    let timer;
     const unsub = base44.entities.MinutesRecord.subscribe(() => {
-      base44.entities.MinutesRecord.list("-created_date", 500).then(setRecords);
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        base44.entities.MinutesRecord.list("-created_date", 500).then(setRecords);
+      }, 2000);
     });
-    return () => unsub();
+    return () => { unsub(); clearTimeout(timer); };
   }, []);
 
   // Mapa player_id -> foto
