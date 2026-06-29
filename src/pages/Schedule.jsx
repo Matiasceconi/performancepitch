@@ -318,11 +318,11 @@ function EventCard({ event, onEdit, onDelete, onDownloadDay }) {
             <p className={`text-sm font-semibold ${c.text}`}>{event.title}</p>
             {event.type && <p className="text-xs text-zinc-500">{event.type}</p>}
           </div>
-          <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-            <button onClick={() => onEdit(event)} className="p-1 rounded hover:bg-white/10 text-zinc-400 hover:text-white transition-colors">
+          <div className="flex gap-1 shrink-0">
+            <button onClick={(e) => { e.stopPropagation(); onEdit(event); }} className="p-1 rounded hover:bg-white/10 text-zinc-500 hover:text-white transition-colors">
               <Pencil size={12} />
             </button>
-            <button onClick={() => onDelete(event.id)} className="p-1 rounded hover:bg-red-500/20 text-zinc-400 hover:text-red-400 transition-colors">
+            <button onClick={(e) => { e.stopPropagation(); onDelete(event.id); }} className="p-1 rounded hover:bg-red-500/20 text-zinc-500 hover:text-red-400 transition-colors">
               <Trash2 size={12} />
             </button>
           </div>
