@@ -101,10 +101,10 @@ function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, lo
           <div className="space-y-3">
             <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">GPS — Promedios últimos 30 días</h3>
             <div className="grid grid-cols-2 gap-3">
-              <StatCard label="Dist. total prom." value={avgGps("total_distance") ? `${Math.round(avgGps("total_distance") / 100) / 10} km` : "—"} color="text-blue-400" />
+              <StatCard label="Dist. total prom." value={avgGps("total_distance") ? `${(avgGps("total_distance") / 1000).toFixed(2)} km` : "—"} color="text-blue-400" />
               <StatCard label="Vel. máx. prom." value={avgGps("max_velocity") ? `${avgGps("max_velocity")} km/h` : "—"} color="text-orange-400" />
-              <StatCard label="HSR prom." value={avgGps("distance_hsr") ? `${avgGps("distance_hsr")} m` : "—"} color="text-purple-400" />
-              <StatCard label="Player Load prom." value={avgGps("player_load")} color="text-emerald-400" />
+              <StatCard label="HSR prom." value={avgGps("distance_hsr") ? `${Math.round(avgGps("distance_hsr"))} m` : "—"} color="text-purple-400" />
+              <StatCard label="Player Load prom." value={avgGps("player_load") ?? "—"} color="text-emerald-400" />
             </div>
           </div>
         )}
@@ -207,18 +207,46 @@ function TabConsolidado({ player, medicalRecords, loadingRecords, gpsRecords, lo
 // Tab: Rendimiento
 function TabRendimiento({ player }) {
   const [minutesRecords, setMinutesRecords] = useState([]);
-  const [gpsRecords, setGpsRecords] = useState([]);
+  const [gpsRecords, setGpsRecords] = useState([]); // CatapultReport (sesiones)
+  const [matchGpsRecords, setMatchGpsRecords] = useState([]); // CatapultReport de partidos
+  const [gpsSource, setGpsSource] = useState("all"); // "all" | "sessions" | "matches"
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
-      const [mins, gps] = await Promise.all([
-        base44.entities.MinutesRecord.filter({ player_id: player.id }, "-match_date", 50),
-        base44.entities.GPSRecord.filter({ player_id: player.id }, "-date", 30),
-      ]);
-      setMinutesRecords(mins);
-      setGpsRecords(gps);
-      setLoading(false);
+      try {
+        const [mins, catapult, sessions, matchReports] = await Promise.all([
+          base44.entities.MinutesRecord.filter({ player_id: player.id }, "-match_date", 50),
+          base44.entities.CatapultReport.filter({ player_id: player.id }, "-date", 300),
+          base44.entities.TrainingSession.list("-date", 300),
+          base44.entities.MatchReport.list("-date", 100),
+        ]);
+        setMinutesRecords(mins);
+
+        // Build a set of session dates vs match dates to classify each CatapultReport
+        const sessionDates = new Set(sessions.map(s => s.date));
+        const matchDates = new Set(matchReports.map(m => m.date));
+
+        // Deduplicate catapult by date, keeping latest
+        const deduped = {};
+        catapult.forEach(r => {
+          if (!r.date) return;
+          if (!deduped[r.date] || new Date(r.updated_date) > new Date(deduped[r.date].updated_date)) {
+            deduped[r.date] = r;
+          }
+        });
+        const allGps = Object.values(deduped).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        // Classify: if a date is a match date → match GPS; if training session → session GPS
+        // If appears in both or neither, classify by session_label or put in sessions
+        const matchGps = allGps.filter(r => matchDates.has(r.date) && !sessionDates.has(r.date));
+        const sessionGps = allGps.filter(r => !matchDates.has(r.date) || sessionDates.has(r.date));
+
+        setMatchGpsRecords(matchGps);
+        setGpsRecords(sessionGps);
+      } finally {
+        setLoading(false);
+      }
     }
     load();
   }, [player.id]);
@@ -229,8 +257,13 @@ function TabRendimiento({ player }) {
   const matchesPlayed = minutesRecords.filter(r => (r.minutes || 0) > 0).length;
   const avgMinutes = matchesPlayed ? Math.round(totalMinutes / matchesPlayed) : 0;
 
+  // Combined GPS for averages based on filter
+  const activeGps = gpsSource === "all"
+    ? [...gpsRecords, ...matchGpsRecords]
+    : gpsSource === "sessions" ? gpsRecords : matchGpsRecords;
+
   const avgGps = (field) => {
-    const vals = gpsRecords.filter(r => r[field] > 0).map(r => r[field]);
+    const vals = activeGps.filter(r => r[field] != null && r[field] > 0).map(r => r[field]);
     return vals.length ? Math.round(vals.reduce((a, b) => a + b, 0) / vals.length) : null;
   };
 
@@ -239,10 +272,14 @@ function TabRendimiento({ player }) {
     min: r.minutes || 0,
   }));
 
-  const gpsChartData = [...gpsRecords].reverse().slice(-10).map(r => ({
+  const gpsChartData = [...activeGps].slice(0, 10).reverse().map(r => ({
     label: moment(r.date).format("DD/MM"),
     dist: Math.round((r.total_distance || 0) / 1000 * 10) / 10,
+    isMatch: matchGpsRecords.some(m => m.date === r.date),
   }));
+
+  const totalSessionsWithGps = gpsRecords.length;
+  const totalMatchesWithGps = matchGpsRecords.length;
 
   return (
     <div className="space-y-6">
@@ -271,29 +308,49 @@ function TabRendimiento({ player }) {
         )}
       </div>
 
-      {/* GPS resumen */}
+      {/* GPS resumen — fuente unificada: CatapultReport (sesiones + partidos) */}
       <div>
-        <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">GPS — Promedios generales</h3>
-        <div className="grid grid-cols-2 gap-3 mb-4">
-          <StatCard label="Dist. total prom." value={avgGps("total_distance") ? `${Math.round(avgGps("total_distance") / 100) / 10} km` : "—"} color="text-blue-400" />
-          <StatCard label="Vel. máx. prom." value={avgGps("max_speed") ? `${avgGps("max_speed")} km/h` : "—"} color="text-orange-400" />
-          <StatCard label="HSR prom." value={avgGps("high_speed_running") ? `${avgGps("high_speed_running")} m` : "—"} color="text-purple-400" />
-          <StatCard label="Player Load prom." value={avgGps("player_load")} color="text-emerald-400" />
-        </div>
-        {gpsChartData.length > 0 ? (
-          <div className="bg-zinc-800/40 rounded-xl p-3">
-            <p className="text-xs text-zinc-500 mb-3">Distancia total por sesión (km)</p>
-            <ResponsiveContainer width="100%" height={120}>
-              <LineChart data={gpsChartData}>
-                <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
-                <YAxis hide />
-                <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#60a5fa" }} formatter={(v) => [`${v} km`, "Distancia"]} />
-                <Line type="monotone" dataKey="dist" stroke="#60a5fa" strokeWidth={2} dot={{ fill: "#60a5fa", r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-xs font-semibold text-zinc-500 uppercase tracking-wider">GPS — Promedios generales</h3>
+          <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-0.5">
+            {[
+              { id: "all", label: `Todo (${totalSessionsWithGps + totalMatchesWithGps})` },
+              { id: "sessions", label: `Sesiones (${totalSessionsWithGps})` },
+              { id: "matches", label: `Partidos (${totalMatchesWithGps})` },
+            ].map(opt => (
+              <button key={opt.id} onClick={() => setGpsSource(opt.id)}
+                className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${gpsSource === opt.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+                {opt.label}
+              </button>
+            ))}
           </div>
+        </div>
+
+        {activeGps.length === 0 ? (
+          <p className="text-zinc-600 text-sm text-center py-6">Sin registros GPS</p>
         ) : (
-          <p className="text-zinc-600 text-sm text-center py-4">Sin registros GPS</p>
+          <>
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <StatCard label="Dist. total prom." value={avgGps("total_distance") ? `${(avgGps("total_distance") / 1000).toFixed(2)} km` : "—"} color="text-blue-400" />
+              <StatCard label="Vel. máx. prom." value={avgGps("max_velocity") ? `${avgGps("max_velocity")} km/h` : "—"} color="text-orange-400" />
+              <StatCard label="HSR prom." value={avgGps("distance_hsr") ? `${Math.round(avgGps("distance_hsr"))} m` : "—"} color="text-purple-400" />
+              <StatCard label="Player Load prom." value={avgGps("player_load") ?? "—"} color="text-emerald-400" />
+            </div>
+            <div className="bg-zinc-800/40 rounded-xl p-3">
+              <p className="text-xs text-zinc-500 mb-3">Distancia total por sesión/partido (km)</p>
+              <ResponsiveContainer width="100%" height={120}>
+                <BarChart data={gpsChartData} barSize={18}>
+                  <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
+                  <YAxis hide />
+                  <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#60a5fa" }} formatter={(v) => [`${v} km`, "Distancia"]} />
+                  <Bar dataKey="dist" radius={[3, 3, 0, 0]}
+                    fill="#60a5fa"
+                    label={false}
+                  />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </>
         )}
       </div>
     </div>
