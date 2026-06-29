@@ -33,7 +33,7 @@ function getTrafficLight(value, teamAvg) {
 }
 
 // ── Panel de resolución de nombres no reconocidos ──────────────────────────
-function UnresolvedNamesPanel({ unresolvedNames, playerOptions, onResolved }) {
+function UnresolvedNamesPanel({ unresolvedNames, playerOptions, onResolved, matchId, matchDate, csvUrl, csvLabel }) {
   const { toast } = useToast();
   const [selections, setSelections] = useState({}); // csvName -> player_id
   const [saving, setSaving] = useState(false);
@@ -44,7 +44,15 @@ function UnresolvedNamesPanel({ unresolvedNames, playerOptions, onResolved }) {
     if (!playerId) return;
     setSaving(true);
     try {
-      await base44.functions.invoke("resolveMatchGpsCSV", { mode: "save_mapping", csv_name: csvName, player_id: playerId });
+      await base44.functions.invoke("resolveMatchGpsCSV", {
+        mode: "save_mapping",
+        csv_name: csvName,
+        player_id: playerId,
+        match_id: matchId,
+        match_date: matchDate,
+        csv_url: csvUrl,
+        csv_label: csvLabel,
+      });
       setSaved(s => ({ ...s, [csvName]: true }));
       toast({ title: `"${csvName}" vinculado correctamente` });
       onResolved?.();
@@ -115,7 +123,12 @@ export default function MatchGpsReport({ match }) {
     setLoading(true);
     setError(false);
     try {
-      const res = await base44.functions.invoke("resolveMatchGpsCSV", { csv_url: match.csv_url });
+      const res = await base44.functions.invoke("resolveMatchGpsCSV", {
+        csv_url: match.csv_url,
+        match_id: match.id,
+        match_date: match.date,
+        csv_label: match.csv_label,
+      });
       setData(res.data);
       if (res.data?.unresolved > 0) setShowUnresolved(true);
     } catch {
@@ -221,6 +234,10 @@ export default function MatchGpsReport({ match }) {
                 unresolvedNames={data.unresolved_names}
                 playerOptions={data.player_options || []}
                 onResolved={loadData}
+                matchId={match.id}
+                matchDate={match.date}
+                csvUrl={match.csv_url}
+                csvLabel={match.csv_label}
               />
             )}
 

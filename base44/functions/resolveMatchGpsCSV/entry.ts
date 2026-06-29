@@ -118,7 +118,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
 
-    // Modo: "resolve" (leer CSV y resolver) o "save_mapping" (guardar alias manual)
+    // ── Modo: save_mapping (guardar alias manual) ──────────────────────────────
     if (body.mode === "save_mapping") {
       const { csv_name, player_id } = body;
       if (!csv_name || !player_id) return Response.json({ error: "csv_name y player_id requeridos" }, { status: 400 });
@@ -144,11 +144,54 @@ Deno.serve(async (req) => {
           sources: ['Partidos GPS'],
         });
       }
+
+      // Si se pasa match_id + match_date + csv_url, también actualizar el CatapultReport de ese jugador
+      if (body.match_id && body.match_date && body.csv_url) {
+        try {
+          const existing = await base44.asServiceRole.entities.CatapultReport.filter({
+            session_id: body.match_id,
+            player_id: player_id,
+          });
+          if (existing.length === 0) {
+            // Re-parsear CSV para obtener los datos de este jugador
+            const csvText = await fetch(body.csv_url).then(r => r.text());
+            const parsed = parseCatapultCSV(csvText);
+            if (!parsed.error) {
+              const playerRow = parsed.rows.find(r => normalizeName(r.player_name) === normalizeName(csv_name));
+              if (playerRow) {
+                await base44.asServiceRole.entities.CatapultReport.create({
+                  player_id: player_id,
+                  player_name: officialName,
+                  date: body.match_date,
+                  session_id: body.match_id,
+                  session_label: body.csv_label || "Partido GPS",
+                  file_url: body.csv_url,
+                  total_duration: playerRow.total_duration,
+                  total_distance: playerRow.total_distance,
+                  distance_hsr: playerRow.distance_hsr,
+                  sprint_distance: playerRow.sprint_distance,
+                  sprint_efforts: playerRow.sprint_efforts,
+                  accelerations: playerRow.accelerations,
+                  decelerations: playerRow.decelerations,
+                  player_load: playerRow.player_load,
+                  max_velocity: playerRow.max_velocity,
+                  max_velocity_percentage: playerRow.max_velocity_percentage,
+                  meters_per_minute: playerRow.meters_per_minute,
+                });
+              }
+            }
+          }
+        } catch (e) {
+          // Continuar aunque falle el upsert
+        }
+      }
+
       return Response.json({ success: true, message: `Alias "${csv_name}" vinculado a ${officialName}` });
     }
 
-    // Modo "resolve" (por defecto)
-    const { csv_url } = body;
+    // ── Modo: resolve + persist (por defecto) ────────────────────────────────
+    // Parámetros: csv_url (requerido), match_id (opcional), match_date (opcional), csv_label (opcional)
+    const { csv_url, match_id, match_date, csv_label } = body;
     if (!csv_url) return Response.json({ error: "csv_url requerido" }, { status: 400 });
 
     // Descargar y parsear CSV
@@ -171,18 +214,18 @@ Deno.serve(async (req) => {
       });
     });
 
-    // Mapa player_id -> player object
     const playerById = Object.fromEntries(players.map(p => [p.id, p]));
 
     const resolvedRows = [];
     const unresolvedNames = new Set();
+    const toUpsert = []; // rows to persist in CatapultReport
 
     for (const row of parseResult.rows) {
       const csvName = (row.player_name || "").trim();
       let playerId = null;
       let officialName = null;
 
-      // 1. Buscar en alias map
+      // 1. Alias map
       const aliasHit = aliasMap[normalizeName(csvName)];
       if (aliasHit && playerById[aliasHit]) {
         playerId = aliasHit;
@@ -190,7 +233,7 @@ Deno.serve(async (req) => {
         officialName = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
       }
 
-      // 2. Buscar por nombre exacto normalizado
+      // 2. Nombre exacto normalizado
       if (!playerId) {
         for (const p of players) {
           const pName = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
@@ -222,6 +265,10 @@ Deno.serve(async (req) => {
           jersey_number: p?.jersey_number || null,
           position: p?.position || null,
         });
+        // Marcar para persistir si se proporcionó match_id
+        if (match_id && match_date) {
+          toUpsert.push({ row, playerId, officialName: officialName || csvName });
+        }
       } else {
         unresolvedNames.add(csvName);
         resolvedRows.push({
@@ -234,7 +281,42 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Candidatos del plantel para selección manual de los no resueltos
+    // ── Persistir en CatapultReport (upsert por player_id + session_id) ──────
+    if (match_id && match_date && toUpsert.length > 0) {
+      // Cargar registros existentes para este partido
+      const existingReports = await base44.asServiceRole.entities.CatapultReport.filter({ session_id: match_id });
+      const existingByPlayerId = Object.fromEntries(existingReports.map(r => [r.player_id, r]));
+
+      for (const { row, playerId, officialName } of toUpsert) {
+        const reportData = {
+          player_id: playerId,
+          player_name: officialName,
+          date: match_date,
+          session_id: match_id,
+          session_label: csv_label || "Partido GPS",
+          file_url: csv_url,
+          total_duration: row.total_duration,
+          total_distance: row.total_distance,
+          distance_hsr: row.distance_hsr,
+          sprint_distance: row.sprint_distance,
+          sprint_efforts: row.sprint_efforts,
+          accelerations: row.accelerations,
+          decelerations: row.decelerations,
+          player_load: row.player_load,
+          max_velocity: row.max_velocity,
+          max_velocity_percentage: row.max_velocity_percentage,
+          meters_per_minute: row.meters_per_minute,
+        };
+
+        if (existingByPlayerId[playerId]) {
+          await base44.asServiceRole.entities.CatapultReport.update(existingByPlayerId[playerId].id, reportData);
+        } else {
+          await base44.asServiceRole.entities.CatapultReport.create(reportData);
+        }
+      }
+    }
+
+    // Candidatos para selección manual
     const playerOptions = players.map(p => ({
       id: p.id,
       full_name: p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim(),
@@ -252,6 +334,7 @@ Deno.serve(async (req) => {
       unresolved: resolvedRows.filter(r => r.unresolved).length,
       unresolved_names: Array.from(unresolvedNames),
       player_options: playerOptions,
+      persisted: toUpsert.length,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

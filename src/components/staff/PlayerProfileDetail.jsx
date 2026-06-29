@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
@@ -215,32 +215,28 @@ function TabRendimiento({ player }) {
   useEffect(() => {
     async function load() {
       try {
-        const [mins, catapult, sessions, matchReports] = await Promise.all([
+        const [mins, catapult, matchReports] = await Promise.all([
           base44.entities.MinutesRecord.filter({ player_id: player.id }, "-match_date", 50),
           base44.entities.CatapultReport.filter({ player_id: player.id }, "-date", 300),
-          base44.entities.TrainingSession.list("-date", 300),
           base44.entities.MatchReport.list("-date", 100),
         ]);
         setMinutesRecords(mins);
 
-        // Build a set of session dates vs match dates to classify each CatapultReport
-        const sessionDates = new Set(sessions.map(s => s.date));
-        const matchDates = new Set(matchReports.map(m => m.date));
+        // Classify by session_id: if session_id matches a MatchReport.id → partido, else → entrenamiento
+        const matchIdSet = new Set(matchReports.map(m => m.id));
 
-        // Deduplicate catapult by date, keeping latest
-        const deduped = {};
+        // Deduplicate by session_id (keep one record per session/match per player)
+        const dedupedBySession = {};
         catapult.forEach(r => {
-          if (!r.date) return;
-          if (!deduped[r.date] || new Date(r.updated_date) > new Date(deduped[r.date].updated_date)) {
-            deduped[r.date] = r;
+          if (!r.session_id) return;
+          if (!dedupedBySession[r.session_id] || new Date(r.updated_date) > new Date(dedupedBySession[r.session_id].updated_date)) {
+            dedupedBySession[r.session_id] = r;
           }
         });
-        const allGps = Object.values(deduped).sort((a, b) => new Date(b.date) - new Date(a.date));
+        const allGps = Object.values(dedupedBySession).sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        // Classify: if a date is a match date → match GPS; if training session → session GPS
-        // If appears in both or neither, classify by session_label or put in sessions
-        const matchGps = allGps.filter(r => matchDates.has(r.date) && !sessionDates.has(r.date));
-        const sessionGps = allGps.filter(r => !matchDates.has(r.date) || sessionDates.has(r.date));
+        const matchGps = allGps.filter(r => matchIdSet.has(r.session_id));
+        const sessionGps = allGps.filter(r => !matchIdSet.has(r.session_id));
 
         setMatchGpsRecords(matchGps);
         setGpsRecords(sessionGps);
@@ -342,11 +338,12 @@ function TabRendimiento({ player }) {
                 <BarChart data={gpsChartData} barSize={18}>
                   <XAxis dataKey="label" tick={{ fill: "#71717a", fontSize: 10 }} axisLine={false} tickLine={false} />
                   <YAxis hide />
-                  <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#fff" }} itemStyle={{ color: "#60a5fa" }} formatter={(v) => [`${v} km`, "Distancia"]} />
-                  <Bar dataKey="dist" radius={[3, 3, 0, 0]}
-                    fill="#60a5fa"
-                    label={false}
-                  />
+                  <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #27272a", borderRadius: 8 }} labelStyle={{ color: "#fff" }} formatter={(v, name, props) => [`${v} km`, props?.payload?.isMatch ? "Partido" : "Sesión"]} />
+                  <Bar dataKey="dist" radius={[3, 3, 0, 0]}>
+                    {gpsChartData.map((entry, i) => (
+                      <Cell key={i} fill={entry.isMatch ? "#f97316" : "#60a5fa"} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
