@@ -45,6 +45,33 @@ function buildFormation433(players) {
   ];
 }
 
+function PlayerChip({ chipColor, photoUrl, player }) {
+  const [imgError, setImgError] = React.useState(false);
+  if (imgError) {
+    return (
+      <div
+        style={{ background: chipColor, boxShadow: `0 0 16px ${chipColor}60, 0 4px 12px rgba(0,0,0,0.7)` }}
+        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold border-2 border-white/50 transition-transform group-hover:scale-110 text-white"
+      >
+        {player.number || "?"}
+      </div>
+    );
+  }
+  return (
+    <div
+      style={{ borderColor: chipColor, borderWidth: "3px", borderStyle: "solid", boxShadow: `0 0 16px ${chipColor}60, 0 4px 12px rgba(0,0,0,0.7)` }}
+      className="w-10 h-10 rounded-full overflow-hidden transition-transform group-hover:scale-110"
+    >
+      <img
+        src={photoUrl}
+        alt={player.full_name || ""}
+        className="w-full h-full object-cover"
+        onError={() => setImgError(true)}
+      />
+    </div>
+  );
+}
+
 export default function PitchMap({ players: rawPlayers, highlighted = new Set(), onToggle, emptyLabel }) {
   const players = (rawPlayers || []).filter(p => p && p.id);
   const [customPositions, setCustomPositions] = React.useState({});
@@ -171,22 +198,7 @@ export default function PitchMap({ players: rawPlayers, highlighted = new Set(),
             className="flex flex-col items-center group"
           >
             {photoUrl ? (
-              <div
-                style={{
-                  borderColor: chipColor,
-                  borderWidth: "3px",
-                  borderStyle: "solid",
-                  boxShadow: `0 0 16px ${chipColor}60, 0 4px 12px rgba(0,0,0,0.7)`,
-                }}
-                className="w-10 h-10 rounded-full overflow-hidden transition-transform group-hover:scale-110"
-              >
-                <img
-                  src={photoUrl}
-                  alt={player.full_name || player.name || ""}
-                  className="w-full h-full object-cover"
-                  onError={(e) => { e.target.style.display = "none"; e.target.parentNode.innerHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:${chipColor};color:#fff;font-weight:bold;font-size:14px">${player.number || "?"}</div>`; }}
-                />
-              </div>
+              <PlayerChip chipColor={chipColor} photoUrl={photoUrl} player={player} />
             ) : (
               <div
                 style={{
