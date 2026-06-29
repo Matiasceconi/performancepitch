@@ -6,6 +6,8 @@ import moment from "moment";
 import "moment/locale/es";
 import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel.jsx";
 import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
+import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
+import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -570,6 +572,26 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated }) {
             </div>
           </div>
 
+          {/* Video del partido */}
+          <MatchVideoPanel match={matchData} onVideoSaved={(url) => setMatchData(m => ({ ...m, match_video_url: url }))} />
+
+          {/* Plan de partido PDF */}
+          <MatchPlanPdfPanel match={matchData} onPdfSaved={(url, label) => setMatchData(m => ({ ...m, match_plan_pdf_url: url, match_plan_pdf_label: label }))} />
+
+          {/* Pelota parada video */}
+          {matchData.video_set_pieces_url && (
+            <YoutubeEmbed url={matchData.video_set_pieces_url} label={"\u26bd Pelota parada"} />
+          )}
+
+          {/* An\u00e1lisis del rival */}
+          {matchData.video_analysis_url && (
+            <YoutubeEmbed url={matchData.video_analysis_url} label={"\uD83C\uDFA5 An\u00e1lisis del rival"} />
+          )}
+
+          {matchData.video_extra_url && (
+            <YoutubeEmbed url={matchData.video_extra_url} label={"\uD83D\uDCF9 Video adicional"} />
+          )}
+
           {/* GPS CSV */}
           <MatchCsvPanel
             match={matchData}
@@ -598,13 +620,6 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated }) {
             </div>
           )}
 
-          {/* Videos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <YoutubeEmbed url={match.video_analysis_url} label="🎥 Análisis del rival" />
-            <YoutubeEmbed url={match.video_set_pieces_url} label="⚽ Pelota parada" />
-            {match.video_extra_url && <YoutubeEmbed url={match.video_extra_url} label="📹 Video adicional" />}
-          </div>
-
           {/* Notas */}
           {match.notes && (
             <div>
@@ -624,6 +639,7 @@ const EMPTY = {
   our_score: "", rival_score: "", rival_formation: "",
   rival_notes: "", set_pieces_notes: "",
   video_analysis_url: "", video_set_pieces_url: "", video_extra_url: "",
+  match_video_url: "", match_plan_pdf_url: "",
   squad_called: [], squad_names: [], notes: "", rival_logo_url: "",
 };
 

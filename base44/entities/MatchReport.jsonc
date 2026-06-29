@@ -56,6 +56,18 @@
       "type": "string",
       "description": "Link YouTube video adicional"
     },
+    "match_video_url": {
+      "type": "string",
+      "description": "Link YouTube / URL del video completo del partido"
+    },
+    "match_plan_pdf_url": {
+      "type": "string",
+      "description": "URL del archivo PDF del plan de partido"
+    },
+    "match_plan_pdf_label": {
+      "type": "string",
+      "description": "Nombre del archivo PDF del plan de partido"
+    },
     "squad_called": {
       "type": "array",
       "items": {
@@ -81,6 +93,10 @@
     "csv_label": {
       "type": "string",
       "description": "Nombre del archivo CSV cargado"
+    },
+    "rival_logo_url": {
+      "type": "string",
+      "description": "URL del escudo del rival"
     }
   },
   "required": [
