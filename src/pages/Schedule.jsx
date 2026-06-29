@@ -1,20 +1,21 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, FileText } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
+import { jsPDF } from "jspdf";
 
 moment.locale("es");
 
 const COLOR_MAP = {
-  blue:   { bg: "bg-blue-500/20",   border: "border-blue-500/40",   text: "text-blue-300",   dot: "bg-blue-400" },
-  green:  { bg: "bg-emerald-500/20", border: "border-emerald-500/40", text: "text-emerald-300", dot: "bg-emerald-400" },
-  yellow: { bg: "bg-yellow-500/20", border: "border-yellow-500/40", text: "text-yellow-300", dot: "bg-yellow-400" },
-  orange: { bg: "bg-orange-500/20", border: "border-orange-500/40", text: "text-orange-300", dot: "bg-orange-400" },
-  red:    { bg: "bg-red-500/20",    border: "border-red-500/40",    text: "text-red-300",    dot: "bg-red-400" },
-  purple: { bg: "bg-violet-500/20", border: "border-violet-500/40", text: "text-violet-300", dot: "bg-violet-400" },
-  pink:   { bg: "bg-pink-500/20",   border: "border-pink-500/40",   text: "text-pink-300",   dot: "bg-pink-400" },
-  cyan:   { bg: "bg-cyan-500/20",   border: "border-cyan-500/40",   text: "text-cyan-300",   dot: "bg-cyan-400" },
+  blue:   { bg: "bg-blue-500/20",   border: "border-blue-500/40",   text: "text-blue-300",   dot: "bg-blue-400",   hex: "#3b82f6" },
+  green:  { bg: "bg-emerald-500/20", border: "border-emerald-500/40", text: "text-emerald-300", dot: "bg-emerald-400", hex: "#22c55e" },
+  yellow: { bg: "bg-yellow-500/20", border: "border-yellow-500/40", text: "text-yellow-300", dot: "bg-yellow-400", hex: "#eab308" },
+  orange: { bg: "bg-orange-500/20", border: "border-orange-500/40", text: "text-orange-300", dot: "bg-orange-400", hex: "#f97316" },
+  red:    { bg: "bg-red-500/20",    border: "border-red-500/40",    text: "text-red-300",    dot: "bg-red-400",    hex: "#ef4444" },
+  purple: { bg: "bg-violet-500/20", border: "border-violet-500/40", text: "text-violet-300", dot: "bg-violet-400", hex: "#8b5cf6" },
+  pink:   { bg: "bg-pink-500/20",   border: "border-pink-500/40",   text: "text-pink-300",   dot: "bg-pink-400",   hex: "#ec4899" },
+  cyan:   { bg: "bg-cyan-500/20",   border: "border-cyan-500/40",   text: "text-cyan-300",   dot: "bg-cyan-400",   hex: "#06b6d4" },
 };
 
 const COLORS = ["blue","green","yellow","orange","red","purple","pink","cyan"];
@@ -22,19 +23,21 @@ const COLOR_LABELS = { blue:"Azul", green:"Verde", yellow:"Amarillo", orange:"Na
 
 const EMPTY_FORM = { date: "", time: "", title: "", type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival_logo_url: "" };
 
-const DEFAULT_TEMPLATES = [
-  { title: "Desayuno", time: "08:00", duration_minutes: 45, color: "yellow", type: "Comida" },
-  { title: "Almuerzo", time: "13:00", duration_minutes: 60, color: "orange", type: "Comida" },
-  { title: "Cena", time: "20:00", duration_minutes: 60, color: "orange", type: "Comida" },
-  { title: "Entrenamiento", time: "10:00", duration_minutes: 90, color: "green", type: "Entrenamiento" },
-  { title: "Partido", time: "20:00", duration_minutes: 105, color: "red", type: "Partido" },
-  { title: "Jornada de Juveniles", time: "14:00", duration_minutes: 120, color: "pink", type: "Jornada de Juveniles" },
-  { title: "Charla técnica", time: "09:00", duration_minutes: 60, color: "blue", type: "Charla" },
-  { title: "Recuperación", time: "11:00", duration_minutes: 60, color: "cyan", type: "Físico" },
-  { title: "Viaje", time: "07:00", duration_minutes: 120, color: "purple", type: "Logística" },
+const DAY_NAMES_ES = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
+const DAY_NAMES_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+// 0=Dom,1=Lun,...,6=Sáb
+const START_DAY_OPTIONS = [
+  { value: 1, label: "Lunes" },
+  { value: 2, label: "Martes" },
+  { value: 3, label: "Miércoles" },
+  { value: 4, label: "Jueves" },
+  { value: 5, label: "Viernes" },
+  { value: 6, label: "Sábado" },
+  { value: 0, label: "Domingo" },
 ];
 
 const STORAGE_KEY = "schedule_custom_templates";
+const WEEK_START_KEY = "schedule_week_start_day";
 
 function loadCustomTemplates() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); } catch { return []; }
@@ -42,9 +45,155 @@ function loadCustomTemplates() {
 function saveCustomTemplates(templates) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(templates));
 }
+function loadWeekStartDay() {
+  try { return parseInt(localStorage.getItem(WEEK_START_KEY) || "1", 10); } catch { return 1; }
+}
+function saveWeekStartDay(day) {
+  localStorage.setItem(WEEK_START_KEY, String(day));
+}
+
+// Get the start of a custom week (isoWeek equivalent but with any start day)
+function getCustomWeekStart(refDate, startDay) {
+  const d = refDate.clone().startOf("day");
+  const currentDay = d.day(); // 0=Dom,...,6=Sáb
+  let diff = currentDay - startDay;
+  if (diff < 0) diff += 7;
+  return d.subtract(diff, "days");
+}
 
 const EMPTY_TEMPLATE = { title: "", time: "", duration_minutes: "", color: "blue", type: "" };
 
+// ── PDF helpers ──
+function buildWeekPDF(days, eventsForDate, weekLabel) {
+  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+
+  // Header
+  doc.setFillColor(20, 20, 20);
+  doc.rect(0, 0, pw, ph, "F");
+  doc.setFillColor(34, 197, 94);
+  doc.rect(0, 0, pw, 14, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(11);
+  doc.setFont("helvetica", "bold");
+  doc.text("PLANTEL RESERVA", 8, 9);
+  doc.setFontSize(9);
+  doc.setFont("helvetica", "normal");
+  doc.text(weekLabel, pw / 2, 9, { align: "center" });
+
+  const colW = (pw - 16) / days.length;
+  const startY = 18;
+  const headerH = 10;
+
+  // Day headers
+  days.forEach((d, i) => {
+    const x = 8 + i * colW;
+    doc.setFillColor(40, 40, 40);
+    doc.rect(x, startY, colW - 1, headerH, "F");
+    doc.setTextColor(255, 255, 255);
+    doc.setFontSize(8);
+    doc.setFont("helvetica", "bold");
+    const label = d.format("dddd D").toUpperCase();
+    doc.text(label, x + colW / 2 - 0.5, startY + 7, { align: "center" });
+  });
+
+  // Events
+  const evY = startY + headerH + 2;
+  const rowH = 9;
+  const maxRows = Math.floor((ph - evY - 8) / rowH);
+  const hexToRgb = (hex) => {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return [r,g,b];
+  };
+
+  days.forEach((d, i) => {
+    const x = 8 + i * colW;
+    const evs = eventsForDate(d.format("YYYY-MM-DD")).slice(0, maxRows);
+    evs.forEach((ev, j) => {
+      const y = evY + j * rowH;
+      const [r,g,b] = hexToRgb(COLOR_MAP[ev.color]?.hex || "#3b82f6");
+      doc.setFillColor(r,g,b);
+      doc.roundedRect(x, y, colW - 2, rowH - 1, 1, 1, "F");
+      doc.setTextColor(255,255,255);
+      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "bold");
+      doc.text(ev.title, x + 2, y + 4, { maxWidth: colW - 4 });
+      if (ev.time) {
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(5.5);
+        doc.text(ev.time + (ev.duration_minutes ? ` · ${ev.duration_minutes}min` : ""), x + 2, y + 7.5);
+      }
+    });
+    if (evs.length === 0) {
+      doc.setTextColor(100,100,100);
+      doc.setFontSize(6);
+      doc.setFont("helvetica", "italic");
+      doc.text("Sin eventos", x + colW / 2 - 0.5, evY + 5, { align: "center" });
+    }
+  });
+
+  doc.setTextColor(120,120,120);
+  doc.setFontSize(5.5);
+  doc.text("HORARIOS SUJETOS A MODIFICACIONES", pw / 2, ph - 4, { align: "center" });
+  return doc;
+}
+
+function buildDayPDF(day, events) {
+  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+  const pw = doc.internal.pageSize.getWidth();
+  const ph = doc.internal.pageSize.getHeight();
+
+  doc.setFillColor(20,20,20);
+  doc.rect(0,0,pw,ph,"F");
+  doc.setFillColor(34,197,94);
+  doc.rect(0,0,pw,14,"F");
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(11);
+  doc.setFont("helvetica","bold");
+  doc.text("CRONOGRAMA DEL DÍA", pw/2, 9, { align: "center" });
+  doc.setFontSize(8);
+  doc.setFont("helvetica","normal");
+  doc.text(day.format("dddd D [de] MMMM YYYY").toUpperCase(), pw/2, 14+5, { align: "center" });
+
+  const hexToRgb = (hex) => {
+    const r = parseInt(hex.slice(1,3),16);
+    const g = parseInt(hex.slice(3,5),16);
+    const b = parseInt(hex.slice(5,7),16);
+    return [r,g,b];
+  };
+
+  let y = 26;
+  if (events.length === 0) {
+    doc.setTextColor(120,120,120);
+    doc.setFontSize(8);
+    doc.text("Sin eventos para este día.", pw/2, y+10, { align: "center" });
+  }
+  events.forEach((ev) => {
+    const [r,g,b] = hexToRgb(COLOR_MAP[ev.color]?.hex || "#3b82f6");
+    doc.setFillColor(r,g,b);
+    doc.roundedRect(8, y, pw-16, 14, 2, 2, "F");
+    doc.setTextColor(255,255,255);
+    doc.setFontSize(9);
+    doc.setFont("helvetica","bold");
+    doc.text(ev.title, 12, y+6);
+    doc.setFontSize(7);
+    doc.setFont("helvetica","normal");
+    const sub = [ev.time && `${ev.time}${ev.duration_minutes ? ` · ${ev.duration_minutes}min` : ""}`, ev.location].filter(Boolean).join("  |  ");
+    if (sub) doc.text(sub, 12, y+11);
+    y += 17;
+    if (y > ph - 12) { doc.addPage(); y = 10; }
+  });
+
+  doc.setTextColor(120,120,120);
+  doc.setFontSize(5.5);
+  doc.text("HORARIOS SUJETOS A MODIFICACIONES", pw/2, ph-4, { align: "center" });
+  return doc;
+}
+
+// ── TemplateManagerModal ──
 function TemplateManagerModal({ open, onClose }) {
   const [templates, setTemplates] = useState([]);
   const [form, setForm] = useState(EMPTY_TEMPLATE);
@@ -55,7 +204,6 @@ function TemplateManagerModal({ open, onClose }) {
   }, [open]);
 
   if (!open) return null;
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   function handleAdd() {
@@ -80,8 +228,6 @@ function TemplateManagerModal({ open, onClose }) {
           <h3 className="text-white font-semibold text-sm">Gestionar plantillas</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
         </div>
-
-        {/* Existing custom templates */}
         {templates.length === 0 && !adding && (
           <p className="text-zinc-600 text-xs text-center py-4">No tenés plantillas personalizadas aún.</p>
         )}
@@ -102,8 +248,6 @@ function TemplateManagerModal({ open, onClose }) {
             );
           })}
         </div>
-
-        {/* Add form */}
         {adding ? (
           <div className="space-y-2 border-t border-zinc-800 pt-3">
             <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Título *" value={form.title} onChange={(e) => set("title", e.target.value)} />
@@ -132,7 +276,35 @@ function TemplateManagerModal({ open, onClose }) {
   );
 }
 
-function EventCard({ event, onEdit, onDelete }) {
+// ── WeekSettingsModal ──
+function WeekSettingsModal({ open, onClose, startDay, onChangeStartDay }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60" onClick={onClose}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 w-full max-w-xs mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-white font-semibold text-sm">Configurar semana</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+        </div>
+        <p className="text-xs text-zinc-500 mb-3">Día de inicio de la semana</p>
+        <div className="grid grid-cols-2 gap-2">
+          {START_DAY_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => { onChangeStartDay(opt.value); onClose(); }}
+              className={`px-3 py-2 rounded-lg text-xs font-medium border transition-colors ${startDay === opt.value ? "bg-white text-zinc-900 border-white" : "bg-zinc-800 text-zinc-300 border-zinc-700 hover:border-zinc-500"}`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── EventCard ──
+function EventCard({ event, onEdit, onDelete, onDownloadDay }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
   return (
     <div className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${c.bg} ${c.border} group`}>
@@ -173,11 +345,26 @@ function EventCard({ event, onEdit, onDelete }) {
   );
 }
 
+// ── EventModal ──
 function EventModal({ open, onClose, onSave, initial, defaultDate }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
   const [customTemplates, setCustomTemplates] = useState([]);
+
+  const DEFAULT_TEMPLATES = [
+    { title: "Desayuno", time: "08:00", duration_minutes: 45, color: "yellow", type: "Comida" },
+    { title: "Almuerzo", time: "13:00", duration_minutes: 60, color: "orange", type: "Comida" },
+    { title: "Cena", time: "20:00", duration_minutes: 60, color: "orange", type: "Comida" },
+    { title: "Entrenamiento", time: "10:00", duration_minutes: 90, color: "green", type: "Entrenamiento" },
+    { title: "Partido", time: "20:00", duration_minutes: 105, color: "red", type: "Partido" },
+    { title: "Jornada de Juveniles", time: "14:00", duration_minutes: 120, color: "pink", type: "Jornada de Juveniles" },
+    { title: "Charla técnica", time: "09:00", duration_minutes: 60, color: "blue", type: "Charla" },
+    { title: "Recuperación", time: "11:00", duration_minutes: 60, color: "cyan", type: "Físico" },
+    { title: "Viaje", time: "07:00", duration_minutes: 120, color: "purple", type: "Logística" },
+    { title: "Gimnasio", time: "09:30", duration_minutes: 60, color: "purple", type: "Físico" },
+    { title: "Cancha", time: "10:00", duration_minutes: 90, color: "green", type: "Entrenamiento" },
+  ];
 
   useEffect(() => {
     if (open) {
@@ -187,9 +374,7 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
   }, [open, initial, defaultDate]);
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...customTemplates];
-
   if (!open) return null;
-
   const set = (k, v) => setForm((f) => ({ ...f, [k]: v }));
 
   async function handleSave() {
@@ -203,7 +388,7 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
           <h3 className="text-white font-semibold">{initial ? "Editar evento" : "Nuevo evento"}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
@@ -290,15 +475,18 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
   );
 }
 
+// ── Main Schedule ──
 export default function Schedule() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [currentWeek, setCurrentWeek] = useState(moment().startOf("isoWeek"));
-  const [view, setView] = useState("week"); // "week" | "month"
+  const [weekStartDay, setWeekStartDay] = useState(loadWeekStartDay);
+  const [currentWeekStart, setCurrentWeekStart] = useState(() => getCustomWeekStart(moment(), loadWeekStartDay()));
+  const [view, setView] = useState("week");
   const [currentMonth, setCurrentMonth] = useState(moment().startOf("month"));
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState(null);
   const [defaultDate, setDefaultDate] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
 
   async function loadEvents() {
     const data = await base44.entities.DayEvent.list("-date", 500);
@@ -307,6 +495,16 @@ export default function Schedule() {
   }
 
   useEffect(() => { loadEvents(); }, []);
+
+  // Re-compute week start when weekStartDay changes
+  useEffect(() => {
+    setCurrentWeekStart(getCustomWeekStart(moment(), weekStartDay));
+  }, [weekStartDay]);
+
+  function handleChangeStartDay(day) {
+    saveWeekStartDay(day);
+    setWeekStartDay(day);
+  }
 
   function getEventsForDate(dateStr) {
     return events
@@ -340,21 +538,38 @@ export default function Schedule() {
     setModalOpen(true);
   }
 
-  // WEEK VIEW
+  function getWeekDays() {
+    return Array.from({ length: 7 }, (_, i) => currentWeekStart.clone().add(i, "day"));
+  }
+
+  function downloadWeekPDF() {
+    const days = getWeekDays();
+    const weekLabel = `${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
+    const doc = buildWeekPDF(days, getEventsForDate, weekLabel);
+    doc.save(`cronograma-semana-${days[0].format("YYYY-MM-DD")}.pdf`);
+  }
+
+  function downloadDayPDF(day) {
+    const evs = getEventsForDate(day.format("YYYY-MM-DD"));
+    const doc = buildDayPDF(day, evs);
+    doc.save(`cronograma-${day.format("YYYY-MM-DD")}.pdf`);
+  }
+
+  // ── WEEK VIEW ──
   function renderWeek() {
-    const days = Array.from({ length: 7 }, (_, i) => currentWeek.clone().add(i, "day"));
+    const days = getWeekDays();
     const today = moment().format("YYYY-MM-DD");
 
     return (
       <>
         <div className="flex items-center justify-between mb-4">
-          <button onClick={() => setCurrentWeek((w) => w.clone().subtract(1, "week"))} className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-colors">
+          <button onClick={() => setCurrentWeekStart((w) => w.clone().subtract(7, "days"))} className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-colors">
             <ChevronLeft size={16} />
           </button>
           <h2 className="text-white font-semibold capitalize">
-            {currentWeek.format("D MMM")} – {currentWeek.clone().endOf("isoWeek").format("D MMM YYYY")}
+            {days[0].format("D MMM")} – {days[6].format("D MMM YYYY")}
           </h2>
-          <button onClick={() => setCurrentWeek((w) => w.clone().add(1, "week"))} className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-colors">
+          <button onClick={() => setCurrentWeekStart((w) => w.clone().add(7, "days"))} className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white transition-colors">
             <ChevronRight size={16} />
           </button>
         </div>
@@ -367,17 +582,20 @@ export default function Schedule() {
 
             return (
               <div key={dateStr} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
-                {/* Day header */}
                 <div className={`flex items-center justify-between px-3 py-2 border-b ${isToday ? "border-white/10" : "border-zinc-800"}`}>
                   <div>
                     <p className="text-xs text-zinc-500 uppercase font-medium">{d.format("ddd")}</p>
                     <p className={`text-lg font-bold ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()}</p>
                   </div>
-                  <button onClick={() => openNew(dateStr)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors" title="Agregar evento">
-                    <Plus size={14} />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button onClick={() => downloadDayPDF(d)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-600 hover:text-zinc-300 transition-colors" title="Descargar PDF del día">
+                      <FileText size={12} />
+                    </button>
+                    <button onClick={() => openNew(dateStr)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors" title="Agregar evento">
+                      <Plus size={14} />
+                    </button>
+                  </div>
                 </div>
-                {/* Events */}
                 <div className="flex-1 p-2 space-y-1.5 min-h-[120px]">
                   {dayEvents.length === 0 && (
                     <p className="text-xs text-zinc-700 text-center pt-4">Sin eventos</p>
@@ -394,7 +612,7 @@ export default function Schedule() {
     );
   }
 
-  // MONTH VIEW — mini calendar
+  // ── MONTH VIEW ──
   function renderMonth() {
     const DAYS_HEADER = ["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"];
     const startOfMonth = currentMonth.clone();
@@ -430,7 +648,7 @@ export default function Schedule() {
                 <div className="flex items-center justify-between mb-1">
                   <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-white text-zinc-900" : "text-zinc-400"}`}>{d.date()}</div>
                   {isCurrentMonth && (
-                    <button onClick={() => openNew(dateStr)} className="p-0.5 rounded hover:bg-zinc-700 text-zinc-700 hover:text-zinc-400 transition-colors opacity-0 hover:opacity-100 group-hover:opacity-100">
+                    <button onClick={() => openNew(dateStr)} className="p-0.5 rounded hover:bg-zinc-700 text-zinc-700 hover:text-zinc-400 transition-colors">
                       <Plus size={10} />
                     </button>
                   )}
@@ -468,11 +686,21 @@ export default function Schedule() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Cronograma</h1>
           <p className="text-zinc-500 text-sm mt-1">Planificación diaria del equipo</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center bg-zinc-800 rounded-lg p-1 gap-1">
             <button onClick={() => setView("week")} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "week" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>Semana</button>
             <button onClick={() => setView("month")} className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${view === "month" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>Mes</button>
           </div>
+          {view === "week" && (
+            <>
+              <button onClick={() => setShowSettings(true)} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors" title="Configurar semana">
+                <Settings2 size={15} /> Configurar
+              </button>
+              <button onClick={downloadWeekPDF} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors">
+                <Download size={15} /> PDF semana
+              </button>
+            </>
+          )}
           <button onClick={() => openNew(moment().format("YYYY-MM-DD"))} className="flex items-center gap-1.5 px-3 py-2 bg-white text-zinc-900 rounded-lg text-sm font-semibold hover:bg-zinc-200 transition-colors">
             <Plus size={15} /> Nuevo evento
           </button>
@@ -487,6 +715,13 @@ export default function Schedule() {
         onSave={handleSave}
         initial={editingEvent}
         defaultDate={defaultDate}
+      />
+
+      <WeekSettingsModal
+        open={showSettings}
+        onClose={() => setShowSettings(false)}
+        startDay={weekStartDay}
+        onChangeStartDay={handleChangeStartDay}
       />
     </div>
   );
