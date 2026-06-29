@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Upload, CheckCircle, AlertCircle, Eye, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import { fmtMetric } from "@/utils";
+import { fmtMetric, fmtSmax } from "@/utils";
 
 // ── Normalize player name for matching ──────────────────────────────────────
 function normalize(s) {
@@ -332,7 +332,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
             { label: "Con GPS", value: withGPS, color: "text-emerald-400" },
             { label: "Sin GPS", value: withoutGPS, color: "text-zinc-500" },
             { label: "Prom. distancia", value: avgDistRaw != null ? `${fmtMetric(avgDistRaw)}m` : "—", color: "text-blue-400" },
-            { label: "Mayor velocidad", value: topSpeed ? `${topSpeed.smax} km/h` : "—", color: "text-orange-400" },
+            { label: "Mayor velocidad", value: topSpeed ? `${fmtSmax(topSpeed.smax)} km/h` : "—", color: "text-orange-400" },
           ].map(s => (
             <div key={s.label} className="bg-zinc-800/50 rounded-xl p-3 text-center">
               <p className={`text-lg font-bold ${s.color}`}>{s.value}</p>
@@ -370,7 +370,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
                     <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.acc_3)}</td>
                     <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.dec_3)}</td>
                     <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.player_load)}</td>
-                    <td className="py-2 px-2 text-orange-300 font-semibold">{r.smax ?? "—"}</td>
+                    <td className="py-2 px-2 text-orange-300 font-semibold">{fmtSmax(r.smax)}</td>
                     <td className="py-2 px-2 text-zinc-300">{r.max_vel_percent != null ? `${fmtMetric(r.max_vel_percent)}%` : "—"}</td>
                   </tr>
                 ))}
