@@ -1,54 +1,83 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, CheckCircle, AlertCircle, TrendingUp, Zap, Footprints } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Eye, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
+// ── Normalize player name for matching ──────────────────────────────────────
 function normalize(s) {
   return (s || "").toLowerCase()
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9 ]/g, "").replace(/\s+/g, " ").trim();
 }
 
+// ── Parse a float value (dot decimal, ignore empty/dash) ───────────────────
 function parseNum(v) {
-  const n = parseFloat((v || "").toString().replace(",", "."));
+  if (!v || v === "-" || v === "") return undefined;
+  const n = parseFloat(v.toString().trim());
   return isNaN(n) ? undefined : n;
 }
 
-// Map CSV headers to our fields
-const HEADER_MAP = [
-  { field: "duration",       patterns: [/duration|tiempo|duracion/i] },
-  { field: "total_distance", patterns: [/total.?dist|distancia.?total/i] },
-  { field: "m_min",          patterns: [/m.?min|metros.?por.?min/i] },
-  { field: "distance_19_8",  patterns: [/19[._]?8|hsr|high.?speed/i] },
-  { field: "distance_25",    patterns: [/25|sprint.?dist|dist.?25/i] },
-  { field: "sprints",        patterns: [/sprint.?effort|sprint.?count|sprints(?!.?dist)/i] },
-  { field: "acc_3",          patterns: [/acc[^c]|accel/i] },
-  { field: "dec_3",          patterns: [/dec|decel/i] },
-  { field: "player_load",    patterns: [/player.?load/i] },
-  { field: "smax",           patterns: [/max.?vel|vel.?max|smax|vmax/i] },
-  { field: "rhie",           patterns: [/rhie/i] },
-  { field: "pl_min",         patterns: [/pl.?min|load.?min/i] },
-];
+// ── RFC-4180 CSV parser: handles commas inside double-quoted fields ─────────
+function parseCSV(text) {
+  // Strip BOM if present
+  const raw = text.startsWith("\uFEFF") ? text.slice(1) : text;
+  const rows = [];
+  let row = [];
+  let field = "";
+  let inQuotes = false;
 
-function mapHeaders(headers) {
-  const mapping = {}; // field -> header key
-  headers.forEach(h => {
-    HEADER_MAP.forEach(({ field, patterns }) => {
-      if (!mapping[field] && patterns.some(p => p.test(h))) mapping[field] = h;
-    });
-  });
-  return mapping;
+  for (let i = 0; i < raw.length; i++) {
+    const ch = raw[i];
+    const next = raw[i + 1];
+
+    if (inQuotes) {
+      if (ch === '"' && next === '"') { field += '"'; i++; }          // escaped quote
+      else if (ch === '"') { inQuotes = false; }                       // closing quote
+      else { field += ch; }
+    } else {
+      if (ch === '"') { inQuotes = true; }
+      else if (ch === ',') { row.push(field.trim()); field = ""; }
+      else if (ch === '\n') {
+        row.push(field.trim()); field = "";
+        if (row.some(c => c !== "")) rows.push(row);
+        row = [];
+      } else if (ch === '\r') { /* skip */ }
+      else { field += ch; }
+    }
+  }
+  // last field/row
+  if (field || row.length) { row.push(field.trim()); if (row.some(c => c !== "")) rows.push(row); }
+  return rows;
 }
+
+// ── Exact column name → entity field mapping ───────────────────────────────
+const COLUMN_MAP = {
+  "Name":                     { field: "player_name_original", numeric: false },
+  "Total Duration":           { field: "duration",             numeric: false }, // keep as HH:MM:SS
+  "Total Distance (m)":       { field: "total_distance",       numeric: true  },
+  "D 19,8-25,0 km/h (m)":    { field: "distance_19_8",        numeric: true  },
+  "D+ 25,0 km/h (m)":        { field: "distance_25",          numeric: true  },
+  "Sprint Efforts":           { field: "sprints",              numeric: true  },
+  "Acc + 3mt/s eff":          { field: "acc_3",                numeric: true  },
+  "Dec +3mts/s Eff":          { field: "dec_3",                numeric: true  },
+  "Total Player Load":        { field: "player_load",          numeric: true  },
+  "Maximum Velocity (km/h)":  { field: "smax",                 numeric: true  },
+  "Max Vel (% Max)":          { field: "max_vel_percent",      numeric: true  },
+  "Metros x Min":             { field: "m_min",                numeric: true  },
+};
+
+const REQUIRED_COLS = ["Name", "Total Distance (m)", "Total Duration"];
 
 export default function SessionGPS({ session, sessionPlayers }) {
   const [uploading, setUploading] = useState(false);
-  const [gpsRows, setGpsRows] = useState([]); // SessionGPSData records
+  const [gpsRows, setGpsRows] = useState([]);
   const [unmatched, setUnmatched] = useState([]);
-  const [aliasTargets, setAliasTargets] = useState({}); // rawName -> playerId (for manual correction)
+  const [aliasTargets, setAliasTargets] = useState({});
   const [allPlayers, setAllPlayers] = useState([]);
+  const [preview, setPreview] = useState(null); // { detectedCols, missingCols, parsedRows, fileName, file }
+  const [importing, setImporting] = useState(false);
   const { toast } = useToast();
 
-  // Load existing GPS data for this session
   useEffect(() => {
     base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200)
       .then(rows => setGpsRows(rows));
@@ -56,48 +85,60 @@ export default function SessionGPS({ session, sessionPlayers }) {
       .then(p => setAllPlayers(p.filter(x => x.active !== false)));
   }, [session.id]);
 
+  // ── Step 1: Parse & preview ───────────────────────────────────────────────
   async function handleFile(e) {
     const file = e.target.files[0];
+    e.target.value = "";
     if (!file) return;
     setUploading(true);
 
-    // Upload file
-    await base44.integrations.Core.UploadFile({ file });
-    await base44.entities.TrainingSession.update(session.id, { csv_url: undefined, csv_label: file.name });
-
-    // Parse CSV
     const text = await file.text();
-    const lines = text.split("\n").filter(l => l.trim());
-    if (lines.length < 2) { setUploading(false); return; }
+    const rows = parseCSV(text);
+    if (rows.length < 2) {
+      toast({ title: "CSV vacío o inválido", variant: "destructive" });
+      setUploading(false);
+      return;
+    }
 
-    const sep = lines[0].includes(";") ? ";" : ",";
-    const rawHeaders = lines[0].split(sep).map(h => h.replace(/"/g, "").trim());
-    const nameColIdx = rawHeaders.findIndex(h => /^name$|^jugador$|^player.?name$|^atleta/i.test(h));
-    const fieldMap = mapHeaders(rawHeaders);
+    const headers = rows[0]; // first row = headers
+    const detectedCols = {}; // colName -> index (only those in COLUMN_MAP)
+    headers.forEach((h, i) => { if (COLUMN_MAP[h]) detectedCols[h] = i; });
 
-    const csvRows = lines.slice(1).map(l => {
-      const cols = l.split(sep).map(c => c.replace(/"/g, "").trim());
-      const obj = {};
-      rawHeaders.forEach((h, i) => { obj[h] = cols[i] || ""; });
-      return obj;
-    }).filter(r => Object.values(r).some(v => v));
+    const missingCols = REQUIRED_COLS.filter(c => !(c in detectedCols));
 
-    // Load aliases
+    // Build parsed rows for preview (use ALL columns found in COLUMN_MAP)
+    const parsedRows = rows.slice(1).map(cols => {
+      const rec = {};
+      Object.entries(detectedCols).forEach(([colName, idx]) => {
+        rec[colName] = cols[idx] ?? "";
+      });
+      return rec;
+    }).filter(r => r["Name"] && r["Name"] !== "");
+
+    setPreview({ detectedCols, missingCols, parsedRows, fileName: file.name, file });
+    setUploading(false);
+  }
+
+  // ── Step 2: Confirm & import ──────────────────────────────────────────────
+  async function confirmImport() {
+    if (!preview) return;
+    const { detectedCols, parsedRows, fileName, file } = preview;
+    setImporting(true);
+
+    // Load aliases & player maps
     const aliases = await base44.entities.PlayerAlias.list("-created_date", 1000);
-    const aliasMap = {}; // normalized -> player_id
+    const aliasMap = {};
     aliases.forEach(a => { if (a.normalized_alias) aliasMap[a.normalized_alias] = a.player_id; });
-    // Also match directly from session players
     const spMap = {};
     sessionPlayers.forEach(sp => { spMap[normalize(sp.player_name)] = sp.player_id; });
-    // And all players
     const allPlayerMap = {};
     allPlayers.forEach(p => { allPlayerMap[normalize(p.full_name || "")] = p.id; });
 
     const toCreate = [];
     const unmatchedList = [];
 
-    csvRows.forEach(row => {
-      const rawName = nameColIdx >= 0 ? row[rawHeaders[nameColIdx]] : "";
+    parsedRows.forEach(row => {
+      const rawName = row["Name"] || "";
       const normName = normalize(rawName);
       const playerId = aliasMap[normName] || spMap[normName] || allPlayerMap[normName];
       const playerRecord = allPlayers.find(p => p.id === playerId);
@@ -107,20 +148,26 @@ export default function SessionGPS({ session, sessionPlayers }) {
         player_name_original: rawName,
         player_id: playerId || "",
         player_name: playerRecord?.full_name || rawName,
-        source_file: file.name,
+        source_file: fileName,
       };
-      Object.entries(fieldMap).forEach(([field, hdr]) => {
-        record[field] = parseNum(row[hdr]);
+
+      // Map each detected column to its entity field
+      Object.entries(detectedCols).forEach(([colName, idx]) => {
+        const { field, numeric } = COLUMN_MAP[colName];
+        if (field === "player_name_original") return; // already set above
+        const raw = row[colName] ?? "";
+        record[field] = numeric ? parseNum(raw) : (raw || undefined);
       });
 
-      if (playerId) {
-        toCreate.push(record);
-      } else {
-        unmatchedList.push({ rawName, record });
-      }
+      if (playerId) toCreate.push(record);
+      else unmatchedList.push({ rawName, record });
     });
 
-    // Delete old GPS for this session and save new
+    // Upload file reference
+    await base44.integrations.Core.UploadFile({ file });
+    await base44.entities.TrainingSession.update(session.id, { csv_label: fileName });
+
+    // Replace existing GPS data
     const existing = await base44.entities.SessionGPSData.filter({ session_id: session.id }, "-created_date", 500);
     await Promise.all(existing.map(r => base44.entities.SessionGPSData.delete(r.id)));
 
@@ -131,24 +178,24 @@ export default function SessionGPS({ session, sessionPlayers }) {
 
     setGpsRows(Array.isArray(savedRows) ? savedRows : toCreate);
     setUnmatched(unmatchedList);
-    setUploading(false);
-    toast({ title: `GPS: ${toCreate.length} reconocidos, ${unmatchedList.length} sin reconocer` });
+    setPreview(null);
+    setImporting(false);
+    toast({ title: `GPS importado: ${toCreate.length} jugadores OK, ${unmatchedList.length} sin reconocer` });
   }
 
+  // ── Manual alias ──────────────────────────────────────────────────────────
   async function saveManualAlias(rawName, playerId) {
     if (!playerId) return;
     const player = allPlayers.find(p => p.id === playerId);
     if (!player) return;
-    const normAlias = normalize(rawName);
     await base44.entities.PlayerAlias.create({
       player_id: playerId,
       player_name: player.full_name || "",
       alias_name: rawName,
-      normalized_alias: normAlias,
+      normalized_alias: normalize(rawName),
       source: "Manual",
       confidence_score: 1,
     });
-    // Update the unmatched record and move it to matched
     const unmRow = unmatched.find(u => u.rawName === rawName);
     if (unmRow) {
       const record = { ...unmRow.record, player_id: playerId, player_name: player.full_name || "" };
@@ -159,41 +206,131 @@ export default function SessionGPS({ session, sessionPlayers }) {
     toast({ title: `✓ Alias guardado para ${player.full_name}` });
   }
 
-  // Summary stats
+  // ── Stats ──────────────────────────────────────────────────────────────────
   const withGPS = gpsRows.length;
   const withoutGPS = sessionPlayers.filter(sp => !gpsRows.find(r => r.player_id === sp.player_id)).length;
   const avgDist = gpsRows.length ? Math.round(gpsRows.reduce((s, r) => s + (r.total_distance || 0), 0) / gpsRows.length) : 0;
   const avgMMin = gpsRows.length ? (gpsRows.reduce((s, r) => s + (r.m_min || 0), 0) / gpsRows.length).toFixed(1) : 0;
-  const topDist = gpsRows.length ? gpsRows.reduce((a, b) => (b.total_distance || 0) > (a.total_distance || 0) ? b : a, gpsRows[0]) : null;
   const topSpeed = gpsRows.length ? gpsRows.reduce((a, b) => (b.smax || 0) > (a.smax || 0) ? b : a, gpsRows[0]) : null;
-  const topSprints = gpsRows.length ? gpsRows.reduce((a, b) => (b.sprints || 0) > (a.sprints || 0) ? b : a, gpsRows[0]) : null;
 
   return (
     <div className="space-y-6">
-      {/* Upload */}
+      {/* Upload zone */}
       <div className="border-2 border-dashed border-zinc-700 rounded-xl p-6 text-center">
         <Upload size={20} className="text-zinc-500 mx-auto mb-2" />
-        <p className="text-sm text-zinc-400 mb-3">Cargar CSV de GPS (Catapult / OpenField)</p>
-        <label className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white hover:bg-zinc-700 transition-colors">
-          <Upload size={14} /> {uploading ? "Procesando..." : "Seleccionar archivo CSV"}
+        <p className="text-sm text-zinc-400 mb-1">Cargar CSV de GPS Catapult</p>
+        <p className="text-[10px] text-zinc-600 mb-3">Separado por comas · con comillas dobles · UTF-8</p>
+        <label className={`cursor-pointer inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm text-white hover:bg-zinc-700 transition-colors ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
+          <Upload size={14} /> {uploading ? "Leyendo archivo..." : "Seleccionar archivo CSV"}
           <input type="file" accept=".csv" className="hidden" onChange={handleFile} disabled={uploading} />
         </label>
         {session.csv_label && <p className="text-xs text-zinc-500 mt-2">Último cargado: {session.csv_label}</p>}
       </div>
 
-      {gpsRows.length === 0 && unmatched.length === 0 && (
-        <p className="text-zinc-600 text-sm text-center py-2">Sin carga externa cargada</p>
+      {/* Preview modal */}
+      {preview && (
+        <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-white flex items-center gap-2">
+              <Eye size={14} className="text-blue-400" /> Vista previa — {preview.fileName}
+            </p>
+            <button onClick={() => setPreview(null)} className="text-zinc-500 hover:text-white">
+              <X size={16} />
+            </button>
+          </div>
+
+          {/* Missing required columns error */}
+          {preview.missingCols.length > 0 && (
+            <div className="flex items-start gap-2 px-3 py-3 bg-red-500/10 border border-red-500/30 rounded-lg">
+              <AlertCircle size={15} className="text-red-400 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-semibold text-red-300">Columnas obligatorias no encontradas:</p>
+                <p className="text-xs text-red-400 mt-0.5">{preview.missingCols.join(", ")}</p>
+                <p className="text-[10px] text-zinc-500 mt-1">Revisá que los encabezados del CSV coincidan exactamente con los esperados.</p>
+              </div>
+            </div>
+          )}
+
+          {/* Detected columns */}
+          <div>
+            <p className="text-[10px] text-zinc-500 mb-2 uppercase tracking-wider font-medium">Columnas detectadas ({Object.keys(preview.detectedCols).length})</p>
+            <div className="flex flex-wrap gap-1.5">
+              {Object.keys(COLUMN_MAP).map(col => {
+                const found = col in preview.detectedCols;
+                const required = REQUIRED_COLS.includes(col);
+                return (
+                  <span key={col}
+                    className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${
+                      found
+                        ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/30"
+                        : required
+                          ? "bg-red-500/10 text-red-400 border-red-500/30"
+                          : "bg-zinc-800 text-zinc-500 border-zinc-700"
+                    }`}>
+                    {found ? "✓" : "✗"} {col}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Preview rows */}
+          {preview.parsedRows.length > 0 && (
+            <div>
+              <p className="text-[10px] text-zinc-500 mb-2 uppercase tracking-wider font-medium">
+                Primeras filas ({Math.min(5, preview.parsedRows.length)} de {preview.parsedRows.length})
+              </p>
+              <div className="overflow-x-auto">
+                <table className="text-[10px] border-collapse w-full">
+                  <thead>
+                    <tr className="border-b border-zinc-800">
+                      {Object.keys(preview.detectedCols).map(col => (
+                        <th key={col} className="text-left py-1.5 px-2 text-zinc-500 font-medium whitespace-nowrap">{col}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {preview.parsedRows.slice(0, 5).map((row, i) => (
+                      <tr key={i} className="border-b border-zinc-800/40">
+                        {Object.keys(preview.detectedCols).map(col => (
+                          <td key={col} className="py-1.5 px-2 text-zinc-300 whitespace-nowrap">{row[col] || "—"}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div className="flex gap-2 justify-end">
+            <button onClick={() => setPreview(null)}
+              className="px-3 py-1.5 bg-zinc-800 text-zinc-300 rounded-lg text-xs hover:bg-zinc-700 transition-colors">
+              Cancelar
+            </button>
+            <button
+              onClick={confirmImport}
+              disabled={importing || preview.missingCols.length > 0}
+              className="px-4 py-1.5 bg-white text-zinc-900 font-semibold rounded-lg text-xs hover:bg-zinc-200 transition-colors disabled:opacity-40">
+              {importing ? "Importando..." : `Confirmar e importar (${preview.parsedRows.length} jugadores)`}
+            </button>
+          </div>
+        </div>
       )}
 
-      {/* Summary */}
+      {/* No data */}
+      {gpsRows.length === 0 && unmatched.length === 0 && !preview && (
+        <p className="text-zinc-600 text-sm text-center py-2">Sin datos GPS cargados</p>
+      )}
+
+      {/* Summary cards */}
       {gpsRows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: "Con GPS", value: withGPS, color: "text-emerald-400" },
             { label: "Sin GPS", value: withoutGPS, color: "text-zinc-500" },
             { label: "Prom. distancia", value: avgDist ? `${avgDist}m` : "—", color: "text-blue-400" },
-            { label: "Prom. m/min", value: avgMMin > 0 ? avgMMin : "—", color: "text-cyan-400" },
-            { label: "Mayor distancia", value: topDist?.player_name?.split(" ").pop() || "—", color: "text-violet-400" },
             { label: "Mayor velocidad", value: topSpeed ? `${topSpeed.smax} km/h` : "—", color: "text-orange-400" },
           ].map(s => (
             <div key={s.label} className="bg-zinc-800/50 rounded-xl p-3 text-center">
@@ -214,15 +351,16 @@ export default function SessionGPS({ session, sessionPlayers }) {
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="border-b border-zinc-800">
-                  {["Jugador", "Dist. (m)", "m/min", "D>19.8", "D>25", "Sprints", "ACC+3", "DEC+3", "P.Load", "Smax"].map(h => (
+                  {["Jugador", "Duración", "Dist. (m)", "m/min", "D>19.8", "D>25", "Sprints", "ACC+3", "DEC+3", "P.Load", "Smax", "% Smax"].map(h => (
                     <th key={h} className="text-left py-2 px-2 text-zinc-500 font-medium whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {gpsRows.map(r => (
-                  <tr key={r.player_id || r.player_name_original} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
+                {gpsRows.map((r, i) => (
+                  <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
                     <td className="py-2 px-2 text-white font-medium whitespace-nowrap">{r.player_name}</td>
+                    <td className="py-2 px-2 text-zinc-400">{r.duration ?? "—"}</td>
                     <td className="py-2 px-2 text-zinc-300">{r.total_distance ?? "—"}</td>
                     <td className="py-2 px-2 text-zinc-300">{r.m_min ?? "—"}</td>
                     <td className="py-2 px-2 text-zinc-300">{r.distance_19_8 ?? "—"}</td>
@@ -232,6 +370,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
                     <td className="py-2 px-2 text-zinc-300">{r.dec_3 ?? "—"}</td>
                     <td className="py-2 px-2 text-zinc-300">{r.player_load ?? "—"}</td>
                     <td className="py-2 px-2 text-orange-300 font-semibold">{r.smax ?? "—"}</td>
+                    <td className="py-2 px-2 text-zinc-300">{r.max_vel_percent != null ? `${r.max_vel_percent}%` : "—"}</td>
                   </tr>
                 ))}
               </tbody>
@@ -240,7 +379,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
         </div>
       )}
 
-      {/* Unmatched with manual fix */}
+      {/* Unmatched */}
       {unmatched.length > 0 && (
         <div>
           <p className="text-xs font-semibold text-red-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">

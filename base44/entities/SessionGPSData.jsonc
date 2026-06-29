@@ -19,8 +19,8 @@
       "description": "Nombre tal como vino en el CSV"
     },
     "duration": {
-      "type": "number",
-      "description": "Duraci\u00f3n (min)"
+      "type": "string",
+      "description": "Duraci\u00f3n total (HH:MM:SS)"
     },
     "total_distance": {
       "type": "number",
@@ -32,39 +32,35 @@
     },
     "distance_19_8": {
       "type": "number",
-      "description": "Distancia > 19.8 km/h (m)"
+      "description": "Distancia D 19,8-25,0 km/h (m)"
     },
     "distance_25": {
       "type": "number",
-      "description": "Distancia > 25 km/h (m)"
+      "description": "Distancia D+ 25,0 km/h (m)"
     },
     "sprints": {
       "type": "number",
-      "description": "Cantidad de sprints"
+      "description": "Sprint Efforts"
     },
     "acc_3": {
       "type": "number",
-      "description": "Aceleraciones > 3 m/s\u00b2"
+      "description": "Acc + 3mt/s eff"
     },
     "dec_3": {
       "type": "number",
-      "description": "Desaceleraciones > 3 m/s\u00b2"
+      "description": "Dec +3mts/s Eff"
     },
     "player_load": {
       "type": "number",
-      "description": "Player Load"
+      "description": "Total Player Load"
     },
     "smax": {
       "type": "number",
-      "description": "Velocidad m\u00e1xima (km/h)"
+      "description": "Maximum Velocity (km/h)"
     },
-    "rhie": {
+    "max_vel_percent": {
       "type": "number",
-      "description": "RHIE (esfuerzos repetidos de alta intensidad)"
-    },
-    "pl_min": {
-      "type": "number",
-      "description": "Player Load por minuto"
+      "description": "Max Vel (% Max)"
     },
     "source_file": {
       "type": "string",
