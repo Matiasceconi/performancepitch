@@ -571,14 +571,14 @@ export default function Schedule() {
           </button>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-7 gap-3">
+        <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
           {days.map((d) => {
             const dateStr = d.format("YYYY-MM-DD");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
 
             return (
-              <div key={dateStr} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
+              <div key={dateStr} style={{ minWidth: "200px", scrollSnapAlign: "start" }} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
                 <div className={`flex items-center justify-between px-3 py-2 border-b ${isToday ? "border-white/10" : "border-zinc-800"}`}>
                   <div>
                     <p className="text-xs text-zinc-500 uppercase font-medium">{d.format("ddd")}</p>
