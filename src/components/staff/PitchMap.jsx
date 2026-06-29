@@ -72,7 +72,9 @@ function PlayerChip({ chipColor, photoUrl, player }) {
   );
 }
 
-export default function PitchMap({ players: rawPlayers, highlighted = new Set(), onToggle, emptyLabel }) {
+const EMPTY_SET = new Set();
+
+export default function PitchMap({ players: rawPlayers, highlighted = EMPTY_SET, onToggle, emptyLabel }) {
   const players = (rawPlayers || []).filter(p => p && p.id);
   const [customPositions, setCustomPositions] = React.useState({});
   const [dragging, setDragging] = React.useState(null);

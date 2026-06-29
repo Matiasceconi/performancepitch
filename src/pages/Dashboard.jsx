@@ -321,7 +321,7 @@ export default function Dashboard() {
         </ErrorBoundary>
       }
 
-      {showMap &&
+      <div className={showMap ? "" : "hidden"}>
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="p-4 border-b border-zinc-800 flex items-center justify-between">
             <div>
@@ -333,7 +333,7 @@ export default function Dashboard() {
             <PitchMap players={availablePlayers} emptyLabel="No hay jugadores disponibles hoy" />
           </div>
         </div>
-      }
+      </div>
 
       {nextMatch &&
         <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />
