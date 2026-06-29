@@ -470,18 +470,17 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
   useEffect(() => {
     loadMedicalRecords();
     loadGpsData();
-    // Suscribirse a cambios en registros médicos para sincronización en tiempo real
+    // Debounced subscribers para evitar rate limit
+    let medicalTimer;
     const unsubMedical = base44.entities.MedicalRecord.subscribe((event) => {
       if (event.data?.player_id === player.id || event.old_data?.player_id === player.id) {
-        loadMedicalRecords();
+        clearTimeout(medicalTimer);
+        medicalTimer = setTimeout(() => loadMedicalRecords(), 2000);
       }
-    });
-    const unsubGps = base44.entities.CatapultReport.subscribe(() => {
-      loadGpsData();
     });
     return () => {
       unsubMedical();
-      unsubGps();
+      clearTimeout(medicalTimer);
     };
   }, [player.id]);
 
