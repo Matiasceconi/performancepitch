@@ -69,6 +69,11 @@ const COLUMN_MAP = {
 
 const REQUIRED_COLS = ["Name", "Total Distance (m)", "Total Duration"];
 
+// Filas resumen del CSV que NO son jugadores reales
+const SUMMARY_ROW_NAMES = new Set([
+  "total", "promedio", "average", "avg", "summary", "team total", "totals"
+]);
+
 export default function SessionGPS({ session, sessionPlayers }) {
   const [uploading, setUploading] = useState(false);
   const [gpsRows, setGpsRows] = useState([]);
@@ -108,7 +113,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
     const missingCols = REQUIRED_COLS.filter(c => !(c in detectedCols));
 
     // Build parsed rows for preview (use ALL columns found in COLUMN_MAP)
-    const parsedRows = rows.slice(1).map(cols => {
+    const allDataRows = rows.slice(1).map(cols => {
       const rec = {};
       Object.entries(detectedCols).forEach(([colName, idx]) => {
         rec[colName] = cols[idx] ?? "";
@@ -116,14 +121,18 @@ export default function SessionGPS({ session, sessionPlayers }) {
       return rec;
     }).filter(r => r["Name"] && r["Name"] !== "");
 
-    setPreview({ detectedCols, missingCols, parsedRows, fileName: file.name, file });
+    // Separar filas resumen de jugadores reales
+    const summaryRows = allDataRows.filter(r => SUMMARY_ROW_NAMES.has(r["Name"].toLowerCase().trim()));
+    const parsedRows = allDataRows.filter(r => !SUMMARY_ROW_NAMES.has(r["Name"].toLowerCase().trim()));
+
+    setPreview({ detectedCols, missingCols, parsedRows, summaryRows, fileName: file.name, file });
     setUploading(false);
   }
 
   // ── Step 2: Confirm & import ──────────────────────────────────────────────
   async function confirmImport() {
     if (!preview) return;
-    const { detectedCols, parsedRows, fileName, file } = preview;
+    const { detectedCols, parsedRows, summaryRows, fileName, file } = preview;
     setImporting(true);
 
     // Load aliases & player maps
@@ -175,6 +184,27 @@ export default function SessionGPS({ session, sessionPlayers }) {
     let savedRows = [];
     if (toCreate.length > 0) {
       savedRows = await base44.entities.SessionGPSData.bulkCreate(toCreate);
+    }
+
+    // Guardar resumen de sesión desde filas Total/Promedio del CSV
+    if (summaryRows && summaryRows.length > 0) {
+      const totalRow = summaryRows.find(r => ["total", "totals", "team total"].includes(r["Name"].toLowerCase().trim()));
+      const avgRow = summaryRows.find(r => ["promedio", "average", "avg"].includes(r["Name"].toLowerCase().trim()));
+
+      const summaryPayload = {
+        session_id: session.id,
+        source_file: fileName,
+        total_distance: parseNum(totalRow?.["Total Distance (m)"]),
+        avg_distance: parseNum(avgRow?.["Total Distance (m)"]),
+        avg_m_min: parseNum(avgRow?.["Metros x Min"]),
+        avg_player_load: parseNum(avgRow?.["Total Player Load"]),
+        max_speed: parseNum(totalRow?.["Maximum Velocity (km/h)"] || avgRow?.["Maximum Velocity (km/h)"]),
+      };
+
+      // Reemplazar resumen anterior
+      const existingSummary = await base44.entities.SessionGPSSummary.filter({ session_id: session.id });
+      await Promise.all(existingSummary.map(r => base44.entities.SessionGPSSummary.delete(r.id)));
+      await base44.entities.SessionGPSSummary.create(summaryPayload);
     }
 
     setGpsRows(Array.isArray(savedRows) ? savedRows : toCreate);
