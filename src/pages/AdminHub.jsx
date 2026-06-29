@@ -1,13 +1,15 @@
 import React, { useState } from "react";
-import { ShieldCheck, GitMerge, Fingerprint } from "lucide-react";
+import { ShieldCheck, GitMerge, Fingerprint, Users } from "lucide-react";
 import PlayerAdmin from "@/pages/PlayerAdmin";
 import DataCrossing from "@/pages/DataCrossing";
 import PlayerIdentity from "@/pages/PlayerIdentity";
+import StaffManager from "@/pages/StaffManager";
 
 const TABS = [
   { id: "players", label: "Admin Plantel", icon: ShieldCheck },
   { id: "crossing", label: "Cruce de datos", icon: GitMerge },
   { id: "identity", label: "Identity Manager", icon: Fingerprint },
+  { id: "staff", label: "Cuerpo Técnico y Staff", icon: Users },
 ];
 
 export default function AdminHub() {
@@ -43,6 +45,7 @@ export default function AdminHub() {
         {activeTab === "players" && <PlayerAdmin />}
         {activeTab === "crossing" && <DataCrossing />}
         {activeTab === "identity" && <PlayerIdentity />}
+        {activeTab === "staff" && <StaffManager />}
       </div>
     </div>
   );

@@ -1,0 +1,72 @@
+{
+  "name": "StaffMember",
+  "type": "object",
+  "properties": {
+    "first_name": {
+      "type": "string",
+      "description": "Nombre"
+    },
+    "last_name": {
+      "type": "string",
+      "description": "Apellido"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email de contacto"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "entrenador",
+        "PF",
+        "analista",
+        "m\u00e9dico",
+        "kinesi\u00f3logo",
+        "nutricionista",
+        "utilero",
+        "coordinador",
+        "dirigente",
+        "admin"
+      ],
+      "description": "Rol del staff"
+    },
+    "squad_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de planteles asignados"
+    },
+    "squad_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Nombres de planteles (desnormalizado)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Miembro activo"
+    },
+    "photo_url": {
+      "type": "string",
+      "description": "Foto de perfil"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
+    }
+  },
+  "required": [
+    "first_name",
+    "last_name",
+    "role"
+  ]
+}
