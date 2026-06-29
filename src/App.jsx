@@ -24,6 +24,7 @@ import Schedule from '@/pages/Schedule';
 import Matches from '@/pages/Matches';
 import PlayerNameManagement from '@/pages/PlayerNameManagement';
 import PlantilDiagnostic from '@/pages/PlantilDiagnostic';
+import WeeklyPlanner from '@/pages/WeeklyPlanner';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -68,6 +69,7 @@ const AuthenticatedApp = () => {
           <Route path="/matches" element={<Matches />} />
           <Route path="/player-names" element={<PlayerNameManagement />} />
           <Route path="/plantil-diagnostic" element={<PlantilDiagnostic />} />
+          <Route path="/weekly-planner" element={<WeeklyPlanner />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />

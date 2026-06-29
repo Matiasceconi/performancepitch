@@ -1,0 +1,25 @@
+{
+  "name": "WeeklyPlan",
+  "type": "object",
+  "properties": {
+    "week_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del lunes de la semana (YYYY-MM-DD)"
+    },
+    "days_data": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "description": "Array de 7 objetos con los datos de cada d\u00eda"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas generales de la semana"
+    }
+  },
+  "required": [
+    "week_start"
+  ]
+}
