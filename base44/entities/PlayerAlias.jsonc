@@ -23,12 +23,18 @@
       "enum": [
         "Catapult",
         "CSV GPS",
+        "Wellness",
+        "Minutos",
         "Manual",
         "Excel",
         "Otro"
       ],
       "default": "Manual",
       "description": "Fuente de origen del alias"
+    },
+    "confidence_score": {
+      "type": "number",
+      "description": "Confianza del match autom\u00e1tico (0-1). 1 = exacto, <0.9 = requiere revisi\u00f3n manual"
     }
   },
   "required": [

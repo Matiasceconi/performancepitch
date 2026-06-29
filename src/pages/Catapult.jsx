@@ -218,25 +218,48 @@ function SessionRow({ session, sessionReports, onImportDone }) {
     if (!csvState?.rows) return;
     setImporting(true);
     try {
-      // Delete previous records for this session before importing
       await base44.entities.CatapultReport.deleteMany({ session_id: session.id });
 
-      const records = csvState.rows.map((r) => ({
-        ...r,
-        date: session.date,
-        session_id: session.id,
-        session_label: session.title,
-        file_url: csvState.file_url,
-      }));
-      console.log("[Catapult] Importando", records.length, "registros para sesión:", session.title);
+      // Resolver player_ids via aliases oficiales
+      const [players, aliases] = await Promise.all([
+        base44.entities.Player.list("", 500),
+        base44.entities.PlayerAlias.list("", 2000),
+      ]);
+      const aliasIndex = {};
+      aliases.forEach(a => { aliasIndex[a.normalized_alias] = a.player_id; });
+
+      function normName(s) {
+        const str = (s || "").trim();
+        if (str.includes(",")) { const [l,f]=str.split(",").map(p=>p.trim()); return `${f} ${l}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[,.]/g,"").replace(/\s+/g," ").trim(); }
+        return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[,.]/g,"").replace(/\s+/g," ").trim();
+      }
+      function wordScore(a,b){const wa=normName(a).split(" ").filter(w=>w.length>1);const wb=normName(b).split(" ").filter(w=>w.length>1);if(!wa.length||!wb.length)return 0;return wa.filter(w=>wb.includes(w)).length/Math.max(wa.length,wb.length);}
+
+      function resolvePlayer(rawName) {
+        const norm = normName(rawName);
+        if (aliasIndex[norm]) return { id: aliasIndex[norm] };
+        const exact = players.find(p => normName(p.full_name || `${p.first_name} ${p.last_name}`) === norm);
+        if (exact) return { id: exact.id };
+        let best = null, bestScore = 0;
+        for (const p of players) {
+          const score = wordScore(rawName, p.full_name || `${p.first_name} ${p.last_name}`);
+          if (score > bestScore) { bestScore = score; best = p; }
+        }
+        return best && bestScore >= 0.90 ? { id: best.id } : null;
+      }
+
+      const records = csvState.rows.map((r) => {
+        const resolved = resolvePlayer(r.player_name || "");
+        return { ...r, date: session.date, session_id: session.id, session_label: session.title, file_url: csvState.file_url, ...(resolved ? { player_id: resolved.id } : {}) };
+      });
+      const matched = records.filter(r => r.player_id).length;
       await base44.entities.CatapultReport.bulkCreate(records);
-      console.log("[Catapult] Importación exitosa:", records.length, "registros");
       setImportResult({ count: records.length });
       setCsvState(null);
-      toast({ title: `✓ ${records.length} jugadores importados para "${session.title}"` });
+      const unmatchedCount = records.length - matched;
+      toast({ title: `✓ ${records.length} jugadores importados — ${matched} vinculados${unmatchedCount > 0 ? `, ${unmatchedCount} sin vincular (revisar en Cruce de datos)` : ""}` });
       onImportDone();
     } catch (err) {
-      console.error("[Catapult] Error al importar:", err);
       setImportResult({ error: err.message });
       toast({ title: "Error al importar", description: err.message, variant: "destructive" });
     } finally {
@@ -471,9 +494,37 @@ function TrainingUploadBar({ sessions, reports, onImportDone }) {
     setImporting(true);
     try {
       await base44.entities.CatapultReport.deleteMany({ session_id: session.id });
-      const records = csvState.rows.map(r => ({ ...r, date: session.date, session_id: session.id, session_label: session.title, file_url: csvState.file_url }));
+
+      // Resolver player_ids via aliases oficiales
+      const [players, aliases] = await Promise.all([
+        base44.entities.Player.list("", 500),
+        base44.entities.PlayerAlias.list("", 2000),
+      ]);
+      const aliasIndex = {};
+      aliases.forEach(a => { aliasIndex[a.normalized_alias] = a.player_id; });
+      function normName(s) {
+        const str = (s || "").trim();
+        if (str.includes(",")) { const [l,f]=str.split(",").map(p=>p.trim()); return `${f} ${l}`.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[,.]/g,"").replace(/\s+/g," ").trim(); }
+        return str.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g,"").replace(/[,.]/g,"").replace(/\s+/g," ").trim();
+      }
+      function wordScore(a,b){const wa=normName(a).split(" ").filter(w=>w.length>1);const wb=normName(b).split(" ").filter(w=>w.length>1);if(!wa.length||!wb.length)return 0;return wa.filter(w=>wb.includes(w)).length/Math.max(wa.length,wb.length);}
+      function resolvePlayer(rawName) {
+        const norm = normName(rawName);
+        if (aliasIndex[norm]) return { id: aliasIndex[norm] };
+        const exact = players.find(p => normName(p.full_name || `${p.first_name} ${p.last_name}`) === norm);
+        if (exact) return { id: exact.id };
+        let best = null, bestScore = 0;
+        for (const p of players) { const score = wordScore(rawName, p.full_name || `${p.first_name} ${p.last_name}`); if (score > bestScore) { bestScore = score; best = p; } }
+        return best && bestScore >= 0.90 ? { id: best.id } : null;
+      }
+
+      const records = csvState.rows.map(r => {
+        const resolved = resolvePlayer(r.player_name || "");
+        return { ...r, date: session.date, session_id: session.id, session_label: session.title, file_url: csvState.file_url, ...(resolved ? { player_id: resolved.id } : {}) };
+      });
+      const matched = records.filter(r => r.player_id).length;
       await base44.entities.CatapultReport.bulkCreate(records);
-      toast({ title: `✓ ${records.length} jugadores importados para "${session.title}"` });
+      toast({ title: `✓ ${records.length} importados — ${matched} vinculados${records.length - matched > 0 ? `, ${records.length - matched} sin vincular` : ""}` });
       setCsvState(null);
       setSelectedSession("");
       onImportDone();

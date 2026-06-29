@@ -1,6 +1,48 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-// CSV parsing helpers (mismo que SessionCsvPanel)
+function normalize(str) {
+  if (!str) return "";
+  return str
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[,\.]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function normalizeCSVName(raw) {
+  const s = (raw || "").trim();
+  if (s.includes(",")) {
+    const [last, first] = s.split(",").map(p => p.trim());
+    return normalize(`${first} ${last}`);
+  }
+  return normalize(s);
+}
+
+function wordScore(a, b) {
+  const wa = normalize(a).split(" ").filter(w => w.length > 1);
+  const wb = normalize(b).split(" ").filter(w => w.length > 1);
+  if (!wa.length || !wb.length) return 0;
+  const shared = wa.filter(w => wb.includes(w)).length;
+  return shared / Math.max(wa.length, wb.length);
+}
+
+function diceScore(a, b) {
+  const na = normalize(a), nb = normalize(b);
+  if (!na || !nb) return 0;
+  if (na === nb) return 1;
+  const bigrams = (s) => { const r=[]; for (let i=0;i<s.length-1;i++) r.push(s[i]+s[i+1]); return r; };
+  const ba = bigrams(na), bb = bigrams(nb);
+  if (!ba.length || !bb.length) return 0;
+  const setB = new Set(bb);
+  return (2 * ba.filter(g => setB.has(g)).length) / (ba.length + bb.length);
+}
+
+function combinedScore(csvName, playerName) {
+  if (normalize(csvName) === normalize(playerName) || normalizeCSVName(csvName) === normalize(playerName)) return 1;
+  return Math.max(wordScore(csvName, playerName), diceScore(csvName, playerName) * 0.9);
+}
+
 function matchColumn(raw) {
   const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
   if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
@@ -36,8 +78,7 @@ function parseDuration(val) {
 }
 
 function splitCSVLine(line, sep) {
-  const result = [];
-  let cur = "", inQuotes = false;
+  const result = []; let cur = "", inQuotes = false;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
     if (ch === '"') inQuotes = !inQuotes;
@@ -50,20 +91,17 @@ function splitCSVLine(line, sep) {
 
 function parseCatapultCSV(text) {
   const clean = text.replace(/^\uFEFF/, "");
-  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
-  const firstSemi = lines[0].split(";").length;
-  const firstComma = lines[0].split(",").length;
+  const lines = clean.split("\n").map(l => l.trim()).filter(Boolean);
+  const firstSemi = lines[0].split(";").length, firstComma = lines[0].split(",").length;
   const sep = firstSemi > firstComma ? ";" : ",";
 
   let headerIdx = -1, headers = [];
   for (let i = 0; i < Math.min(lines.length, 15); i++) {
     const cols = splitCSVLine(lines[i], sep);
     const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
-    const mapped = cols.filter((c) => matchColumn(c) !== null).length;
+    const mapped = cols.filter(c => matchColumn(c) !== null).length;
     if (firstLow === "name" || firstLow === "jugador" || firstLow === "athlete" || mapped >= 3) {
-      headerIdx = i;
-      headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c);
-      break;
+      headerIdx = i; headers = cols.map((c, idx) => idx === 0 ? c.replace(/^\uFEFF/, "") : c); break;
     }
   }
   if (headerIdx === -1) return { error: "No se encontró fila de encabezados válida." };
@@ -101,79 +139,58 @@ Deno.serve(async (req) => {
 
     const { csv_url, session_id, session_date, file_name } = await req.json();
 
-    // 1. Descargar CSV
     const csvText = await fetch(csv_url).then(r => r.text());
-
-    // 2. Parsear CSV
     const parseResult = parseCatapultCSV(csvText);
-    if (parseResult.error) {
-      return Response.json({ error: parseResult.error }, { status: 400 });
-    }
+    if (parseResult.error) return Response.json({ error: parseResult.error }, { status: 400 });
 
     const rows = parseResult.rows;
 
-    // 3. Obtener lista de jugadores y mapeos de nombres
-    const [players, mappings] = await Promise.all([
+    // ── Fuente oficial: Players + PlayerAlias ──────────────────────────────
+    const [players, aliases] = await Promise.all([
       base44.asServiceRole.entities.Player.list('', 500),
-      base44.asServiceRole.entities.PlayerNameMapping.list('', 500),
+      base44.asServiceRole.entities.PlayerAlias.list('', 2000),
     ]);
 
-    const normalizeName = (name) => (name || "")
-      .normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+    // Índice alias → player_id
+    const aliasIndex = {};
+    aliases.forEach(a => { aliasIndex[a.normalized_alias] = a.player_id; });
 
-    // Mapa player_id -> player
-    const playerById = Object.fromEntries(players.map(p => [p.id, p]));
+    function resolvePlayer(rawName) {
+      const norm = normalizeCSVName(rawName);
 
-    // Mapa de alias normalizados -> player_id (de PlayerNameMapping)
-    const aliasMap = {};
-    mappings.forEach(m => {
-      const allNames = [m.player_name, ...(m.aliases || [])];
-      allNames.forEach(name => {
-        aliasMap[normalizeName(name)] = m.player_id;
-      });
-    });
+      // 1. Alias exacto
+      if (aliasIndex[norm]) {
+        const p = players.find(pl => pl.id === aliasIndex[norm]);
+        return p ? { player: p, confidence: 1.0, source: 'alias' } : null;
+      }
 
-    // 4. Procesar cada fila del CSV
-    const imported = [];
-    const matched = [];
-    const unmatched = [];
+      // 2. Nombre oficial exacto
+      const exact = players.find(p => normalize(p.full_name || `${p.first_name} ${p.last_name}`) === norm);
+      if (exact) return { player: exact, confidence: 1.0, source: 'exact' };
+
+      // 3. Fuzzy
+      let best = null, bestScore = 0;
+      for (const p of players) {
+        const score = combinedScore(rawName, p.full_name || `${p.first_name} ${p.last_name}`);
+        if (score > bestScore) { bestScore = score; best = p; }
+      }
+      if (best && bestScore >= 0.90) return { player: best, confidence: bestScore, source: 'fuzzy' };
+
+      return null;
+    }
+
+    // ── Procesar filas ─────────────────────────────────────────────────────
+    const matched = [], unmatched = [];
+    const records = [];
 
     for (const row of rows) {
       const gpsName = (row.player_name || "").trim();
-      let player = null;
+      const resolved = resolvePlayer(gpsName);
 
-      // Intento 1: alias/mapping exacto
-      const aliasPlayerId = aliasMap[normalizeName(gpsName)];
-      if (aliasPlayerId && playerById[aliasPlayerId]) {
-        player = playerById[aliasPlayerId];
-      }
-
-      // Intento 2: búsqueda exacta normalizada por full_name
-      if (!player) {
-        for (const p of players) {
-          const pName = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
-          if (normalizeName(pName) === normalizeName(gpsName)) { player = p; break; }
-        }
-      }
-
-      // Intento 3: fuzzy matching por palabras
-      if (!player) {
-        const gpsWords = normalizeName(gpsName).split(" ").filter(w => w.length > 2);
-        let bestScore = 0;
-        for (const p of players) {
-          const pName = p.full_name || `${p.first_name || ""} ${p.last_name || ""}`.trim();
-          const playerWords = normalizeName(pName).split(" ").filter(w => w.length > 2);
-          const matches = gpsWords.filter(w => playerWords.includes(w)).length;
-          const score = matches / Math.max(gpsWords.length, playerWords.length);
-          if (score > bestScore) { bestScore = score; player = score >= 0.5 ? p : null; }
-        }
-      }
-
-      // Crear registro CatapultReport
-      const reportData = {
+      const record = {
         player_name: gpsName,
         date: session_date,
-        session_id: session_id,
+        session_id,
         session_label: file_name,
         file_url: csv_url,
         total_duration: row.total_duration,
@@ -189,30 +206,41 @@ Deno.serve(async (req) => {
         meters_per_minute: row.meters_per_minute,
       };
 
-      // Crear el documento con player_id en la raíz
-      const finalData = { ...reportData };
-      if (player) {
-        finalData.player_id = player.id;
-        await base44.asServiceRole.entities.CatapultReport.create(finalData);
-        matched.push({ name: gpsName, playerId: player.id, playerName: player.data?.name || player.name });
+      if (resolved) {
+        record.player_id = resolved.player.id;
+        matched.push({ name: gpsName, playerId: resolved.player.id, playerName: resolved.player.full_name, confidence: resolved.confidence });
+
+        // Auto-crear alias si el match fue por fuzzy
+        if (resolved.source === 'fuzzy') {
+          const norm = normalizeCSVName(gpsName);
+          const exists = aliases.find(a => a.normalized_alias === norm && a.player_id === resolved.player.id);
+          if (!exists) {
+            await base44.asServiceRole.entities.PlayerAlias.create({
+              player_id: resolved.player.id,
+              player_name: resolved.player.full_name,
+              alias_name: gpsName,
+              normalized_alias: norm,
+              source: 'Catapult',
+              confidence_score: resolved.confidence,
+            });
+          }
+        }
       } else {
-        // Sin player_id si no se encontró
-        await base44.asServiceRole.entities.CatapultReport.create(finalData);
         unmatched.push(gpsName);
       }
-      imported.push(gpsName);
+
+      records.push(record);
     }
+
+    // Bulk insert
+    await base44.asServiceRole.entities.CatapultReport.bulkCreate(records);
 
     return Response.json({
       success: true,
-      total_imported: imported.length,
+      total_imported: records.length,
       total_matched: matched.length,
       total_unmatched: unmatched.length,
-      details: {
-        imported,
-        matched,
-        unmatched,
-      }
+      details: { matched, unmatched },
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });

@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, ShieldCheck } from "lucide-react";
+import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, ShieldCheck, GitMerge } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -13,7 +13,8 @@ const navItems = [
 { label: "Calendario", path: "/schedule", icon: CalendarDays },
 { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
 { label: "Plan Semanal", path: "/weekly-planner", icon: ClipboardList },
-{ label: "Admin Plantel", path: "/player-admin", icon: ShieldCheck }];
+{ label: "Admin Plantel", path: "/player-admin", icon: ShieldCheck },
+{ label: "Cruce de datos", path: "/data-crossing", icon: GitMerge }];
 
 
 export default function Sidebar() {
