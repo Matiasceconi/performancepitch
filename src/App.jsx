@@ -26,6 +26,7 @@ import PlantilDiagnostic from '@/pages/PlantilDiagnostic';
 import WeeklyPlanner from '@/pages/WeeklyPlanner';
 import AdminHub from '@/pages/AdminHub';
 import DailySquad from '@/pages/DailySquad';
+import SquadManager from '@/pages/SquadManager';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -72,6 +73,7 @@ const AuthenticatedApp = () => {
           <Route path="/weekly-planner" element={<WeeklyPlanner />} />
           <Route path="/admin" element={<AdminHub />} />
           <Route path="/daily-squad" element={<DailySquad />} />
+          <Route path="/squad-manager" element={<SquadManager />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />

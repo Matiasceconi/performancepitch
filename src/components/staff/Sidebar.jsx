@@ -13,6 +13,7 @@ const navItems = [
 { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
 { label: "Plan Semanal", path: "/weekly-planner", icon: ClipboardList },
 { label: "Estado del Plantel", path: "/daily-squad", icon: ShieldCheck },
+{ label: "Planteles", path: "/squad-manager", icon: Users },
 { label: "Administración", path: "/admin", icon: Settings2 },
 ];
 
