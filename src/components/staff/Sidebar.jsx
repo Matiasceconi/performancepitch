@@ -1,6 +1,6 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, Settings2 } from "lucide-react";
+import { Video, FileSpreadsheet, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 
 const navItems = [
@@ -13,6 +13,7 @@ const navItems = [
 { label: "Calendario", path: "/schedule", icon: CalendarDays },
 { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
 { label: "Plan Semanal", path: "/weekly-planner", icon: ClipboardList },
+{ label: "Estado del Plantel", path: "/daily-squad", icon: ShieldCheck },
 { label: "Administración", path: "/admin", icon: Settings2 },
 ];
 
