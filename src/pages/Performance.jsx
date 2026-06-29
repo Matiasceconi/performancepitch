@@ -5,6 +5,8 @@ import Nutrition from "@/pages/Nutrition";
 import GpsAnalytics from "@/components/performance/GpsAnalytics";
 import MonthlyReport from "@/pages/MonthlyReport";
 import MinutesTracker from "@/components/performance/MinutesTracker";
+import MinutesByMatch from "@/components/performance/MinutesByMatch";
+import MinutesSubPanel from "@/components/performance/MinutesSubPanel";
 
 const tabs = [
   { id: "medical", label: "Área Médica", icon: Heart },
@@ -50,7 +52,7 @@ export default function Performance() {
          {active === "nutrition" && <Nutrition />}
          {active === "catapult" && <GpsAnalytics initialTab={gpsInitialTab} initialDate={urlDate} />}
          {active === "report" && <MonthlyReport />}
-         {active === "minutes_official" && <MinutesTracker />}
+         {active === "minutes_official" && <MinutesSubPanel />}
        </div>
     </div>
   );
