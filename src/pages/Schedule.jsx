@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, FileText } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, FileText, Copy, ArrowUp, ArrowDown } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
 import { jsPDF } from "jspdf";
@@ -304,7 +304,7 @@ function WeekSettingsModal({ open, onClose, startDay, onChangeStartDay }) {
 }
 
 // ── EventCard ──
-function EventCard({ event, onEdit, onDelete }) {
+function EventCard({ event, onEdit, onDelete, onCopy, onMoveUp, onMoveDown }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
   return (
     <div className={`rounded-lg border ${c.bg} ${c.border} overflow-hidden`}>
@@ -322,6 +322,15 @@ function EventCard({ event, onEdit, onDelete }) {
           )}
           {event.location && <p className="text-xs text-zinc-500 truncate">{event.location}</p>}
         </div>
+        {/* Move up/down arrows */}
+        <div className="flex flex-col gap-0.5 shrink-0">
+          <button onClick={(e) => { e.stopPropagation(); onMoveUp(event); }} title="Mover antes" className="p-0.5 rounded hover:bg-white/20 text-zinc-500 hover:text-white transition-colors">
+            <ArrowUp size={11} />
+          </button>
+          <button onClick={(e) => { e.stopPropagation(); onMoveDown(event); }} title="Mover después" className="p-0.5 rounded hover:bg-white/20 text-zinc-500 hover:text-white transition-colors">
+            <ArrowDown size={11} />
+          </button>
+        </div>
       </div>
       <div className="flex border-t border-white/10">
         <button
@@ -329,6 +338,13 @@ function EventCard({ event, onEdit, onDelete }) {
           className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
         >
           <Pencil size={11} /> Editar
+        </button>
+        <div className="w-px bg-white/10" />
+        <button
+          onClick={(e) => { e.stopPropagation(); onCopy(event); }}
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <Copy size={11} /> Copiar
         </button>
         <div className="w-px bg-white/10" />
         <button
@@ -343,7 +359,7 @@ function EventCard({ event, onEdit, onDelete }) {
 }
 
 // ── EventModal ──
-function EventModal({ open, onClose, onSave, initial, defaultDate }) {
+function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
@@ -365,10 +381,16 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
 
   useEffect(() => {
     if (open) {
-      setForm(initial ? { ...EMPTY_FORM, ...initial } : { ...EMPTY_FORM, date: defaultDate || "" });
+      if (initial) {
+        setForm({ ...EMPTY_FORM, ...initial });
+      } else if (copyData) {
+        setForm({ ...EMPTY_FORM, ...copyData, date: defaultDate || copyData.date || "" });
+      } else {
+        setForm({ ...EMPTY_FORM, date: defaultDate || "" });
+      }
       setCustomTemplates(loadCustomTemplates());
     }
-  }, [open, initial, defaultDate]);
+  }, [open, initial, copyData, defaultDate]);
 
   const allTemplates = [...DEFAULT_TEMPLATES, ...customTemplates];
   if (!open) return null;
@@ -387,7 +409,7 @@ function EventModal({ open, onClose, onSave, initial, defaultDate }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60" onClick={onClose}>
       <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-md mx-4 shadow-2xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-5">
-          <h3 className="text-white font-semibold">{initial ? "Editar evento" : "Nuevo evento"}</h3>
+          <h3 className="text-white font-semibold">{initial ? "Editar evento" : copyData ? "Copiar evento" : "Nuevo evento"}</h3>
           <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18} /></button>
         </div>
         {/* Quick templates */}
@@ -484,6 +506,7 @@ export default function Schedule() {
   const [editingEvent, setEditingEvent] = useState(null);
   const [defaultDate, setDefaultDate] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [copyData, setCopyData] = useState(null);
 
   async function loadEvents() {
     const data = await base44.entities.DayEvent.list("-date", 500);
@@ -527,14 +550,47 @@ export default function Schedule() {
     await loadEvents();
   }
 
+  function handleCopy(event) {
+    // Abre el modal con los datos del evento copiado pero sin id (nuevo evento)
+    const { id, created_date, updated_date, created_by_id, ...rest } = event;
+    setEditingEvent(null);
+    setDefaultDate(event.date);
+    // Pre-fill the form via editingEvent=null but we need to pass the data — use a trick:
+    // store in defaultDate + a "copyData" state
+    setCopyData(rest);
+    setModalOpen(true);
+  }
+
+  async function handleMoveUp(event) {
+    if (!event.time) return;
+    const [h, m] = event.time.split(":").map(Number);
+    const totalMins = h * 60 + m - 30;
+    if (totalMins < 0) return;
+    const newTime = `${String(Math.floor(totalMins / 60)).padStart(2, "0")}:${String(totalMins % 60).padStart(2, "0")}`;
+    await base44.entities.DayEvent.update(event.id, { time: newTime });
+    await loadEvents();
+  }
+
+  async function handleMoveDown(event) {
+    if (!event.time) return;
+    const [h, m] = event.time.split(":").map(Number);
+    const totalMins = h * 60 + m + 30;
+    if (totalMins >= 24 * 60) return;
+    const newTime = `${String(Math.floor(totalMins / 60)).padStart(2, "0")}:${String(totalMins % 60).padStart(2, "0")}`;
+    await base44.entities.DayEvent.update(event.id, { time: newTime });
+    await loadEvents();
+  }
+
   function openNew(dateStr = "") {
     setEditingEvent(null);
+    setCopyData(null);
     setDefaultDate(dateStr);
     setModalOpen(true);
   }
 
   function openEdit(event) {
     setEditingEvent(event);
+    setCopyData(null);
     setDefaultDate(event.date);
     setModalOpen(true);
   }
@@ -602,7 +658,7 @@ export default function Schedule() {
                     <p className="text-xs text-zinc-700 text-center pt-4">Sin eventos</p>
                   )}
                   {dayEvents.map((ev) => (
-                    <EventCard key={ev.id} event={ev} onEdit={openEdit} onDelete={handleDelete} />
+                    <EventCard key={ev.id} event={ev} onEdit={openEdit} onDelete={handleDelete} onCopy={handleCopy} onMoveUp={handleMoveUp} onMoveDown={handleMoveDown} />
                   ))}
                 </div>
               </div>
@@ -712,9 +768,10 @@ export default function Schedule() {
 
       <EventModal
         open={modalOpen}
-        onClose={() => { setModalOpen(false); setEditingEvent(null); }}
+        onClose={() => { setModalOpen(false); setEditingEvent(null); setCopyData(null); }}
         onSave={handleSave}
         initial={editingEvent}
+        copyData={copyData}
         defaultDate={defaultDate}
       />
 
