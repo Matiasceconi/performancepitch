@@ -14,22 +14,38 @@ moment.locale("es");
 
 export default function DailySquad() {
   const [selectedDate, setSelectedDate] = useState(moment().format("YYYY-MM-DD"));
-  const [players, setPlayers] = useState([]);
-  const [statusMap, setStatusMap] = useState({}); // player_id -> DailySquadStatus record
-  const [pendingChanges, setPendingChanges] = useState({}); // player_id -> partial update
+  const [squads, setSquads] = useState([]);
+  const [selectedSquadId, setSelectedSquadId] = useState(""); // "" = sin filtro
+  const [players, setPlayers] = useState([]);         // todos los jugadores activos
+  const [memberships, setMemberships] = useState([]); // SquadMembership activos
+  const [statusMap, setStatusMap] = useState({});     // player_id -> DailySquadStatus record
+  const [pendingChanges, setPendingChanges] = useState({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [filters, setFilters] = useState({ team: "", category: "", position: "", status: "", tag: "", search: "" });
   const { toast } = useToast();
 
+  // Load squads once
+  useEffect(() => {
+    base44.entities.Squad.list("name", 100).then(sq => {
+      const active = sq.filter(s => s.active !== false);
+      setSquads(active);
+      if (active.length > 0 && !selectedSquadId) setSelectedSquadId(active[0].id);
+    });
+  }, []);
+
   const load = useCallback(async () => {
     setLoading(true);
-    const [allPlayers, dayStatuses] = await Promise.all([
+    const [allPlayers, mb, dayStatuses] = await Promise.all([
       base44.entities.Player.list("-created_date", 500),
-      base44.entities.DailySquadStatus.filter({ date: selectedDate }, "-updated_at", 300),
+      base44.entities.SquadMembership.list("-effective_from", 1000),
+      base44.entities.DailySquadStatus.filter({ date: selectedDate }, "-updated_at", 500),
     ]);
+
     setPlayers(allPlayers.filter(p => p.active !== false));
+    setMemberships(mb.filter(m => m.status === "activo"));
+
     const map = {};
     dayStatuses.forEach(s => { map[s.player_id] = s; });
     setStatusMap(map);
@@ -39,15 +55,67 @@ export default function DailySquad() {
 
   useEffect(() => { load(); }, [load]);
 
+  // ── Compute which players belong to the selected squad for today ───────────
+  // A player appears if:
+  // A) Has active SquadMembership for selectedSquadId (within date range)
+  // B) Has a DailySquadStatus with target_squad_id = selectedSquadId, active_in_target_squad = true, for today
+  const squadPlayers = (() => {
+    if (!selectedSquadId) return players; // no filter = show all
+
+    const today = selectedDate;
+
+    // A) Stable members
+    const stableMemberIds = new Set(
+      memberships.filter(m => {
+        if (m.squad_id !== selectedSquadId) return false;
+        if (m.effective_from && m.effective_from > today) return false;
+        if (m.effective_to && m.effective_to < today) return false;
+        return true;
+      }).map(m => m.player_id)
+    );
+
+    // B) Temporary visitors from DailySquadStatus (already saved)
+    const temporaryIds = new Set(
+      Object.values(statusMap).filter(ds =>
+        ds.target_squad_id === selectedSquadId &&
+        ds.active_in_target_squad === true &&
+        ds.temporary === true
+      ).map(ds => ds.player_id)
+    );
+
+    // Also check pending changes for temporary visitors being set right now
+    Object.entries(pendingChanges).forEach(([pid, ch]) => {
+      if (ch.target_squad_id === selectedSquadId && ch.active_in_target_squad === true && ch.temporary === true) {
+        temporaryIds.add(pid);
+      }
+    });
+
+    return players.filter(p => stableMemberIds.has(p.id) || temporaryIds.has(p.id));
+  })();
+
   function getEffectiveStatus(player) {
     const pending = pendingChanges[player.id];
     const saved = statusMap[player.id];
+
+    // Find player's base squad from membership
+    const mem = memberships.find(m => m.player_id === player.id);
+    const baseSquadId = mem?.squad_id || "";
+    const baseSquadName = squads.find(s => s.id === baseSquadId)?.name || "";
+
     return {
       status: pending?.status ?? saved?.status ?? "disponible",
       tags: pending?.tags ?? saved?.tags ?? [],
       notes: pending?.notes ?? saved?.notes ?? "",
-      team: pending?.team ?? saved?.team ?? player.division ?? "",
       category: pending?.category ?? saved?.category ?? player.category ?? "",
+      position: pending?.position ?? saved?.position ?? player.position ?? "",
+      base_squad_id: baseSquadId,
+      base_squad_name: baseSquadName,
+      target_squad_id: pending?.target_squad_id ?? saved?.target_squad_id ?? baseSquadId,
+      target_squad_name: pending?.target_squad_name ?? saved?.target_squad_name ?? baseSquadName,
+      movement_type: pending?.movement_type ?? saved?.movement_type ?? "normal",
+      temporary: pending?.temporary ?? saved?.temporary ?? false,
+      active_in_target_squad: pending?.active_in_target_squad ?? saved?.active_in_target_squad ?? true,
+      valid_until: pending?.valid_until ?? saved?.valid_until ?? "",
     };
   }
 
@@ -56,6 +124,34 @@ export default function DailySquad() {
       ...prev,
       [playerId]: { ...(prev[playerId] || {}), ...changes }
     }));
+  }
+
+  // ── Quick movement actions ─────────────────────────────────────────────────
+  function applyMovement(player, targetSquadId, movementType, status) {
+    const mem = memberships.find(m => m.player_id === player.id);
+    const baseSquadId = mem?.squad_id || "";
+    const baseSquadName = squads.find(s => s.id === baseSquadId)?.name || "";
+    const targetSquad = squads.find(s => s.id === targetSquadId);
+
+    applyChange(player.id, {
+      status,
+      movement_type: movementType,
+      temporary: targetSquadId !== baseSquadId,
+      active_in_target_squad: true,
+      base_squad_id: baseSquadId,
+      base_squad_name: baseSquadName,
+      target_squad_id: targetSquadId,
+      target_squad_name: targetSquad?.name || "",
+    });
+  }
+
+  function endTemporaryMovement(player) {
+    applyChange(player.id, {
+      temporary: false,
+      active_in_target_squad: false,
+      movement_type: "normal",
+      status: "disponible",
+    });
   }
 
   async function saveAll() {
@@ -70,10 +166,17 @@ export default function DailySquad() {
         date: selectedDate,
         player_id: playerId,
         player_name: player?.full_name || "",
-        team: effective.team,
-        category: effective.category,
         position: player?.position || "",
+        category: player?.category || "",
         updated_at: now,
+        base_squad_id: effective.base_squad_id,
+        base_squad_name: effective.base_squad_name,
+        target_squad_id: effective.target_squad_id,
+        target_squad_name: effective.target_squad_name,
+        movement_type: effective.movement_type,
+        temporary: effective.temporary,
+        active_in_target_squad: effective.active_in_target_squad,
+        valid_until: effective.valid_until,
         ...changes,
       };
       if (existing) {
@@ -91,13 +194,19 @@ export default function DailySquad() {
 
   async function copyYesterday() {
     const yesterday = moment(selectedDate).subtract(1, "day").format("YYYY-MM-DD");
-    const prevStatuses = await base44.entities.DailySquadStatus.filter({ date: yesterday }, "-updated_at", 300);
+    const prevStatuses = await base44.entities.DailySquadStatus.filter({ date: yesterday }, "-updated_at", 500);
     if (prevStatuses.length === 0) {
       toast({ title: "Sin estados del día anterior", variant: "destructive" }); return;
     }
     const changes = {};
     prevStatuses.forEach(s => {
-      changes[s.player_id] = { status: s.status, tags: s.tags, notes: s.notes, team: s.team, category: s.category };
+      changes[s.player_id] = {
+        status: s.status, tags: s.tags, notes: s.notes,
+        base_squad_id: s.base_squad_id, base_squad_name: s.base_squad_name,
+        target_squad_id: s.target_squad_id, target_squad_name: s.target_squad_name,
+        movement_type: s.movement_type, temporary: s.temporary,
+        active_in_target_squad: s.active_in_target_squad,
+      };
     });
     setPendingChanges(prev => ({ ...prev, ...changes }));
     toast({ title: `Copiados ${prevStatuses.length} estados de ayer` });
@@ -105,17 +214,18 @@ export default function DailySquad() {
 
   function markAllAvailable() {
     const changes = {};
-    players.forEach(p => { changes[p.id] = { status: "disponible", tags: [], notes: "" }; });
+    squadPlayers.forEach(p => { changes[p.id] = { status: "disponible", tags: [], notes: "" }; });
     setPendingChanges(prev => ({ ...prev, ...changes }));
     toast({ title: "Todos marcados como disponibles" });
   }
 
   function exportSummary() {
-    const rows = players.map(p => {
+    const rows = squadPlayers.map(p => {
       const s = getEffectiveStatus(p);
       return `${p.full_name} | ${p.position} | ${STATUS_LABELS[s.status] || s.status} | ${(s.tags || []).join(", ")} | ${s.notes || ""}`;
     });
-    const text = `Estado del plantel — ${moment(selectedDate).format("DD/MM/YYYY")}\n\n` + rows.join("\n");
+    const squadName = squads.find(s => s.id === selectedSquadId)?.name || "plantel";
+    const text = `Estado del Plantel ${squadName} — ${moment(selectedDate).format("DD/MM/YYYY")}\n\n` + rows.join("\n");
     const blob = new Blob([text], { type: "text/plain" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a"); a.href = url; a.download = `plantel-${selectedDate}.txt`; a.click();
@@ -124,10 +234,9 @@ export default function DailySquad() {
 
   const hasPending = Object.keys(pendingChanges).length > 0;
 
-  // Filtered players
-  const filteredPlayers = players.filter(p => {
+  // Filtered players (within squadPlayers)
+  const filteredPlayers = squadPlayers.filter(p => {
     const s = getEffectiveStatus(p);
-    if (filters.team && s.team !== filters.team) return false;
     if (filters.category && s.category !== filters.category) return false;
     if (filters.position && p.position !== filters.position) return false;
     if (filters.status && s.status !== filters.status) return false;
@@ -140,17 +249,19 @@ export default function DailySquad() {
   });
 
   const summaryData = {
-    total: players.length,
-    disponibles: players.filter(p => getEffectiveStatus(p).status === "disponible").length,
-    lesionados: players.filter(p => getEffectiveStatus(p).status === "lesionado").length,
-    molestias: players.filter(p => getEffectiveStatus(p).status === "molestia").length,
-    diferenciados: players.filter(p => getEffectiveStatus(p).status === "diferenciado").length,
-    suspendidos: players.filter(p => getEffectiveStatus(p).status === "suspendido").length,
-    bajan: players.filter(p => getEffectiveStatus(p).status === "bajó").length,
-    suben: players.filter(p => getEffectiveStatus(p).status === "subió").length,
-    convocados: players.filter(p => getEffectiveStatus(p).status === "convocado").length,
-    ausentes: players.filter(p => getEffectiveStatus(p).status === "ausente").length,
+    total: squadPlayers.length,
+    disponibles: squadPlayers.filter(p => getEffectiveStatus(p).status === "disponible").length,
+    lesionados: squadPlayers.filter(p => getEffectiveStatus(p).status === "lesionado").length,
+    molestias: squadPlayers.filter(p => getEffectiveStatus(p).status === "molestia").length,
+    diferenciados: squadPlayers.filter(p => getEffectiveStatus(p).status === "diferenciado").length,
+    suspendidos: squadPlayers.filter(p => getEffectiveStatus(p).status === "suspendido").length,
+    bajan: squadPlayers.filter(p => getEffectiveStatus(p).status === "bajó").length,
+    suben: squadPlayers.filter(p => getEffectiveStatus(p).status === "subió").length,
+    convocados: squadPlayers.filter(p => getEffectiveStatus(p).status === "convocado").length,
+    ausentes: squadPlayers.filter(p => getEffectiveStatus(p).status === "ausente").length,
   };
+
+  const selectedSquad = squads.find(s => s.id === selectedSquadId);
 
   return (
     <div className="space-y-5">
@@ -164,12 +275,15 @@ export default function DailySquad() {
         onMarkAllAvailable={markAllAvailable}
         onExport={exportSummary}
         onWhatsApp={() => setShowWhatsApp(true)}
+        squads={squads}
+        selectedSquadId={selectedSquadId}
+        onSquadChange={setSelectedSquadId}
       />
 
       {!loading && <DailySquadSummary data={summaryData} />}
 
       <DailySquadFilters
-        players={players}
+        players={squadPlayers}
         filters={filters}
         setFilters={setFilters}
         getEffectiveStatus={getEffectiveStatus}
@@ -186,12 +300,16 @@ export default function DailySquad() {
           applyChange={applyChange}
           pendingChanges={pendingChanges}
           selectedDate={selectedDate}
+          squads={squads}
+          selectedSquadId={selectedSquadId}
+          onApplyMovement={applyMovement}
+          onEndTemporaryMovement={endTemporaryMovement}
         />
       )}
 
       {showWhatsApp && (
         <DailySquadWhatsApp
-          players={players}
+          players={squadPlayers}
           getEffectiveStatus={getEffectiveStatus}
           selectedDate={selectedDate}
           onClose={() => setShowWhatsApp(false)}

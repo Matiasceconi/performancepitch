@@ -15,23 +15,21 @@
       "type": "string",
       "description": "Nombre del jugador (desnormalizado)"
     },
-    "team": {
+    "base_squad_id": {
       "type": "string",
-      "enum": [
-        "Primera",
-        "Reserva",
-        "Cuarta",
-        "Quinta"
-      ],
-      "description": "Equipo del jugador ese d\u00eda"
+      "description": "Plantel al que pertenece originalmente el jugador (de SquadMembership)"
     },
-    "category": {
+    "base_squad_name": {
       "type": "string",
-      "description": "Categor\u00eda del jugador"
+      "description": "Nombre del plantel base (desnormalizado)"
     },
-    "position": {
+    "target_squad_id": {
       "type": "string",
-      "description": "Posici\u00f3n del jugador"
+      "description": "Plantel donde aparece el jugador ese d\u00eda (puede ser diferente al base)"
+    },
+    "target_squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel destino (desnormalizado)"
     },
     "status": {
       "type": "string",
@@ -50,6 +48,41 @@
       ],
       "default": "disponible",
       "description": "Estado del jugador en el d\u00eda"
+    },
+    "movement_type": {
+      "type": "string",
+      "enum": [
+        "normal",
+        "sube_temporal",
+        "baja_temporal",
+        "fuera_temporal",
+        "reintegro"
+      ],
+      "default": "normal",
+      "description": "Tipo de movimiento del d\u00eda"
+    },
+    "temporary": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el movimiento es temporal (no modifica SquadMembership)"
+    },
+    "active_in_target_squad": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el jugador est\u00e1 activo en el plantel destino ese d\u00eda"
+    },
+    "valid_until": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha hasta la que aplica el movimiento temporal (vac\u00edo = hasta cierre manual)"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda del jugador"
+    },
+    "position": {
+      "type": "string",
+      "description": "Posici\u00f3n del jugador"
     },
     "tags": {
       "type": "array",

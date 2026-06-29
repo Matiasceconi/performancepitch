@@ -2,7 +2,7 @@ import React from "react";
 import { POSITION_GROUPS } from "@/components/squad/squadConstants";
 import PlayerDayCard from "@/components/squad/PlayerDayCard";
 
-export default function DailySquadGrid({ players, getEffectiveStatus, applyChange, pendingChanges, selectedDate }) {
+export default function DailySquadGrid({ players, getEffectiveStatus, applyChange, pendingChanges, selectedDate, squads, selectedSquadId, onApplyMovement, onEndTemporaryMovement }) {
   const grouped = {};
   const ungrouped = [];
 
@@ -47,6 +47,10 @@ export default function DailySquadGrid({ players, getEffectiveStatus, applyChang
                 hasPending={!!pendingChanges[p.id]}
                 onChange={changes => applyChange(p.id, changes)}
                 selectedDate={selectedDate}
+                squads={squads}
+                selectedSquadId={selectedSquadId}
+                onApplyMovement={onApplyMovement}
+                onEndTemporaryMovement={onEndTemporaryMovement}
               />
             ))}
           </div>
@@ -67,6 +71,10 @@ export default function DailySquadGrid({ players, getEffectiveStatus, applyChang
                 hasPending={!!pendingChanges[p.id]}
                 onChange={changes => applyChange(p.id, changes)}
                 selectedDate={selectedDate}
+                squads={squads}
+                selectedSquadId={selectedSquadId}
+                onApplyMovement={onApplyMovement}
+                onEndTemporaryMovement={onEndTemporaryMovement}
               />
             ))}
           </div>

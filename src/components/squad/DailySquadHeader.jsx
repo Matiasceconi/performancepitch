@@ -1,12 +1,13 @@
 import React from "react";
-import { ChevronLeft, ChevronRight, Save, Copy, CheckSquare, Download, MessageSquare } from "lucide-react";
+import { ChevronLeft, ChevronRight, Save, Copy, CheckSquare, Download, MessageSquare, Shield } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
 
 export default function DailySquadHeader({
   selectedDate, setSelectedDate, hasPending, saving,
-  onSave, onCopyYesterday, onMarkAllAvailable, onExport, onWhatsApp
+  onSave, onCopyYesterday, onMarkAllAvailable, onExport, onWhatsApp,
+  squads = [], selectedSquadId, onSquadChange,
 }) {
   function changeDay(delta) {
     setSelectedDate(moment(selectedDate).add(delta, "day").format("YYYY-MM-DD"));
@@ -19,6 +20,31 @@ export default function DailySquadHeader({
           <h1 className="text-2xl font-bold text-white tracking-tight">Estado del Plantel</h1>
           <p className="text-zinc-500 text-sm mt-1">Gestión diaria del estado de los jugadores</p>
         </div>
+
+        {/* Squad selector */}
+        {squads.length > 0 && (
+          <div className="flex items-center gap-2 flex-wrap">
+            <Shield size={15} className="text-zinc-500 shrink-0" />
+            <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl p-1 gap-1 flex-wrap">
+              <button
+                onClick={() => onSquadChange("")}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  !selectedSquadId ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
+                }`}>
+                Todos
+              </button>
+              {squads.map(sq => (
+                <button key={sq.id}
+                  onClick={() => onSquadChange(sq.id)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    selectedSquadId === sq.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
+                  }`}>
+                  {sq.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Date selector */}
         <div className="flex items-center gap-2">
