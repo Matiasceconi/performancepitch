@@ -45,7 +45,8 @@ function buildFormation433(players) {
   ];
 }
 
-export default function PitchMap({ players, highlighted = new Set(), onToggle, emptyLabel }) {
+export default function PitchMap({ players: rawPlayers, highlighted = new Set(), onToggle, emptyLabel }) {
+  const players = (rawPlayers || []).filter(p => p && p.id);
   const [customPositions, setCustomPositions] = React.useState({});
   const [dragging, setDragging] = React.useState(null);
   const containerRef = React.useRef(null);
@@ -201,7 +202,7 @@ export default function PitchMap({ players, highlighted = new Set(), onToggle, e
             <div className="mt-1 bg-black/80 rounded px-1.5 py-0.5 border border-white/30 text-center whitespace-nowrap shadow-md">
               <div className="text-[9px] font-bold text-white leading-tight tracking-wide">
                 {player.number ? `${player.number}·` : ""}
-                {(player.full_name || player.name || "?").split(" ").slice(-1)[0].toUpperCase()}
+                {((player.full_name || player.name || "?").split(" ").pop() || "?").toUpperCase()}
               </div>
               <div className="text-[7px] text-yellow-300 leading-tight font-semibold">
                 {(player.position || "").substring(0, 3).toUpperCase()}

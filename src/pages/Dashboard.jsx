@@ -121,7 +121,7 @@ function StatusPanel({ players, setPlayers, selectedPlayers, handleToggleSelect,
       </div>
       <div className="p-4">
         <div className="grid gap-2">
-          {[...players].sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
+          {[...players].filter(p => p && p.id).sort((a, b) => (a.number || 0) - (b.number || 0)).map((p) =>
             <div key={p.id} className="flex items-center gap-3 py-1.5">
               <Checkbox
                 checked={selectedPlayers.has(p.id)}
