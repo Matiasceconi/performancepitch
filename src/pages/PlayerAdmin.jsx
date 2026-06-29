@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Search, Users, Tag, X, Check, ChevronDown, ChevronUp, ToggleLeft, ToggleRight } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Users, Tag, X, Check, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, ArrowRightLeft } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 // ── Normalización ──
@@ -194,6 +194,73 @@ function AliasPanel({ player, aliases, onAddAlias, onDeleteAlias }) {
   );
 }
 
+// ── MoveModal ──
+function MoveModal({ player, divisions, onMove, onClose }) {
+  const [targetDivision, setTargetDivision] = useState("");
+  const [custom, setCustom] = useState("");
+
+  const finalDivision = targetDivision === "__custom__" ? custom : targetDivision;
+
+  async function handleMove() {
+    if (!finalDivision.trim()) return;
+    await onMove(player, finalDivision.trim());
+    onClose();
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-6 w-full max-w-sm shadow-2xl space-y-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-white font-semibold">Mover a otro plantel</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white"><X size={16} /></button>
+        </div>
+        <p className="text-sm text-zinc-400">
+          Jugador: <span className="text-white font-medium">{player.full_name}</span>
+          <br />
+          <span className="text-xs text-zinc-500">Plantel actual: {player.division || "Sin asignar"}</span>
+        </p>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Plantel destino</label>
+          <select
+            value={targetDivision}
+            onChange={e => setTargetDivision(e.target.value)}
+            className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+          >
+            <option value="">— Seleccionar —</option>
+            {divisions.filter(d => d !== player.division).map(d => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+            <option value="__custom__">Otro (escribir)</option>
+          </select>
+        </div>
+        {targetDivision === "__custom__" && (
+          <div>
+            <label className="text-xs text-zinc-400 mb-1 block">Nombre del plantel</label>
+            <input
+              value={custom}
+              onChange={e => setCustom(e.target.value)}
+              placeholder="ej: Primera, Sub-20..."
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500"
+            />
+          </div>
+        )}
+        <div className="flex gap-2 justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-zinc-400 hover:text-white rounded-lg hover:bg-zinc-800 transition-colors">
+            Cancelar
+          </button>
+          <button
+            onClick={handleMove}
+            disabled={!finalDivision.trim()}
+            className="px-4 py-2 text-sm bg-white text-zinc-900 font-semibold rounded-lg hover:bg-zinc-200 transition-colors disabled:opacity-40"
+          >
+            Mover
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main ──
 export default function PlayerAdmin() {
   const [players, setPlayers] = useState([]);
@@ -207,6 +274,7 @@ export default function PlayerAdmin() {
   const [showForm, setShowForm] = useState(false);
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [expandedAliases, setExpandedAliases] = useState(new Set());
+  const [movingPlayer, setMovingPlayer] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => { load(); }, []);
@@ -241,6 +309,12 @@ export default function PlayerAdmin() {
     await base44.entities.Player.delete(player.id);
     setPlayers(prev => prev.filter(p => p.id !== player.id));
     toast({ title: "Jugador eliminado" });
+  }
+
+  async function handleMovePlayer(player, newDivision) {
+    await base44.entities.Player.update(player.id, { division: newDivision });
+    setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, division: newDivision } : p));
+    toast({ title: `${player.full_name} movido a ${newDivision}` });
   }
 
   async function handleToggleActive(player) {
@@ -407,6 +481,12 @@ export default function PlayerAdmin() {
 
                   {/* Acciones */}
                   <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setMovingPlayer(player)}
+                      title="Mover a otro plantel"
+                      className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors">
+                      <ArrowRightLeft size={14} />
+                    </button>
                     <button onClick={() => toggleAliases(player.id)}
                       className={`flex items-center gap-1 px-2 py-1.5 rounded-lg text-xs transition-colors ${isExpanded ? "bg-violet-500/20 text-violet-300" : "text-zinc-500 hover:text-white hover:bg-zinc-800"}`}>
                       <Tag size={12} /> {aliasCount}
@@ -443,6 +523,15 @@ export default function PlayerAdmin() {
             );
           })}
         </div>
+      )}
+
+      {movingPlayer && (
+        <MoveModal
+          player={movingPlayer}
+          divisions={divisions}
+          onMove={handleMovePlayer}
+          onClose={() => setMovingPlayer(null)}
+        />
       )}
     </div>
   );
