@@ -8,7 +8,23 @@ moment.locale("es");
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
 const MD_OPTIONS = ["— MD —", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2"];
-const OBJETIVO_OPTIONS = ["—", "Fuerza", "Intermitente", "Aceleración", "Velocidad Máxima", "Recuperación", "Resistencia", "Táctica", "Regenerativo"];
+const OBJETIVO_OPTIONS = ["—", "Tensión", "Volumen", "Velocidad", "Activación", "Compensación", "Recuperación", "Fuerza", "Intermitente", "Aceleración", "Velocidad Máxima", "Resistencia", "Táctica", "Regenerativo"];
+
+const OBJETIVO_COLORS = {
+  "Tensión":        { bg: "bg-red-900/60",     text: "text-red-300",     border: "border-red-700/50",     header: "bg-red-800/40" },
+  "Volumen":        { bg: "bg-blue-900/60",     text: "text-blue-300",    border: "border-blue-700/50",    header: "bg-blue-800/40" },
+  "Velocidad":      { bg: "bg-yellow-900/60",   text: "text-yellow-300",  border: "border-yellow-700/50",  header: "bg-yellow-800/40" },
+  "Activación":     { bg: "bg-orange-900/60",   text: "text-orange-300",  border: "border-orange-700/50",  header: "bg-orange-800/40" },
+  "Compensación":   { bg: "bg-purple-900/60",   text: "text-purple-300",  border: "border-purple-700/50",  header: "bg-purple-800/40" },
+  "Recuperación":   { bg: "bg-emerald-900/60",  text: "text-emerald-300", border: "border-emerald-700/50", header: "bg-emerald-800/40" },
+  "Fuerza":         { bg: "bg-pink-900/60",     text: "text-pink-300",    border: "border-pink-700/50",    header: "bg-pink-800/40" },
+  "Intermitente":   { bg: "bg-cyan-900/60",     text: "text-cyan-300",    border: "border-cyan-700/50",    header: "bg-cyan-800/40" },
+  "Aceleración":    { bg: "bg-lime-900/60",     text: "text-lime-300",    border: "border-lime-700/50",    header: "bg-lime-800/40" },
+  "Velocidad Máxima": { bg: "bg-amber-900/60",  text: "text-amber-300",   border: "border-amber-700/50",   header: "bg-amber-800/40" },
+  "Resistencia":    { bg: "bg-teal-900/60",     text: "text-teal-300",    border: "border-teal-700/50",    header: "bg-teal-800/40" },
+  "Táctica":        { bg: "bg-indigo-900/60",   text: "text-indigo-300",  border: "border-indigo-700/50",  header: "bg-indigo-800/40" },
+  "Regenerativo":   { bg: "bg-zinc-800/80",     text: "text-zinc-400",    border: "border-zinc-600/50",    header: "bg-zinc-700/60" },
+};
 const COMP_OPTIONS = ["—", "Intermitente", "HIIT tren superior", "HIIT tren inferior", "Movilidad", "Técnica individual", "Otro"];
 const VUELTA_OPTIONS = ["Elongación pasiva", "Elongación de a 2", "Rolo para cada uno", "Respiración diafragmática"];
 
@@ -247,21 +263,29 @@ export default function WeeklyPlannerBoard() {
                 <th className="w-[110px] min-w-[110px] px-3 py-2.5 text-left text-xs font-bold text-zinc-400 border-r border-zinc-700">
                   CAMPO
                 </th>
-                {days.map((d, i) => (
-                  <th key={i} className="px-2 py-2 text-center border-r border-zinc-700 last:border-r-0 min-w-[140px]">
-                    <div className="flex flex-col items-center gap-1">
-                      <p className="text-xs font-bold text-white tracking-wider">
-                        {d.date ? moment(d.date).format("dddd").toUpperCase() : `DÍA ${i + 1}`}
-                      </p>
-                      <input
-                        type="date"
-                        value={d.date || ""}
-                        onChange={e => changeDayDate(i, e.target.value)}
-                        className="bg-zinc-700 border border-zinc-600 text-blue-300 text-[10px] rounded px-1 py-0.5 focus:outline-none focus:border-blue-500 text-center"
-                      />
-                    </div>
-                  </th>
-                ))}
+                {days.map((d, i) => {
+                  const col = OBJETIVO_COLORS[d.objetivo] || null;
+                  return (
+                    <th key={i} className={`px-2 py-2 text-center border-r border-zinc-700 last:border-r-0 min-w-[140px] transition-colors ${col ? col.header : ""}`}>
+                      <div className="flex flex-col items-center gap-1">
+                        <p className={`text-xs font-bold tracking-wider ${col ? col.text : "text-white"}`}>
+                          {d.date ? moment(d.date).format("dddd").toUpperCase() : `DÍA ${i + 1}`}
+                        </p>
+                        <input
+                          type="date"
+                          value={d.date || ""}
+                          onChange={e => changeDayDate(i, e.target.value)}
+                          className="bg-zinc-700 border border-zinc-600 text-blue-300 text-[10px] rounded px-1 py-0.5 focus:outline-none focus:border-blue-500 text-center"
+                        />
+                        {col && (
+                          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${col.bg} ${col.text} ${col.border}`}>
+                            {d.objetivo}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
                 {/* Columna para agregar día rápido */}
                 <th className="px-2 py-2 text-center w-10">
                   <button
@@ -292,16 +316,19 @@ export default function WeeklyPlannerBoard() {
 
               {/* Objetivo físico */}
               <tr className="border-t border-zinc-700 bg-zinc-900/60">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Objetivo físico</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                    <select value={d.objetivo} onChange={e => handleChange(i, "objetivo", e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 text-white text-[10px] rounded px-1 py-0.5 focus:outline-none">
-                      {OBJETIVO_OPTIONS.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}
-                    </select>
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
+               <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Objetivo físico</td>
+               {days.map((d, i) => {
+                 const col = OBJETIVO_COLORS[d.objetivo] || null;
+                 return (
+                   <td key={i} className={`border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top transition-colors ${col ? col.bg : ""}`}>
+                     <select value={d.objetivo} onChange={e => handleChange(i, "objetivo", e.target.value)}
+                       className={`w-full bg-zinc-800 border border-zinc-700 text-[10px] rounded px-1 py-0.5 focus:outline-none ${col ? col.text : "text-white"}`}>
+                       {OBJETIVO_OPTIONS.map(o => <option key={o} value={o} className="bg-zinc-900 text-white">{o}</option>)}
+                     </select>
+                   </td>
+                 );
+               })}
+               <td className="border-zinc-700" />
               </tr>
 
               {/* Carga % */}
