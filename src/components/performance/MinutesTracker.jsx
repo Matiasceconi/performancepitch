@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search } from "lucide-react";
+import { Search, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
+import { useToast } from "@/components/ui/use-toast";
 
 const TORNEOS = [
   { id: "all",                  label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
@@ -34,6 +35,8 @@ function norm(s) {
 }
 
 export default function MinutesTracker({ onSelectPlayer }) {
+  const { toast } = useToast();
+  const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
@@ -121,6 +124,20 @@ export default function MinutesTracker({ onSelectPlayer }) {
       });
   }, [playerData, search, sortBy, torneoId]);
 
+  function exportPDF() {
+    setExporting(true);
+    base44.functions.invoke("exportMinutesPDF", {})
+      .then((res) => {
+        const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+        const a = document.createElement("a");
+        a.href = url; a.download = "minutos-por-jugador.pdf"; a.click();
+        URL.revokeObjectURL(url);
+        toast({ title: "PDF descargado" });
+      })
+      .catch((err) => toast({ title: "Error al generar PDF", variant: "destructive" }))
+      .finally(() => setExporting(false));
+  }
+
   const cols = showRes && showJuv ? "2rem 2.5rem 1fr 1fr 1fr" : "2rem 2.5rem 1fr 1fr";
 
   if (loading) return (
@@ -169,6 +186,11 @@ export default function MinutesTracker({ onSelectPlayer }) {
               </button>
             ))}
           </div>
+          <button onClick={exportPDF} disabled={exporting}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-red-500/20 border border-red-500/30 text-red-300 hover:bg-red-500/30 rounded-lg transition-colors disabled:opacity-50">
+            {exporting ? <div className="w-3 h-3 border border-red-400 border-t-transparent rounded-full animate-spin" /> : <FileDown size={13} />}
+            PDF
+          </button>
           <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
             {showRes && <button onClick={() => setSortBy("res")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "res" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Reserva</button>}
             {showJuv && <button onClick={() => setSortBy("juv")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "juv" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Juv.</button>}
