@@ -10,13 +10,16 @@ export function usePlayers() {
     staleTime: 1000 * 60 * 5, // 5 min cache
   });
 
-  // Suscribirse a cambios en Player para actualizar fotos en tiempo real
+  // Suscribirse a cambios en Player para actualizar fotos en tiempo real (con debounce)
   useEffect(() => {
+    let timer;
     const unsubscribe = base44.entities.Player.subscribe(() => {
-      // Invalidar el cache para refrescar la lista de jugadores
-      queryClient.invalidateQueries({ queryKey: ["players"] });
+      clearTimeout(timer);
+      timer = setTimeout(() => {
+        queryClient.invalidateQueries({ queryKey: ["players"] });
+      }, 2000);
     });
-    return unsubscribe;
+    return () => { unsubscribe(); clearTimeout(timer); };
   }, [queryClient]);
 
   // Helper para obtener nombre completo
