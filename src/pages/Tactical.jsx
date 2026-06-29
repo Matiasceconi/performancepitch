@@ -2,7 +2,8 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import PitchMap from "@/components/staff/PitchMap";
 import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
-import { Users, Dumbbell } from "lucide-react";
+import { Users, Dumbbell, Wrench } from "lucide-react";
+import UtileriaPanel from "@/components/tactical/UtileriaPanel";
 import moment from "moment";
 
 export default function Tactical() {
@@ -68,6 +69,14 @@ export default function Tactical() {
         >
           <Dumbbell size={15} /> Sesión de hoy
         </button>
+        <button
+          onClick={() => setTab("utileria")}
+          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            tab === "utileria" ? "bg-yellow-400 text-zinc-900" : "text-zinc-400 hover:text-white"
+          }`}
+        >
+          <Wrench size={15} /> Utilería
+        </button>
       </div>
 
       {/* ── SQUAD MAP ── */}
@@ -110,6 +119,9 @@ export default function Tactical() {
           </div>
         </div>
       )}
+
+      {/* ── UTILERÍA ── */}
+      {tab === "utileria" && <UtileriaPanel />}
 
       {/* ── SESSION MAP ── */}
       {tab === "session" && (
