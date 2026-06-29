@@ -208,6 +208,20 @@ export default function Dashboard() {
     load();
   }, []);
 
+  const positionOrder = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
+  const filteredPlayers = useMemo(() => selectedStatus ? players.filter((p) => p.status === selectedStatus) : players, [players, selectedStatus]);
+  const availablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status === "Disponible").sort((a, b) => {
+    const posA = positionOrder.indexOf(a.position || "");
+    const posB = positionOrder.indexOf(b.position || "");
+    if (posA === posB) return (a.number || 0) - (b.number || 0);
+    return posA - posB;
+  }), [filteredPlayers]);
+  const unavailablePlayers = useMemo(() => filteredPlayers.filter((p) => p.status !== "Disponible" && p.status !== "Subieron de juveniles").sort((a, b) => {
+    if (a.status !== b.status) return (a.status || "").localeCompare(b.status || "");
+    return (a.number || 0) - (b.number || 0);
+  }), [filteredPlayers]);
+  const subioDJuveniles = useMemo(() => filteredPlayers.filter((p) => p.status === "Subieron de juveniles").sort((a, b) => (a.number || 0) - (b.number || 0)), [filteredPlayers]);
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
