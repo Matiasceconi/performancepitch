@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Save, ChevronLeft, ChevronRight } from "lucide-react";
+import { Save, ChevronLeft, ChevronRight, Plus, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
@@ -30,6 +30,7 @@ const EMPTY_DAY = {
   trabajoCompensatorio: "—",
   vueltaCalma: [],
   observaciones: "",
+  tareasTecnico: [""], // array de strings, una por tarea del técnico
 };
 
 // ─── Gauge circular ────────────────────────────────────────────────────────────
@@ -456,6 +457,62 @@ export default function WeeklyPlannerBoard() {
                       className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
                   </td>
                 ))}
+              </tr>
+
+              {/* ── Separador Director Técnico ── */}
+              <tr>
+                <td colSpan={8} className="px-3 py-2 bg-emerald-900/70 border-t-2 border-emerald-600" style={{ colSpan: 8 }}>
+                  <span className="text-xs font-bold text-emerald-300 uppercase tracking-widest">Director Técnico</span>
+                </td>
+              </tr>
+
+              {/* Tareas del técnico (dinámicas) */}
+              <tr className="border-t border-zinc-700 bg-zinc-900/60">
+                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">
+                  Tareas
+                </td>
+                {days.map((d, i) => {
+                  const tareas = d.tareasTecnico || [""];
+                  function setTareas(newTareas) { handleChange(i, "tareasTecnico", newTareas); }
+                  return (
+                    <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
+                      <div className="space-y-1.5">
+                        {tareas.map((t, ti) => (
+                          <div key={ti} className="flex items-start gap-1 group">
+                            <div className="flex flex-col flex-1 min-w-0">
+                              <span className="text-[9px] text-emerald-400 font-semibold mb-0.5">Tarea {ti + 1}</span>
+                              <textarea
+                                rows={2}
+                                value={t}
+                                onChange={e => {
+                                  const next = [...tareas];
+                                  next[ti] = e.target.value;
+                                  setTareas(next);
+                                }}
+                                placeholder="—"
+                                className="w-full bg-emerald-900/10 border border-emerald-800/30 rounded text-white text-[10px] resize-none focus:outline-none focus:border-emerald-600/50 placeholder-zinc-600 px-1 py-0.5"
+                              />
+                            </div>
+                            {tareas.length > 1 && (
+                              <button
+                                onClick={() => setTareas(tareas.filter((_, idx) => idx !== ti))}
+                                className="mt-4 text-zinc-600 hover:text-red-400 transition-colors shrink-0"
+                              >
+                                <X size={11} />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                        <button
+                          onClick={() => setTareas([...tareas, ""])}
+                          className="flex items-center gap-1 text-[9px] text-emerald-500 hover:text-emerald-300 transition-colors mt-1"
+                        >
+                          <Plus size={10} /> Agregar tarea
+                        </button>
+                      </div>
+                    </td>
+                  );
+                })}
               </tr>
             </tbody>
           </table>
