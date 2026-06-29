@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Activity } from "lucide-react";
-import { Clock, Users, FileSpreadsheet } from "lucide-react";
-import moment from "moment";
+import { base44 } from "@/api/base44Client";
+import { Activity, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, UserCheck } from "lucide-react";
+import { FileSpreadsheet, Users } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -12,7 +13,7 @@ const METRICS = [
   { key: "distance_hsr",    label: "19.8-25 km/h (m)",   color: "#34d399", fmt: (v) => Math.round(v) },
   { key: "sprint_distance", label: "+25 km/h (m)",        color: "#fbbf24", fmt: (v) => Math.round(v) },
   { key: "player_load",     label: "Player Load",         color: "#a78bfa", fmt: (v) => parseFloat(v).toFixed(0) },
-  { key: "max_velocity",    label: "Vel. M\u00e1x (km/h)",    color: "#f87171", fmt: (v) => parseFloat(v).toFixed(1) },
+  { key: "max_velocity",    label: "Vel. Máx (km/h)",    color: "#f87171", fmt: (v) => parseFloat(v).toFixed(1) },
   { key: "accelerations",   label: "Aceleraciones",       color: "#fb923c", fmt: (v) => Math.round(v) },
   { key: "decelerations",   label: "Desaceleraciones",    color: "#e879f9", fmt: (v) => Math.round(v) },
   { key: "sprint_efforts",  label: "Sprint Efforts",      color: "#2dd4bf", fmt: (v) => Math.round(v) },
@@ -26,139 +27,141 @@ function avg(arr) {
 function getTrafficLight(value, teamAvg) {
   if (value == null || teamAvg == null || teamAvg === 0) return null;
   const pct = (value / teamAvg) * 100;
-  if (pct > 90) return { color: "#ef4444", label: "Alto", bg: "bg-red-500/20 border-red-500/40", dot: "bg-red-500" };
-  if (pct >= 60) return { color: "#f59e0b", label: "Medio", bg: "bg-yellow-500/20 border-yellow-500/40", dot: "bg-yellow-500" };
-  return { color: "#22c55e", label: "Bajo", bg: "bg-green-500/20 border-green-500/40", dot: "bg-green-500" };
+  if (pct > 90) return { color: "#ef4444", bg: "bg-red-500/20 border-red-500/40", dot: "bg-red-500" };
+  if (pct >= 60) return { color: "#f59e0b", bg: "bg-yellow-500/20 border-yellow-500/40", dot: "bg-yellow-500" };
+  return { color: "#22c55e", bg: "bg-green-500/20 border-green-500/40", dot: "bg-green-500" };
 }
 
-// ── CSV parser ──────────────────────────────────────────────────────────────
-function matchColumn(raw) {
-  const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
-  if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
-  if (h === "total duration" || h === "tot dur") return "total_duration";
-  if (h.includes("total distance") || h === "tot dist (m)" || h === "tot dist") return "total_distance";
-  if (h.startsWith("d") && h.includes("19")) return "distance_hsr";
-  if ((h.startsWith("d+") || h.startsWith("d +")) && h.includes("25")) return "sprint_distance";
-  if (h === "sprint efforts" || h === "sprint effs") return "sprint_efforts";
-  if (h.includes("acc") && (h.includes("3mt") || h.includes("3 m"))) return "accelerations";
-  if (h.includes("dec") && (h.includes("3mt") || h.includes("3 m"))) return "decelerations";
-  if (h === "total player load" || h === "tot pl" || h === "player load") return "player_load";
-  if (h.includes("maximum velocity") || h === "max vel (km/h)" || h === "max velocity (km/h)") return "max_velocity";
-  if (h.includes("max vel") && h.includes("%")) return "max_velocity_percentage";
-  if (h === "metros x min" || h === "m/min" || h === "meters per minute") return "meters_per_minute";
-  return null;
-}
+// ── Panel de resolución de nombres no reconocidos ──────────────────────────
+function UnresolvedNamesPanel({ unresolvedNames, playerOptions, onResolved }) {
+  const { toast } = useToast();
+  const [selections, setSelections] = useState({}); // csvName -> player_id
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState({});
 
-function parseNum(val) {
-  if (val == null || val === "" || val === "-") return null;
-  const str = String(val).trim();
-  const hasCommaDecimal = /^\d+,\d+$/.test(str) || /^\d{1,3}(\.\d{3})*,\d+$/.test(str);
-  const cleaned = hasCommaDecimal ? str.replace(/\./g, "").replace(",", ".") : str.replace(",", ".");
-  const n = parseFloat(cleaned);
-  return isNaN(n) ? null : n;
-}
-
-function splitCSVLine(line, sep) {
-  const result = [];
-  let cur = "", inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
-    if (ch === '"') inQuotes = !inQuotes;
-    else if (ch === sep && !inQuotes) { result.push(cur.trim()); cur = ""; }
-    else cur += ch;
-  }
-  result.push(cur.trim());
-  return result;
-}
-
-function parseCatapultCSV(text) {
-  const clean = text.replace(/^\uFEFF/, "");
-  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
-  const firstSemi = lines[0].split(";").length;
-  const firstComma = lines[0].split(",").length;
-  const sep = firstSemi > firstComma ? ";" : ",";
-  let headerIdx = -1, headers = [];
-  for (let i = 0; i < Math.min(lines.length, 15); i++) {
-    const cols = splitCSVLine(lines[i], sep);
-    const mapped = cols.filter((c) => matchColumn(c) !== null).length;
-    const firstLow = cols[0]?.replace(/^\uFEFF/, "").toLowerCase().trim();
-    if (firstLow === "name" || firstLow === "jugador" || firstLow === "athlete" || mapped >= 3) {
-      headerIdx = i;
-      headers = cols.map((c) => c.replace(/^\uFEFF/, ""));
-      break;
+  async function saveMapping(csvName) {
+    const playerId = selections[csvName];
+    if (!playerId) return;
+    setSaving(true);
+    try {
+      await base44.functions.invoke("resolveMatchGpsCSV", { mode: "save_mapping", csv_name: csvName, player_id: playerId });
+      setSaved(s => ({ ...s, [csvName]: true }));
+      toast({ title: `"${csvName}" vinculado correctamente` });
+      onResolved?.();
+    } catch {
+      toast({ title: "Error al guardar el vínculo", variant: "destructive" });
+    } finally {
+      setSaving(false);
     }
   }
-  if (headerIdx === -1) return null;
-  const fieldMap = {};
-  headers.forEach((h, idx) => {
-    const field = matchColumn(h);
-    if (field) fieldMap[idx] = field;
-    else if (idx === 0) fieldMap[idx] = "player_name";
-  });
-  const rows = [];
-  for (let i = headerIdx + 1; i < lines.length; i++) {
-    const cols = splitCSVLine(lines[i], sep);
-    const obj = {};
-    Object.entries(fieldMap).forEach(([colIdx, field]) => {
-      const raw = cols[parseInt(colIdx)];
-      if (field === "player_name") obj[field] = raw || "";
-      else obj[field] = parseNum(raw);
-    });
-    const name = (obj.player_name || "").trim();
-    if (!name) continue;
-    if (["total", "promedio", "average", "team", "totals"].includes(name.toLowerCase())) continue;
-    rows.push(obj);
-  }
-  return rows;
+
+  const pending = unresolvedNames.filter(n => !saved[n]);
+  if (pending.length === 0) return null;
+
+  return (
+    <div className="bg-orange-950/30 border border-orange-500/30 rounded-xl p-4 space-y-3">
+      <div className="flex items-center gap-2">
+        <AlertTriangle size={14} className="text-orange-400" />
+        <p className="text-sm font-semibold text-orange-300">
+          {pending.length} jugador{pending.length !== 1 ? "es" : ""} sin identificar en el CSV
+        </p>
+      </div>
+      <p className="text-xs text-orange-400/70">
+        Asignales su perfil del plantel para que queden unificados en todos los reportes futuros.
+      </p>
+      <div className="space-y-2">
+        {pending.map((csvName) => (
+          <div key={csvName} className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-mono bg-zinc-900 border border-zinc-700 text-zinc-300 px-2 py-1 rounded min-w-[140px]">
+              {csvName}
+            </span>
+            <ChevronRight size={12} className="text-zinc-600 shrink-0" />
+            <select
+              value={selections[csvName] || ""}
+              onChange={e => setSelections(s => ({ ...s, [csvName]: e.target.value }))}
+              className="flex-1 min-w-[160px] bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white focus:outline-none focus:border-orange-500/50"
+            >
+              <option value="">— Seleccionar jugador —</option>
+              {playerOptions.map(p => (
+                <option key={p.id} value={p.id}>
+                  {p.jersey_number ? `#${p.jersey_number} ` : ""}{p.full_name} {p.division ? `(${p.division})` : ""}
+                </option>
+              ))}
+            </select>
+            <button
+              onClick={() => saveMapping(csvName)}
+              disabled={!selections[csvName] || saving}
+              className="flex items-center gap-1 px-2.5 py-1 text-xs bg-orange-500/20 border border-orange-500/30 text-orange-300 hover:bg-orange-500/30 rounded-lg transition-colors disabled:opacity-40"
+            >
+              <UserCheck size={11} /> Vincular
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
 }
 
-// ── Componente ─────────────────────────────────────────────────────────────
+// ── Componente principal ─────────────────────────────────────────────────────
 export default function MatchGpsReport({ match }) {
-  const [rows, setRows] = useState([]);
+  const [data, setData] = useState(null); // { rows, unresolved_names, player_options }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(false);
   const [activeMetric, setActiveMetric] = useState("total_distance");
+  const [showUnresolved, setShowUnresolved] = useState(true);
 
-  useEffect(() => {
+  async function loadData() {
     if (!match.csv_url) return;
     setLoading(true);
     setError(false);
-    fetch(match.csv_url)
-      .then((r) => r.text())
-      .then((text) => {
-        const parsed = parseCatapultCSV(text);
-        setRows(parsed || []);
-        if (!parsed) setError(true);
-      })
-      .catch(() => setError(true))
-      .finally(() => setLoading(false));
-  }, [match.csv_url]);
+    try {
+      const res = await base44.functions.invoke("resolveMatchGpsCSV", { csv_url: match.csv_url });
+      setData(res.data);
+      if (res.data?.unresolved > 0) setShowUnresolved(true);
+    } catch {
+      setError(true);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadData(); }, [match.csv_url]);
+
+  const rows = data?.rows || [];
+  const resolvedRows = rows.filter(r => !r.unresolved);
 
   const metric = METRICS.find((m) => m.key === activeMetric);
 
   const teamAvgs = useMemo(() => {
     const out = {};
-    METRICS.forEach(({ key }) => { out[key] = avg(rows.map((r) => r[key])); });
+    METRICS.forEach(({ key }) => { out[key] = avg(resolvedRows.map((r) => r[key])); });
     return out;
-  }, [rows]);
+  }, [resolvedRows]);
 
   const playerData = useMemo(() => {
     const byPlayer = {};
     rows.forEach((r) => {
-      if (!r.player_name) return;
-      if (!byPlayer[r.player_name]) byPlayer[r.player_name] = [];
-      byPlayer[r.player_name].push(r);
+      const key = r.player_id || r.player_name;
+      if (!byPlayer[key]) byPlayer[key] = { ...r, _rows: [] };
+      byPlayer[key]._rows.push(r);
     });
-    return Object.entries(byPlayer).map(([name, prows]) => {
-      const out = { player_name: name, shortName: name };
-      METRICS.forEach(({ key }) => { out[key] = avg(prows.map((r) => r[key])); });
+    return Object.values(byPlayer).map((p) => {
+      const out = {
+        player_name: p.player_name,
+        player_id: p.player_id,
+        photo_url: p.photo_url,
+        jersey_number: p.jersey_number,
+        csv_name: p.csv_name,
+        unresolved: p.unresolved,
+      };
+      METRICS.forEach(({ key }) => { out[key] = avg(p._rows.map((r) => r[key])); });
       return out;
     });
   }, [rows]);
 
   const chartData = useMemo(() =>
     playerData
-      .filter((p) => p[activeMetric] != null)
+      .filter((p) => !p.unresolved && p[activeMetric] != null)
       .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
       .map((p) => ({ ...p, value: p[activeMetric] })),
     [playerData, activeMetric]
@@ -179,29 +182,49 @@ export default function MatchGpsReport({ match }) {
       <div className="px-4 py-3 bg-zinc-800/80 border-b border-zinc-700/50 flex items-center gap-2">
         <FileSpreadsheet size={14} className="text-green-400" />
         <p className="text-sm font-semibold text-white">Informe GPS del partido</p>
-        {!loading && rows.length > 0 && (
-          <span className="text-xs text-zinc-500 ml-auto">
-            <Users size={11} className="inline mr-1" />{new Set(rows.map((r) => r.player_name)).size} jugadores
-          </span>
+        {!loading && data && (
+          <div className="ml-auto flex items-center gap-2">
+            {data.unresolved > 0 && (
+              <span className="text-xs text-orange-400 flex items-center gap-1">
+                <AlertTriangle size={11} /> {data.unresolved} sin ID
+              </span>
+            )}
+            {data.resolved > 0 && (
+              <span className="text-xs text-green-400 flex items-center gap-1">
+                <CheckCircle size={11} /> {data.resolved} resueltos
+              </span>
+            )}
+            <span className="text-xs text-zinc-500">
+              <Users size={11} className="inline mr-1" />{data.total} jugadores
+            </span>
+          </div>
         )}
       </div>
 
-      {/* Contenido */}
       <div className="p-4 space-y-4">
         {loading ? (
           <div className="flex justify-center py-6">
             <div className="flex items-center gap-2 text-zinc-500 text-xs">
               <div className="w-4 h-4 border border-zinc-600 border-t-white rounded-full animate-spin" />
-              Analizando datos GPS...
+              Analizando y cruzando datos GPS...
             </div>
           </div>
         ) : error ? (
-          <p className="text-red-400 text-xs text-center py-4">No se pudo leer el archivo CSV.</p>
+          <p className="text-red-400 text-xs text-center py-4">No se pudo procesar el archivo CSV.</p>
         ) : rows.length === 0 ? (
           <p className="text-zinc-500 text-xs text-center py-4">Sin datos de jugadores en el CSV.</p>
         ) : (
           <>
-            {/* KPIs del equipo */}
+            {/* Panel de nombres no resueltos */}
+            {data?.unresolved_names?.length > 0 && (
+              <UnresolvedNamesPanel
+                unresolvedNames={data.unresolved_names}
+                playerOptions={data.player_options || []}
+                onResolved={loadData}
+              />
+            )}
+
+            {/* KPIs del equipo (solo jugadores resueltos) */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
               {METRICS.filter(({ key }) => teamAvgs[key] != null).slice(0, 4).map(({ key, label, color, fmt }) => (
                 <div key={key} className="bg-zinc-900/80 border border-zinc-700/50 rounded-lg p-3 text-center">
@@ -236,11 +259,14 @@ export default function MatchGpsReport({ match }) {
                   <BarChart data={chartData} layout="vertical" margin={{ left: 8, right: 50, top: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#3f3f46" horizontal={false} />
                     <XAxis type="number" tick={{ fontSize: 9, fill: "#71717a" }} axisLine={false} tickLine={false} />
-                    <YAxis type="category" dataKey="shortName" width={80} tick={{ fontSize: 9, fill: "#d4d4d8" }} axisLine={false} tickLine={false} />
+                    <YAxis type="category" dataKey="player_name" width={100} tick={{ fontSize: 9, fill: "#d4d4d8" }} axisLine={false} tickLine={false} />
                     <Tooltip
                       contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 11 }}
                       formatter={(val) => [metric?.fmt(val), metric?.label]}
-                      labelFormatter={(_, payload) => payload?.[0]?.payload?.player_name || ""}
+                      labelFormatter={(_, payload) => {
+                        const p = payload?.[0]?.payload;
+                        return p ? `${p.player_name}${p.csv_name && p.csv_name !== p.player_name ? ` (CSV: ${p.csv_name})` : ""}` : "";
+                      }}
                     />
                     {teamAvg != null && (
                       <ReferenceLine x={teamAvg} stroke={metric?.color} strokeDasharray="4 4" strokeOpacity={0.6}
@@ -276,17 +302,38 @@ export default function MatchGpsReport({ match }) {
                     ))}
                   </tr>
                   {tableData.map((row, ri) => (
-                    <tr key={ri} className={ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/10"}>
-                      <td className="px-2.5 py-1.5 text-zinc-200 font-medium whitespace-nowrap">{row.player_name}</td>
+                    <tr key={ri} className={`${ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/10"} ${row.unresolved ? "opacity-50" : ""}`}>
+                      <td className="px-2.5 py-1.5 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          {row.photo_url ? (
+                            <img src={row.photo_url} alt={row.player_name} className="w-4 h-4 rounded-full object-cover border border-zinc-700 shrink-0" />
+                          ) : (
+                            <div className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
+                              <span className="text-[8px] font-bold text-zinc-400">{row.player_name?.charAt(0)}</span>
+                            </div>
+                          )}
+                          <span className="text-zinc-200 font-medium">{row.player_name}</span>
+                          {row.unresolved && (
+                            <span title={`CSV: "${row.csv_name}"`}>
+                              <AlertTriangle size={9} className="text-orange-400 shrink-0" />
+                            </span>
+                          )}
+                          {!row.unresolved && row.csv_name && row.csv_name !== row.player_name && (
+                            <span className="text-zinc-600 text-[9px] truncate max-w-[60px]" title={`CSV: ${row.csv_name}`}>
+                              ≡ {row.csv_name}
+                            </span>
+                          )}
+                        </div>
+                      </td>
                       {METRICS.filter(({ key }) => tableData.some((r) => r[key] != null)).map(({ key, fmt }) => {
                         const val = row[key];
-                        const light = getTrafficLight(val, teamAvgs[key]);
+                        const light = row.unresolved ? null : getTrafficLight(val, teamAvgs[key]);
                         return (
                           <td key={key} className="px-2.5 py-1.5 text-right whitespace-nowrap">
                             {val != null ? (
-                              <span className={`inline-flex items-center gap-1 justify-end font-mono font-semibold px-1.5 py-0.5 rounded border ${light?.bg || ""}`}
+                              <span className={`inline-flex items-center gap-1 justify-end font-mono font-semibold px-1.5 py-0.5 rounded border ${light?.bg || "border-transparent"}`}
                                 style={{ color: light?.color || "#a1a1aa" }}>
-                                <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${light?.dot || "bg-zinc-500"}`} />
+                                {light && <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${light.dot}`} />}
                                 {fmt(val)}
                               </span>
                             ) : (
@@ -301,7 +348,9 @@ export default function MatchGpsReport({ match }) {
               </table>
             </div>
 
-            <p className="text-zinc-600 text-[10px] text-center">{rows.length} registros · {tableData.length} jugadores</p>
+            <p className="text-zinc-600 text-[10px] text-center">
+              {rows.length} registros · {resolvedRows.length} con ID · {data?.unresolved || 0} sin identificar
+            </p>
           </>
         )}
       </div>
