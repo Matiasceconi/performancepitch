@@ -5,6 +5,7 @@ import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
 import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel.jsx";
+import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -574,6 +575,9 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated }) {
             match={matchData}
             onCsvSaved={(url, label) => setMatchData(m => ({ ...m, csv_url: url, csv_label: label }))}
           />
+
+          {/* Informe GPS del partido */}
+          <MatchGpsReport match={matchData} />
 
           {/* Convocados + Minutos */}
           <SquadMinutesPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} />
