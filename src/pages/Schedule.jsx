@@ -304,42 +304,39 @@ function WeekSettingsModal({ open, onClose, startDay, onChangeStartDay }) {
 }
 
 // ── EventCard ──
-function EventCard({ event, onEdit, onDelete, onDownloadDay }) {
+function EventCard({ event, onEdit, onDelete }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
   return (
-    <div className={`flex items-start gap-2.5 p-2.5 rounded-lg border ${c.bg} ${c.border} group`}>
-      {event.rival_logo_url
-        ? <img src={event.rival_logo_url} alt="Escudo" className="w-7 h-7 object-contain shrink-0 mt-0.5" onError={(e) => { e.target.style.display = "none"; }} />
-        : <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${c.dot}`} />
-      }
-      <div className="flex-1 min-w-0">
-        <div className="flex items-start justify-between gap-1">
-          <div>
-            <p className={`text-sm font-semibold ${c.text}`}>{event.title}</p>
-            {event.type && <p className="text-xs text-zinc-500">{event.type}</p>}
-          </div>
-          <div className="flex gap-1 shrink-0">
-            <button onClick={(e) => { e.stopPropagation(); onEdit(event); }} className="p-1.5 rounded-md bg-white/10 hover:bg-white/20 text-white transition-colors">
-              <Pencil size={13} />
-            </button>
-            <button onClick={(e) => { e.stopPropagation(); onDelete(event.id); }} className="p-1.5 rounded-md bg-red-500/30 hover:bg-red-500/60 text-red-300 hover:text-white transition-colors">
-              <Trash2 size={13} />
-            </button>
-          </div>
-        </div>
-        <div className="flex items-center gap-3 mt-1 flex-wrap">
+    <div className={`rounded-lg border ${c.bg} ${c.border} overflow-hidden`}>
+      <div className="flex items-start gap-2 p-2">
+        {event.rival_logo_url
+          ? <img src={event.rival_logo_url} alt="Escudo" className="w-6 h-6 object-contain shrink-0 mt-0.5" onError={(e) => { e.target.style.display = "none"; }} />
+          : <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${c.dot}`} />
+        }
+        <div className="flex-1 min-w-0">
+          <p className={`text-xs font-bold ${c.text} leading-tight`}>{event.title}</p>
           {event.time && (
-            <span className="flex items-center gap-1 text-xs text-zinc-500">
-              <Clock size={10} /> {event.time}{event.duration_minutes ? ` · ${event.duration_minutes}min` : ""}
-            </span>
+            <p className="text-xs text-zinc-400 mt-0.5">
+              {event.time}{event.duration_minutes ? ` · ${event.duration_minutes}min` : ""}
+            </p>
           )}
-          {event.location && (
-            <span className="flex items-center gap-1 text-xs text-zinc-500">
-              <MapPin size={10} /> {event.location}
-            </span>
-          )}
+          {event.location && <p className="text-xs text-zinc-500 truncate">{event.location}</p>}
         </div>
-        {event.notes && <p className="text-xs text-zinc-600 mt-1">{event.notes}</p>}
+      </div>
+      <div className="flex border-t border-white/10">
+        <button
+          onClick={(e) => { e.stopPropagation(); onEdit(event); }}
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
+        >
+          <Pencil size={11} /> Editar
+        </button>
+        <div className="w-px bg-white/10" />
+        <button
+          onClick={(e) => { e.stopPropagation(); onDelete(event.id); }}
+          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
+        >
+          <Trash2 size={11} /> Eliminar
+        </button>
       </div>
     </div>
   );
