@@ -18,7 +18,7 @@ function norm(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
-export default function MinutesByMatch() {
+export default function MinutesByMatch({ selectedPlayer }) {
   const [search, setSearch] = useState("");
   const [tournamentFilter, setTournamentFilter] = useState("all");
   const [fechaFilter, setFechaFilter] = useState("all");
@@ -26,6 +26,15 @@ export default function MinutesByMatch() {
   const [matchReports, setMatchReports] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [playerFilter, setPlayerFilter] = useState(selectedPlayer || null);
+
+  // Sincronizar cuando cambia selectedPlayer desde afuera
+  useEffect(() => {
+    setPlayerFilter(selectedPlayer || null);
+    if (selectedPlayer) {
+      setSearch(selectedPlayer.name || "");
+    }
+  }, [selectedPlayer]);
 
   useEffect(() => {
     Promise.all([
@@ -84,6 +93,50 @@ export default function MinutesByMatch() {
     return ms.map(m => ({ label: `Fecha ${m._fecha} — ${moment(m.date).format("DD/MM")} vs ${m.rival}`, value: m._fecha }));
   }, [tournamentFilter, groupedMatches]);
 
+  // Mapa de minutos: match_date+tournament -> { player_id/name -> minutes }
+  const minutesMap = useMemo(() => {
+    const map = {};
+    for (const r of minutesRecords) {
+      if (!r.minutes || r.minutes <= 0) continue;
+      const date = r.match_date;
+      const key = r.player_id || `name:${norm(r.player_name)}`;
+      const t = (r.tournament || "").toLowerCase().trim();
+      if (!map[date]) map[date] = {};
+      if (!map[date]._byTourney) map[date]._byTourney = {};
+      if (!map[date]._byTourney[t]) map[date]._byTourney[t] = {};
+      map[date]._byTourney[t][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
+    }
+    return map;
+  }, [minutesRecords]);
+
+  function matchTournamentsForLookup(match) {
+    const comp = match.competition || "";
+    if (comp.includes("Juveniles")) return ["juveniles"];
+    if (comp.includes("Clausura")) return ["proyección apertura", "clausura"];
+    if (comp.includes("Apertura")) return ["proyección apertura"];
+    if (comp === "Amistosos") return ["amistosos", "proyección apertura"];
+    return ["proyección apertura"];
+  }
+
+  function getRecsForMatch(match) {
+    const dateMap = minutesMap[match.date] || {};
+    const lookups = dateMap._byTourney || {};
+    const tournaments = matchTournamentsForLookup(match);
+    for (const t of tournaments) {
+      const recs = lookups[t];
+      if (recs) return recs;
+    }
+    return {};
+  }
+
+  // Función para determinar si un registro pertenece al jugador filtrado
+  function recMatchesPlayer(rec) {
+    if (!playerFilter) return true;
+    if (playerFilter.id && rec.player_id === playerFilter.id) return true;
+    if (!rec.player_id && playerFilter.name && norm(rec.player_name).includes(norm(playerFilter.name))) return true;
+    return false;
+  }
+
   // Partidos visibles según filtros
   const visibleMatches = useMemo(() => {
     let list = matchReports;
@@ -114,46 +167,16 @@ export default function MinutesByMatch() {
       }
     }
     list.sort((a, b) => (a.date || "").localeCompare(b.date || ""));
+    // Si tenemos un jugador filtrado, mostrar solo partidos donde tiene minutos
+    if (playerFilter) {
+      list = list.filter(m => {
+        const recs = getRecsForMatch(m);
+        const keys = Object.keys(recs);
+        return keys.some(k => recMatchesPlayer(recs[k]));
+      });
+    }
     return list;
-  }, [matchReports, tournamentFilter, fechaFilter, groupedMatches]);
-
-  
-
-// Mapa de minutos: match_date+tournament -> { player_id/name -> minutes }
-const minutesMap = useMemo(() => {
-  const map = {};
-  for (const r of minutesRecords) {
-    if (!r.minutes || r.minutes <= 0) continue;
-    const date = r.match_date;
-    const key = r.player_id || `name:${norm(r.player_name)}`;
-    const t = (r.tournament || "").toLowerCase().trim();
-    if (!map[date]) map[date] = {};
-    if (!map[date]._byTourney) map[date]._byTourney = {};
-    if (!map[date]._byTourney[t]) map[date]._byTourney[t] = {};
-    map[date]._byTourney[t][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
-  }
-  return map;
-}, [minutesRecords]);
-
-function matchTournamentsForLookup(match) {
-  const comp = match.competition || "";
-  if (comp.includes("Juveniles")) return ["juveniles"];
-  if (comp.includes("Clausura")) return ["proyección apertura", "clausura"];
-  if (comp.includes("Apertura")) return ["proyección apertura"];
-  if (comp === "Amistosos") return ["amistosos", "proyección apertura"];
-  return ["proyección apertura"];
-}
-
-function getRecsForMatch(match) {
-  const dateMap = minutesMap[match.date] || {};
-  const lookups = dateMap._byTourney || {};
-  const tournaments = matchTournamentsForLookup(match);
-  for (const t of tournaments) {
-    const recs = lookups[t];
-    if (recs) return recs;
-  }
-  return {};
-}
+  }, [matchReports, tournamentFilter, fechaFilter, groupedMatches, playerFilter, minutesMap]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -228,6 +251,7 @@ function getRecsForMatch(match) {
                 recs={recs}
                 totalMins={totalMins}
                 playerMap={playerMap}
+                highlightedPlayer={playerFilter}
               />
             );
           })}
@@ -237,8 +261,15 @@ function getRecsForMatch(match) {
   );
 }
 
-function MatchCard({ match, logo, playerKeys, recs, totalMins, playerMap }) {
-  const [expanded, setExpanded] = useState(false);
+function MatchCard({ match, logo, playerKeys, recs, totalMins, playerMap, highlightedPlayer }) {
+  const [expanded, setExpanded] = useState(!!highlightedPlayer);
+
+  function recMatchesPlayerHighlight(rec) {
+    if (!highlightedPlayer) return false;
+    if (highlightedPlayer.id && rec.player_id === highlightedPlayer.id) return true;
+    if (!rec.player_id && highlightedPlayer.name && norm(rec.player_name).includes(norm(highlightedPlayer.name))) return true;
+    return false;
+  }
   const won = match.our_score != null && match.rival_score != null && match.our_score > match.rival_score;
   const drew = match.our_score != null && match.rival_score != null && match.our_score === match.rival_score;
   const hasResult = match.our_score != null && match.rival_score != null;
@@ -297,7 +328,7 @@ function MatchCard({ match, logo, playerKeys, recs, totalMins, playerMap }) {
               const rec = recs[key];
               const player = rec.player_id ? playerMap[rec.player_id] : null;
               return (
-                <div key={key} className="px-4 py-2 grid grid-cols-[2rem_1fr_4rem] gap-2 items-center hover:bg-zinc-800/30 transition-colors">
+                <div key={key} className={`px-4 py-2 grid grid-cols-[2rem_1fr_4rem] gap-2 items-center transition-colors ${recMatchesPlayerHighlight(rec) ? "bg-yellow-500/10 border-l-2 border-l-yellow-400" : "hover:bg-zinc-800/30"}`}>
                   <span className="text-xs text-zinc-500 font-mono">
                     {player?.jersey_number || rec.player_number || i + 1}
                   </span>
@@ -309,9 +340,9 @@ function MatchCard({ match, logo, playerKeys, recs, totalMins, playerMap }) {
                         <span className="text-[10px] font-bold text-zinc-500">{(rec.player_name || "?").charAt(0)}</span>
                       </div>
                     )}
-                    <span className="text-sm text-white truncate">{rec.player_name}</span>
+                    <span className={`text-sm truncate ${recMatchesPlayerHighlight(rec) ? "text-yellow-300 font-semibold" : "text-white"}`}>{rec.player_name}</span>
                   </div>
-                  <span className="text-sm text-white font-mono font-semibold text-right">{rec.minutes}'</span>
+                  <span className={`text-sm font-mono font-semibold text-right ${recMatchesPlayerHighlight(rec) ? "text-yellow-300" : "text-white"}`}>{rec.minutes}'</span>
                 </div>
               );
             })}

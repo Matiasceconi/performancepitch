@@ -33,7 +33,7 @@ function norm(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
-export default function MinutesTracker() {
+export default function MinutesTracker({ onSelectPlayer }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
@@ -194,7 +194,8 @@ export default function MinutesTracker() {
             const num = p.player_id ? (numberMap[p.player_id] || p.player_number) : p.player_number;
             return (
               <div key={p.player_id || p.player_name}
-                className="grid items-center gap-4 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors"
+                onClick={() => onSelectPlayer?.(p.player_id, p.player_name)}
+                className="grid items-center gap-4 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors cursor-pointer"
                 style={{ gridTemplateColumns: cols }}>
                 <span className="text-zinc-600 text-sm font-mono">{num || i + 1}</span>
                 {photo ? (

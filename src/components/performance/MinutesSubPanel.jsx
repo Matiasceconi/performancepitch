@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import MinutesTracker from "@/components/performance/MinutesTracker";
 import MinutesByMatch from "@/components/performance/MinutesByMatch";
 
@@ -9,10 +9,29 @@ const SUB_TABS = [
 
 export default function MinutesSubPanel() {
   const [subTab, setSubTab] = useState("summary");
+  const [selectedPlayer, setSelectedPlayer] = useState(null);
+
+  const handleSelectPlayer = useCallback((playerId, playerName) => {
+    setSelectedPlayer({ id: playerId, name: playerName });
+    setSubTab("matches");
+  }, []);
+
+  const handleBack = useCallback(() => {
+    setSelectedPlayer(null);
+    setSubTab("summary");
+  }, []);
 
   return (
     <div className="space-y-5">
       <div className="flex gap-0 border-b border-zinc-800">
+        {selectedPlayer && (
+          <button
+            onClick={handleBack}
+            className="px-3 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all flex items-center gap-1"
+          >
+            ← Resumen
+          </button>
+        )}
         {SUB_TABS.map((t) => (
           <button
             key={t.id}
@@ -28,8 +47,12 @@ export default function MinutesSubPanel() {
         ))}
       </div>
 
-      {subTab === "summary" && <MinutesTracker />}
-      {subTab === "matches" && <MinutesByMatch />}
+      {subTab === "summary" && (
+        <MinutesTracker onSelectPlayer={handleSelectPlayer} />
+      )}
+      {subTab === "matches" && (
+        <MinutesByMatch selectedPlayer={selectedPlayer} />
+      )}
     </div>
   );
 }
