@@ -13,6 +13,18 @@ import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
 
+const DEFAULT_STATUSES = [
+  { id: "disponible", name: "Disponible" },
+  { id: "lesionado", name: "Lesionado" },
+  { id: "recuperacion", name: "En recuperación" },
+  { id: "suspendido", name: "Suspendido" },
+  { id: "permiso", name: "Permiso" },
+  { id: "seleccion", name: "Selección" },
+  { id: "subio", name: "Subio a primera" },
+  { id: "bajo", name: "Bajo a juveniles" },
+  { id: "sparring", name: "Sparring" },
+];
+
 function NextMatchCard({ match, matchReport }) {
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
   const [logoError, setLogoError] = useState(false);
@@ -107,7 +119,7 @@ export default function Dashboard() {
         setPlayers(p);
         setSessions(s);
         setDivisions(divs);
-        setStatuses(sts);
+        setStatuses(sts.length > 0 ? sts : DEFAULT_STATUSES);
         const today = moment().format("YYYY-MM-DD");
         const match = events.find((e) => e.type === "Partido" && e.date >= today);
         setNextMatch(match || null);
@@ -117,6 +129,7 @@ export default function Dashboard() {
         }
       } catch (e) {
         console.error(e);
+        setStatuses(DEFAULT_STATUSES);
       } finally {
         setLoading(false);
       }
