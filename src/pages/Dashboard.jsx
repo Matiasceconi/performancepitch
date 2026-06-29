@@ -223,6 +223,7 @@ export default function Dashboard() {
   const [selectedSquadId, setSelectedSquadId] = useState(""); // "" = todos
   const [playerMap, setPlayerMap] = useState({});  // id -> Player
   const [playerList, setPlayerList] = useState([]); // for birthdays
+  const [memberships, setMemberships] = useState([]); // SquadMembership activos
   const [dayStatuses, setDayStatuses] = useState([]); // DailySquadStatus[] for today
   const [sessions, setSessions] = useState([]);
   const [nextMatch, setNextMatch] = useState(null);
@@ -234,10 +235,11 @@ export default function Dashboard() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
 
-    const [allPlayers, statuses, allSquads, events, s, matchReports] = await Promise.all([
+    const [allPlayers, statuses, allSquads, mb, events, s, matchReports] = await Promise.all([
       base44.entities.Player.list("-created_date", 500),
       base44.entities.DailySquadStatus.filter({ date: today }, "-updated_at", 500),
       base44.entities.Squad.list("name", 100),
+      base44.entities.SquadMembership.list("-effective_from", 1000),
       base44.entities.DayEvent.list("date", 200),
       base44.entities.TrainingSession.list("-date", 5),
       base44.entities.MatchReport.list("-date", 20),
@@ -248,6 +250,7 @@ export default function Dashboard() {
     setPlayerMap(map);
     setPlayerList(allPlayers.filter(p => p.active !== false));
     setDayStatuses(statuses);
+    setMemberships(mb.filter(m => m.status === "activo"));
     setSquads(allSquads.filter(sq => sq.active !== false));
     setSessions(s);
 
@@ -277,35 +280,85 @@ export default function Dashboard() {
     return unsubscribe;
   }, [today]);
 
-  // ── Filter DailySquadStatus by selected squad ──────────────────────────
-  const filteredStatuses = useMemo(() => {
-    if (!selectedSquadId) return dayStatuses;
-    // A record belongs to this squad if:
-    // - target_squad_id matches (explicitly set), OR
-    // - base_squad_id matches and the player has no active temporary movement to another squad
-    return dayStatuses.filter(ds => {
-      const effectiveSquad = ds.target_squad_id || ds.base_squad_id;
-      return effectiveSquad === selectedSquadId && ds.active_in_target_squad !== false;
-    });
-  }, [dayStatuses, selectedSquadId]);
+  // ── Build the unified player list for the selected squad ──────────────
+  // Returns synthetic "ds-like" records combining membership + DailySquadStatus
+  const squadRecords = useMemo(() => {
+    const statusById = {}; // player_id -> DailySquadStatus
+    dayStatuses.forEach(ds => { statusById[ds.player_id] = ds; });
 
-  // ── Group by status — everything driven from DailySquadStatus ─────────
+    if (!selectedSquadId) {
+      // "Todos": show all DailySquadStatus records regardless of squad
+      return dayStatuses;
+    }
+
+    // 1) Active stable members of this squad (via SquadMembership)
+    const stableMembers = memberships.filter(m => {
+      if (m.squad_id !== selectedSquadId) return false;
+      if (m.effective_from && m.effective_from > today) return false;
+      if (m.effective_to && m.effective_to < today) return false;
+      return true;
+    });
+
+    const recordsMap = {}; // player_id -> ds record (real or synthetic)
+
+    stableMembers.forEach(m => {
+      const player = playerMap[m.player_id];
+      if (!player) return;
+
+      const saved = statusById[m.player_id];
+
+      // If the player has a status record AND they have an active temporary movement to ANOTHER squad,
+      // they are NOT in this squad today — skip them
+      if (saved && saved.temporary && saved.active_in_target_squad && saved.target_squad_id && saved.target_squad_id !== selectedSquadId) {
+        return;
+      }
+
+      if (saved) {
+        recordsMap[m.player_id] = saved;
+      } else {
+        // No status record → synthetic "disponible por defecto"
+        recordsMap[m.player_id] = {
+          player_id: m.player_id,
+          player_name: player.full_name || "",
+          position: player.position || "",
+          category: player.category || "",
+          status: "disponible",
+          tags: [],
+          notes: "",
+          temporary: false,
+          active_in_target_squad: true,
+          base_squad_id: selectedSquadId,
+          target_squad_id: selectedSquadId,
+          _synthetic: true, // marker: no real record exists
+        };
+      }
+    });
+
+    // 2) Temporary visitors from other squads active in this squad today
+    dayStatuses.forEach(ds => {
+      if (ds.temporary && ds.active_in_target_squad && ds.target_squad_id === selectedSquadId) {
+        recordsMap[ds.player_id] = ds;
+      }
+    });
+
+    return Object.values(recordsMap);
+  }, [selectedSquadId, dayStatuses, memberships, playerMap, today]);
+
+  // ── Group by status ────────────────────────────────────────────────────
   const byStatus = useMemo(() => {
     const groups = {};
-    filteredStatuses.forEach(ds => {
+    squadRecords.forEach(ds => {
       const s = ds.status || "disponible";
       if (!groups[s]) groups[s] = [];
       groups[s].push(ds);
     });
     return groups;
-  }, [filteredStatuses]);
+  }, [squadRecords]);
 
-  // ── Total count for selected squad ────────────────────────────────────
-  // Total = unique players that have an active status record for this squad today
-  const totalCount = filteredStatuses.length;
+  const totalCount = squadRecords.length;
 
   const summaryStats = [
-    { label: "Con estado hoy", value: totalCount,                          icon: Users,       color: "text-blue-400" },
+    { label: "Total plantel",  value: totalCount,                          icon: Users,       color: "text-blue-400" },
     { label: "Disponibles",    value: (byStatus.disponible || []).length,  icon: Activity,    color: "text-emerald-400" },
     { label: "Lesionados",     value: (byStatus.lesionado || []).length,   icon: AlertCircle, color: "text-red-400" },
     { label: "Molestias",      value: (byStatus.molestia || []).length,    icon: AlertCircle, color: "text-orange-400" },
@@ -328,7 +381,7 @@ export default function Dashboard() {
     </div>
   );
 
-  const hasStatusToday = dayStatuses.length > 0;
+  const hasStatusToday = selectedSquadId ? squadRecords.length > 0 : dayStatuses.length > 0;
 
   return (
     <div className="space-y-6">
