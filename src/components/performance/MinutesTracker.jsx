@@ -89,7 +89,7 @@ export default function MinutesTracker() {
       }
       const t = r.tournament;
       const mins = r.minutes || 0;
-      if (t === "Proyección Apertura") map[key].reserva += mins;
+      if (t === "Proyección Apertura" || t === "Clausura") map[key].reserva += mins;
       else if (t === "Juveniles") map[key].juveniles += mins;
       else if (t === "Amistosos") map[key].amistosos += mins;
     });

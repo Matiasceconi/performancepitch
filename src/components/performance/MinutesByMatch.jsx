@@ -117,38 +117,43 @@ export default function MinutesByMatch() {
     return list;
   }, [matchReports, tournamentFilter, fechaFilter, groupedMatches]);
 
-  // Mapa de minutos: match_date -> { player_id/name -> minutes }
-  const minutesMap = useMemo(() => {
-    const map = {};
-    for (const r of minutesRecords) {
-      if (!r.minutes || r.minutes <= 0) continue;
-      const date = r.match_date;
-      if (!map[date]) map[date] = {};
-      const key = r.player_id || `name:${norm(r.player_name)}`;
-      map[date][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
-    }
-    return map;
-  }, [minutesRecords]);
+  
 
-  // Jugadores con minutos en al menos un partido visible
-  const playersWithMinutes = useMemo(() => {
-    const seen = new Set();
-    const result = [];
-    for (const m of visibleMatches) {
-      const recs = minutesMap[m.date] || {};
-      for (const [key, val] of Object.entries(recs)) {
-        if (!seen.has(key)) {
-          seen.add(key);
-          result.push({ key, player_id: val.player_id, player_name: val.player_name });
-        }
-      }
-    }
-    return result;
-  }, [visibleMatches, minutesMap]);
-
-  function getMinForPlayerAndMatch(playerKey, matchDate) {
-    return minutesMap[matchDate]?.[playerKey]?.minutes || 0;
+// Mapa de minutos: match_date+tournament -> { player_id/name -> minutes }
+const minutesMap = useMemo(() => {
+  const map = {};
+  for (const r of minutesRecords) {
+    if (!r.minutes || r.minutes <= 0) continue;
+    const date = r.match_date;
+    const key = r.player_id || `name:${norm(r.player_name)}`;
+    const t = (r.tournament || "").toLowerCase().trim();
+    if (!map[date]) map[date] = {};
+    if (!map[date]._byTourney) map[date]._byTourney = {};
+    if (!map[date]._byTourney[t]) map[date]._byTourney[t] = {};
+    map[date]._byTourney[t][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
   }
+  return map;
+}, [minutesRecords]);
+
+function matchTournamentsForLookup(match) {
+  const comp = match.competition || "";
+  if (comp.includes("Juveniles")) return ["juveniles"];
+  if (comp.includes("Clausura")) return ["proyección apertura", "clausura"];
+  if (comp.includes("Apertura")) return ["proyección apertura"];
+  if (comp === "Amistosos") return ["amistosos", "proyección apertura"];
+  return ["proyección apertura"];
+}
+
+function getRecsForMatch(match) {
+  const dateMap = minutesMap[match.date] || {};
+  const lookups = dateMap._byTourney || {};
+  const tournaments = matchTournamentsForLookup(match);
+  for (const t of tournaments) {
+    const recs = lookups[t];
+    if (recs) return recs;
+  }
+  return {};
+}
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -208,7 +213,7 @@ export default function MinutesByMatch() {
         <div className="space-y-4">
           {visibleMatches.map(match => {
             const logo = getRivalLogo(match);
-            const recs = minutesMap[match.date] || {};
+            const recs = getRecsForMatch(match);
             const playerKeys = Object.keys(recs)
               .filter(k => !search || norm(recs[k].player_name).includes(norm(search)))
               .sort((a, b) => (recs[b]?.minutes || 0) - (recs[a]?.minutes || 0));

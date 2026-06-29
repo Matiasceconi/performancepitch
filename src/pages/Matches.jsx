@@ -200,22 +200,34 @@ function SquadMinutesPanel({ match, players }) {
     load();
   }, [match.id, match.date]);
 
+  function getTournament() {
+    const comp = match.competition || "";
+    if (comp.includes("Apertura")) return "Proyección Apertura";
+    if (comp.includes("Clausura")) return "Clausura";
+    if (comp === "Amistosos") return "Amistosos";
+    return "Proyección Apertura";
+  }
+
   async function saveMinutes() {
     setSaving(true);
     try {
       const matchLabel = `vs ${match.rival} ${moment(match.date).format("DD/MM/YY")}`;
+      const tournament = getTournament();
+      const existingMap = {};
+      existingRecords.forEach(r => { if (r.player_id) existingMap[r.player_id] = r; });
+
       for (const player of convocados) {
         const mins = minutesMap[player.id];
-        const existing = existingRecords.find(r => r.player_id === player.id);
+        const existing = existingMap[player.id];
         const minutesVal = mins !== "" && mins !== undefined ? Number(mins) : 0;
         if (existing) {
-          await base44.entities.MinutesRecord.update(existing.id, { minutes: minutesVal });
+          await base44.entities.MinutesRecord.update(existing.id, { minutes: minutesVal, tournament });
         } else {
           await base44.entities.MinutesRecord.create({
             player_id: player.id,
             player_name: player.full_name,
             player_number: player.jersey_number || player.number,
-            tournament: "Proyección Apertura",
+            tournament,
             match_label: matchLabel,
             match_date: match.date,
             rival: match.rival,
