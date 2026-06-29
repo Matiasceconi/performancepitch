@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Zap, FileText, Calendar, Clock, Target, MapPin } from "lucide-react";
+import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video } from "lucide-react";
 import moment from "moment";
 import SessionPlayerTable from "@/components/sessions/SessionPlayerTable";
 import SessionExercises from "@/components/sessions/SessionExercises";
@@ -118,6 +118,14 @@ export default function SessionDetail({ session, onBack }) {
 
         {session.notes && (
           <p className="text-xs text-zinc-500 italic border-t border-zinc-800 pt-3">{session.notes}</p>
+        )}
+
+        {/* Video link */}
+        {session.video_url && (
+          <a href={session.video_url} target="_blank" rel="noreferrer"
+            className="flex items-center gap-2 text-xs text-blue-400 hover:text-blue-300 border-t border-zinc-800 pt-3 w-fit">
+            <Video size={13} /> Ver video de la sesión
+          </a>
         )}
       </div>
 

@@ -1,0 +1,94 @@
+{
+  "name": "SessionExercise",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID de la sesi\u00f3n (TrainingSession)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del ejercicio"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden dentro de la sesi\u00f3n",
+      "default": 0
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Activaci\u00f3n",
+        "T\u00e9cnico",
+        "T\u00e1ctico",
+        "Reducido",
+        "Posesi\u00f3n",
+        "Finalizaci\u00f3n",
+        "Fuerza",
+        "Regenerativo",
+        "Otro"
+      ],
+      "description": "Tipo de ejercicio"
+    },
+    "duration_min": {
+      "type": "number",
+      "description": "Duraci\u00f3n total (minutos)"
+    },
+    "blocks": {
+      "type": "number",
+      "description": "Cantidad de bloques"
+    },
+    "work_time": {
+      "type": "string",
+      "description": "Tiempo de trabajo (ej: 4 min)"
+    },
+    "rest_time": {
+      "type": "string",
+      "description": "Pausa entre bloques (ej: 2 min)"
+    },
+    "length_m": {
+      "type": "number",
+      "description": "Largo del espacio en metros"
+    },
+    "width_m": {
+      "type": "number",
+      "description": "Ancho del espacio en metros"
+    },
+    "players_count": {
+      "type": "number",
+      "description": "N\u00famero de jugadores"
+    },
+    "total_area": {
+      "type": "number",
+      "description": "Superficie total (largo x ancho)"
+    },
+    "eii": {
+      "type": "number",
+      "description": "Espacio de Interacci\u00f3n Individual (total_area / players_count)"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo del ejercicio"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del ejercicio"
+    },
+    "image_url": {
+      "type": "string",
+      "description": "URL de imagen o dibujo del ejercicio"
+    },
+    "video_url": {
+      "type": "string",
+      "description": "Link al video del ejercicio"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    }
+  },
+  "required": [
+    "session_id",
+    "name"
+  ]
+}

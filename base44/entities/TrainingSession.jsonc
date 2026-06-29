@@ -83,6 +83,10 @@
       "type": "number",
       "description": "Jugadores diferenciados"
     },
+    "video_url": {
+      "type": "string",
+      "description": "URL del video general de la sesi\u00f3n"
+    },
     "csv_url": {
       "type": "string",
       "description": "URL del CSV GPS de la sesi\u00f3n"

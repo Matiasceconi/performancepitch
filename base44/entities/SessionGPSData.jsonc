@@ -1,0 +1,78 @@
+{
+  "name": "SessionGPSData",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID de la sesi\u00f3n"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador (Player)"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre oficial del jugador (desnormalizado)"
+    },
+    "player_name_original": {
+      "type": "string",
+      "description": "Nombre tal como vino en el CSV"
+    },
+    "duration": {
+      "type": "number",
+      "description": "Duraci\u00f3n (min)"
+    },
+    "total_distance": {
+      "type": "number",
+      "description": "Distancia total (m)"
+    },
+    "m_min": {
+      "type": "number",
+      "description": "Metros por minuto"
+    },
+    "distance_19_8": {
+      "type": "number",
+      "description": "Distancia > 19.8 km/h (m)"
+    },
+    "distance_25": {
+      "type": "number",
+      "description": "Distancia > 25 km/h (m)"
+    },
+    "sprints": {
+      "type": "number",
+      "description": "Cantidad de sprints"
+    },
+    "acc_3": {
+      "type": "number",
+      "description": "Aceleraciones > 3 m/s\u00b2"
+    },
+    "dec_3": {
+      "type": "number",
+      "description": "Desaceleraciones > 3 m/s\u00b2"
+    },
+    "player_load": {
+      "type": "number",
+      "description": "Player Load"
+    },
+    "smax": {
+      "type": "number",
+      "description": "Velocidad m\u00e1xima (km/h)"
+    },
+    "rhie": {
+      "type": "number",
+      "description": "RHIE (esfuerzos repetidos de alta intensidad)"
+    },
+    "pl_min": {
+      "type": "number",
+      "description": "Player Load por minuto"
+    },
+    "source_file": {
+      "type": "string",
+      "description": "Nombre del archivo CSV origen"
+    }
+  },
+  "required": [
+    "session_id",
+    "player_id"
+  ]
+}
