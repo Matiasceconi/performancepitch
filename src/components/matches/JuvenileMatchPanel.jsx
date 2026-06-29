@@ -408,6 +408,22 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                             onChange={e => setEditMinutesMap(m => ({ ...m, [key]: { ...val, minutes: e.target.value } }))}
                             className="w-16 bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white text-center focus:outline-none focus:border-violet-500/50 shrink-0"
                           />
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              if (val.id) {
+                                await base44.entities.MinutesRecord.delete(val.id);
+                              }
+                              const newMap = { ...editMinutesMap };
+                              delete newMap[key];
+                              setEditMinutesMap(newMap);
+                              setMinutesRecords(recs => recs.filter(r => r.id !== val.id));
+                            }}
+                            title="Quitar jugador"
+                            className="p-1 rounded text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                          >
+                            <X size={12} />
+                          </button>
                         </div>
                       );
                     })
