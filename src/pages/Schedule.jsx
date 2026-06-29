@@ -507,6 +507,8 @@ export default function Schedule() {
   const [defaultDate, setDefaultDate] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [copyData, setCopyData] = useState(null);
+  const [copyingEvent, setCopyingEvent] = useState(null); // event being copied
+  const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
 
   async function loadEvents() {
     const data = await base44.entities.DayEvent.list("-date", 500);
@@ -551,14 +553,17 @@ export default function Schedule() {
   }
 
   function handleCopy(event) {
-    // Abre el modal con los datos del evento copiado pero sin id (nuevo evento)
-    const { id, created_date, updated_date, created_by_id, ...rest } = event;
-    setEditingEvent(null);
-    setDefaultDate(event.date);
-    // Pre-fill the form via editingEvent=null but we need to pass the data — use a trick:
-    // store in defaultDate + a "copyData" state
-    setCopyData(rest);
-    setModalOpen(true);
+    setCopyingEvent(event);
+    setCopyTargetDate(event.date);
+  }
+
+  async function handlePaste() {
+    if (!copyingEvent || !copyTargetDate) return;
+    const { id, created_date, updated_date, created_by_id, ...rest } = copyingEvent;
+    await base44.entities.DayEvent.create({ ...rest, date: copyTargetDate });
+    setCopyingEvent(null);
+    setCopyTargetDate("");
+    await loadEvents();
   }
 
   async function handleMoveUp(event) {
@@ -763,6 +768,36 @@ export default function Schedule() {
           </button>
         </div>
       </div>
+
+      {/* Banner de pegado */}
+      {copyingEvent && (
+        <div className="flex items-center gap-3 bg-violet-500/10 border border-violet-500/30 rounded-xl px-4 py-3">
+          <Copy size={15} className="text-violet-400 shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-xs text-violet-300 font-semibold truncate">Copiando: <span className="text-white">{copyingEvent.title}</span></p>
+            <p className="text-xs text-zinc-500 mt-0.5">Elegí el día de destino:</p>
+          </div>
+          <input
+            type="date"
+            value={copyTargetDate}
+            onChange={(e) => setCopyTargetDate(e.target.value)}
+            className="bg-zinc-800 border border-zinc-600 rounded-lg px-3 py-1.5 text-sm text-white focus:outline-none focus:border-violet-500"
+          />
+          <button
+            onClick={handlePaste}
+            disabled={!copyTargetDate}
+            className="px-4 py-1.5 rounded-lg text-sm bg-violet-600 text-white font-semibold hover:bg-violet-700 disabled:opacity-40 transition-colors"
+          >
+            Pegar
+          </button>
+          <button
+            onClick={() => { setCopyingEvent(null); setCopyTargetDate(""); }}
+            className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
 
       {view === "week" ? renderWeek() : renderMonth()}
 
