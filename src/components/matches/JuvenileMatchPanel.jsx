@@ -426,7 +426,7 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                           <span className="text-xs text-zinc-400 flex-1">{p.full_name}</span>
                           <input
                             type="number" min="0" max="120" placeholder="min"
-                            onChange={e => {
+                            onBlur={e => {
                               if (e.target.value) {
                                 setEditMinutesMap(m => ({
                                   ...m,
