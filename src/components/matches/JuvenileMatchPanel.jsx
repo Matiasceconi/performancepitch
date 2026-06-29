@@ -358,7 +358,14 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
           {/* Jugadores con minutos */}
           <div>
             <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-white">Jugadores con minutos</p>
+              <p className="text-sm font-semibold text-white">
+                Jugadores con minutos
+                {Object.keys(editMinutesMap).filter(k => editMinutesMap[k].minutes > 0 || editMinutesMap[k].minutes !== "").length > 0 && (
+                  <span className="text-zinc-500 text-xs ml-2 font-normal">
+                    ({Object.keys(editMinutesMap).filter(k => editMinutesMap[k].minutes > 0 || editMinutesMap[k].minutes !== "").length})
+                  </span>
+                )}
+              </p>
               <button onClick={saveMinutes} disabled={saving}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-violet-500/20 border border-violet-500/30 text-violet-300 hover:bg-violet-500/30 rounded-lg transition-colors disabled:opacity-50">
                 {saving ? <div className="w-3 h-3 border border-violet-400 border-t-transparent rounded-full animate-spin" /> : <Save size={12} />}
@@ -380,7 +387,7 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                     .map(([key, val]) => {
                       const player = val.player_id ? playerMap[val.player_id] : null;
                       return (
-                        <div key={key} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/30 transition-colors">
+                        <div key={key} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/30 transition-colors group">
                           {player?.photo_url ? (
                             <img src={player.photo_url} alt={val.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
                           ) : (
@@ -406,14 +413,14 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                     })
                 )}
 
-                {/* Agregar jugadores de Reserva que bajaron */}
+                {/* Agregar jugadores */}
                 <details className="mt-3">
                   <summary className="text-xs text-zinc-500 hover:text-zinc-300 cursor-pointer select-none">
-                    + Agregar jugador de Reserva
+                    + Agregar jugador
                   </summary>
                   <div className="mt-2 space-y-1 max-h-48 overflow-y-auto">
-                    {reservaPlayers
-                      .filter(p => !editMinutesMap[p.id])
+                    {players
+                      .filter(p => !editMinutesMap[p.id] && !editMinutesMap[`name:${normalizeStr(p.full_name)}`])
                       .map(p => (
                         <div key={p.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/30 transition-colors">
                           {p.photo_url ? (
@@ -423,14 +430,18 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                               <span className="text-[10px] font-bold text-zinc-400">{p.full_name?.charAt(0)}</span>
                             </div>
                           )}
+                          <span className="text-xs text-zinc-500 font-mono w-5 shrink-0">{p.jersey_number || "—"}</span>
                           <span className="text-xs text-zinc-400 flex-1">{p.full_name}</span>
+                          <span className="text-xs text-zinc-600 shrink-0">{p.division || ""}</span>
                           <input
                             type="number" min="0" max="120" placeholder="min"
                             onBlur={e => {
                               if (e.target.value) {
+                                const name = p.full_name;
+                                const key = p.id;
                                 setEditMinutesMap(m => ({
                                   ...m,
-                                  [p.id]: { minutes: e.target.value, name: p.full_name, player_id: p.id }
+                                  [key]: { minutes: e.target.value, name, player_id: p.id }
                                 }));
                               }
                             }}

@@ -172,15 +172,17 @@ function MatchCsvPanel({ match, onCsvSaved }) {
 }
 
 // ── Convocados con minutos ────────────────────────────────────────────────────
-function SquadMinutesPanel({ match, players }) {
+function SquadMinutesPanel({ match, players, onMatchUpdated }) {
   const { toast } = useToast();
   const [minutesMap, setMinutesMap] = useState({});
   const [existingRecords, setExistingRecords] = useState([]);
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [squadIds, setSquadIds] = useState(match.squad_called || []);
+  const [showAddPanel, setShowAddPanel] = useState(false);
 
-  const convocadosIds = match.squad_called || [];
-  const convocados = players.filter(p => convocadosIds.includes(p.id));
+  const convocados = players.filter(p => squadIds.includes(p.id));
+  const available = players.filter(p => !squadIds.includes(p.id));
 
   useEffect(() => {
     async function load() {
@@ -208,7 +210,16 @@ function SquadMinutesPanel({ match, players }) {
     return "Proyección Apertura";
   }
 
-  async function saveMinutes() {
+  function toggleSquadPlayer(player) {
+    const already = squadIds.includes(player.id);
+    if (already) {
+      setSquadIds(ids => ids.filter(id => id !== player.id));
+    } else {
+      setSquadIds(ids => [...ids, player.id]);
+    }
+  }
+
+  async function saveAll() {
     setSaving(true);
     try {
       const matchLabel = `vs ${match.rival} ${moment(match.date).format("DD/MM/YY")}`;
@@ -216,6 +227,7 @@ function SquadMinutesPanel({ match, players }) {
       const existingMap = {};
       existingRecords.forEach(r => { if (r.player_id) existingMap[r.player_id] = r; });
 
+      // Guardar minutos de todos los convocados actuales
       for (const player of convocados) {
         const mins = minutesMap[player.id];
         const existing = existingMap[player.id];
@@ -235,9 +247,21 @@ function SquadMinutesPanel({ match, players }) {
           });
         }
       }
-      toast({ title: "Minutos guardados correctamente" });
+
+      // Actualizar convocados en el partido
+      const newNames = convocados.map(p => p.full_name || p.name);
+      await base44.entities.MatchReport.update(match.id, {
+        squad_called: squadIds,
+        squad_names: newNames,
+      });
+      onMatchUpdated?.(match.id, {
+        squad_called: squadIds,
+        squad_names: newNames,
+      });
+
+      toast({ title: "Cambios guardados correctamente" });
     } catch {
-      toast({ title: "Error al guardar minutos", variant: "destructive" });
+      toast({ title: "Error al guardar", variant: "destructive" });
     } finally {
       setSaving(false);
     }
@@ -249,12 +273,6 @@ function SquadMinutesPanel({ match, players }) {
     </div>
   );
 
-  if (convocados.length === 0) return (
-    <div className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4 text-center">
-      <p className="text-zinc-500 text-sm">Sin convocados registrados — editar el partido para agregarlos</p>
-    </div>
-  );
-
   return (
     <div className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4">
       <div className="flex items-center justify-between mb-3">
@@ -262,7 +280,7 @@ function SquadMinutesPanel({ match, players }) {
           <Clock size={14} className="text-yellow-400" /> Minutos jugados — Convocados ({convocados.length})
         </p>
         <button
-          onClick={saveMinutes}
+          onClick={saveAll}
           disabled={saving}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg transition-colors disabled:opacity-50"
         >
@@ -270,9 +288,10 @@ function SquadMinutesPanel({ match, players }) {
           Guardar
         </button>
       </div>
-      <div className="space-y-1.5 max-h-72 overflow-y-auto">
+
+      <div className="space-y-1.5 max-h-72 overflow-y-auto mb-3">
         {convocados.map(player => (
-          <div key={player.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-700/30 transition-colors">
+          <div key={player.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-700/30 transition-colors group">
             {player.photo_url ? (
               <img src={player.photo_url} alt={player.full_name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
             ) : (
@@ -292,8 +311,49 @@ function SquadMinutesPanel({ match, players }) {
               onChange={e => setMinutesMap(m => ({ ...m, [player.id]: e.target.value }))}
               className="w-16 bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white text-center focus:outline-none focus:border-yellow-500/50 shrink-0"
             />
+            <button
+              onClick={() => toggleSquadPlayer(player)}
+              title="Quitar de convocados"
+              className="p-1 rounded text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+            >
+              <X size={12} />
+            </button>
           </div>
         ))}
+      </div>
+
+      {convocados.length === 0 && (
+        <p className="text-zinc-500 text-sm text-center mb-3">Sin convocados</p>
+      )}
+
+      {/* Agregar jugadores */}
+      <div>
+        <button
+          onClick={() => setShowAddPanel(!showAddPanel)}
+          className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"
+        >
+          {showAddPanel ? "▼" : "▶"} {showAddPanel ? "Cerrar" : "+ Agregar jugador"}
+        </button>
+        {showAddPanel && (
+          <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border-t border-zinc-800 pt-2">
+            {available.length === 0 ? (
+              <p className="text-xs text-zinc-600 py-2">Todos los jugadores están convocados</p>
+            ) : (
+              available.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => toggleSquadPlayer(p)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-700/30 transition-colors text-left"
+                >
+                  <span className="font-mono w-5 text-center shrink-0">{p.jersey_number || p.number || "—"}</span>
+                  <span className="flex-1 truncate">{p.full_name || p.name}</span>
+                  <span className="text-zinc-600">{p.position?.split(" ")[0] || ""}</span>
+                  <span className="text-zinc-600">+</span>
+                </button>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -354,10 +414,12 @@ const COMPETITION_OPTIONS = [
 ];
 
 // ── MatchCard ─────────────────────────────────────────────────────────────────
-function MatchCard({ match, players, onEdit, onDelete }) {
+function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated }) {
   const [expanded, setExpanded] = useState(false);
   const [matchData, setMatchData] = useState(match);
   const [editingCompetition, setEditingCompetition] = useState(false);
+
+  useEffect(() => { setMatchData(match); }, [match]);
   const { toast } = useToast();
   const hasResult = match.our_score != null && match.rival_score != null;
   const won = match.our_score > match.rival_score;
@@ -514,7 +576,7 @@ function MatchCard({ match, players, onEdit, onDelete }) {
           />
 
           {/* Convocados + Minutos */}
-          <SquadMinutesPanel match={match} players={players} />
+          <SquadMinutesPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} />
 
           {/* Análisis del rival */}
           {match.rival_notes && (
@@ -677,6 +739,10 @@ export default function Matches() {
   const [editing, setEditing] = useState(null);
   const { toast } = useToast();
 
+  function handleMatchUpdated(id, data) {
+    setMatches(ms => ms.map(m => m.id === id ? { ...m, ...data } : m));
+  }
+
   useEffect(() => { loadAll(); }, []);
 
   async function loadAll() {
@@ -770,7 +836,7 @@ export default function Matches() {
           ) : (
             <div className="space-y-3">
               {matches.map(m => (
-                <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} />
+                <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} />
               ))}
             </div>
           )}
