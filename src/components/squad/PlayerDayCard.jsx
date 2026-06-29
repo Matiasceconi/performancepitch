@@ -36,11 +36,22 @@ export default function PlayerDayCard({
       }`}>
         {/* Temporary visitor badge */}
         {isTemporaryVisitor && (
-          <div className="px-3 pt-2 flex items-center gap-1.5">
-            <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-full px-2 py-0.5 font-medium">
-              {movement_type === "sube_temporal" ? "↑ Sube" : movement_type === "baja_temporal" ? "↓ Baja" : "Temporal"}
-              {base_squad_name ? ` · desde ${base_squad_name}` : ""}
-            </span>
+          <div className="px-3 pt-2 flex items-center gap-1.5 flex-wrap">
+            {movement_type === "sube_temporal" ? (
+              <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-full px-2 py-0.5 font-medium">
+                ↑ Sube desde {base_squad_name || "otro plantel"}
+                {target_squad_name ? ` → ${target_squad_name}` : ""}
+              </span>
+            ) : movement_type === "baja_temporal" ? (
+              <span className="text-[10px] bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
+                ↓ Baja desde {base_squad_name || "otro plantel"}
+                {target_squad_name ? ` → ${target_squad_name}` : ""}
+              </span>
+            ) : (
+              <span className="text-[10px] bg-zinc-700/40 text-zinc-300 border border-zinc-700 rounded-full px-2 py-0.5 font-medium">
+                Temporal · {base_squad_name || "otro plantel"}
+              </span>
+            )}
           </div>
         )}
 

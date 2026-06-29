@@ -109,12 +109,11 @@ function StatCard({ label, value, color, icon: Icon }) {
 }
 
 // ─── Player row (read-only) — driven by DailySquadStatus record ────────────
-function PlayerRow({ ds, playerMap }) {
+function PlayerRow({ ds, playerMap, showMovement = false }) {
   const player = playerMap[ds.player_id] || {};
   const col = statusColor(ds.status);
   const name = ds.player_name || player.full_name || "—";
   const position = player.position || ds.position || "";
-  const category = player.category || ds.category || "";
   return (
     <div className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${col.bg} ${col.border}`}>
       {player.photo_url
@@ -124,10 +123,16 @@ function PlayerRow({ ds, playerMap }) {
           </div>}
       <div className="flex-1 min-w-0">
         <p className="text-sm text-white font-medium truncate">{name}</p>
-        <p className="text-xs text-zinc-500 truncate">
-          {position}{category ? ` · ${category}` : ""}
-          {ds.temporary && ds.base_squad_name ? ` · desde ${ds.base_squad_name}` : ""}
-        </p>
+        {showMovement && ds.base_squad_name && ds.target_squad_name ? (
+          <p className="text-xs text-zinc-500 truncate">
+            {position} · <span className="text-zinc-400">{ds.base_squad_name}</span>
+            <span className="text-zinc-600 mx-1">→</span>
+            <span className="text-sky-400">{ds.target_squad_name}</span>
+            {ds.temporary && <span className="ml-1 text-[9px] text-zinc-600">· Temporal</span>}
+          </p>
+        ) : (
+          <p className="text-xs text-zinc-500 truncate">{position}</p>
+        )}
         {ds.notes && <p className="text-[10px] text-zinc-500 italic truncate">"{ds.notes}"</p>}
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
@@ -147,7 +152,7 @@ function PlayerRow({ ds, playerMap }) {
 }
 
 // ─── Group list card ───────────────────────────────────────────────────────
-function GroupCard({ title, dotColor, records, playerMap, emptyText, linkTo }) {
+function GroupCard({ title, dotColor, records, playerMap, emptyText, linkTo, showMovement = false }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
@@ -166,7 +171,7 @@ function GroupCard({ title, dotColor, records, playerMap, emptyText, linkTo }) {
         {records.length === 0
           ? <p className="text-zinc-600 text-sm text-center py-5">{emptyText}</p>
           : <div className="space-y-1.5 max-h-64 overflow-y-auto">
-              {records.map(ds => <PlayerRow key={ds.id || ds.player_id} ds={ds} playerMap={playerMap} />)}
+              {records.map(ds => <PlayerRow key={ds.id || ds.player_id} ds={ds} playerMap={playerMap} showMovement={showMovement} />)}
             </div>}
       </div>
     </div>
@@ -355,6 +360,55 @@ export default function Dashboard() {
     return groups;
   }, [squadRecords]);
 
+  // ── Movement groups (only when a squad is selected) ───────────────────
+  // "Suben DESDE este plantel" → base = selectedSquad, target = otro plantel superior
+  const subenDesde = useMemo(() => {
+    if (!selectedSquadId) return (byStatus["subió"] || []);
+    return squadRecords.filter(ds =>
+      ds.temporary &&
+      ds.active_in_target_squad &&
+      ds.base_squad_id === selectedSquadId &&
+      ds.target_squad_id !== selectedSquadId &&
+      ["sube_temporal", "subió"].includes(ds.movement_type || ds.status)
+    );
+  }, [squadRecords, selectedSquadId, byStatus]);
+
+  // "Suben A este plantel" → base = otro plantel, target = selectedSquad
+  const subenA = useMemo(() => {
+    if (!selectedSquadId) return [];
+    return squadRecords.filter(ds =>
+      ds.temporary &&
+      ds.active_in_target_squad &&
+      ds.base_squad_id !== selectedSquadId &&
+      ds.target_squad_id === selectedSquadId &&
+      ["sube_temporal", "subió"].includes(ds.movement_type || ds.status)
+    );
+  }, [squadRecords, selectedSquadId]);
+
+  // "Bajan DESDE este plantel" → base = selectedSquad, target = otro plantel inferior
+  const bajanDesde = useMemo(() => {
+    if (!selectedSquadId) return (byStatus["bajó"] || []);
+    return squadRecords.filter(ds =>
+      ds.temporary &&
+      ds.active_in_target_squad &&
+      ds.base_squad_id === selectedSquadId &&
+      ds.target_squad_id !== selectedSquadId &&
+      ["baja_temporal", "bajó"].includes(ds.movement_type || ds.status)
+    );
+  }, [squadRecords, selectedSquadId, byStatus]);
+
+  // "Bajan A este plantel" → base = otro plantel superior, target = selectedSquad
+  const bajanA = useMemo(() => {
+    if (!selectedSquadId) return [];
+    return squadRecords.filter(ds =>
+      ds.temporary &&
+      ds.active_in_target_squad &&
+      ds.base_squad_id !== selectedSquadId &&
+      ds.target_squad_id === selectedSquadId &&
+      ["baja_temporal", "bajó"].includes(ds.movement_type || ds.status)
+    );
+  }, [squadRecords, selectedSquadId]);
+
   const totalCount = squadRecords.length;
 
   const summaryStats = [
@@ -365,8 +419,8 @@ export default function Dashboard() {
     { label: "Diferenciados",  value: (byStatus.diferenciado || []).length,icon: Zap,         color: "text-amber-400" },
     { label: "Suspendidos",    value: (byStatus.suspendido || []).length,  icon: UserX,       color: "text-purple-400" },
     { label: "Convocados",     value: (byStatus.convocado || []).length,   icon: UserCheck,   color: "text-blue-300" },
-    { label: "Suben",          value: (byStatus["subió"] || []).length,    icon: ArrowUp,     color: "text-sky-400" },
-    { label: "Bajan",          value: (byStatus["bajó"] || []).length,     icon: ArrowDown,   color: "text-orange-400" },
+    { label: "Suben",          value: subenDesde.length + subenA.length,   icon: ArrowUp,     color: "text-sky-400" },
+    { label: "Bajan",          value: bajanDesde.length + bajanA.length,   icon: ArrowDown,   color: "text-orange-400" },
     { label: "Ausentes",       value: (byStatus.ausente || []).length,     icon: UserX,       color: "text-zinc-400" },
   ];
 
@@ -503,22 +557,46 @@ export default function Dashboard() {
           </ErrorBoundary>
         )}
 
-        {(byStatus["subió"] || []).length > 0 && (
+        {subenDesde.length > 0 && (
           <ErrorBoundary>
             <GroupCard
-              title="Suben" dotColor="bg-sky-400"
-              records={byStatus["subió"]} playerMap={playerMap}
-              emptyText="" linkTo="/daily-squad"
+              title={selectedSquadId ? `Suben desde ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Suben"}
+              dotColor="bg-sky-400"
+              records={subenDesde} playerMap={playerMap}
+              emptyText="" linkTo="/daily-squad" showMovement
             />
           </ErrorBoundary>
         )}
 
-        {(byStatus["bajó"] || []).length > 0 && (
+        {subenA.length > 0 && (
           <ErrorBoundary>
             <GroupCard
-              title="Bajan" dotColor="bg-orange-400"
-              records={byStatus["bajó"]} playerMap={playerMap}
-              emptyText="" linkTo="/daily-squad"
+              title={selectedSquadId ? `Suben a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Suben (visitantes)"}
+              dotColor="bg-cyan-400"
+              records={subenA} playerMap={playerMap}
+              emptyText="" linkTo="/daily-squad" showMovement
+            />
+          </ErrorBoundary>
+        )}
+
+        {bajanDesde.length > 0 && (
+          <ErrorBoundary>
+            <GroupCard
+              title={selectedSquadId ? `Bajan desde ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Bajan"}
+              dotColor="bg-orange-400"
+              records={bajanDesde} playerMap={playerMap}
+              emptyText="" linkTo="/daily-squad" showMovement
+            />
+          </ErrorBoundary>
+        )}
+
+        {bajanA.length > 0 && (
+          <ErrorBoundary>
+            <GroupCard
+              title={selectedSquadId ? `Bajan a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Bajan (visitantes)"}
+              dotColor="bg-amber-400"
+              records={bajanA} playerMap={playerMap}
+              emptyText="" linkTo="/daily-squad" showMovement
             />
           </ErrorBoundary>
         )}
