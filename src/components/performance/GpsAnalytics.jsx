@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { FileSpreadsheet, TrendingUp, BarChart2, Activity, Filter, Clock } from "lucide-react";
+import { FileSpreadsheet, TrendingUp, BarChart2, Activity, Filter, Clock, Swords, Dumbbell } from "lucide-react";
 import moment from "moment";
 import LastSessionDashboard from "./LastSessionDashboard";
 import {
@@ -283,6 +283,8 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod, matc
       .map((r) => ({
         date: moment(r.date).format("DD/MM"),
         session: r.session_title || r.date,
+        source: r.source,
+        match_day_code: r.match_day_code,
         ...Object.fromEntries(METRICS.map((m) => [m.key, r[m.key] ?? null])),
       })),
   [allRows, player, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode]);
@@ -340,13 +342,19 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod, matc
                   <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: meta?.color }} />
                   {meta?.label}
                 </h3>
-                {average != null && (
-                  <div className="flex gap-4 text-xs">
-                    <span className="text-zinc-500">Prom: <span className="text-white font-semibold">{meta?.fmt(average)}</span></span>
-                    <span className="text-green-400">Máx: <span className="font-semibold">{meta?.fmt(Math.max(...vals))}</span></span>
-                    <span className="text-red-400">Mín: <span className="font-semibold">{meta?.fmt(Math.min(...vals))}</span></span>
+                <div className="flex items-center gap-4 flex-wrap">
+                  {average != null && (
+                    <div className="flex gap-4 text-xs">
+                      <span className="text-zinc-500">Prom: <span className="text-white font-semibold">{meta?.fmt(average)}</span></span>
+                      <span className="text-green-400">Máx: <span className="font-semibold">{meta?.fmt(Math.max(...vals))}</span></span>
+                      <span className="text-red-400">Mín: <span className="font-semibold">{meta?.fmt(Math.min(...vals))}</span></span>
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                    <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: meta?.color }} /> Entrenamiento</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded-full inline-block border-2 border-red-300 bg-red-500" /> Partido</span>
                   </div>
-                )}
+                </div>
               </div>
               <ResponsiveContainer width="100%" height={180}>
                 <LineChart data={chartData} margin={{ left: 0, right: 30, top: 8, bottom: 0 }}>
@@ -356,14 +364,34 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod, matc
                   <Tooltip
                     contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }}
                     formatter={(v) => [meta?.fmt(v), meta?.label]}
-                    labelFormatter={(_, payload) => payload?.[0]?.payload?.session || ""}
+                    labelFormatter={(_, payload) => {
+                      const p = payload?.[0]?.payload;
+                      if (!p) return "";
+                      const tipo = p.source === "match" ? "⚽ Partido" : `🏋️ ${p.match_day_code || "Entrenamiento"}`;
+                      return `${p.session} — ${tipo}`;
+                    }}
                   />
                   {average != null && (
                     <ReferenceLine y={average} stroke={meta?.color} strokeDasharray="4 4" strokeOpacity={0.5}
                       label={{ value: "prom", position: "right", fill: meta?.color, fontSize: 10 }} />
                   )}
                   <Line type="monotone" dataKey={metricKey} stroke={meta?.color} strokeWidth={2}
-                    dot={{ r: 4, fill: meta?.color, strokeWidth: 0 }} activeDot={{ r: 6 }} connectNulls={false} />
+                    dot={(props) => {
+                      const { cx, cy, payload } = props;
+                      const isMatch = payload?.source === "match";
+                      return (
+                        <circle
+                          key={`dot-${cx}-${cy}`}
+                          cx={cx} cy={cy}
+                          r={isMatch ? 6 : 4}
+                          fill={isMatch ? "#ef4444" : meta?.color}
+                          stroke={isMatch ? "#fca5a5" : "none"}
+                          strokeWidth={isMatch ? 2 : 0}
+                        />
+                      );
+                    }}
+                    activeDot={{ r: 7 }}
+                    connectNulls={false} />
                 </LineChart>
               </ResponsiveContainer>
             </div>
@@ -467,13 +495,75 @@ const SESSION_TYPES = ["Entrenamiento", "Táctica", "Físico", "Regenerativo", "
 const SEASON_PERIODS = ["En competencia", "Pretemporada", "Transitorio"];
 const MATCH_DAY_CODES = ["MD", "MD-1", "MD-2", "MD-3", "MD-4", "MD-5", "MD-6", "MD+1", "MD+2"];
 
+// ── Selector de Sesión/Partido para el Informe ────────────────────────────────
+function SessionSelector({ sessions, matches, selectedId, onSelect }) {
+  const sessionOptions = sessions
+    .filter(s => s.csv_url)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map(s => ({ id: s.id, label: s.title, date: s.date, type: "session", match_day_code: s.match_day_code, session_type: s.session_type }));
+
+  const matchOptions = matches
+    .filter(m => m.csv_url)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .map(m => ({ id: m.id, label: `vs. ${m.rival}`, date: m.date, type: "match" }));
+
+  const all = [...sessionOptions, ...matchOptions].sort((a, b) => b.date.localeCompare(a.date));
+
+  return (
+    <div className="flex items-center gap-3 flex-wrap">
+      <span className="text-xs text-zinc-500 font-semibold uppercase tracking-wider shrink-0">Ver informe:</span>
+      <select
+        value={selectedId || ""}
+        onChange={e => onSelect(e.target.value)}
+        className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500 flex-1 min-w-[220px]"
+      >
+        <option value="">— Seleccionar —</option>
+        <optgroup label="🏋️ Entrenamientos">
+          {sessionOptions.map(s => (
+            <option key={s.id} value={s.id}>
+              {moment(s.date).format("DD/MM/YY")} · {s.label}{s.match_day_code ? ` (${s.match_day_code})` : ""}
+            </option>
+          ))}
+        </optgroup>
+        <optgroup label="⚽ Partidos">
+          {matchOptions.map(m => (
+            <option key={m.id} value={m.id}>
+              {moment(m.date).format("DD/MM/YY")} · {m.label}
+            </option>
+          ))}
+        </optgroup>
+      </select>
+      {all.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => {
+              const idx = all.findIndex(x => x.id === selectedId);
+              if (idx < all.length - 1) onSelect(all[idx + 1].id);
+            }}
+            disabled={all.findIndex(x => x.id === selectedId) >= all.length - 1}
+            className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg text-xs disabled:opacity-30 transition-colors"
+          >← Ant</button>
+          <button
+            onClick={() => {
+              const idx = all.findIndex(x => x.id === selectedId);
+              if (idx > 0) onSelect(all[idx - 1].id);
+            }}
+            disabled={all.findIndex(x => x.id === selectedId) <= 0}
+            className="px-2 py-1.5 bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white rounded-lg text-xs disabled:opacity-30 transition-colors"
+          >Sig →</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function GpsAnalytics({ initialTab, initialDate }) {
   const [sessions, setSessions] = useState([]);
   const [matches, setMatches] = useState([]);
   const [allRows, setAllRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadingCsvs, setLoadingCsvs] = useState(false);
-  const [tab, setTab] = useState(initialTab || "team");
+  const [tab, setTab] = useState(initialTab || "last");
 
   // Filtros globales
   const [dateFrom, setDateFrom]         = useState("");
@@ -481,23 +571,36 @@ export default function GpsAnalytics({ initialTab, initialDate }) {
   const [sessionType, setSessionType]   = useState("");
   const [seasonPeriod, setSeasonPeriod] = useState("");
   const [matchDayCode, setMatchDayCode] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all"); // "all" | "session" | "match"
 
-  const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod || matchDayCode;
+  const hasFilters = dateFrom || dateTo || sessionType || seasonPeriod || matchDayCode || sourceFilter !== "all";
 
-  // Obtener sesión a mostrar en el Informe: si viene initialDate, buscar por fecha; sino la última con CSV
-  const lastSession = useMemo(() => {
-    const withData = sessions.filter(s => s.csv_url);
-    if (initialDate) {
-      const byDate = withData.find(s => s.date === initialDate);
-      if (byDate) return byDate;
-    }
-    return withData.sort((a, b) => new Date(b.date) - new Date(a.date))[0];
-  }, [sessions, initialDate]);
+  // Sesión/partido seleccionado para el informe
+  const [selectedReportId, setSelectedReportId] = useState(null);
 
-  const lastSessionRows = useMemo(() => 
-    lastSession ? allRows.filter(r => r.session_id === lastSession.id) : [],
-    [allRows, lastSession]
+  // Determinar qué sesión/partido mostrar en el informe
+  const allSources = useMemo(() => {
+    const s = sessions.filter(x => x.csv_url).map(x => ({ ...x, source: "session", label: x.title }));
+    const m = matches.filter(x => x.csv_url).map(x => ({ ...x, source: "match", label: `vs. ${x.rival}` }));
+    return [...s, ...m].sort((a, b) => b.date.localeCompare(a.date));
+  }, [sessions, matches]);
+
+  const reportSource = useMemo(() => {
+    if (selectedReportId) return allSources.find(x => x.id === selectedReportId) || allSources[0];
+    if (initialDate) return allSources.find(x => x.date === initialDate) || allSources[0];
+    return allSources[0];
+  }, [selectedReportId, allSources, initialDate]);
+
+  const reportRows = useMemo(() =>
+    reportSource ? allRows.filter(r => r.session_id === reportSource.id) : [],
+    [allRows, reportSource]
   );
+
+  // Filas filtradas por fuente (para vistas Equipo, Jugador, Comparar)
+  const filteredBySource = useMemo(() => {
+    if (sourceFilter === "all") return allRows;
+    return allRows.filter(r => r.source === sourceFilter);
+  }, [allRows, sourceFilter]);
 
   // 1. Carga sesiones y partidos
   useEffect(() => {
@@ -557,9 +660,11 @@ export default function GpsAnalytics({ initialTab, initialDate }) {
     </div>
   );
 
-  const sessionsWithCsv = sessions.filter((s) => s.csv_url).length + matches.filter((m) => m.csv_url).length;
+  const sessionsWithCsv = sessions.filter((s) => s.csv_url).length;
+  const matchesWithCsv = matches.filter((m) => m.csv_url).length;
+  const totalWithCsv = sessionsWithCsv + matchesWithCsv;
 
-  if (sessionsWithCsv === 0) {
+  if (totalWithCsv === 0) {
     return (
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-14 text-center">
         <FileSpreadsheet size={40} className="text-zinc-700 mx-auto mb-3" />
@@ -572,66 +677,104 @@ export default function GpsAnalytics({ initialTab, initialDate }) {
   return (
     <div className="space-y-5">
       {/* Panel de filtros */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Filter size={14} className="text-zinc-500" />
-          <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Filtros</span>
-          {hasFilters && (
-            <button onClick={() => { setDateFrom(""); setDateTo(""); setSessionType(""); setSeasonPeriod(""); setMatchDayCode(""); }}
-              className="ml-auto text-xs text-zinc-500 hover:text-white border border-zinc-700 px-2 py-1 rounded-lg transition-colors">
-              Limpiar
-            </button>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-3">
-           <div className="flex flex-col gap-1">
-             <label className="text-zinc-500 text-xs">Desde</label>
-             <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
-               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
-           </div>
-           <div className="flex flex-col gap-1">
-             <label className="text-zinc-500 text-xs">Hasta</label>
-             <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
-               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
-           </div>
-           <div className="flex flex-col gap-1">
-             <label className="text-zinc-500 text-xs">Tipo de sesión</label>
-             <select value={sessionType} onChange={(e) => setSessionType(e.target.value)}
-               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-               <option value="">Todos</option>
-               {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-             </select>
-           </div>
-           <div className="flex flex-col gap-1">
-             <label className="text-zinc-500 text-xs">Período</label>
-             <select value={seasonPeriod} onChange={(e) => setSeasonPeriod(e.target.value)}
-               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-               <option value="">Todos</option>
-               {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
-             </select>
-           </div>
-           <div className="flex flex-col gap-1">
-             <label className="text-zinc-500 text-xs">Código de día</label>
-             <select value={matchDayCode} onChange={(e) => setMatchDayCode(e.target.value)}
-               className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
-               <option value="">Todos</option>
-               {MATCH_DAY_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
-             </select>
-           </div>
-         </div>
-        <div className="flex items-center gap-3 mt-3 pt-3 border-t border-zinc-800/60">
-          <span className="text-zinc-600 text-xs">{sessionsWithCsv} sesiones con GPS · {allRows.length} registros totales</span>
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-4">
+        {/* Toggle fuente + contador */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1 bg-zinc-800 rounded-lg p-1 border border-zinc-700">
+            {[
+              { id: "all",     label: "Todo",           icon: null },
+              { id: "session", label: "Entrenamientos", icon: Dumbbell },
+              { id: "match",   label: "Partidos",       icon: Swords },
+            ].map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setSourceFilter(id)}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+                  sourceFilter === id
+                    ? id === "match"
+                      ? "bg-red-500/20 text-red-300 border border-red-500/40"
+                      : id === "session"
+                      ? "bg-blue-500/20 text-blue-300 border border-blue-500/40"
+                      : "bg-zinc-700 text-white border border-zinc-600"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+              >
+                {Icon && <Icon size={11} />}
+                {label}
+                <span className="text-zinc-600 font-normal">
+                  ({id === "session" ? sessionsWithCsv : id === "match" ? matchesWithCsv : totalWithCsv})
+                </span>
+              </button>
+            ))}
+          </div>
           {loadingCsvs && (
             <span className="flex items-center gap-1.5 text-zinc-500 text-xs">
               <div className="w-3 h-3 border border-zinc-600 border-t-white rounded-full animate-spin" />
-              Cargando datos...
+              Cargando CSVs...
             </span>
           )}
+          <span className="text-zinc-600 text-xs ml-auto">{filteredBySource.length} registros</span>
         </div>
+
+        {/* Filtros adicionales (solo si no es vista de informe) */}
+        {tab !== "last" && (
+          <>
+            <div className="flex items-center gap-2">
+              <Filter size={12} className="text-zinc-600" />
+              <span className="text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Filtros adicionales</span>
+              {hasFilters && (
+                <button onClick={() => { setDateFrom(""); setDateTo(""); setSessionType(""); setSeasonPeriod(""); setMatchDayCode(""); setSourceFilter("all"); }}
+                  className="ml-auto text-xs text-zinc-500 hover:text-white border border-zinc-700 px-2 py-0.5 rounded-lg transition-colors">
+                  Limpiar todo
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <div className="flex flex-col gap-1">
+                <label className="text-zinc-500 text-xs">Desde</label>
+                <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)}
+                  className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+              </div>
+              <div className="flex flex-col gap-1">
+                <label className="text-zinc-500 text-xs">Hasta</label>
+                <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)}
+                  className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+              </div>
+              {sourceFilter !== "match" && (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-500 text-xs">Tipo de sesión</label>
+                    <select value={sessionType} onChange={(e) => setSessionType(e.target.value)}
+                      className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+                      <option value="">Todos</option>
+                      {SESSION_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-500 text-xs">Período</label>
+                    <select value={seasonPeriod} onChange={(e) => setSeasonPeriod(e.target.value)}
+                      className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+                      <option value="">Todos</option>
+                      {SEASON_PERIODS.map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-zinc-500 text-xs">Código de día</label>
+                    <select value={matchDayCode} onChange={(e) => setMatchDayCode(e.target.value)}
+                      className="bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+                      <option value="">Todos</option>
+                      {MATCH_DAY_CODES.map((code) => <option key={code} value={code}>{code}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* Sub-tabs */}
-      <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+      <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit flex-wrap">
         {TABS.map(({ id, label, icon: Icon }) => (
           <button key={id} onClick={() => setTab(id)}
             className={`flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${
@@ -644,16 +787,42 @@ export default function GpsAnalytics({ initialTab, initialDate }) {
       </div>
 
       {tab === "last" && (
-        <LastSessionDashboard session={lastSession} rows={lastSessionRows} />
+        <div className="space-y-4">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
+            <SessionSelector
+              sessions={sessions}
+              matches={matches}
+              selectedId={reportSource?.id}
+              onSelect={setSelectedReportId}
+            />
+            {reportSource && (
+              <div className="mt-2 flex items-center gap-2">
+                {reportSource.source === "match" ? (
+                  <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-900/30 text-red-400 border border-red-800/40">
+                    <Swords size={10} /> Partido
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-blue-900/30 text-blue-400 border border-blue-800/40">
+                    <Dumbbell size={10} /> Entrenamiento
+                  </span>
+                )}
+                {reportRows.length === 0 && !loadingCsvs && (
+                  <span className="text-xs text-zinc-500">Sin datos GPS cargados para esta selección.</span>
+                )}
+              </div>
+            )}
+          </div>
+          <LastSessionDashboard session={reportSource} rows={reportRows} />
+        </div>
       )}
       {tab === "team" && (
-        <TeamView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
+        <TeamView allRows={filteredBySource} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
       {tab === "player" && (
-        <PlayerView allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
+        <PlayerView allRows={filteredBySource} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
       {tab === "comparison" && (
-        <ComparisonView sessions={sessions} allRows={allRows} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
+        <ComparisonView sessions={[...sessions, ...matches.map(m => ({ ...m, title: `vs. ${m.rival}` }))]} allRows={filteredBySource} dateFrom={dateFrom} dateTo={dateTo} sessionType={sessionType} seasonPeriod={seasonPeriod} matchDayCode={matchDayCode} />
       )}
     </div>
   );
