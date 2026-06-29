@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Pencil, Trash2, Search, Users, Tag, X, Check, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, ArrowRightLeft } from "lucide-react";
+import { Plus, Pencil, Trash2, Search, Users, Tag, X, Check, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, ArrowRightLeft, IdCard } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import PlayerFichaModal from "@/components/staff/PlayerFichaModal";
 
 // ── Normalización ──
 function normalizeName(str) {
@@ -275,6 +276,7 @@ export default function PlayerAdmin() {
   const [editingPlayer, setEditingPlayer] = useState(null);
   const [expandedAliases, setExpandedAliases] = useState(new Set());
   const [movingPlayer, setMovingPlayer] = useState(null);
+  const [fichaPlayer, setFichaPlayer] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => { load(); }, []);
@@ -482,6 +484,12 @@ export default function PlayerAdmin() {
                   {/* Acciones */}
                   <div className="flex items-center gap-1 shrink-0">
                     <button
+                      onClick={() => setFichaPlayer(player)}
+                      title="Ver ficha del jugador"
+                      className="p-1.5 rounded-lg text-zinc-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors">
+                      <IdCard size={14} />
+                    </button>
+                    <button
                       onClick={() => setMovingPlayer(player)}
                       title="Mover a otro plantel"
                       className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-400 hover:bg-blue-500/10 transition-colors">
@@ -523,6 +531,14 @@ export default function PlayerAdmin() {
             );
           })}
         </div>
+      )}
+
+      {fichaPlayer && (
+        <PlayerFichaModal
+          player={fichaPlayer}
+          onClose={() => setFichaPlayer(null)}
+          onEdit={(p) => { setFichaPlayer(null); setEditingPlayer(p); setShowForm(true); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+        />
       )}
 
       {movingPlayer && (
