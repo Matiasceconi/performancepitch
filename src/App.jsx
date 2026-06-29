@@ -27,6 +27,7 @@ import PlantilDiagnostic from '@/pages/PlantilDiagnostic';
 import WeeklyPlanner from '@/pages/WeeklyPlanner';
 import PlayerAdmin from '@/pages/PlayerAdmin';
 import DataCrossing from '@/pages/DataCrossing';
+import PlayerIdentity from '@/pages/PlayerIdentity';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -74,6 +75,7 @@ const AuthenticatedApp = () => {
           <Route path="/weekly-planner" element={<WeeklyPlanner />} />
           <Route path="/player-admin" element={<PlayerAdmin />} />
           <Route path="/data-crossing" element={<DataCrossing />} />
+          <Route path="/identity" element={<PlayerIdentity />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
