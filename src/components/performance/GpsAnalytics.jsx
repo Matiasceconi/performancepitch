@@ -402,8 +402,123 @@ function PlayerView({ allRows, dateFrom, dateTo, sessionType, seasonPeriod, matc
   );
 }
 
+// ── Vista Comparar: Jugadores en misma sesión ─────────────────────────────────
+function PlayerComparisonView({ allRows }) {
+  const sessionOptions = useMemo(() => {
+    const seen = new Set();
+    const out = [];
+    allRows.forEach(r => {
+      if (!seen.has(r.session_id)) {
+        seen.add(r.session_id);
+        out.push({ id: r.session_id, title: r.session_title, date: r.date, source: r.source });
+      }
+    });
+    return out.sort((a, b) => b.date.localeCompare(a.date));
+  }, [allRows]);
+
+  const [sessionId, setSessionId] = useState(sessionOptions[0]?.id || "");
+
+  const sessionRows = useMemo(() => allRows.filter(r => r.session_id === sessionId), [allRows, sessionId]);
+  const playerNames = useMemo(() => [...new Set(sessionRows.map(r => r.player_name))].sort(), [sessionRows]);
+
+  const [playerA, setPlayerA] = useState("");
+  const [playerB, setPlayerB] = useState("");
+
+  // Auto-seleccionar jugadores cuando cambia sesión
+  useEffect(() => {
+    setPlayerA(playerNames[0] || "");
+    setPlayerB(playerNames[1] || "");
+  }, [sessionId, playerNames.join(",")]);
+
+  const rowA = useMemo(() => sessionRows.find(r => r.player_name === playerA), [sessionRows, playerA]);
+  const rowB = useMemo(() => sessionRows.find(r => r.player_name === playerB), [sessionRows, playerB]);
+
+  const sessionInfo = sessionOptions.find(s => s.id === sessionId);
+
+  return (
+    <div className="space-y-5">
+      {/* Selector de sesión */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+        <label className="text-xs text-zinc-500 font-semibold uppercase tracking-wider">Sesión</label>
+        <select value={sessionId} onChange={e => setSessionId(e.target.value)}
+          className="w-full bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none focus:border-zinc-500">
+          {sessionOptions.map(s => (
+            <option key={s.id} value={s.id}>
+              {moment(s.date).format("DD/MM/YY")} — {s.title}
+            </option>
+          ))}
+        </select>
+        {sessionInfo && (
+          <p className="text-xs text-zinc-500">{moment(sessionInfo.date).format("dddd DD [de] MMMM YYYY")} · {playerNames.length} jugadores</p>
+        )}
+      </div>
+
+      {/* Selectores de jugadores */}
+      <div className="grid grid-cols-2 gap-4">
+        {[
+          { label: "Jugador A", color: "#60a5fa", value: playerA, set: setPlayerA, row: rowA },
+          { label: "Jugador B", color: "#f87171", value: playerB, set: setPlayerB, row: rowB },
+        ].map(({ label, color, value, set }) => (
+          <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+              <span className="text-white font-semibold text-sm">{label}</span>
+            </div>
+            <select value={value} onChange={e => set(e.target.value)}
+              className="w-full bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none">
+              <option value="">— Seleccionar —</option>
+              {playerNames.map(n => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabla comparativa */}
+      {rowA && rowB && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="px-4 py-3 border-b border-zinc-800 grid grid-cols-4 text-xs font-semibold text-zinc-400">
+            <span>Métrica</span>
+            <span className="text-center text-blue-400">{playerA}</span>
+            <span className="text-center text-red-400">{playerB}</span>
+            <span className="text-center">Diferencia</span>
+          </div>
+          {METRICS.map(({ key, label, fmt }) => {
+            const a = rowA[key] ?? null;
+            const b = rowB[key] ?? null;
+            const diff = a != null && b != null ? a - b : null;
+            const up = diff != null && diff > 0;
+            return (
+              <div key={key} className="grid grid-cols-4 border-b border-zinc-800/50 hover:bg-zinc-800/20 px-4 py-3 items-center">
+                <span className="text-zinc-300 text-xs font-medium">{label}</span>
+                <span className="text-center text-white text-sm font-bold">{a != null ? fmt(a) : "—"}</span>
+                <span className="text-center text-white text-sm font-bold">{b != null ? fmt(b) : "—"}</span>
+                <span className={`text-center text-xs font-semibold flex items-center justify-center gap-1 ${diff == null ? "text-zinc-600" : up ? "text-green-400" : "text-red-400"}`}>
+                  {diff == null ? "—" : <><span>{up ? "▲" : "▼"}</span><span>{fmt(Math.abs(diff))}</span></>}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {(!rowA || !rowB) && playerNames.length >= 2 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+          <p className="text-zinc-500 text-sm">Seleccioná dos jugadores para ver la comparación.</p>
+        </div>
+      )}
+      {playerNames.length < 2 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+          <p className="text-zinc-500 text-sm">Esta sesión no tiene suficientes jugadores con datos GPS.</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Vista Comparar sesiones ───────────────────────────────────────────────────
 function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seasonPeriod, matchDayCode }) {
+  const [compareMode, setCompareMode] = useState("sessions"); // "sessions" | "players"
+
   const sessionOptions = useMemo(() => {
     return sessions
       .filter((s) => {
@@ -430,61 +545,81 @@ function ComparisonView({ sessions, allRows, dateFrom, dateTo, sessionType, seas
   const infoA = sessions.find((s) => s.id === idA);
   const infoB = sessions.find((s) => s.id === idB);
 
-  if (sessionOptions.length < 2) {
-    return (
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-        <p className="text-zinc-500 text-sm">Necesitás al menos 2 sesiones con datos GPS para comparar.</p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-4">
-        {[
-          { label: "Sesión A", color: "#60a5fa", value: idA, set: setIdA, info: infoA, avg: avgA },
-          { label: "Sesión B", color: "#f87171", value: idB, set: setIdB, info: infoB, avg: avgB },
-        ].map(({ label, color, value, set, info }) => (
-          <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
-              <span className="text-white font-semibold text-sm">{label}</span>
-            </div>
-            <select value={value} onChange={(e) => set(e.target.value)}
-              className="w-full bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none">
-              {sessionOptions.map((s) => (
-                <option key={s.id} value={s.id}>{moment(s.date).format("DD/MM/YY")} — {s.title}</option>
-              ))}
-            </select>
-            {info && <p className="text-xs text-zinc-500">{moment(info.date).format("DD [de] MMMM YYYY")}{info.match_day_code ? ` · ${info.match_day_code}` : ""}</p>}
-          </div>
-        ))}
+      {/* Toggle modo */}
+      <div className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
+        <button onClick={() => setCompareMode("sessions")}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${compareMode === "sessions" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+          Sesión vs Sesión
+        </button>
+        <button onClick={() => setCompareMode("players")}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-all ${compareMode === "players" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+          Jugador vs Jugador
+        </button>
       </div>
 
-      {reportsA.length > 0 && reportsB.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-          <div className="p-4 border-b border-zinc-800 grid grid-cols-4 text-xs font-semibold text-zinc-400">
-            <span>Métrica</span>
-            <span className="text-center text-blue-400">{infoA?.title || "Sesión A"}</span>
-            <span className="text-center text-red-400">{infoB?.title || "Sesión B"}</span>
-            <span className="text-center">Diferencia</span>
-          </div>
-          {METRICS.map(({ key, label, fmt }) => {
-            const a = avgA[key], b = avgB[key];
-            const diff = a != null && b != null ? a - b : null;
-            const up = diff != null && diff > 0;
-            return (
-              <div key={key} className="grid grid-cols-4 border-b border-zinc-800/60 hover:bg-zinc-800/20 px-4 py-3 items-center">
-                <span className="text-zinc-300 text-xs font-medium">{label}</span>
-                <span className="text-center text-white text-sm font-bold">{a != null ? fmt(a) : "—"}</span>
-                <span className="text-center text-white text-sm font-bold">{b != null ? fmt(b) : "—"}</span>
-                <span className={`text-center text-xs font-semibold ${diff == null ? "text-zinc-600" : up ? "text-green-400" : "text-red-400"}`}>
-                  {diff == null ? "—" : `${up ? "▲" : "▼"} ${fmt(Math.abs(diff))}`}
-                </span>
+      {compareMode === "players" && (
+        <PlayerComparisonView allRows={allRows} />
+      )}
+
+      {compareMode === "sessions" && (
+        <>
+          {sessionOptions.length < 2 ? (
+            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+              <p className="text-zinc-500 text-sm">Necesitás al menos 2 sesiones con datos GPS para comparar.</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { label: "Sesión A", color: "#60a5fa", value: idA, set: setIdA, info: infoA },
+                  { label: "Sesión B", color: "#f87171", value: idB, set: setIdB, info: infoB },
+                ].map(({ label, color, value, set, info }) => (
+                  <div key={label} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 space-y-2">
+                    <div className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full" style={{ backgroundColor: color }} />
+                      <span className="text-white font-semibold text-sm">{label}</span>
+                    </div>
+                    <select value={value} onChange={(e) => set(e.target.value)}
+                      className="w-full bg-zinc-800 text-white text-sm rounded-lg px-3 py-2 border border-zinc-700 focus:outline-none">
+                      {sessionOptions.map((s) => (
+                        <option key={s.id} value={s.id}>{moment(s.date).format("DD/MM/YY")} — {s.title}</option>
+                      ))}
+                    </select>
+                    {info && <p className="text-xs text-zinc-500">{moment(info.date).format("DD [de] MMMM YYYY")}{info.match_day_code ? ` · ${info.match_day_code}` : ""}</p>}
+                  </div>
+                ))}
               </div>
-            );
-          })}
-        </div>
+
+              {reportsA.length > 0 && reportsB.length > 0 && (
+                <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+                  <div className="p-4 border-b border-zinc-800 grid grid-cols-4 text-xs font-semibold text-zinc-400">
+                    <span>Métrica</span>
+                    <span className="text-center text-blue-400">{infoA?.title || "Sesión A"}</span>
+                    <span className="text-center text-red-400">{infoB?.title || "Sesión B"}</span>
+                    <span className="text-center">Diferencia</span>
+                  </div>
+                  {METRICS.map(({ key, label, fmt }) => {
+                    const a = avgA[key], b = avgB[key];
+                    const diff = a != null && b != null ? a - b : null;
+                    const up = diff != null && diff > 0;
+                    return (
+                      <div key={key} className="grid grid-cols-4 border-b border-zinc-800/60 hover:bg-zinc-800/20 px-4 py-3 items-center">
+                        <span className="text-zinc-300 text-xs font-medium">{label}</span>
+                        <span className="text-center text-white text-sm font-bold">{a != null ? fmt(a) : "—"}</span>
+                        <span className="text-center text-white text-sm font-bold">{b != null ? fmt(b) : "—"}</span>
+                        <span className={`text-center text-xs font-semibold ${diff == null ? "text-zinc-600" : up ? "text-green-400" : "text-red-400"}`}>
+                          {diff == null ? "—" : `${up ? "▲" : "▼"} ${fmt(Math.abs(diff))}`}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );
