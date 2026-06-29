@@ -2,13 +2,17 @@
   "name": "Player",
   "type": "object",
   "properties": {
+    "dni": {
+      "type": "string",
+      "description": "DNI \u00fanico del jugador \u2014 identificador estable"
+    },
     "first_name": {
       "type": "string",
-      "description": "Nombre del jugador"
+      "description": "Nombre"
     },
     "last_name": {
       "type": "string",
-      "description": "Apellido del jugador"
+      "description": "Apellido"
     },
     "full_name": {
       "type": "string",
@@ -18,9 +22,22 @@
       "type": "string",
       "description": "Nombre normalizado para b\u00fasqueda (min\u00fascula, sin tildes)"
     },
-    "jersey_number": {
+    "birth_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de nacimiento"
+    },
+    "age": {
       "type": "number",
-      "description": "N\u00famero de camiseta"
+      "description": "Edad calculada"
+    },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda (ej: 2005, Sub-20, Juvenil)"
+    },
+    "division": {
+      "type": "string",
+      "description": "Divisi\u00f3n / Equipo (ej: Primera, Reserva)"
     },
     "position": {
       "type": "string",
@@ -40,19 +57,6 @@
       "type": "string",
       "description": "Posici\u00f3n secundaria"
     },
-    "category": {
-      "type": "string",
-      "description": "Categor\u00eda (ej: 2005, Sub-20, Juvenil)"
-    },
-    "birth_date": {
-      "type": "string",
-      "format": "date",
-      "description": "Fecha de nacimiento"
-    },
-    "age": {
-      "type": "number",
-      "description": "Edad calculada"
-    },
     "dominant_leg": {
       "type": "string",
       "enum": [
@@ -69,10 +73,6 @@
     "weight": {
       "type": "number",
       "description": "Peso en kg"
-    },
-    "photo_url": {
-      "type": "string",
-      "description": "Foto de perfil del jugador"
     },
     "status": {
       "type": "string",
@@ -92,24 +92,22 @@
       "default": "Disponible",
       "description": "Estado actual del jugador"
     },
-    "division": {
-      "type": "string",
-      "enum": [
-        "Primera",
-        "Reserva",
-        "Cuarta Divisi\u00f3n",
-        "Quinta Divisi\u00f3n"
-      ],
-      "default": "Primera",
-      "description": "Divisi\u00f3n"
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Jugador activo en el plantel"
     },
-    "notes": {
+    "jersey_number": {
+      "type": "number",
+      "description": "N\u00famero de camiseta"
+    },
+    "photo_url": {
       "type": "string",
-      "description": "Notas adicionales"
+      "description": "Foto de perfil del jugador"
     },
     "document_number": {
       "type": "string",
-      "description": "DNI / Documento"
+      "description": "DNI / Documento (alias de dni para compatibilidad)"
     },
     "birth_place": {
       "type": "string",
@@ -128,6 +126,10 @@
       "type": "boolean",
       "default": false,
       "description": "Tiene contrato"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas adicionales"
     }
   },
   "required": [
