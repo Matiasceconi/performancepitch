@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Upload, CheckCircle, AlertCircle, Eye, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { fmtMetric } from "@/utils";
 
 // ── Normalize player name for matching ──────────────────────────────────────
 function normalize(s) {
@@ -209,8 +210,8 @@ export default function SessionGPS({ session, sessionPlayers }) {
   // ── Stats ──────────────────────────────────────────────────────────────────
   const withGPS = gpsRows.length;
   const withoutGPS = sessionPlayers.filter(sp => !gpsRows.find(r => r.player_id === sp.player_id)).length;
-  const avgDist = gpsRows.length ? Math.round(gpsRows.reduce((s, r) => s + (r.total_distance || 0), 0) / gpsRows.length) : 0;
-  const avgMMin = gpsRows.length ? (gpsRows.reduce((s, r) => s + (r.m_min || 0), 0) / gpsRows.length).toFixed(1) : 0;
+  const avgDistRaw = gpsRows.length ? gpsRows.reduce((s, r) => s + (r.total_distance || 0), 0) / gpsRows.length : null;
+  const avgMMinRaw = gpsRows.length ? gpsRows.reduce((s, r) => s + (r.m_min || 0), 0) / gpsRows.length : null;
   const topSpeed = gpsRows.length ? gpsRows.reduce((a, b) => (b.smax || 0) > (a.smax || 0) ? b : a, gpsRows[0]) : null;
 
   return (
@@ -330,7 +331,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
           {[
             { label: "Con GPS", value: withGPS, color: "text-emerald-400" },
             { label: "Sin GPS", value: withoutGPS, color: "text-zinc-500" },
-            { label: "Prom. distancia", value: avgDist ? `${avgDist}m` : "—", color: "text-blue-400" },
+            { label: "Prom. distancia", value: avgDistRaw != null ? `${fmtMetric(avgDistRaw)}m` : "—", color: "text-blue-400" },
             { label: "Mayor velocidad", value: topSpeed ? `${topSpeed.smax} km/h` : "—", color: "text-orange-400" },
           ].map(s => (
             <div key={s.label} className="bg-zinc-800/50 rounded-xl p-3 text-center">
@@ -361,16 +362,16 @@ export default function SessionGPS({ session, sessionPlayers }) {
                   <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
                     <td className="py-2 px-2 text-white font-medium whitespace-nowrap">{r.player_name}</td>
                     <td className="py-2 px-2 text-zinc-400">{r.duration ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.total_distance ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.m_min ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.distance_19_8 ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.distance_25 ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.sprints ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.acc_3 ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.dec_3 ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.player_load ?? "—"}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.total_distance)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.m_min)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.distance_19_8)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.distance_25)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.sprints)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.acc_3)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.dec_3)}</td>
+                    <td className="py-2 px-2 text-zinc-300">{fmtMetric(r.player_load)}</td>
                     <td className="py-2 px-2 text-orange-300 font-semibold">{r.smax ?? "—"}</td>
-                    <td className="py-2 px-2 text-zinc-300">{r.max_vel_percent != null ? `${r.max_vel_percent}%` : "—"}</td>
+                    <td className="py-2 px-2 text-zinc-300">{r.max_vel_percent != null ? `${fmtMetric(r.max_vel_percent)}%` : "—"}</td>
                   </tr>
                 ))}
               </tbody>
