@@ -14,6 +14,9 @@ import { STATUS_LABELS, isGoalkeeper, resolvePlayerType } from "@/components/squ
 import PlayerAvatar from "@/components/player/PlayerAvatar";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
 import MovementBoardCard from "@/components/dashboard/MovementBoardCard";
+import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import DaySummarySection from "@/components/dashboard/DaySummarySection";
+import DayScheduleAgenda from "@/components/dashboard/DayScheduleAgenda";
 
 moment.locale("es");
 
@@ -47,89 +50,6 @@ class ErrorBoundary extends Component {
     );
     return this.props.children;
   }
-}
-
-// ─── Next Match Card ───────────────────────────────────────────────────────
-function NextMatchCard({ match, matchReport }) {
-  const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
-  const [logoError, setLogoError] = useState(false);
-  const [showSquad, setShowSquad] = useState(false);
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-      <div className="p-4 flex items-center gap-4">
-        <div className="w-14 h-14 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden">
-          {match.rival_logo_url && !logoError
-            ? <img src={match.rival_logo_url} alt="Rival" className="w-full h-full object-contain p-1" onError={() => setLogoError(true)} />
-            : <Shield size={24} className="text-zinc-500" />}
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-zinc-500 font-medium uppercase tracking-wider mb-0.5">Próximo partido</p>
-          <p className="text-white font-bold text-base truncate">{match.title}</p>
-          <p className="text-zinc-400 text-sm capitalize">
-            {moment(match.date).format("dddd D [de] MMMM")}
-            {match.time ? ` · ${match.time}hs` : ""}
-            {match.location ? ` · ${match.location}` : ""}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-2 shrink-0">
-          <div className="text-right">
-            <p className="text-3xl font-black text-white leading-none">{daysLeft}</p>
-            <p className="text-xs text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
-          </div>
-          {matchReport?.squad_names?.length > 0 &&
-            <button onClick={() => setShowSquad(!showSquad)}
-              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 transition-colors font-medium">
-              <Users size={12} /> Convocados ({matchReport.squad_names.length})
-            </button>}
-        </div>
-      </div>
-      {showSquad && matchReport &&
-        <div className="border-t border-zinc-800 p-4">
-          <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-3">Lista de convocados</p>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            {matchReport.squad_names.map((name, i) =>
-              <div key={i} className="flex items-center gap-2 text-sm text-white">
-                <span className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center text-[10px] font-bold text-zinc-400 shrink-0">{i + 1}</span>
-                {name}
-              </div>)}
-          </div>
-        </div>}
-    </div>
-  );
-}
-
-// ─── Summary stat card ─────────────────────────────────────────────────────
-function StatCard({ label, value, color, icon: Icon, sub }) {
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-      <div className="flex items-center justify-between mb-1">
-        <Icon size={14} className={color} />
-      </div>
-      <p className={`text-xl font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] text-zinc-500 mt-0.5 leading-tight">{label}</p>
-      {sub && (
-        <p className="text-[9px] text-zinc-600 mt-1 leading-tight">{sub}</p>
-      )}
-    </div>
-  );
-}
-
-// ─── Goalkeeper / Field split card ─────────────────────────────────────────
-function SplitStatCard({ label, fieldValue, gkValue, color, icon: Icon }) {
-  const total = (fieldValue || 0) + (gkValue || 0);
-  return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-      <div className="flex items-center gap-1 mb-1">
-        <Icon size={14} className={color} />
-      </div>
-      <p className={`text-xl font-bold ${color}`}>{total}</p>
-      <p className="text-[10px] text-zinc-500 mt-0.5">{label}</p>
-      <div className="flex gap-2 mt-1.5">
-        <span className="text-[9px] text-zinc-400">Campo: <strong className="text-zinc-300">{fieldValue}</strong></span>
-        <span className="text-[9px] text-zinc-400">ARQ: <strong className="text-yellow-400">{gkValue}</strong></span>
-      </div>
-    </div>
-  );
 }
 
 // ─── Player row (read-only) — driven by DailySquadStatus record ────────────
@@ -303,6 +223,8 @@ export default function Dashboard() {
   const [sessions, setSessions] = useState([]);
   const [nextMatch, setNextMatch] = useState(null);
   const [nextMatchReport, setNextMatchReport] = useState(null);
+  const [lastMatchEvent, setLastMatchEvent] = useState(null);
+  const [todayEvents, setTodayEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -314,7 +236,7 @@ export default function Dashboard() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
 
-    const [allPlayers, statuses, allSquads, mb, events, s, matchReports] = await Promise.all([
+    const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw] = await Promise.all([
       base44.entities.Player.list("-created_date", 500),
       base44.entities.DailySquadStatus.filter({ date: today }, "-updated_at", 500),
       base44.entities.Squad.list("name", 100),
@@ -322,6 +244,7 @@ export default function Dashboard() {
       base44.entities.DayEvent.list("date", 200),
       base44.entities.TrainingSession.list("-date", 50),
       base44.entities.MatchReport.list("-date", 20),
+      base44.entities.DayEvent.filter({ date: today }, "time", 100),
     ]);
 
     const map = {};
@@ -337,6 +260,11 @@ export default function Dashboard() {
     const match = events.find(e => e.type === "Partido" && e.date >= today);
     setNextMatch(match || null);
     if (match) setNextMatchReport(matchReports.find(r => r.date === match.date) || null);
+
+    const pastMatches = events.filter(e => e.type === "Partido" && e.date < today);
+    setLastMatchEvent(pastMatches.length > 0 ? pastMatches[pastMatches.length - 1] : null);
+
+    setTodayEvents(todayEventsRaw.filter(filterBySquad));
 
     setLastSync(new Date());
     if (!silent) setLoading(false); else setRefreshing(false);
@@ -497,7 +425,19 @@ export default function Dashboard() {
     );
   }, [squadRecords, selectedSquadId]);
 
-  const totalCount = squadRecords.length;
+  // ── Día del microciclo (MD-4 ... MD ... MD+2 / Libre) ──────────────────
+  const microcycleLabel = useMemo(() => {
+    if (nextMatch) {
+      const diff = moment(nextMatch.date).diff(moment(today), "days");
+      if (diff === 0) return "MD";
+      if (diff > 0 && diff <= 4) return `MD-${diff}`;
+    }
+    if (lastMatchEvent) {
+      const diff = moment(today).diff(moment(lastMatchEvent.date), "days");
+      if (diff > 0 && diff <= 2) return `MD+${diff}`;
+    }
+    return "Libre";
+  }, [nextMatch, lastMatchEvent, today]);
 
   // Split records by goalkeeper / field player using playerMap
   // Checks player_type first (most reliable), then falls back to position
@@ -507,18 +447,6 @@ export default function Dashboard() {
     // fallback: use position stored in ds or resolve from position string
     return isGoalkeeper({ position: ds.position });
   }
-
-  function splitByType(records) {
-    const gk = records.filter(ds => isGK(ds));
-    const field = records.filter(ds => !isGK(ds));
-    return { gk: gk.length, field: field.length };
-  }
-
-  const dispSplit = splitByType(byStatus.disponible || []);
-  const lesioSplit = splitByType(byStatus.lesionado || []);
-  const diffSplit = splitByType(byStatus.diferenciado || []);
-  const gkTotal = splitByType(squadRecords).gk;
-  const fieldTotal = splitByType(squadRecords).field;
 
   const birthdayPlayers = useMemo(() =>
     playerList.filter(p => p.birth_date && moment(p.birth_date).format("MM-DD") === moment().format("MM-DD")),
@@ -536,51 +464,34 @@ export default function Dashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-            Dashboard
-            {activeSquad && <span className="text-zinc-500 font-normal text-lg ml-2">· {activeSquad.name}</span>}
-          </h1>
-          <p className="text-zinc-500 text-sm mt-1 capitalize">{moment().format("dddd D [de] MMMM, YYYY")}</p>
-          {lastSync && (
-            <p className="text-zinc-600 text-xs mt-0.5 flex items-center gap-1">
-              <Clock size={10} />
-              Actualizado desde Estado del Plantel: {moment(lastSync).format("HH:mm:ss")}
-            </p>
-          )}
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={refresh}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors">
-            <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
-            Actualizar
-          </button>
-          <Link to="/daily-squad"
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
-            Gestionar estados <ChevronRight size={15} />
-          </Link>
-        </div>
-      </div>
+      <DashboardHeader
+        activeSquad={activeSquad}
+        mySquads={mySquads}
+        setActiveSquad={setActiveSquad}
+        nextMatch={nextMatch}
+        nextMatchReport={nextMatchReport}
+        microcycleLabel={microcycleLabel}
+      />
 
-      {/* Squad filter — driven by WorkspaceContext activeSquad */}
-      {mySquads.length > 1 && (
-        <div className="flex items-center gap-2 flex-wrap">
-          <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl p-1 gap-1 flex-wrap">
-            {mySquads.map(sq => (
-              <button key={sq.id}
-                onClick={() => setActiveSquad(sq)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  selectedSquadId === sq.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
-                }`}>
-                {sq.name}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="flex items-center justify-end gap-2 flex-wrap">
+        {lastSync && (
+          <p className="text-zinc-600 text-xs flex items-center gap-1">
+            <Clock size={10} />
+            Actualizado: {moment(lastSync).format("HH:mm:ss")}
+          </p>
+        )}
+        <button
+          onClick={refresh}
+          disabled={refreshing}
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors">
+          <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
+          Actualizar
+        </button>
+        <Link to="/daily-squad"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-white text-sm font-medium transition-colors">
+          Gestionar estados <ChevronRight size={15} />
+        </Link>
+      </div>
 
       {/* No state loaded warning */}
       {!hasStatusToday && (
@@ -595,17 +506,19 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Summary cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-        <StatCard label="Total plantel" value={totalCount} icon={Users} color="text-blue-400"
-          sub={`Campo: ${fieldTotal} · ARQ: ${gkTotal}`} />
-        <SplitStatCard label="Disponibles" fieldValue={dispSplit.field} gkValue={dispSplit.gk} icon={Activity} color="text-emerald-400" />
-        <SplitStatCard label="Lesionados" fieldValue={lesioSplit.field} gkValue={lesioSplit.gk} icon={AlertCircle} color="text-red-400" />
-        <SplitStatCard label="Diferenciados" fieldValue={diffSplit.field} gkValue={diffSplit.gk} icon={Zap} color="text-amber-400" />
-        <StatCard label="Molestias" value={(byStatus.molestia || []).length} icon={AlertCircle} color="text-orange-400" />
-        <StatCard label="Convocados" value={(byStatus.convocado || []).length} icon={UserCheck} color="text-blue-300" />
-        <StatCard label="Suspendidos" value={(byStatus.suspendido || []).length} icon={UserX} color="text-purple-400" />
-      </div>
+      {/* Resumen del Día */}
+      <DaySummarySection
+        squadRecords={squadRecords}
+        byStatus={byStatus}
+        subenA={subenA}
+        subenReservaAPrimera={subenReservaAPrimera}
+        playerMap={playerMap}
+        isGKFn={isGK}
+        squadName={squads.find(s => s.id === selectedSquadId)?.name}
+      />
+
+      {/* Cronograma del Día */}
+      <DayScheduleAgenda events={todayEvents} />
 
       {/* Birthday */}
       {birthdayPlayers.length > 0 && (
@@ -619,9 +532,6 @@ export default function Dashboard() {
           </div>
         </div>
       )}
-
-      {/* Next match */}
-      {nextMatch && <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />}
 
       {/* Player groups + next training */}
       <div className="grid lg:grid-cols-3 gap-4">
