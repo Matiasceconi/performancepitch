@@ -19,9 +19,11 @@ export default function Sessions() {
     setLoading(true);
     setView("list");
     setSelectedSession(null);
-    const query = activeSquadId ? { squad_id: activeSquadId } : {};
-    base44.entities.TrainingSession.filter(query, "-date", 200).then(s => {
-      setSessions(s);
+    base44.entities.TrainingSession.list("-date", 200).then(all => {
+      const filtered = activeSquadId
+        ? all.filter(s => !s.squad_id || s.squad_id === activeSquadId)
+        : all;
+      setSessions(filtered);
       setLoading(false);
     });
   }, [activeSquadId]);
