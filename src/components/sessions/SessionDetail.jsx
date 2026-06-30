@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video } from "lucide-react";
+import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video, Download, FileText } from "lucide-react";
+import SessionVideoPanel from "@/components/sessions/SessionVideoPanel";
+import SessionPDFExport from "@/components/sessions/SessionPDFExport";
 import moment from "moment";
 import SessionPlayerTable from "@/components/sessions/SessionPlayerTable";
 import SessionExercises from "@/components/sessions/SessionExercises";
@@ -32,6 +34,8 @@ export default function SessionDetail({ session, onBack }) {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("players");
   const [currentSession, setCurrentSession] = useState(session);
+  const [showVideoPanel, setShowVideoPanel] = useState(false);
+  const [showPDFExport, setShowPDFExport] = useState(false);
 
   useEffect(() => { setCurrentSession(session); }, [session]);
 
@@ -55,6 +59,21 @@ export default function SessionDetail({ session, onBack }) {
       {/* Header */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
         <div className="flex items-start justify-between gap-3 flex-wrap">
+          {/* Action buttons */}
+          <div className="w-full flex justify-end gap-2 mb-1">
+            <button
+              onClick={() => setShowVideoPanel(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 rounded-lg transition-colors"
+            >
+              <Video size={12} /> Videos
+            </button>
+            <button
+              onClick={() => setShowPDFExport(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 rounded-lg transition-colors"
+            >
+              <FileText size={12} /> Exportar PDF
+            </button>
+          </div>
           <div>
             <div className="flex items-center gap-2 flex-wrap mb-1">
               <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${typeClass}`}>
@@ -147,6 +166,14 @@ export default function SessionDetail({ session, onBack }) {
           </button>
         ))}
       </div>
+
+      {/* Modals */}
+      {showVideoPanel && (
+        <SessionVideoPanel session={currentSession} onClose={() => setShowVideoPanel(false)} />
+      )}
+      {showPDFExport && (
+        <SessionPDFExport session={currentSession} sessionPlayers={sessionPlayers} onClose={() => setShowPDFExport(false)} />
+      )}
 
       {/* Tab content */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
