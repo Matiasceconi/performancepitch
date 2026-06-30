@@ -1,42 +1,54 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Edit2, X, ChevronDown, ChevronUp, UserCheck, UserX, Shield } from "lucide-react";
+import { Plus, Edit2, UserCheck, UserX, Shield, ChevronDown, Mail, Phone, Briefcase } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import StaffForm from "@/components/staff/StaffForm";
-import StaffAccessModal from "@/components/staff/StaffAccessModal";
+import StaffPermissionsModal from "@/components/staff/StaffPermissionsModal";
 
 const ROLE_COLORS = {
-  entrenador: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
-  PF: "bg-blue-500/15 text-blue-300 border-blue-500/30",
-  analista: "bg-purple-500/15 text-purple-300 border-purple-500/30",
-  "médico": "bg-red-500/15 text-red-300 border-red-500/30",
+  entrenador:    "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
+  PF:            "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  analista:      "bg-purple-500/15 text-purple-300 border-purple-500/30",
+  "médico":      "bg-red-500/15 text-red-300 border-red-500/30",
   "kinesiólogo": "bg-orange-500/15 text-orange-300 border-orange-500/30",
-  "nutricionista": "bg-green-500/15 text-green-300 border-green-500/30",
-  utilero: "bg-zinc-500/15 text-zinc-300 border-zinc-600",
-  coordinador: "bg-sky-500/15 text-sky-300 border-sky-500/30",
-  dirigente: "bg-pink-500/15 text-pink-300 border-pink-500/30",
-  admin: "bg-white/10 text-white border-white/20",
+  "nutricionista":"bg-green-500/15 text-green-300 border-green-500/30",
+  utilero:       "bg-zinc-500/15 text-zinc-300 border-zinc-600",
+  coordinador:   "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  dirigente:     "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  admin:         "bg-white/10 text-white border-white/20",
 };
 
-const ALL_ROLES = ["entrenador", "PF", "analista", "médico", "kinesiólogo", "nutricionista", "utilero", "coordinador", "dirigente", "admin"];
+const ALL_ROLES = ["entrenador","PF","analista","médico","kinesiólogo","nutricionista","utilero","coordinador","dirigente","admin"];
 
 export default function StaffManager() {
   const [members, setMembers] = useState([]);
   const [squads, setSquads] = useState([]);
+  const [accessMap, setAccessMap] = useState({}); // staffId → UserAccess record
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editMember, setEditMember] = useState(null);
-  const [accessMember, setAccessMember] = useState(null);
+  const [permsMember, setPermsMember] = useState(null);
   const [filterSquad, setFilterSquad] = useState("");
   const [filterRole, setFilterRole] = useState("");
   const { toast } = useToast();
 
-  useEffect(() => {
-    Promise.all([
+  async function load() {
+    setLoading(true);
+    const [m, s, accesses] = await Promise.all([
       base44.entities.StaffMember.list("-created_date", 200),
       base44.entities.Squad.list("name", 50),
-    ]).then(([m, s]) => { setMembers(m); setSquads(s); setLoading(false); });
-  }, []);
+      base44.entities.UserAccess.list("-created_date", 200),
+    ]);
+    setMembers(m);
+    setSquads(s);
+    // Build a map staffId → access record for quick lookup
+    const map = {};
+    accesses.forEach(a => { if (a.staff_id) map[a.staff_id] = a; });
+    setAccessMap(map);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, []);
 
   async function toggleActive(member) {
     const updated = await base44.entities.StaffMember.update(member.id, { active: !member.active });
@@ -53,6 +65,11 @@ export default function StaffManager() {
       : [member, ...prev]);
     setShowForm(false);
     setEditMember(null);
+  }
+
+  function handlePermsSaved(access) {
+    setAccessMap(prev => ({ ...prev, [access.staff_id]: access }));
+    setPermsMember(null);
   }
 
   const filtered = members.filter(m => {
@@ -76,7 +93,7 @@ export default function StaffManager() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h2 className="text-lg font-bold text-white">Cuerpo Técnico y Staff</h2>
-          <p className="text-xs text-zinc-500 mt-0.5">{active.length} miembros activos</p>
+          <p className="text-xs text-zinc-500 mt-0.5">{active.length} miembros activos · Identidad laboral del equipo</p>
         </div>
         <button onClick={openNew}
           className="flex items-center gap-2 px-4 py-2 bg-white text-zinc-900 font-semibold text-sm rounded-lg hover:bg-zinc-200 transition-colors">
@@ -99,13 +116,16 @@ export default function StaffManager() {
       </div>
 
       {/* Active members */}
-      {active.length > 0 && (
-        <div className="space-y-2">
-          {active.map(m => <MemberCard key={m.id} member={m} squads={squads} onEdit={openEdit} onToggle={toggleActive} onAccess={setAccessMember} />)}
-        </div>
-      )}
+      {active.map(m => (
+        <MemberCard key={m.id} member={m} squads={squads}
+          access={accessMap[m.id] || null}
+          onEdit={openEdit}
+          onToggle={toggleActive}
+          onPerms={() => setPermsMember(m)}
+        />
+      ))}
 
-      {/* Inactive members */}
+      {/* Inactive */}
       {inactive.length > 0 && (
         <details className="group">
           <summary className="cursor-pointer text-xs text-zinc-500 uppercase tracking-wider font-medium py-2 select-none list-none flex items-center gap-1">
@@ -113,7 +133,14 @@ export default function StaffManager() {
             Inactivos ({inactive.length})
           </summary>
           <div className="space-y-2 mt-2 opacity-60">
-            {inactive.map(m => <MemberCard key={m.id} member={m} squads={squads} onEdit={openEdit} onToggle={toggleActive} onAccess={setAccessMember} />)}
+            {inactive.map(m => (
+              <MemberCard key={m.id} member={m} squads={squads}
+                access={accessMap[m.id] || null}
+                onEdit={openEdit}
+                onToggle={toggleActive}
+                onPerms={() => setPermsMember(m)}
+              />
+            ))}
           </div>
         </details>
       )}
@@ -122,7 +149,6 @@ export default function StaffManager() {
         <p className="text-zinc-600 text-sm text-center py-8">Sin miembros para los filtros seleccionados</p>
       )}
 
-      {/* Form modal */}
       {showForm && (
         <StaffForm
           member={editMember}
@@ -132,21 +158,23 @@ export default function StaffManager() {
         />
       )}
 
-      {/* Access modal */}
-      {accessMember && (
-        <StaffAccessModal
-          member={accessMember}
+      {permsMember && (
+        <StaffPermissionsModal
+          member={permsMember}
           squads={squads}
-          onClose={() => setAccessMember(null)}
+          existingAccess={accessMap[permsMember.id] || null}
+          onSaved={handlePermsSaved}
+          onClose={() => setPermsMember(null)}
         />
       )}
     </div>
   );
 }
 
-function MemberCard({ member, squads, onEdit, onToggle, onAccess }) {
+function MemberCard({ member, squads, access, onEdit, onToggle, onPerms }) {
   const roleClass = ROLE_COLORS[member.role] || ROLE_COLORS["utilero"];
   const squadNames = (member.squad_names || []).join(", ") || "Sin plantel";
+  const hasAccess = !!access;
 
   return (
     <div className="flex items-center gap-4 p-4 bg-zinc-800/50 border border-zinc-700 rounded-xl flex-wrap">
@@ -160,16 +188,31 @@ function MemberCard({ member, squads, onEdit, onToggle, onAccess }) {
         <p className="text-sm font-semibold text-white">{member.first_name} {member.last_name}</p>
         <div className="flex items-center gap-2 mt-0.5 flex-wrap">
           <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${roleClass}`}>{member.role}</span>
+          {member.job_title && (
+            <span className="flex items-center gap-1 text-[10px] text-zinc-400"><Briefcase size={9} />{member.job_title}</span>
+          )}
           <span className="text-[10px] text-zinc-500">{squadNames}</span>
-          {member.email && <span className="text-[10px] text-zinc-600">{member.email}</span>}
+        </div>
+        <div className="flex items-center gap-3 mt-1 flex-wrap">
+          {member.email && (
+            <span className="flex items-center gap-1 text-[10px] text-zinc-600"><Mail size={9} />{member.email}</span>
+          )}
+          {member.phone && (
+            <span className="flex items-center gap-1 text-[10px] text-zinc-600"><Phone size={9} />{member.phone}</span>
+          )}
+          {/* Access status indicator */}
+          <span className={`flex items-center gap-1 text-[10px] font-medium ${hasAccess && access.active ? "text-emerald-400" : "text-zinc-600"}`}>
+            <Shield size={9} />
+            {hasAccess ? (access.active ? `Acceso: ${access.role}` : "Acceso inactivo") : "Sin cuenta de usuario"}
+          </span>
         </div>
       </div>
       <div className="flex items-center gap-1 shrink-0">
-        <button onClick={() => onAccess(member)} title="Permisos"
-          className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-400 transition-colors">
+        <button onClick={onPerms} title="Gestionar acceso y permisos"
+          className={`p-1.5 rounded-lg transition-colors ${hasAccess ? "text-blue-400 hover:text-blue-300" : "text-zinc-500 hover:text-blue-400"}`}>
           <Shield size={14} />
         </button>
-        <button onClick={() => onEdit(member)} title="Editar"
+        <button onClick={() => onEdit(member)} title="Editar datos del staff"
           className="p-1.5 rounded-lg text-zinc-500 hover:text-white transition-colors">
           <Edit2 size={14} />
         </button>

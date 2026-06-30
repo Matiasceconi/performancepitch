@@ -12,7 +12,7 @@
     },
     "email": {
       "type": "string",
-      "description": "Email de contacto"
+      "description": "Email de contacto (usado para vincular cuenta de usuario)"
     },
     "phone": {
       "type": "string",
@@ -32,7 +32,11 @@
         "dirigente",
         "admin"
       ],
-      "description": "Rol del staff"
+      "description": "Rol deportivo/laboral"
+    },
+    "job_title": {
+      "type": "string",
+      "description": "Cargo o t\u00edtulo (ej: Preparador F\u00edsico Principal)"
     },
     "squad_ids": {
       "type": "array",

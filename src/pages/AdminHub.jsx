@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ShieldCheck, GitMerge, Fingerprint, Users, UserCog } from "lucide-react";
+import { ShieldCheck, GitMerge, Fingerprint, Users, UserCog, Lock } from "lucide-react";
 import PlayerAdmin from "@/pages/PlayerAdmin";
 import DataCrossing from "@/pages/DataCrossing";
 import PlayerIdentity from "@/pages/PlayerIdentity";
@@ -7,15 +7,15 @@ import StaffManager from "@/pages/StaffManager";
 import UsersAccess from "@/pages/UsersAccess";
 
 const TABS = [
-  { id: "users", label: "Usuarios y Accesos", icon: UserCog },
-  { id: "players", label: "Admin Plantel", icon: ShieldCheck },
-  { id: "crossing", label: "Cruce de datos", icon: GitMerge },
-  { id: "identity", label: "Identity Manager", icon: Fingerprint },
-  { id: "staff", label: "Cuerpo Técnico y Staff", icon: Users },
+  { id: "staff",    label: "Cuerpo Técnico",    icon: Users },
+  { id: "users",    label: "Accesos y Permisos", icon: Lock },
+  { id: "players",  label: "Admin Plantel",      icon: ShieldCheck },
+  { id: "crossing", label: "Cruce de datos",     icon: GitMerge },
+  { id: "identity", label: "Identity Manager",   icon: Fingerprint },
 ];
 
 export default function AdminHub() {
-  const [activeTab, setActiveTab] = useState("users");
+  const [activeTab, setActiveTab] = useState("staff");
 
   return (
     <div className="space-y-4">

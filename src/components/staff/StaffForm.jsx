@@ -13,6 +13,7 @@ export default function StaffForm({ member, squads, onSaved, onClose }) {
     email: member?.email || "",
     phone: member?.phone || "",
     role: member?.role || "entrenador",
+    job_title: member?.job_title || "",
     squad_ids: member?.squad_ids || [],
     active: member?.active !== false,
     notes: member?.notes || "",
@@ -80,12 +81,18 @@ export default function StaffForm({ member, squads, onSaved, onClose }) {
               <input value={form.phone} onChange={e => setF("phone", e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
             </div>
-            <div className="col-span-2">
+            <div>
               <label className="text-[10px] text-zinc-400 mb-1 block">Rol *</label>
               <select value={form.role} onChange={e => setF("role", e.target.value)}
                 className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
                 {ALL_ROLES.map(r => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
               </select>
+            </div>
+            <div>
+              <label className="text-[10px] text-zinc-400 mb-1 block">Cargo / Título</label>
+              <input value={form.job_title} onChange={e => setF("job_title", e.target.value)}
+                placeholder="ej: Preparador Físico Principal"
+                className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none" />
             </div>
           </div>
 

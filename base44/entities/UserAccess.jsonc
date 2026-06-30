@@ -2,6 +2,14 @@
   "name": "UserAccess",
   "type": "object",
   "properties": {
+    "staff_id": {
+      "type": "string",
+      "description": "ID del StaffMember vinculado (obligatorio)"
+    },
+    "staff_name": {
+      "type": "string",
+      "description": "Nombre completo del staff (desnormalizado)"
+    },
     "user_email": {
       "type": "string",
       "description": "Email del usuario de la plataforma"
@@ -34,7 +42,7 @@
         "type": "string"
       },
       "default": [],
-      "description": "IDs de planteles asignados. Vac\u00edo = todos los planteles"
+      "description": "IDs de planteles asignados. Vac\u00edo = ninguno (salvo all_squads=true)"
     },
     "squad_names": {
       "type": "array",
@@ -55,28 +63,17 @@
         "type": "string"
       },
       "default": [
-        "dashboard",
-        "daily_squad",
-        "sessions",
-        "matches",
-        "performance",
-        "gps",
-        "field_library",
-        "strength_library",
-        "schedule",
-        "team",
-        "weekly_planner",
-        "tactical"
+        "dashboard"
       ],
       "description": "M\u00f3dulos habilitados"
     },
     "can_create": {
       "type": "boolean",
-      "default": true
+      "default": false
     },
     "can_edit": {
       "type": "boolean",
-      "default": true
+      "default": false
     },
     "can_delete": {
       "type": "boolean",
@@ -84,17 +81,17 @@
     },
     "can_export": {
       "type": "boolean",
-      "default": true
+      "default": false
     },
     "can_admin": {
       "type": "boolean",
       "default": false,
-      "description": "Acceso a Administraci\u00f3n"
+      "description": "Acceso a m\u00f3dulo Administraci\u00f3n"
     },
     "can_manage_users": {
       "type": "boolean",
       "default": false,
-      "description": "Puede gestionar usuarios"
+      "description": "Puede gestionar usuarios/accesos"
     },
     "active": {
       "type": "boolean",
@@ -104,17 +101,12 @@
       "type": "string",
       "description": "\u00daltimo acceso (ISO datetime)"
     },
-    "phone": {
-      "type": "string"
-    },
-    "photo_url": {
-      "type": "string"
-    },
     "notes": {
       "type": "string"
     }
   },
   "required": [
+    "staff_id",
     "user_email",
     "role"
   ]
