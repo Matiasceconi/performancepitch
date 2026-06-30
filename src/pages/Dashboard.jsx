@@ -384,12 +384,9 @@ export default function Dashboard() {
 
       const saved = statusById[m.player_id];
 
-      // If the player has a status record AND they have an active temporary movement to ANOTHER squad,
-      // they are NOT in this squad today — skip them
-      if (saved && saved.temporary && saved.active_in_target_squad && saved.target_squad_id && saved.target_squad_id !== selectedSquadId) {
-        return;
-      }
-
+      // If the player has an active temporary movement to ANOTHER squad, they keep their record
+      // (status like "subió", not "disponible") so they still show up in "Suben desde..." boards,
+      // but are NOT counted as disponibles of this squad.
       if (saved) {
         recordsMap[m.player_id] = saved;
       } else {
