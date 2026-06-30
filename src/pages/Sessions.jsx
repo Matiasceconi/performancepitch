@@ -2,11 +2,13 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, ClipboardList } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import SessionList from "@/components/sessions/SessionList";
 import SessionForm from "@/components/sessions/SessionForm";
 import SessionDetail from "@/components/sessions/SessionDetail";
 
 export default function Sessions() {
+  const { activeSquadId, activeSquad } = useWorkspace();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "new" | "detail"
@@ -14,11 +16,15 @@ export default function Sessions() {
   const { toast } = useToast();
 
   useEffect(() => {
-    base44.entities.TrainingSession.list("-date", 200).then(s => {
+    setLoading(true);
+    setView("list");
+    setSelectedSession(null);
+    const query = activeSquadId ? { squad_id: activeSquadId } : {};
+    base44.entities.TrainingSession.filter(query, "-date", 200).then(s => {
       setSessions(s);
       setLoading(false);
     });
-  }, []);
+  }, [activeSquadId]);
 
   function handleCreated(session) {
     setSessions(prev => [session, ...prev]);
@@ -53,7 +59,9 @@ export default function Sessions() {
             <ClipboardList size={22} className="text-zinc-400" />
             <div>
               <h1 className="text-2xl font-bold text-white tracking-tight">Sesiones</h1>
-              <p className="text-zinc-500 text-sm mt-0.5">Registrá los entrenamientos del equipo</p>
+              <p className="text-zinc-500 text-sm mt-0.5">
+                {activeSquad ? activeSquad.name : "Todos los planteles"}
+              </p>
             </div>
           </div>
           <button

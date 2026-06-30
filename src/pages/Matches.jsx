@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink, Clock, Save } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import "moment/locale/es";
 import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel.jsx";
@@ -762,6 +763,7 @@ function MatchForm({ initial, players, onSave, onCancel }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Matches() {
+  const { activeSquadId, activeSquad } = useWorkspace();
   const [tab, setTab] = useState("reserva");
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
@@ -774,14 +776,20 @@ export default function Matches() {
     setMatches(ms => ms.map(m => m.id === id ? { ...m, ...data } : m));
   }
 
-  useEffect(() => { loadAll(); }, []);
+  useEffect(() => { loadAll(); }, [activeSquadId]);
 
   async function loadAll() {
+    setLoading(true);
+    // Filter by squad_id if set; also exclude Juveniles competition tag
+    const squadQuery = activeSquadId
+      ? { squad_id: activeSquadId }
+      : {};
     const [m, p] = await Promise.all([
-      base44.entities.MatchReport.filter({ competition: { $ne: "Juveniles" } }, "-date", 100),
+      base44.entities.MatchReport.filter(squadQuery, "-date", 100),
       base44.entities.Player.list("-created_date", 100),
     ]);
-    setMatches(m);
+    // Client-side exclude Juveniles competition (legacy data without squad_id)
+    setMatches(m.filter(x => x.competition !== "Juveniles"));
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
     setLoading(false);
   }
@@ -789,6 +797,8 @@ export default function Matches() {
   async function save(form) {
     const data = {
       ...form,
+      squad_id: activeSquadId || undefined,
+      squad_name: activeSquad?.name || undefined,
       our_score: form.our_score !== "" ? Number(form.our_score) : null,
       rival_score: form.rival_score !== "" ? Number(form.rival_score) : null,
     };
@@ -842,7 +852,10 @@ export default function Matches() {
       {tab === "reserva" && (
         <>
           <div className="flex items-center justify-between">
-            <p className="text-zinc-400 text-sm">{matches.length} partido{matches.length !== 1 ? "s" : ""}</p>
+            <p className="text-zinc-400 text-sm">
+              {activeSquad ? <span className="text-white font-medium">{activeSquad.name} · </span> : ""}
+              {matches.length} partido{matches.length !== 1 ? "s" : ""}
+            </p>
             <button
               onClick={() => { setEditing(null); setShowForm(true); }}
               className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"

@@ -2,6 +2,14 @@
   "name": "MatchReport",
   "type": "object",
   "properties": {
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel al que pertenece este partido"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
     "date": {
       "type": "string",
       "format": "date",

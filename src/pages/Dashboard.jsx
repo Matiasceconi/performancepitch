@@ -4,8 +4,9 @@ import { Link } from "react-router-dom";
 import {
   Users, AlertCircle, Cake, Shield, ChevronRight,
   Activity, ArrowUp, ArrowDown, UserCheck, UserX, Zap,
-  RefreshCw, Clock, ShieldCheck
+  RefreshCw, Clock
 } from "lucide-react";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import "moment/locale/es";
 import TournamentTable from "@/components/staff/TournamentTable";
@@ -222,10 +223,13 @@ function NextTrainingPanel({ byStatus, playerMap }) {
 // ─── Main Dashboard ────────────────────────────────────────────────────────
 export default function Dashboard() {
   const today = moment().format("YYYY-MM-DD");
+  const { activeSquadId, activeSquad, mySquads, setActiveSquad } = useWorkspace();
+
+  // Use activeSquadId from context as selectedSquadId
+  const selectedSquadId = activeSquadId || "";
 
   // State
   const [squads, setSquads] = useState([]);
-  const [selectedSquadId, setSelectedSquadId] = useState(""); // "" = todos
   const [playerMap, setPlayerMap] = useState({});  // id -> Player
   const [playerList, setPlayerList] = useState([]); // for birthdays
   const [memberships, setMemberships] = useState([]); // SquadMembership activos
@@ -466,21 +470,13 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Squad filter */}
-      {squads.length > 0 && (
+      {/* Squad filter — driven by WorkspaceContext activeSquad */}
+      {mySquads.length > 1 && (
         <div className="flex items-center gap-2 flex-wrap">
-          <ShieldCheck size={14} className="text-zinc-500" />
           <div className="flex items-center bg-zinc-900 border border-zinc-700 rounded-xl p-1 gap-1 flex-wrap">
-            <button
-              onClick={() => setSelectedSquadId("")}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                !selectedSquadId ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
-              }`}>
-              Todos
-            </button>
-            {squads.map(sq => (
+            {mySquads.map(sq => (
               <button key={sq.id}
-                onClick={() => setSelectedSquadId(sq.id)}
+                onClick={() => setActiveSquad(sq)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   selectedSquadId === sq.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
                 }`}>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Users, CheckSquare, Square, Search, X } from "lucide-react";
 import moment from "moment";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
 const MD_CODES = ["MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "Otro"];
@@ -18,10 +19,11 @@ const STATUS_LABELS = {
 };
 
 export default function SessionForm({ onCreated, onCancel }) {
+  const { activeSquadId, mySquads } = useWorkspace();
   const [squads, setSquads] = useState([]);
   const [form, setForm] = useState({
     title: "", date: moment().format("YYYY-MM-DD"),
-    squad_id: "", session_type: "Campo", match_day_code: "MD-1",
+    squad_id: activeSquadId || "", session_type: "Campo", match_day_code: "MD-1",
     duration_minutes: 90, objective: "", location: "", intensity_goal: "Media", notes: "",
   });
   const [squadPlayers, setSquadPlayers] = useState([]); // {player, ds}
@@ -35,9 +37,11 @@ export default function SessionForm({ onCreated, onCancel }) {
     base44.entities.Squad.list("name", 100).then(sq => {
       const active = sq.filter(s => s.active !== false);
       setSquads(active);
-      if (active.length > 0) setForm(f => ({ ...f, squad_id: active[0].id }));
+      // Pre-select active squad from context, fallback to first
+      const defaultId = activeSquadId || (active.length > 0 ? active[0].id : "");
+      setForm(f => ({ ...f, squad_id: defaultId }));
     });
-  }, []);
+  }, [activeSquadId]);
 
   // Load players whenever date or squad changes
   useEffect(() => {
