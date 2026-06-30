@@ -15,6 +15,7 @@ import PlayerAvatar from "@/components/player/PlayerAvatar";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
 import MovementBoardCard from "@/components/dashboard/MovementBoardCard";
 import DashboardHeader from "@/components/dashboard/DashboardHeader";
+import QuickActionsBar from "@/components/dashboard/QuickActionsBar";
 import DaySummarySection from "@/components/dashboard/DaySummarySection";
 import DayScheduleAgenda from "@/components/dashboard/DayScheduleAgenda";
 
@@ -472,6 +473,8 @@ export default function Dashboard() {
         nextMatchReport={nextMatchReport}
         microcycleLabel={microcycleLabel}
       />
+
+      <QuickActionsBar />
 
       <div className="flex items-center justify-end gap-2 flex-wrap">
         {lastSync && (

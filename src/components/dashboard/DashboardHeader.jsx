@@ -1,5 +1,4 @@
 import React from "react";
-import { Shield } from "lucide-react";
 import moment from "moment";
 import SquadActiveSelector from "./SquadActiveSelector";
 import NextMatchHeaderCard from "./NextMatchHeaderCard";
@@ -20,8 +19,12 @@ export default function DashboardHeader({ activeSquad, mySquads, setActiveSquad,
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
       <div className="flex items-center gap-4">
-        <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-          <Shield size={30} className="text-blue-400" />
+        <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
+          <img
+            src="https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/b77b5674e_image.png"
+            alt="Defensa y Justicia"
+            className="w-full h-full object-contain"
+          />
         </div>
         <div>
           <div className="flex items-center gap-2 flex-wrap">
