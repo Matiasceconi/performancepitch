@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { base44 } from "@/api/base44Client";
 import { Star, Search, ChevronDown, ChevronUp, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -18,6 +19,7 @@ const TYPE_COLORS = {
 };
 
 export default function FieldLibraryPanel() {
+  const { activeSquadId, activeSquad } = useWorkspace();
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -29,9 +31,17 @@ export default function FieldLibraryPanel() {
   const { toast } = useToast();
 
   useEffect(() => {
-    base44.entities.FieldExerciseLibrary.list("-times_used", 500)
-      .then(data => { setExercises(data); setLoading(false); });
-  }, []);
+    base44.entities.FieldExerciseLibrary.list("-times_used", 500).then(data => {
+      // Mostrar: globales + los del plantel activo (sin squad_id legacy = global)
+      const visible = data.filter(e =>
+        e.global !== false ||
+        !e.squad_id ||
+        e.squad_id === activeSquadId
+      );
+      setExercises(visible);
+      setLoading(false);
+    });
+  }, [activeSquadId]);
 
   async function toggleFavorite(ex) {
     const updated = await base44.entities.FieldExerciseLibrary.update(ex.id, { favorite: !ex.favorite });

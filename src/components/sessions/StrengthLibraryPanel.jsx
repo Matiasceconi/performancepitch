@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { base44 } from "@/api/base44Client";
 import { Star, Search, ChevronDown, ChevronUp } from "lucide-react";
 import moment from "moment";
@@ -16,6 +17,7 @@ const CAT_COLORS = {
 };
 
 export default function StrengthLibraryPanel() {
+  const { activeSquadId } = useWorkspace();
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -24,9 +26,17 @@ export default function StrengthLibraryPanel() {
   const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
-    base44.entities.StrengthExerciseLibrary.list("-times_used", 500)
-      .then(data => { setExercises(data); setLoading(false); });
-  }, []);
+    base44.entities.StrengthExerciseLibrary.list("-times_used", 500).then(data => {
+      // Mostrar: globales + los del plantel activo (sin squad_id legacy = global)
+      const visible = data.filter(e =>
+        e.global !== false ||
+        !e.squad_id ||
+        e.squad_id === activeSquadId
+      );
+      setExercises(visible);
+      setLoading(false);
+    });
+  }, [activeSquadId]);
 
   async function toggleFavorite(ex) {
     const updated = await base44.entities.StrengthExerciseLibrary.update(ex.id, { favorite: !ex.favorite });

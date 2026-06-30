@@ -6,6 +6,19 @@
       "type": "string",
       "description": "Nombre del ejercicio"
     },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel propietario (vac\u00edo si global=true)"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "global": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si true, visible desde cualquier plantel"
+    },
     "type": {
       "type": "string",
       "enum": [

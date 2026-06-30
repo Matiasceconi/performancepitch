@@ -6,6 +6,19 @@
       "type": "string",
       "description": "Nombre del ejercicio"
     },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel propietario (vac\u00edo si global=true)"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "global": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si true, visible desde cualquier plantel"
+    },
     "category": {
       "type": "string",
       "enum": [
@@ -38,7 +51,7 @@
     },
     "method": {
       "type": "string",
-      "description": "M\u00e9todo de entrenamiento (ej: Contraste, Potencia, Ondulatorio)"
+      "description": "M\u00e9todo de entrenamiento"
     },
     "objective": {
       "type": "string",

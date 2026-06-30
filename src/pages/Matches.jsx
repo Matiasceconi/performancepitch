@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink, Clock, Save } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink, Clock, Save, Trophy } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import "moment/locale/es";
-import JuvenileMatchPanel from "@/components/matches/JuvenileMatchPanel.jsx";
+
 import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
 import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
@@ -764,7 +764,6 @@ function MatchForm({ initial, players, onSave, onCancel }) {
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Matches() {
   const { activeSquadId, activeSquad } = useWorkspace();
-  const [tab, setTab] = useState("reserva");
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -784,10 +783,8 @@ export default function Matches() {
       base44.entities.MatchReport.list("-date", 200),
       base44.entities.Player.list("-created_date", 100),
     ]);
-    // Mostrar partidos del plantel activo + legados sin squad_id; excluir tag Juveniles
-    const filtered = all
-      .filter(x => x.competition !== "Juveniles")
-      .filter(x => !activeSquadId || !x.squad_id || x.squad_id === activeSquadId);
+    // Filtrar por plantel activo + legados sin squad_id
+    const filtered = all.filter(x => !activeSquadId || !x.squad_id || x.squad_id === activeSquadId);
     setMatches(filtered);
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
     setLoading(false);
@@ -828,62 +825,38 @@ export default function Matches() {
 
   return (
     <div className="space-y-4">
-      {/* Tabs Reserva / Juveniles */}
-      <div className="flex gap-0 border-b border-zinc-800">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-white">Partidos</h1>
+          {activeSquad && <p className="text-xs text-zinc-500 mt-0.5">{activeSquad.name} · {matches.length} partido{matches.length !== 1 ? "s" : ""}</p>}
+        </div>
         <button
-          onClick={() => setTab("reserva")}
-          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${tab === "reserva" ? "border-yellow-400 text-yellow-300" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
+          onClick={() => { setEditing(null); setShowForm(true); }}
+          className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
         >
-          Reserva
-        </button>
-        <button
-          onClick={() => setTab("juveniles")}
-          className={`px-5 py-2.5 text-sm font-medium border-b-2 transition-all -mb-px ${tab === "juveniles" ? "border-violet-400 text-violet-300" : "border-transparent text-zinc-500 hover:text-zinc-300"}`}
-        >
-          Juveniles
+          <Plus size={15} /> Nuevo partido
         </button>
       </div>
 
-      {tab === "juveniles" && (
-        <JuvenileMatchPanel players={players} />
+      {showForm && (
+        <MatchForm
+          initial={editing}
+          players={players}
+          onSave={save}
+          onCancel={() => { setShowForm(false); setEditing(null); }}
+        />
       )}
 
-      {tab === "reserva" && (
-        <>
-          <div className="flex items-center justify-between">
-            <p className="text-zinc-400 text-sm">
-              {activeSquad ? <span className="text-white font-medium">{activeSquad.name} · </span> : ""}
-              {matches.length} partido{matches.length !== 1 ? "s" : ""}
-            </p>
-            <button
-              onClick={() => { setEditing(null); setShowForm(true); }}
-              className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
-            >
-              <Plus size={15} /> Nuevo partido
-            </button>
-          </div>
-
-          {showForm && (
-            <MatchForm
-              initial={editing}
-              players={players}
-              onSave={save}
-              onCancel={() => { setShowForm(false); setEditing(null); }}
-            />
-          )}
-
-          {matches.length === 0 && !showForm ? (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-              <p className="text-zinc-500 text-sm">No hay partidos registrados</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {matches.map(m => (
-                <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} />
-              ))}
-            </div>
-          )}
-        </>
+      {matches.length === 0 && !showForm ? (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
+          <p className="text-zinc-500 text-sm">No hay partidos registrados para {activeSquad?.name || "este plantel"}</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {matches.map(m => (
+            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} />
+          ))}
+        </div>
       )}
     </div>
   );

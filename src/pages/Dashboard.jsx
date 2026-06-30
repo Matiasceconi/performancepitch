@@ -9,8 +9,7 @@ import {
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import "moment/locale/es";
-import TournamentTable from "@/components/staff/TournamentTable";
-import TournamentImporter from "@/components/staff/TournamentImporter";
+
 import { STATUS_LABELS } from "@/components/squad/squadConstants";
 
 moment.locale("es");
@@ -241,6 +240,10 @@ export default function Dashboard() {
   const [lastSync, setLastSync] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
+  useEffect(() => { loadData(); }, [activeSquadId]);
+
+  function refresh() { loadData(true); }
+
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
 
@@ -250,18 +253,19 @@ export default function Dashboard() {
       base44.entities.Squad.list("name", 100),
       base44.entities.SquadMembership.list("-effective_from", 1000),
       base44.entities.DayEvent.list("date", 200),
-      base44.entities.TrainingSession.list("-date", 5),
+      base44.entities.TrainingSession.list("-date", 50),
       base44.entities.MatchReport.list("-date", 20),
     ]);
 
     const map = {};
     allPlayers.filter(p => p.active !== false).forEach(p => { map[p.id] = p; });
+    const filterBySquad = x => !selectedSquadId || !x.squad_id || x.squad_id === selectedSquadId;
     setPlayerMap(map);
     setPlayerList(allPlayers.filter(p => p.active !== false));
     setDayStatuses(statuses);
     setMemberships(mb.filter(m => m.status === "activo"));
     setSquads(allSquads.filter(sq => sq.active !== false));
-    setSessions(s);
+    setSessions(s.filter(filterBySquad).slice(0, 5));
 
     const match = events.find(e => e.type === "Partido" && e.date >= today);
     setNextMatch(match || null);
@@ -270,8 +274,6 @@ export default function Dashboard() {
     setLastSync(new Date());
     if (!silent) setLoading(false); else setRefreshing(false);
   }, [today]);
-
-  useEffect(() => { loadData(); }, [loadData]);
 
   // Real-time subscription — DailySquadStatus is the source of truth
   useEffect(() => {
@@ -446,7 +448,10 @@ export default function Dashboard() {
       {/* Header */}
       <div className="flex items-start justify-between gap-3 flex-wrap">
         <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard</h1>
+          <h1 className="text-2xl font-bold text-white tracking-tight">
+            Dashboard
+            {activeSquad && <span className="text-zinc-500 font-normal text-lg ml-2">· {activeSquad.name}</span>}
+          </h1>
           <p className="text-zinc-500 text-sm mt-1 capitalize">{moment().format("dddd D [de] MMMM, YYYY")}</p>
           {lastSync && (
             <p className="text-zinc-600 text-xs mt-0.5 flex items-center gap-1">
@@ -457,7 +462,7 @@ export default function Dashboard() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={() => loadData(true)}
+            onClick={refresh}
             disabled={refreshing}
             className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors">
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} />
@@ -626,19 +631,6 @@ export default function Dashboard() {
             />
           </ErrorBoundary>
         )}
-
-        {/* Tournament table */}
-        <ErrorBoundary>
-          <div className="lg:col-span-2 bg-zinc-900 border border-zinc-800 rounded-xl">
-            <div className="p-4 border-b border-zinc-800">
-              <h2 className="text-sm font-semibold text-white">Clasificación — Torneo Proyección</h2>
-            </div>
-            <div className="p-4 space-y-4">
-              <TournamentImporter />
-              <TournamentTable />
-            </div>
-          </div>
-        </ErrorBoundary>
 
         {/* Sessions */}
         <ErrorBoundary>
