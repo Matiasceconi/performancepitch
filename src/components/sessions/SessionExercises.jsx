@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen, Search } from "lucide-react";
+import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen, Search, Activity } from "lucide-react";
+import ExerciseGPS from "@/components/sessions/ExerciseGPS";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 
@@ -83,7 +84,7 @@ function calcDerived(f) {
 
 function num(v) { const n = parseFloat(v); return isNaN(n) ? undefined : n; }
 
-export default function SessionExercises({ sessionId }) {
+export default function SessionExercises({ sessionId, sessionPlayers }) {
   const [exercises, setExercises] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editId, setEditId] = useState(null);
@@ -311,6 +312,8 @@ export default function SessionExercises({ sessionId }) {
                 </div>
                 {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
                 {ex.notes && <p className="text-xs text-zinc-500 italic">{ex.notes}</p>}
+                {/* GPS por ejercicio */}
+                <ExerciseGPS sessionId={sessionId} exerciseId={ex.id} sessionPlayers={sessionPlayers || []} />
               </div>
             )}
           </div>

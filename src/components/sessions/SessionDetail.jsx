@@ -157,7 +157,7 @@ export default function SessionDetail({ session, onBack }) {
         ) : (
           <>
             {tab === "players"   && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} />}
-            {tab === "exercises" && <SessionExercises sessionId={currentSession.id} />}
+            {tab === "exercises" && <SessionExercises sessionId={currentSession.id} sessionPlayers={sessionPlayers} />}
             {tab === "strength"  && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
             {tab === "gps"       && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}
             {tab === "video"     && <SessionVideoObs session={currentSession} onUpdate={setCurrentSession} />}
