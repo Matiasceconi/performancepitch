@@ -36,10 +36,12 @@ export default function Sidebar() {
   const [sessionsOpen, setSessionsOpen] = useState(SESSION_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
-  const { canModule, isAdmin } = useWorkspace();
+  const { canModule, isAdmin, userAccess, loadingWorkspace } = useWorkspace();
 
   // Filter items by permission; admins always see the admin module
+  // While workspace is loading, show all items to avoid flicker/disappearing
   function canSee(item) {
+    if (loadingWorkspace) return true;
     if (item.module === "admin" && isAdmin) return true;
     return canModule(item.module);
   }
