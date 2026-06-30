@@ -58,6 +58,12 @@ export function WorkspaceProvider({ children }) {
     if (access) {
       const defaults = ROLE_DEFAULTS[access.role] || ROLE_DEFAULTS["Solo lectura"];
       access = { ...defaults, ...access };
+      // Platform admins always keep full admin rights regardless of UserAccess record
+      if (user.role === "admin") {
+        access.can_admin = true;
+        access.can_manage_users = true;
+        access.all_squads = true;
+      }
     }
 
     setUserAccess(access);
