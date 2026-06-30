@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Star, Search, X, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Search, ChevronDown, ChevronUp, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
+import LibraryExerciseGPS from "@/components/sessions/LibraryExerciseGPS";
 
 const TYPE_COLORS = {
   "Activación": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
@@ -24,6 +25,7 @@ export default function FieldLibraryPanel() {
   const [filterPlayers, setFilterPlayers] = useState("");
   const [sortBy, setSortBy] = useState("times_used");
   const [expanded, setExpanded] = useState({});
+  const [activeTab, setActiveTab] = useState({}); // per exercise: "info" | "gps"
   const { toast } = useToast();
 
   useEffect(() => {
@@ -154,20 +156,46 @@ export default function FieldLibraryPanel() {
                 </div>
 
                 {isExp && (
-                  <div className="mt-3 pt-3 border-t border-zinc-700 space-y-2">
-                    {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      {ex.blocks && <div><span className="text-zinc-500">Bloques: </span><span className="text-zinc-300">{ex.blocks}</span></div>}
-                      {ex.work_time && <div><span className="text-zinc-500">Trabajo: </span><span className="text-zinc-300">{ex.work_time}</span></div>}
-                      {ex.rest_time && <div><span className="text-zinc-500">Pausa: </span><span className="text-zinc-300">{ex.rest_time}</span></div>}
-                      {ex.total_area && <div><span className="text-zinc-500">Área: </span><span className="text-zinc-300">{ex.total_area}m²</span></div>}
+                  <div className="mt-3 pt-3 border-t border-zinc-700">
+                    {/* Sub-tabs */}
+                    <div className="flex gap-1 mb-3">
+                      {[
+                        { key: "info", label: "Información" },
+                        { key: "gps",  label: "Carga externa", icon: Activity },
+                      ].map(t => (
+                        <button key={t.key}
+                          onClick={() => setActiveTab(p => ({ ...p, [ex.id]: t.key }))}
+                          className={`flex items-center gap-1 px-2.5 py-1 rounded text-[10px] font-medium transition-colors ${
+                            (activeTab[ex.id] || "info") === t.key
+                              ? "bg-zinc-700 text-white"
+                              : "text-zinc-500 hover:text-zinc-300"
+                          }`}>
+                          {t.icon && <t.icon size={10} />} {t.label}
+                        </button>
+                      ))}
                     </div>
-                    {ex.last_used_at && <p className="text-[10px] text-zinc-600">Último uso: {moment(ex.last_used_at).format("DD/MM/YYYY")}</p>}
-                    {ex.video_url && (
-                      <a href={ex.video_url} target="_blank" rel="noreferrer"
-                        className="text-[10px] text-blue-400 hover:text-blue-300">▶ Ver video</a>
+
+                    {(activeTab[ex.id] || "info") === "info" && (
+                      <div className="space-y-2">
+                        {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {ex.blocks && <div><span className="text-zinc-500">Bloques: </span><span className="text-zinc-300">{ex.blocks}</span></div>}
+                          {ex.work_time && <div><span className="text-zinc-500">Trabajo: </span><span className="text-zinc-300">{ex.work_time}</span></div>}
+                          {ex.rest_time && <div><span className="text-zinc-500">Pausa: </span><span className="text-zinc-300">{ex.rest_time}</span></div>}
+                          {ex.total_area && <div><span className="text-zinc-500">Área: </span><span className="text-zinc-300">{ex.total_area}m²</span></div>}
+                        </div>
+                        {ex.last_used_at && <p className="text-[10px] text-zinc-600">Último uso: {moment(ex.last_used_at).format("DD/MM/YYYY")}</p>}
+                        {ex.video_url && (
+                          <a href={ex.video_url} target="_blank" rel="noreferrer"
+                            className="text-[10px] text-blue-400 hover:text-blue-300">▶ Ver video</a>
+                        )}
+                        {ex.notes && <p className="text-[10px] text-zinc-500 italic">{ex.notes}</p>}
+                      </div>
                     )}
-                    {ex.notes && <p className="text-[10px] text-zinc-500 italic">{ex.notes}</p>}
+
+                    {(activeTab[ex.id] || "info") === "gps" && (
+                      <LibraryExerciseGPS libraryExerciseId={ex.id} />
+                    )}
                   </div>
                 )}
               </div>

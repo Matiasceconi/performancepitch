@@ -85,6 +85,10 @@
     "notes": {
       "type": "string",
       "description": "Observaciones"
+    },
+    "library_exercise_id": {
+      "type": "string",
+      "description": "ID del ejercicio en FieldExerciseLibrary (si est\u00e1 vinculado)"
     }
   },
   "required": [

@@ -84,7 +84,8 @@ function calcDerived(f) {
 
 function num(v) { const n = parseFloat(v); return isNaN(n) ? undefined : n; }
 
-export default function SessionExercises({ sessionId, sessionPlayers }) {
+export default function SessionExercises({ session, sessionPlayers }) {
+  const sessionId = session?.id;
   const [exercises, setExercises] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
   const [editId, setEditId] = useState(null);
@@ -313,7 +314,7 @@ export default function SessionExercises({ sessionId, sessionPlayers }) {
                 {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
                 {ex.notes && <p className="text-xs text-zinc-500 italic">{ex.notes}</p>}
                 {/* GPS por ejercicio */}
-                <ExerciseGPS sessionId={sessionId} exerciseId={ex.id} sessionPlayers={sessionPlayers || []} />
+                <ExerciseGPS session={session} exercise={ex} sessionPlayers={sessionPlayers || []} />
               </div>
             )}
           </div>

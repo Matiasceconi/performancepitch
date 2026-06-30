@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, AlertCircle, X, Eye, Activity } from "lucide-react";
+import { Upload, AlertCircle, X, Eye, Link } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { fmtMetric, fmtSmax } from "@/utils";
 
@@ -70,12 +70,17 @@ function avg(rows, key) {
   const vals = rows.map(r => r[key] || 0).filter(v => v > 0);
   return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
 }
-function max(rows, key) {
+function maxVal(rows, key) {
   const vals = rows.map(r => r[key] || 0);
   return vals.length ? Math.max(...vals) : null;
 }
 
-export default function ExerciseGPS({ sessionId, exerciseId, sessionPlayers }) {
+// exercise prop: { id, name, session_id (from parent), library_exercise_id? }
+// session prop: { id, title, date }
+export default function ExerciseGPS({ session, exercise, sessionPlayers }) {
+  const sessionId = session?.id;
+  const exerciseId = exercise?.id;
+
   const [rows, setRows] = useState([]);
   const [unmatched, setUnmatched] = useState([]);
   const [aliasTargets, setAliasTargets] = useState({});
@@ -83,14 +88,32 @@ export default function ExerciseGPS({ sessionId, exerciseId, sessionPlayers }) {
   const [preview, setPreview] = useState(null);
   const [importing, setImporting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  // Current library link state (can be updated if user links)
+  const [libraryExerciseId, setLibraryExerciseId] = useState(exercise?.library_exercise_id || null);
+  const [linkingLibrary, setLinkingLibrary] = useState(false);
+  const [libraryOptions, setLibraryOptions] = useState([]);
+  const [selectedLibrary, setSelectedLibrary] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
-    base44.entities.ExerciseGPSData.filter({ exercise_id: exerciseId }, "player_name", 200)
-      .then(setRows);
-    base44.entities.Player.list("-created_date", 500)
-      .then(p => setAllPlayers(p.filter(x => x.active !== false)));
+    if (!exerciseId) return;
+    base44.entities.ExerciseGPSData.filter({ exercise_id: exerciseId }, "player_name", 200).then(setRows);
+    base44.entities.Player.list("-created_date", 500).then(p => setAllPlayers(p.filter(x => x.active !== false)));
   }, [exerciseId]);
+
+  async function openLinkLibrary() {
+    const libs = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
+    setLibraryOptions(libs);
+    setLinkingLibrary(true);
+  }
+
+  async function confirmLinkLibrary() {
+    if (!selectedLibrary) return;
+    await base44.entities.SessionExercise.update(exerciseId, { library_exercise_id: selectedLibrary });
+    setLibraryExerciseId(selectedLibrary);
+    setLinkingLibrary(false);
+    toast({ title: "✓ Ejercicio vinculado a biblioteca" });
+  }
 
   async function handleFile(e) {
     const file = e.target.files[0]; e.target.value = "";
@@ -147,17 +170,34 @@ export default function ExerciseGPS({ sessionId, exerciseId, sessionPlayers }) {
       else unmatchedList.push({ rawName, record });
     });
 
-    // Replace existing
+    // Replace existing ExerciseGPSData for this exercise
     const existing = await base44.entities.ExerciseGPSData.filter({ exercise_id: exerciseId }, "-created_date", 500);
     await Promise.all(existing.map(r => base44.entities.ExerciseGPSData.delete(r.id)));
     let saved = [];
     if (toCreate.length > 0) saved = await base44.entities.ExerciseGPSData.bulkCreate(toCreate);
 
+    // If linked to library, also copy to LibraryExerciseGPSData
+    const libId = libraryExerciseId;
+    if (libId && toCreate.length > 0) {
+      // Remove previous library records for this session+exercise
+      const prevLib = await base44.entities.LibraryExerciseGPSData.filter({ exercise_id: exerciseId }, "-created_date", 500);
+      await Promise.all(prevLib.map(r => base44.entities.LibraryExerciseGPSData.delete(r.id)));
+      const libRecords = toCreate.map(r => ({
+        ...r,
+        library_exercise_id: libId,
+        session_title: session?.title || "",
+        session_date: session?.date || "",
+        exercise_name: exercise?.name || "",
+      }));
+      await base44.entities.LibraryExerciseGPSData.bulkCreate(libRecords);
+    }
+
     setRows(Array.isArray(saved) ? saved : toCreate);
     setUnmatched(unmatchedList);
     setPreview(null);
     setImporting(false);
-    toast({ title: `GPS ejercicio: ${toCreate.length} OK, ${unmatchedList.length} sin reconocer` });
+    const libMsg = libId ? " · datos copiados a biblioteca" : "";
+    toast({ title: `GPS ejercicio: ${toCreate.length} OK, ${unmatchedList.length} sin reconocer${libMsg}` });
   }
 
   async function saveManualAlias(rawName, playerId) {
@@ -173,6 +213,16 @@ export default function ExerciseGPS({ sessionId, exerciseId, sessionPlayers }) {
     if (unmRow) {
       const record = { ...unmRow.record, player_id: playerId, player_name: player.full_name || "" };
       const created = await base44.entities.ExerciseGPSData.create(record);
+      // Also copy to library if linked
+      if (libraryExerciseId) {
+        await base44.entities.LibraryExerciseGPSData.create({
+          ...record, player_id: playerId, player_name: player.full_name || "",
+          library_exercise_id: libraryExerciseId,
+          session_title: session?.title || "",
+          session_date: session?.date || "",
+          exercise_name: exercise?.name || "",
+        });
+      }
       setRows(prev => [...prev, created]);
       setUnmatched(prev => prev.filter(u => u.rawName !== rawName));
     }
@@ -188,10 +238,42 @@ export default function ExerciseGPS({ sessionId, exerciseId, sessionPlayers }) {
   const avgAcc  = avg(rows, "acc_3");
   const avgDec  = avg(rows, "dec_3");
   const avgLoad = avg(rows, "player_load");
-  const maxSmax = max(rows, "smax");
+  const maxSmax = maxVal(rows, "smax");
 
   return (
     <div className="mt-4 border-t border-zinc-700 pt-4 space-y-4">
+
+      {/* Library link banner */}
+      {!libraryExerciseId && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg flex-wrap">
+          <Link size={11} className="text-amber-400 shrink-0" />
+          <p className="text-[10px] text-amber-300 flex-1">Este ejercicio no está vinculado a la biblioteca. Vincularlo para guardar carga externa histórica.</p>
+          {!linkingLibrary ? (
+            <button onClick={openLinkLibrary}
+              className="px-2.5 py-1 bg-amber-500/20 border border-amber-500/30 text-amber-300 rounded text-[10px] font-semibold hover:bg-amber-500/30 transition-colors whitespace-nowrap">
+              Vincular a biblioteca
+            </button>
+          ) : (
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <select value={selectedLibrary} onChange={e => setSelectedLibrary(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[10px] text-white focus:outline-none">
+                <option value="">Seleccionar ejercicio...</option>
+                {libraryOptions.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+              </select>
+              <button onClick={confirmLinkLibrary} disabled={!selectedLibrary}
+                className="px-2.5 py-1 bg-white text-zinc-900 rounded text-[10px] font-semibold disabled:opacity-40">Confirmar</button>
+              <button onClick={() => setLinkingLibrary(false)} className="text-zinc-500 hover:text-white text-[10px]">✕</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {libraryExerciseId && (
+        <p className="text-[10px] text-emerald-500 flex items-center gap-1">
+          <Link size={10} /> Vinculado a biblioteca · la carga GPS se copiará automáticamente al historial.
+        </p>
+      )}
+
       {/* Upload */}
       <div className="flex items-center gap-3 flex-wrap">
         <label className={`cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 bg-zinc-800 border border-zinc-700 rounded-lg text-xs text-zinc-300 hover:bg-zinc-700 transition-colors ${uploading ? "opacity-60 pointer-events-none" : ""}`}>
