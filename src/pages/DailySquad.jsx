@@ -8,7 +8,7 @@ import DailySquadSummary from "@/components/squad/DailySquadSummary";
 import DailySquadGrid from "@/components/squad/DailySquadGrid";
 import DailySquadFilters from "@/components/squad/DailySquadFilters";
 import DailySquadWhatsApp from "@/components/squad/DailySquadWhatsApp";
-import { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS } from "@/components/squad/squadConstants";
+import { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS, isGoalkeeper } from "@/components/squad/squadConstants";
 export { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS };
 moment.locale("es");
 
@@ -254,6 +254,9 @@ export default function DailySquad() {
     return true;
   });
 
+  const gkPlayers    = squadPlayers.filter(p => isGoalkeeper(p));
+  const fieldPlayers = squadPlayers.filter(p => !isGoalkeeper(p));
+
   const summaryData = {
     total: squadPlayers.length,
     disponibles: squadPlayers.filter(p => getEffectiveStatus(p).status === "disponible").length,
@@ -265,6 +268,15 @@ export default function DailySquad() {
     suben: squadPlayers.filter(p => getEffectiveStatus(p).status === "subió").length,
     convocados: squadPlayers.filter(p => getEffectiveStatus(p).status === "convocado").length,
     ausentes: squadPlayers.filter(p => getEffectiveStatus(p).status === "ausente").length,
+    // Goalkeeper breakdown
+    gk_total: gkPlayers.length,
+    gk_disponibles: gkPlayers.filter(p => getEffectiveStatus(p).status === "disponible").length,
+    gk_lesionados: gkPlayers.filter(p => ["lesionado", "molestia"].includes(getEffectiveStatus(p).status)).length,
+    gk_diferenciados: gkPlayers.filter(p => getEffectiveStatus(p).status === "diferenciado").length,
+    gk_ausentes: gkPlayers.filter(p => ["ausente", "suspendido"].includes(getEffectiveStatus(p).status)).length,
+    gk_convocados: gkPlayers.filter(p => getEffectiveStatus(p).status === "convocado").length,
+    field_total: fieldPlayers.length,
+    field_disponibles: fieldPlayers.filter(p => getEffectiveStatus(p).status === "disponible").length,
   };
 
   const selectedSquad = squads.find(s => s.id === selectedSquadId);

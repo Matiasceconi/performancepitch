@@ -41,21 +41,31 @@ export const POSITION_GROUPS = {
   "Delanteros":     ["Delantero Centro"],
 };
 
-// Helper: determina si un jugador es arquero por su posición
+// Alias conocidos de arquero (normalizados a minúsculas)
+const GK_ALIASES = new Set(["arquero", "arq", "gk", "goalkeeper", "portero", "golero", "guardameta", "arqueros"]);
+
+// Helper: determina si un jugador es arquero por su posición o player_type
 export function isGoalkeeper(player) {
-  const pos = player?.position || "";
-  return pos === "Arquero";
+  if (!player) return false;
+  // Chequear player_type primero (más confiable si está seteado)
+  if (player.player_type === "arquero") return true;
+  // Fallback: chequear position
+  const pos = (player.position || "").toLowerCase().trim();
+  return GK_ALIASES.has(pos);
 }
 
 // Helper: determina el player_type según posición
 export function resolvePlayerType(position) {
-  return position === "Arquero" ? "arquero" : "jugador_campo";
+  const pos = (position || "").toLowerCase().trim();
+  return GK_ALIASES.has(pos) ? "arquero" : "jugador_campo";
 }
 
 // Helper: determina el position_group según posición
 export function resolvePositionGroup(position) {
+  const pos = (position || "").toLowerCase().trim();
+  if (GK_ALIASES.has(pos)) return "Arqueros";
   for (const [group, positions] of Object.entries(POSITION_GROUPS)) {
-    if (positions.includes(position)) return group;
+    if (positions.map(p => p.toLowerCase()).includes(pos)) return group;
   }
   return null;
 }

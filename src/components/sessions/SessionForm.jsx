@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Users, CheckSquare, Square, Search, X } from "lucide-react";
+import { isGoalkeeper } from "@/components/squad/squadConstants";
 import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
@@ -172,6 +173,18 @@ export default function SessionForm({ onCreated, onCancel }) {
   const availableFiltered = filtered.filter(({ ds }) => AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
   const unavailableFiltered = filtered.filter(({ ds }) => !AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
 
+  // Split counts by type
+  const availableField = availableFiltered.filter(({ player }) => !isGoalkeeper(player));
+  const availableGK    = availableFiltered.filter(({ player }) => isGoalkeeper(player));
+  const selectedField  = [...selectedIds].filter(id => {
+    const p = squadPlayers.find(({ player }) => player.id === id)?.player;
+    return p && !isGoalkeeper(p);
+  }).length;
+  const selectedGK = [...selectedIds].filter(id => {
+    const p = squadPlayers.find(({ player }) => player.id === id)?.player;
+    return p && isGoalkeeper(p);
+  }).length;
+
   function setF(key, val) { setForm(f => ({ ...f, [key]: val })); }
 
   return (
@@ -248,11 +261,14 @@ export default function SessionForm({ onCreated, onCancel }) {
       {/* Player selection */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2 flex-wrap">
             <Users size={15} className="text-zinc-400" />
             Jugadores
             <span className="text-xs text-zinc-500 font-normal">
-              {squadPlayers.length} del plantel · {selectedIds.size} seleccionados
+              {squadPlayers.length} del plantel
+            </span>
+            <span className="text-xs text-emerald-400 font-medium">
+              Campo: {selectedField} · <span className="text-yellow-400">ARQ: {selectedGK}</span> · Total: {selectedIds.size}
             </span>
           </h2>
           <button type="button" onClick={selectAllAvailable}
@@ -285,6 +301,9 @@ export default function SessionForm({ onCreated, onCancel }) {
             <div>
               <p className="text-xs text-emerald-400 font-semibold uppercase tracking-wider mb-2">
                 Disponibles para entrenar ({availableFiltered.length})
+                <span className="text-zinc-500 font-normal ml-2 normal-case">
+                  Campo: {availableField.length} · <span className="text-yellow-400">ARQ: {availableGK.length}</span>
+                </span>
               </p>
               {availableFiltered.length === 0
                 ? <p className="text-zinc-600 text-xs">Sin jugadores disponibles</p>

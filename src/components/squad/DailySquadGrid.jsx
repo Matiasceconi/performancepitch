@@ -29,14 +29,18 @@ export default function DailySquadGrid({ players, getEffectiveStatus, applyChang
     );
   }
 
+  const isGkGroup = (group) => group === "Arqueros";
+
   return (
     <div className="space-y-6">
       {groupOrder.filter(g => grouped[g]?.length > 0).map(group => (
         <div key={group}>
           <div className="flex items-center gap-3 mb-3">
-            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">{group}</h2>
-            <div className="flex-1 h-px bg-zinc-800" />
-            <span className="text-xs text-zinc-600">{grouped[group].length}</span>
+            {isGkGroup(group)
+              ? <h2 className="text-sm font-semibold text-yellow-400 uppercase tracking-wider flex items-center gap-1.5">🥅 {group}</h2>
+              : <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider">{group}</h2>}
+            <div className={`flex-1 h-px ${isGkGroup(group) ? "bg-yellow-500/25" : "bg-zinc-800"}`} />
+            <span className={`text-xs ${isGkGroup(group) ? "text-yellow-500" : "text-zinc-600"}`}>{grouped[group].length}</span>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {grouped[group].map(p => (

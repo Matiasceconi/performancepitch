@@ -58,6 +58,15 @@ const TOOLS = [
     color: "text-cyan-400",
     bg: "bg-cyan-500/10 border-cyan-500/20",
   },
+  {
+    id: "syncPlayerTypes",
+    label: "Sincronizar posiciones y tipos",
+    description: "Revisa todos los Players y corrige player_type (arquero/jugador_campo) y position_group automáticamente",
+    fn: "syncPlayerTypes",
+    payload: {},
+    color: "text-yellow-400",
+    bg: "bg-yellow-500/10 border-yellow-500/20",
+  },
 ];
 
 export default function AdminTools() {
@@ -99,7 +108,7 @@ export default function AdminTools() {
               {result && (
                 <div className={`flex items-start gap-2 p-2 rounded-lg text-xs ${result.ok ? "bg-emerald-500/10 text-emerald-300" : "bg-red-500/10 text-red-300"}`}>
                   {result.ok ? <CheckCircle2 size={12} className="shrink-0 mt-0.5" /> : <AlertTriangle size={12} className="shrink-0 mt-0.5" />}
-                  <span>{result.ok ? "Completado correctamente" : result.error}</span>
+                  <span>{result.ok ? (result.data?.summary || "Completado correctamente") : result.error}</span>
                 </div>
               )}
               <button

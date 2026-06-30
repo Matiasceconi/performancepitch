@@ -10,7 +10,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import "moment/locale/es";
 
-import { STATUS_LABELS, isGoalkeeper } from "@/components/squad/squadConstants";
+import { STATUS_LABELS, isGoalkeeper, resolvePlayerType } from "@/components/squad/squadConstants";
 
 moment.locale("es");
 
@@ -240,6 +240,111 @@ function NextTrainingPanel({ byStatus, playerMap }) {
   );
 }
 
+// ─── Goalkeeper availability panel ────────────────────────────────────────
+function GoalkeeperPanel({ squadRecords, playerMap, isGK }) {
+  const gkRecords = squadRecords.filter(ds => isGK(ds));
+
+  // classify
+  const disponibles = gkRecords.filter(ds => (ds.status || "disponible") === "disponible");
+  const lesionados  = gkRecords.filter(ds => ds.status === "lesionado" || ds.status === "molestia");
+  const diferenciados = gkRecords.filter(ds => ds.status === "diferenciado");
+  const ausentes    = gkRecords.filter(ds => ds.status === "ausente" || ds.status === "suspendido");
+  const convocados  = gkRecords.filter(ds => ds.status === "convocado");
+
+  const getName = ds => ds.player_name || playerMap[ds.player_id]?.full_name || "—";
+
+  return (
+    <div className="bg-zinc-900 border border-yellow-500/25 rounded-xl overflow-hidden">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-yellow-500/20 bg-yellow-500/5">
+        <h2 className="text-sm font-semibold text-yellow-300 flex items-center gap-2">
+          <span className="text-base">🥅</span>
+          Arqueros disponibles
+          <span className="text-xs font-normal text-yellow-500">({disponibles.length} / {gkRecords.length} total)</span>
+        </h2>
+        <Link to="/daily-squad" className="text-xs text-zinc-500 hover:text-white flex items-center gap-1">
+          Ver plantel <ChevronRight size={14} />
+        </Link>
+      </div>
+
+      {gkRecords.length === 0 ? (
+        <div className="p-4 text-center text-zinc-600 text-sm">
+          Sin arqueros registrados en el plantel activo
+        </div>
+      ) : (
+        <div className="p-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          {/* Disponibles */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+              Disponibles ({disponibles.length})
+            </p>
+            {disponibles.length === 0
+              ? <p className="text-xs text-zinc-600 italic">Ninguno</p>
+              : disponibles.map(ds => (
+                  <div key={ds.player_id} className="flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1.5">
+                    {playerMap[ds.player_id]?.photo_url
+                      ? <img src={playerMap[ds.player_id].photo_url} className="w-5 h-5 rounded-full object-cover shrink-0" alt="" />
+                      : <span className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-400 shrink-0">{getName(ds).charAt(0)}</span>}
+                    <span className="text-xs text-white font-medium truncate">{getName(ds)}</span>
+                  </div>
+                ))}
+          </div>
+
+          {/* Lesionados */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-red-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />
+              Lesionados ({lesionados.length})
+            </p>
+            {lesionados.length === 0
+              ? <p className="text-xs text-zinc-600 italic">Ninguno</p>
+              : lesionados.map(ds => (
+                  <div key={ds.player_id} className="flex items-center gap-2 bg-red-500/10 border border-red-500/20 rounded-lg px-2.5 py-1.5">
+                    <span className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-400 shrink-0">{getName(ds).charAt(0)}</span>
+                    <span className="text-xs text-white truncate">{getName(ds)}</span>
+                    <span className="text-[9px] text-red-400 ml-auto shrink-0">{STATUS_LABELS[ds.status] || ds.status}</span>
+                  </div>
+                ))}
+          </div>
+
+          {/* Diferenciados */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-amber-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
+              Diferenciados ({diferenciados.length})
+            </p>
+            {diferenciados.length === 0
+              ? <p className="text-xs text-zinc-600 italic">Ninguno</p>
+              : diferenciados.map(ds => (
+                  <div key={ds.player_id} className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5">
+                    <span className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-400 shrink-0">{getName(ds).charAt(0)}</span>
+                    <span className="text-xs text-white truncate">{getName(ds)}</span>
+                  </div>
+                ))}
+          </div>
+
+          {/* Ausentes / Convocados */}
+          <div className="space-y-1.5">
+            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 inline-block" />
+              Ausentes / Convocados ({ausentes.length + convocados.length})
+            </p>
+            {(ausentes.length + convocados.length) === 0
+              ? <p className="text-xs text-zinc-600 italic">Ninguno</p>
+              : [...ausentes, ...convocados].map(ds => (
+                  <div key={ds.player_id} className="flex items-center gap-2 bg-zinc-700/20 border border-zinc-700 rounded-lg px-2.5 py-1.5">
+                    <span className="w-5 h-5 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-400 shrink-0">{getName(ds).charAt(0)}</span>
+                    <span className="text-xs text-zinc-300 truncate">{getName(ds)}</span>
+                    <span className="text-[9px] text-zinc-500 ml-auto shrink-0">{STATUS_LABELS[ds.status] || ds.status}</span>
+                  </div>
+                ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main Dashboard ────────────────────────────────────────────────────────
 export default function Dashboard() {
   const today = moment().format("YYYY-MM-DD");
@@ -439,9 +544,17 @@ export default function Dashboard() {
   const totalCount = squadRecords.length;
 
   // Split records by goalkeeper / field player using playerMap
+  // Checks player_type first (most reliable), then falls back to position
+  function isGK(ds) {
+    const player = playerMap[ds.player_id];
+    if (player) return isGoalkeeper(player);
+    // fallback: use position stored in ds or resolve from position string
+    return isGoalkeeper({ position: ds.position });
+  }
+
   function splitByType(records) {
-    const gk = records.filter(ds => isGoalkeeper(playerMap[ds.player_id] || { position: ds.position }));
-    const field = records.filter(ds => !isGoalkeeper(playerMap[ds.player_id] || { position: ds.position }));
+    const gk = records.filter(ds => isGK(ds));
+    const field = records.filter(ds => !isGK(ds));
     return { gk: gk.length, field: field.length };
   }
 
@@ -553,6 +666,9 @@ export default function Dashboard() {
 
       {/* Next match */}
       {nextMatch && <NextMatchCard match={nextMatch} matchReport={nextMatchReport} />}
+
+      {/* Goalkeeper panel — always visible */}
+      <GoalkeeperPanel squadRecords={squadRecords} playerMap={playerMap} isGK={isGK} />
 
       {/* Player groups + next training */}
       <div className="grid lg:grid-cols-3 gap-4">
