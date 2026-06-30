@@ -56,15 +56,15 @@ export default function DailySquad() {
   useEffect(() => { load(); }, [load]);
 
   // ── Compute which players belong to the selected squad for today ───────────
-  // A player appears if:
-  // A) Has active SquadMembership for selectedSquadId (within date range)
-  // B) Has a DailySquadStatus with target_squad_id = selectedSquadId, active_in_target_squad = true, for today
-  const squadPlayers = (() => {
-    if (!selectedSquadId) return players; // no filter = show all
-
+  // Returns the full player list for the squad + movements breakdown
+  const { squadPlayers, movements } = (() => {
     const today = selectedDate;
 
-    // A) Stable members
+    if (!selectedSquadId) {
+      return { squadPlayers: players, movements: { subenDesde: [], subenA: [], bajanDesde: [], bajanA: [] } };
+    }
+
+    // A) Stable members of this squad
     const stableMemberIds = new Set(
       memberships.filter(m => {
         if (m.squad_id !== selectedSquadId) return false;
@@ -74,23 +74,64 @@ export default function DailySquad() {
       }).map(m => m.player_id)
     );
 
-    // B) Temporary visitors from DailySquadStatus (already saved)
-    const temporaryIds = new Set(
-      Object.values(statusMap).filter(ds =>
-        ds.target_squad_id === selectedSquadId &&
-        ds.active_in_target_squad === true &&
-        ds.temporary === true
-      ).map(ds => ds.player_id)
-    );
-
-    // Also check pending changes for temporary visitors being set right now
+    // Merge statusMap + pendingChanges into effective statuses
+    const effectiveStatuses = { ...statusMap };
     Object.entries(pendingChanges).forEach(([pid, ch]) => {
-      if (ch.target_squad_id === selectedSquadId && ch.active_in_target_squad === true && ch.temporary === true) {
-        temporaryIds.add(pid);
+      effectiveStatuses[pid] = { ...(effectiveStatuses[pid] || {}), ...ch };
+    });
+
+    // B) Classify temporary movements
+    // "Suben DESDE este plantel" — base = selectedSquad, target = otro plantel
+    const subenDesde = [];
+    // "Suben A este plantel" — base = otro plantel, target = selectedSquad
+    const subenA = [];
+    // "Bajan DESDE este plantel" — base = selectedSquad, target = otro plantel (inferior)
+    const bajanDesde = [];
+    // "Bajan A este plantel" — base = otro plantel, target = selectedSquad
+    const bajanA = [];
+
+    Object.values(effectiveStatuses).forEach(ds => {
+      if (!ds.temporary || !ds.active_in_target_squad) return;
+      const isSube = ds.movement_type === "sube_temporal";
+      const isBaja = ds.movement_type === "baja_temporal";
+      if (!isSube && !isBaja) return;
+
+      const player = players.find(p => p.id === ds.player_id);
+      if (!player) return;
+
+      if (isSube) {
+        if (ds.base_squad_id === selectedSquadId && ds.target_squad_id !== selectedSquadId) {
+          subenDesde.push(player);
+        } else if (ds.base_squad_id !== selectedSquadId && ds.target_squad_id === selectedSquadId) {
+          subenA.push(player);
+        }
+      } else if (isBaja) {
+        if (ds.base_squad_id === selectedSquadId && ds.target_squad_id !== selectedSquadId) {
+          bajanDesde.push(player);
+        } else if (ds.base_squad_id !== selectedSquadId && ds.target_squad_id === selectedSquadId) {
+          bajanA.push(player);
+        }
       }
     });
 
-    return players.filter(p => stableMemberIds.has(p.id) || temporaryIds.has(p.id));
+    const subenDesdeIds = new Set(subenDesde.map(p => p.id));
+    const bajanDesdeIds = new Set(bajanDesde.map(p => p.id));
+
+    // C) Visitors in this squad today
+    const temporaryInIds = new Set([...subenA, ...bajanA].map(p => p.id));
+
+    // D) Final player list:
+    // stable members EXCEPT those who left temporarily (subenDesde / bajanDesde)
+    // + temporary visitors who are now here
+    const finalPlayers = players.filter(p =>
+      (stableMemberIds.has(p.id) && !subenDesdeIds.has(p.id) && !bajanDesdeIds.has(p.id)) ||
+      temporaryInIds.has(p.id)
+    );
+
+    return {
+      squadPlayers: finalPlayers,
+      movements: { subenDesde, subenA, bajanDesde, bajanA },
+    };
   })();
 
   function getEffectiveStatus(player) {
@@ -314,6 +355,7 @@ export default function DailySquad() {
       ) : (
         <DailySquadGrid
           players={filteredPlayers}
+          movements={movements}
           getEffectiveStatus={getEffectiveStatus}
           applyChange={applyChange}
           pendingChanges={pendingChanges}

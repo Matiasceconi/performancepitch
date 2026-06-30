@@ -376,43 +376,45 @@ export default function Dashboard() {
     const recordsMap = {}; // player_id -> ds record (real or synthetic)
 
     stableMembers.forEach(m => {
-      const player = playerMap[m.player_id];
-      if (!player) return;
+    const player = playerMap[m.player_id];
+    if (!player) return;
 
-      const saved = statusById[m.player_id];
+    const saved = statusById[m.player_id];
 
-      // If the player has a status record AND they have an active temporary movement to ANOTHER squad,
-      // they are NOT in this squad today — skip them
-      if (saved && saved.temporary && saved.active_in_target_squad && saved.target_squad_id && saved.target_squad_id !== selectedSquadId) {
-        return;
-      }
+    // If the player has a temporary movement OUT of this squad, exclude from stable list
+    // (they'll appear in the subenDesde / bajanDesde movement groups instead)
+    if (saved && saved.temporary && saved.active_in_target_squad &&
+        saved.target_squad_id && saved.target_squad_id !== selectedSquadId &&
+        (saved.movement_type === "sube_temporal" || saved.movement_type === "baja_temporal")) {
+      return;
+    }
 
-      if (saved) {
-        recordsMap[m.player_id] = saved;
-      } else {
-        // No status record → synthetic "disponible por defecto"
-        recordsMap[m.player_id] = {
-          player_id: m.player_id,
-          player_name: player.full_name || "",
-          position: player.position || "",
-          category: player.category || "",
-          status: "disponible",
-          tags: [],
-          notes: "",
-          temporary: false,
-          active_in_target_squad: true,
-          base_squad_id: selectedSquadId,
-          target_squad_id: selectedSquadId,
-          _synthetic: true, // marker: no real record exists
-        };
-      }
+    if (saved) {
+      recordsMap[m.player_id] = saved;
+    } else {
+      recordsMap[m.player_id] = {
+        player_id: m.player_id,
+        player_name: player.full_name || "",
+        position: player.position || "",
+        category: player.category || "",
+        status: "disponible",
+        tags: [],
+        notes: "",
+        temporary: false,
+        active_in_target_squad: true,
+        base_squad_id: selectedSquadId,
+        target_squad_id: selectedSquadId,
+        _synthetic: true,
+      };
+    }
     });
 
-    // 2) Temporary visitors from other squads active in this squad today
+    // 2) Temporary visitors arriving at this squad today (sube_temporal or baja_temporal)
     dayStatuses.forEach(ds => {
-      if (ds.temporary && ds.active_in_target_squad && ds.target_squad_id === selectedSquadId) {
-        recordsMap[ds.player_id] = ds;
-      }
+    if (ds.temporary && ds.active_in_target_squad && ds.target_squad_id === selectedSquadId &&
+        (ds.movement_type === "sube_temporal" || ds.movement_type === "baja_temporal")) {
+      recordsMap[ds.player_id] = ds;
+    }
     });
 
     return Object.values(recordsMap);
@@ -429,52 +431,48 @@ export default function Dashboard() {
     return groups;
   }, [squadRecords]);
 
-  // ── Movement groups (only when a squad is selected) ───────────────────
-  // "Suben DESDE este plantel" → base = selectedSquad, target = otro plantel superior
+  // ── Movement groups — usando movement_type como fuente de verdad ──────
   const subenDesde = useMemo(() => {
-    if (!selectedSquadId) return (byStatus["subió"] || []);
+    if (!selectedSquadId) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
       ds.active_in_target_squad &&
+      ds.movement_type === "sube_temporal" &&
       ds.base_squad_id === selectedSquadId &&
-      ds.target_squad_id !== selectedSquadId &&
-      ["sube_temporal", "subió"].includes(ds.movement_type || ds.status)
+      ds.target_squad_id !== selectedSquadId
     );
-  }, [squadRecords, selectedSquadId, byStatus]);
+  }, [squadRecords, selectedSquadId]);
 
-  // "Suben A este plantel" → base = otro plantel, target = selectedSquad
   const subenA = useMemo(() => {
     if (!selectedSquadId) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
       ds.active_in_target_squad &&
+      ds.movement_type === "sube_temporal" &&
       ds.base_squad_id !== selectedSquadId &&
-      ds.target_squad_id === selectedSquadId &&
-      ["sube_temporal", "subió"].includes(ds.movement_type || ds.status)
+      ds.target_squad_id === selectedSquadId
     );
   }, [squadRecords, selectedSquadId]);
 
-  // "Bajan DESDE este plantel" → base = selectedSquad, target = otro plantel inferior
   const bajanDesde = useMemo(() => {
-    if (!selectedSquadId) return (byStatus["bajó"] || []);
+    if (!selectedSquadId) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
       ds.active_in_target_squad &&
+      ds.movement_type === "baja_temporal" &&
       ds.base_squad_id === selectedSquadId &&
-      ds.target_squad_id !== selectedSquadId &&
-      ["baja_temporal", "bajó"].includes(ds.movement_type || ds.status)
+      ds.target_squad_id !== selectedSquadId
     );
-  }, [squadRecords, selectedSquadId, byStatus]);
+  }, [squadRecords, selectedSquadId]);
 
-  // "Bajan A este plantel" → base = otro plantel superior, target = selectedSquad
   const bajanA = useMemo(() => {
     if (!selectedSquadId) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
       ds.active_in_target_squad &&
+      ds.movement_type === "baja_temporal" &&
       ds.base_squad_id !== selectedSquadId &&
-      ds.target_squad_id === selectedSquadId &&
-      ["baja_temporal", "bajó"].includes(ds.movement_type || ds.status)
+      ds.target_squad_id === selectedSquadId
     );
   }, [squadRecords, selectedSquadId]);
 
@@ -641,7 +639,7 @@ export default function Dashboard() {
         {subenDesde.length > 0 && (
           <ErrorBoundary>
             <GroupCard
-              title={selectedSquadId ? `Suben desde ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Suben"}
+              title={`Suben desde ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}`}
               dotColor="bg-sky-400"
               records={subenDesde} playerMap={playerMap}
               emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
@@ -652,7 +650,7 @@ export default function Dashboard() {
         {subenA.length > 0 && (
           <ErrorBoundary>
             <GroupCard
-              title={selectedSquadId ? `Suben a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Suben (visitantes)"}
+              title={`Suben a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}`}
               dotColor="bg-cyan-400"
               records={subenA} playerMap={playerMap}
               emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
@@ -663,7 +661,7 @@ export default function Dashboard() {
         {bajanDesde.length > 0 && (
           <ErrorBoundary>
             <GroupCard
-              title={selectedSquadId ? `Bajan desde ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Bajan"}
+              title={`Bajan desde ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}`}
               dotColor="bg-orange-400"
               records={bajanDesde} playerMap={playerMap}
               emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
@@ -674,7 +672,7 @@ export default function Dashboard() {
         {bajanA.length > 0 && (
           <ErrorBoundary>
             <GroupCard
-              title={selectedSquadId ? `Bajan a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Bajan (visitantes)"}
+              title={`Bajan a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}`}
               dotColor="bg-amber-400"
               records={bajanA} playerMap={playerMap}
               emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
