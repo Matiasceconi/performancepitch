@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
+import SquadSelectModal from "@/components/workspace/SquadSelectModal";
 
 const WorkspaceContext = createContext(null);
 
@@ -26,6 +27,7 @@ export function WorkspaceProvider({ children }) {
   const [activeSquad, setActiveSquadState] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
+  const [needSquadSelection, setNeedSquadSelection] = useState(false);
 
   const loadWorkspace = useCallback(async () => {
     if (!isAuthenticated || !user) { setLoadingWorkspace(false); return; }
@@ -65,10 +67,21 @@ export function WorkspaceProvider({ children }) {
       ? allSquads
       : allSquads.filter(s => (access?.squad_ids || []).includes(s.id));
 
-    // 6. Restore last active squad from localStorage or pick first
+    // 6. Restore last active squad from localStorage or ask user to pick
     const savedId = localStorage.getItem("activeSquadId");
-    const restoredSquad = mySquads.find(s => s.id === savedId) || mySquads[0] || null;
-    setActiveSquadState(restoredSquad);
+    const restoredSquad = mySquads.find(s => s.id === savedId) || null;
+
+    if (restoredSquad) {
+      setActiveSquadState(restoredSquad);
+    } else if (mySquads.length === 1) {
+      setActiveSquadState(mySquads[0]);
+      localStorage.setItem("activeSquadId", mySquads[0].id);
+    } else if (mySquads.length > 1) {
+      // Multiple squads, no saved preference → show selector
+      setNeedSquadSelection(true);
+    } else {
+      setActiveSquadState(null);
+    }
 
     // 7. Update last_seen on access record (fire and forget)
     if (accessRecords[0]) {
@@ -84,6 +97,7 @@ export function WorkspaceProvider({ children }) {
 
   function setActiveSquad(squad) {
     setActiveSquadState(squad);
+    setNeedSquadSelection(false);
     if (squad) localStorage.setItem("activeSquadId", squad.id);
   }
 
@@ -107,6 +121,17 @@ export function WorkspaceProvider({ children }) {
     if (!userAccess) return false;
     if (userAccess.all_squads) return true;
     return (userAccess.squad_ids || []).includes(squadId);
+  }
+
+  // Show squad picker before rendering app
+  if (needSquadSelection && isAuthenticated) {
+    return (
+      <SquadSelectModal
+        squads={mySquads}
+        userName={user?.full_name || ""}
+        onSelect={setActiveSquad}
+      />
+    );
   }
 
   return (
