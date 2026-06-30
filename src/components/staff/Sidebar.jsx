@@ -36,11 +36,15 @@ export default function Sidebar() {
   const [sessionsOpen, setSessionsOpen] = useState(SESSION_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
-  const { canModule } = useWorkspace();
+  const { canModule, isAdmin } = useWorkspace();
 
-  // Filter items by permission, keeping group structure
-  const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canModule(i.module));
-  const topItems = NAV_ITEMS.filter(i => !i.group && canModule(i.module));
+  // Filter items by permission; admins always see the admin module
+  function canSee(item) {
+    if (item.module === "admin" && isAdmin) return true;
+    return canModule(item.module);
+  }
+  const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canSee(i));
+  const topItems = NAV_ITEMS.filter(i => !i.group && canSee(i));
 
   function NavLink({ item }) {
     const isActive = location.pathname === item.path;
