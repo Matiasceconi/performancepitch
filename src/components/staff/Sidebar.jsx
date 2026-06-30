@@ -1,6 +1,8 @@
 import React, { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
-import { Video, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen, Dumbbell, ChevronDown, ChevronRight } from "lucide-react";
+import { Video, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound, CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen, Dumbbell, ChevronDown, ChevronRight, LogOut } from "lucide-react";
+import SquadSelector from "@/components/workspace/SquadSelector";
+import { useAuth } from "@/lib/AuthContext";
 
 const navItems = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -26,6 +28,7 @@ const navItems = [
 export default function Sidebar() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const { user, logout } = useAuth();
 
   // Auto-expand Sesiones group if any child is active
   const sessionPaths = ["/sessions", "/field-library", "/strength-library"];
@@ -43,14 +46,15 @@ export default function Sidebar() {
 
       <aside className={`fixed top-0 left-0 h-full w-64 bg-zinc-950 border-r border-zinc-800 z-50 transition-transform duration-300 lg:translate-x-0 ${open ? "translate-x-0" : "-translate-x-full"}`}>
 
-        <div className="p-5 border-b border-zinc-800 flex items-center gap-3">
+        <div className="p-4 border-b border-zinc-800 space-y-3">
           <div>
             <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Defensa y Justicia</h1>
-            <p className="text-xs mt-0.5" style={{ color: "#F0C800" }}>Cuerpo Técnico</p>
+            <p className="text-xs mt-0.5" style={{ color: "#F0C800" }}>PerformancePitch</p>
           </div>
+          <SquadSelector />
         </div>
 
-        <nav className="p-4 space-y-1">
+        <nav className="p-4 space-y-1 pb-24 overflow-y-auto" style={{ maxHeight: "calc(100vh - 160px)" }}>
           {navItems.map((item) => {
             if (item.children) {
               const isGroupActive = item.children.some(c => location.pathname === c.path);
@@ -105,6 +109,19 @@ export default function Sidebar() {
             );
           })}
         </nav>
+
+        {/* User footer */}
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-zinc-800">
+          <div className="flex items-center gap-2">
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-zinc-300 truncate">{user?.full_name || user?.email || "Usuario"}</p>
+            </div>
+            <button onClick={() => logout()} title="Cerrar sesión"
+              className="p-1.5 text-zinc-600 hover:text-zinc-300 transition-colors shrink-0">
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
 
         <button onClick={() => setOpen(false)} className="lg:hidden absolute top-4 right-4 text-zinc-500">
           <X size={18} />

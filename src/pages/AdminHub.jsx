@@ -1,11 +1,13 @@
 import React, { useState } from "react";
-import { ShieldCheck, GitMerge, Fingerprint, Users } from "lucide-react";
+import { ShieldCheck, GitMerge, Fingerprint, Users, UserCog } from "lucide-react";
 import PlayerAdmin from "@/pages/PlayerAdmin";
 import DataCrossing from "@/pages/DataCrossing";
 import PlayerIdentity from "@/pages/PlayerIdentity";
 import StaffManager from "@/pages/StaffManager";
+import UsersAccess from "@/pages/UsersAccess";
 
 const TABS = [
+  { id: "users", label: "Usuarios y Accesos", icon: UserCog },
   { id: "players", label: "Admin Plantel", icon: ShieldCheck },
   { id: "crossing", label: "Cruce de datos", icon: GitMerge },
   { id: "identity", label: "Identity Manager", icon: Fingerprint },
@@ -13,7 +15,7 @@ const TABS = [
 ];
 
 export default function AdminHub() {
-  const [activeTab, setActiveTab] = useState("players");
+  const [activeTab, setActiveTab] = useState("users");
 
   return (
     <div className="space-y-4">
@@ -42,10 +44,11 @@ export default function AdminHub() {
       </div>
 
       <div>
-        {activeTab === "players" && <PlayerAdmin />}
+        {activeTab === "users"    && <UsersAccess />}
+        {activeTab === "players"  && <PlayerAdmin />}
         {activeTab === "crossing" && <DataCrossing />}
         {activeTab === "identity" && <PlayerIdentity />}
-        {activeTab === "staff" && <StaffManager />}
+        {activeTab === "staff"    && <StaffManager />}
       </div>
     </div>
   );

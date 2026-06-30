@@ -13,6 +13,7 @@ import Register from '@/pages/Register';
 import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Layout from '@/components/staff/Layout';
+import { WorkspaceProvider } from '@/lib/WorkspaceContext';
 import Dashboard from '@/pages/Dashboard';
 import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
@@ -29,6 +30,7 @@ import DailySquad from '@/pages/DailySquad';
 import SquadManager from '@/pages/SquadManager';
 import FieldLibrary from '@/pages/FieldLibrary';
 import StrengthLibrary from '@/pages/StrengthLibrary';
+import UsersAccess from '@/pages/UsersAccess';
 
 const AuthenticatedApp = () => {
   const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
@@ -78,6 +80,7 @@ const AuthenticatedApp = () => {
           <Route path="/squad-manager" element={<SquadManager />} />
           <Route path="/field-library" element={<FieldLibrary />} />
           <Route path="/strength-library" element={<StrengthLibrary />} />
+          <Route path="/users-access" element={<UsersAccess />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
@@ -93,7 +96,9 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <Router>
           <ScrollToTop />
-          <AuthenticatedApp />
+          <WorkspaceProvider>
+            <AuthenticatedApp />
+          </WorkspaceProvider>
         </Router>
         <Toaster />
       </QueryClientProvider>

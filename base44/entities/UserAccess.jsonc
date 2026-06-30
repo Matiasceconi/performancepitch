@@ -1,0 +1,121 @@
+{
+  "name": "UserAccess",
+  "type": "object",
+  "properties": {
+    "user_email": {
+      "type": "string",
+      "description": "Email del usuario de la plataforma"
+    },
+    "user_name": {
+      "type": "string",
+      "description": "Nombre completo (desnormalizado)"
+    },
+    "role": {
+      "type": "string",
+      "enum": [
+        "Administrador",
+        "Coordinador",
+        "Director Deportivo",
+        "Entrenador",
+        "Preparador F\u00edsico",
+        "Analista de Rendimiento",
+        "M\u00e9dico",
+        "Kinesi\u00f3logo",
+        "Nutricionista",
+        "Videoanalista",
+        "Utilero",
+        "Solo lectura"
+      ],
+      "description": "Rol del usuario"
+    },
+    "squad_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de planteles asignados. Vac\u00edo = todos los planteles"
+    },
+    "squad_names": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Nombres de planteles (desnormalizado)"
+    },
+    "all_squads": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si true, tiene acceso a todos los planteles"
+    },
+    "allowed_modules": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [
+        "dashboard",
+        "daily_squad",
+        "sessions",
+        "matches",
+        "performance",
+        "gps",
+        "field_library",
+        "strength_library",
+        "schedule",
+        "team",
+        "weekly_planner",
+        "tactical"
+      ],
+      "description": "M\u00f3dulos habilitados"
+    },
+    "can_create": {
+      "type": "boolean",
+      "default": true
+    },
+    "can_edit": {
+      "type": "boolean",
+      "default": true
+    },
+    "can_delete": {
+      "type": "boolean",
+      "default": false
+    },
+    "can_export": {
+      "type": "boolean",
+      "default": true
+    },
+    "can_admin": {
+      "type": "boolean",
+      "default": false,
+      "description": "Acceso a Administraci\u00f3n"
+    },
+    "can_manage_users": {
+      "type": "boolean",
+      "default": false,
+      "description": "Puede gestionar usuarios"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "last_seen": {
+      "type": "string",
+      "description": "\u00daltimo acceso (ISO datetime)"
+    },
+    "phone": {
+      "type": "string"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "user_email",
+    "role"
+  ]
+}
