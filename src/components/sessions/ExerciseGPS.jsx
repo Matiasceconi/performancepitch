@@ -176,8 +176,21 @@ export default function ExerciseGPS({ session, exercise, sessionPlayers }) {
     let saved = [];
     if (toCreate.length > 0) saved = await base44.entities.ExerciseGPSData.bulkCreate(toCreate);
 
+    // Auto-resolve library link if not set: search by exercise name
+    let libId = libraryExerciseId;
+    if (!libId && exercise?.name) {
+      const libs = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
+      const norm = (s) => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      const found = libs.find(l => norm(l.name) === norm(exercise.name));
+      if (found) {
+        libId = found.id;
+        // Persist the link so future imports are automatic
+        await base44.entities.SessionExercise.update(exerciseId, { library_exercise_id: libId });
+        setLibraryExerciseId(libId);
+      }
+    }
+
     // If linked to library, also copy to LibraryExerciseGPSData
-    const libId = libraryExerciseId;
     if (libId && toCreate.length > 0) {
       // Remove previous library records for this session+exercise
       const prevLib = await base44.entities.LibraryExerciseGPSData.filter({ exercise_id: exerciseId }, "-created_date", 500);

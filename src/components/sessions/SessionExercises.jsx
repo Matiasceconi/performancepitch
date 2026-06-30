@@ -9,6 +9,7 @@ function normalize(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
+// Returns the library exercise id (existing or newly created)
 async function syncToFieldLibrary(form, sessionId) {
   const today = moment().format("YYYY-MM-DD");
   const all = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
@@ -22,13 +23,14 @@ async function syncToFieldLibrary(form, sessionId) {
       times_used: (match.times_used || 1) + 1,
       last_used_at: today,
     });
+    return match.id;
   } else {
     const l = parseFloat(form.length_m) || 0;
     const w = parseFloat(form.width_m) || 0;
     const p = parseFloat(form.players_count) || 0;
     const total_area = l && w ? parseFloat((l * w).toFixed(1)) : undefined;
     const eii = total_area && p ? parseFloat((total_area / p).toFixed(2)) : undefined;
-    await base44.entities.FieldExerciseLibrary.create({
+    const created = await base44.entities.FieldExerciseLibrary.create({
       name: form.name,
       type: form.type || undefined,
       objective: form.objective || undefined,
@@ -50,6 +52,7 @@ async function syncToFieldLibrary(form, sessionId) {
       last_used_at: today,
       created_from_session_id: sessionId,
     });
+    return created.id;
   }
 }
 
@@ -161,10 +164,14 @@ export default function SessionExercises({ session, sessionPlayers }) {
     } else {
       payload.order = exercises.length + 1;
       const created = await base44.entities.SessionExercise.create(payload);
+      // Sync automático a biblioteca de campo y guardar library_exercise_id
+      const libId = await syncToFieldLibrary(form, sessionId);
+      if (libId) {
+        await base44.entities.SessionExercise.update(created.id, { library_exercise_id: libId });
+        created.library_exercise_id = libId;
+      }
       setExercises(prev => [...prev, created]);
       toast({ title: "✓ Ejercicio agregado" });
-      // Sync automático a biblioteca de campo
-      await syncToFieldLibrary(form, sessionId);
     }
     setShowForm(false);
     setEditId(null);
