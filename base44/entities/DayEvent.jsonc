@@ -2,10 +2,18 @@
   "name": "DayEvent",
   "type": "object",
   "properties": {
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel al que pertenece el evento"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
     "date": {
       "type": "string",
       "format": "date",
-      "description": "Fecha del evento"
+      "description": "Fecha del evento (YYYY-MM-DD)"
     },
     "time": {
       "type": "string",
@@ -17,7 +25,7 @@
     },
     "type": {
       "type": "string",
-      "description": "Tipo de evento (ej: Desayuno, Viaje, Charla t\u00e9cnica, etc.)"
+      "description": "Tipo de evento (Comida, Viaje, Partido...)"
     },
     "duration_minutes": {
       "type": "number",
@@ -25,34 +33,24 @@
     },
     "location": {
       "type": "string",
-      "description": "Lugar o ubicaci\u00f3n"
+      "description": "Lugar del evento"
     },
     "notes": {
       "type": "string",
-      "description": "Notas adicionales"
+      "description": "Observaciones"
     },
     "color": {
       "type": "string",
-      "enum": [
-        "blue",
-        "green",
-        "yellow",
-        "orange",
-        "red",
-        "purple",
-        "pink",
-        "cyan"
-      ],
-      "default": "blue",
-      "description": "Color del evento"
+      "description": "Color del evento",
+      "default": "blue"
     },
     "rival_logo_url": {
       "type": "string",
-      "description": "URL del escudo del equipo rival (solo para eventos tipo Partido)"
+      "description": "URL del escudo rival (para eventos de partido)"
     }
   },
   "required": [
-    "date",
-    "title"
+    "title",
+    "date"
   ]
 }

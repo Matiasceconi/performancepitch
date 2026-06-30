@@ -2,6 +2,14 @@
   "name": "WeeklyPlan",
   "type": "object",
   "properties": {
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel al que pertenece el plan"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
     "week_start": {
       "type": "string",
       "format": "date",

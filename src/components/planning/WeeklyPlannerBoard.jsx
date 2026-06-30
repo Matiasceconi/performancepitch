@@ -4,6 +4,7 @@ import { Save, ChevronLeft, ChevronRight, Plus, X, Calendar } from "lucide-react
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 moment.locale("es");
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ function CircularGauge({ value }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function WeeklyPlannerBoard() {
   const { toast } = useToast();
+  const { activeSquadId, activeSquad } = useWorkspace();
 
   // El plan se identifica por la fecha del primer día
   const [startDate, setStartDate] = useState(moment().startOf("isoWeek").format("YYYY-MM-DD"));
@@ -79,12 +81,16 @@ export default function WeeklyPlannerBoard() {
   const [saving, setSaving] = useState(false);
   const [recordId, setRecordId] = useState(null);
 
-  // Cargar plan desde BD cuando cambia la fecha de inicio
+  // Cargar plan desde BD cuando cambia la fecha de inicio o el plantel activo
   useEffect(() => {
     async function load() {
       setLoading(true);
+      setRecordId(null);
       try {
-        const records = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
+        const filter = activeSquadId
+          ? { week_start: startDate, squad_id: activeSquadId }
+          : { week_start: startDate };
+        const records = await base44.entities.WeeklyPlan.filter(filter);
         if (records.length > 0) {
           const rec = records[0];
           setRecordId(rec.id);
@@ -105,7 +111,7 @@ export default function WeeklyPlannerBoard() {
       }
     }
     load();
-  }, [startDate]);
+  }, [startDate, activeSquadId]);
 
   function buildDays(start, count) {
     return Array.from({ length: count }, (_, i) =>
@@ -160,10 +166,11 @@ export default function WeeklyPlannerBoard() {
   async function save() {
     setSaving(true);
     try {
+      const payload = { days_data: days, week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "" };
       if (recordId) {
-        await base44.entities.WeeklyPlan.update(recordId, { days_data: days, week_start: startDate });
+        await base44.entities.WeeklyPlan.update(recordId, payload);
       } else {
-        const rec = await base44.entities.WeeklyPlan.create({ week_start: startDate, days_data: days });
+        const rec = await base44.entities.WeeklyPlan.create(payload);
         setRecordId(rec.id);
       }
       toast({ title: "Plan guardado correctamente" });

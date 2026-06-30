@@ -61,7 +61,7 @@ function DaysCounter({ injuryDate, expectedReturn }) {
   );
 }
 
-export default function MedicalDashboard() {
+export default function MedicalDashboard({ squadPlayerIds }) {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
@@ -76,26 +76,31 @@ export default function MedicalDashboard() {
     load();
   }, []);
 
+  // Filtrar por plantel activo si se pasan IDs de jugadores
+  const filteredRecords = squadPlayerIds instanceof Set
+    ? records.filter(r => !r.player_id || squadPlayerIds.has(r.player_id))
+    : records;
+
   // Active injured: Lesionado or En recuperación
-  const activeInjured = records.filter(r =>
+  const activeInjured = filteredRecords.filter(r =>
     (r.status === "Lesionado" || r.status === "En recuperación") &&
     r.record_type !== "Consulta/Seguimiento"
   );
 
   // Seguimiento
-  const seguimiento = records.filter(r => r.status === "Seguimiento");
+  const seguimiento = filteredRecords.filter(r => r.status === "Seguimiento");
 
   // Stats
   const totalInjured = activeInjured.length;
   const totalSeguimiento = seguimiento.length;
-  const totalDaysLost = records.reduce((acc, r) => acc + (r.days_lost || 0), 0);
-  const avgDaysLost = records.filter(r => r.days_lost > 0).length
-    ? Math.round(totalDaysLost / records.filter(r => r.days_lost > 0).length)
+  const totalDaysLost = filteredRecords.reduce((acc, r) => acc + (r.days_lost || 0), 0);
+  const avgDaysLost = filteredRecords.filter(r => r.days_lost > 0).length
+    ? Math.round(totalDaysLost / filteredRecords.filter(r => r.days_lost > 0).length)
     : 0;
 
   // Most common injuries
   const diagnosisCounts = {};
-  records.forEach(r => {
+  filteredRecords.forEach(r => {
     if (!r.diagnosis) return;
     const key = r.diagnosis.toLowerCase().trim();
     diagnosisCounts[key] = (diagnosisCounts[key] || 0) + 1;
@@ -108,7 +113,7 @@ export default function MedicalDashboard() {
   // Build list of players with any medical record, for the history panel
   const playersWithRecords = (() => {
     const seen = new Map();
-    records.forEach(r => {
+    filteredRecords.forEach(r => {
       const key = r.player_id || r.player_name;
       if (!seen.has(key)) {
         const playerData = getPlayer(r.player_id, r.player_name);

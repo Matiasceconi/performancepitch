@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Down
 import moment from "moment";
 import "moment/locale/es";
 import { jsPDF } from "jspdf";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 moment.locale("es");
 
@@ -77,7 +78,7 @@ function buildWeekPDF(days, eventsForDate, weekLabel) {
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(11);
   doc.setFont("helvetica", "bold");
-  doc.text("PLANTEL RESERVA", 8, 9);
+  doc.text("CRONOGRAMA", 8, 9);
   doc.setFontSize(9);
   doc.setFont("helvetica", "normal");
   doc.text(weekLabel, pw / 2, 9, { align: "center" });
@@ -496,6 +497,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
 
 // ── Main Schedule ──
 export default function Schedule() {
+  const { activeSquadId, activeSquad } = useWorkspace();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [weekStartDay, setWeekStartDay] = useState(loadWeekStartDay);
@@ -511,12 +513,13 @@ export default function Schedule() {
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
 
   async function loadEvents() {
-    const data = await base44.entities.DayEvent.list("-date", 500);
+    if (!activeSquadId) { setEvents([]); setLoading(false); return; }
+    const data = await base44.entities.DayEvent.filter({ squad_id: activeSquadId }, "-date", 500);
     setEvents(data);
     setLoading(false);
   }
 
-  useEffect(() => { loadEvents(); }, []);
+  useEffect(() => { setLoading(true); loadEvents(); }, [activeSquadId]);
 
   // Re-compute week start when weekStartDay changes
   useEffect(() => {
@@ -535,10 +538,11 @@ export default function Schedule() {
   }
 
   async function handleSave(form) {
+    const payload = { ...form, squad_id: activeSquadId, squad_name: activeSquad?.name || "" };
     if (editingEvent) {
-      await base44.entities.DayEvent.update(editingEvent.id, form);
+      await base44.entities.DayEvent.update(editingEvent.id, payload);
     } else {
-      await base44.entities.DayEvent.create(form);
+      await base44.entities.DayEvent.create(payload);
     }
     await loadEvents();
   }
@@ -606,7 +610,7 @@ export default function Schedule() {
 
   function downloadWeekPDF() {
     const days = getWeekDays();
-    const weekLabel = `${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
+    const weekLabel = `${activeSquad?.name ? activeSquad.name + " · " : ""}${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
     const doc = buildWeekPDF(days, getEventsForDate, weekLabel);
     doc.save(`cronograma-semana-${days[0].format("YYYY-MM-DD")}.pdf`);
   }
@@ -746,7 +750,7 @@ export default function Schedule() {
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">Cronograma</h1>
-          <p className="text-zinc-500 text-sm mt-1">Planificación diaria del equipo</p>
+          <p className="text-zinc-500 text-sm mt-1">{activeSquad?.name || "Planificación diaria del equipo"}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <div className="flex items-center bg-zinc-800 rounded-lg p-1 gap-1">

@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Plus, Trash2, Heart, Activity, LayoutDashboard } from "lucide-react";
 import MedicalDashboard from "@/components/medical/MedicalDashboard";
 import { usePlayers } from "@/hooks/usePlayers";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -28,7 +29,9 @@ const EMPTY_FORM = {
 };
 
 export default function Medical() {
+  const { activeSquadId } = useWorkspace();
   const [records, setRecords] = useState([]);
+  const [squadPlayerIds, setSquadPlayerIds] = useState(null); // null = sin filtro aún
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -36,9 +39,17 @@ export default function Medical() {
   const { toast } = useToast();
   const { players = [], getPlayer } = usePlayers();
 
-  useEffect(() => { loadAll(); }, []);
+  // Obtener IDs de jugadores del plantel activo
+  useEffect(() => {
+    if (!activeSquadId) { setSquadPlayerIds(null); return; }
+    base44.entities.SquadMembership.filter({ squad_id: activeSquadId, status: "activo" }, "player_name", 200)
+      .then(members => setSquadPlayerIds(new Set(members.map(m => m.player_id))));
+  }, [activeSquadId]);
+
+  useEffect(() => { loadAll(); }, [activeSquadId]);
 
   async function loadAll() {
+    setLoading(true);
     try {
       const recs = await base44.entities.MedicalRecord.list("-injury_date", 200);
       setRecords(recs);
@@ -46,6 +57,11 @@ export default function Medical() {
       setLoading(false);
     }
   }
+
+  // Filtrar registros por jugadores del plantel activo
+  const filteredRecords = squadPlayerIds === null
+    ? records
+    : records.filter(r => !r.player_id || squadPlayerIds.has(r.player_id));
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -70,7 +86,7 @@ export default function Medical() {
     setRecords((prev) => prev.filter((r) => r.id !== id));
   }
 
-  const lesiones = records
+  const lesiones = filteredRecords
     .filter(r => r.record_type === "Lesión" || !r.record_type)
     .sort((a, b) => {
       if (!a.injury_date && !b.injury_date) return 0;
@@ -78,7 +94,7 @@ export default function Medical() {
       if (!b.injury_date) return -1;
       return new Date(b.injury_date) - new Date(a.injury_date);
     });
-  const consultas = records.filter(r => r.record_type === "Consulta/Seguimiento");
+  const consultas = filteredRecords.filter(r => r.record_type === "Consulta/Seguimiento");
   const displayed = activeTab === "lesiones" ? lesiones : consultas;
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
@@ -116,7 +132,7 @@ export default function Medical() {
       </div>
 
       {activeTab === "dashboard" ? (
-        <MedicalDashboard />
+        <MedicalDashboard squadPlayerIds={squadPlayerIds} />
       ) : displayed.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
           <Heart size={36} className="text-zinc-700 mx-auto mb-3" />

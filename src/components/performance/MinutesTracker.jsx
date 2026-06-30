@@ -3,6 +3,7 @@ import { Search, FileDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 const TORNEOS = [
   { id: "all",                  label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
@@ -36,15 +37,24 @@ function norm(s) {
 
 export default function MinutesTracker({ onSelectPlayer }) {
   const { toast } = useToast();
+  const { activeSquadId } = useWorkspace();
   const [exporting, setExporting] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
   const [records, setRecords] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [squadPlayerIds, setSquadPlayerIds] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!activeSquadId) { setSquadPlayerIds(null); return; }
+    base44.entities.SquadMembership.filter({ squad_id: activeSquadId, status: "activo" }, "player_name", 200)
+      .then(members => setSquadPlayerIds(new Set(members.map(m => m.player_id))));
+  }, [activeSquadId]);
+
+  useEffect(() => {
+    setLoading(true);
     Promise.all([
       base44.entities.MinutesRecord.list("-created_date", 500),
       base44.entities.Player.list("-created_date", 200),
@@ -126,7 +136,11 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
   const display = useMemo(() => {
     return playerData
-      .filter(p => !search || norm(p.player_name).includes(norm(search)))
+      .filter(p => {
+        if (search && !norm(p.player_name).includes(norm(search))) return false;
+        if (squadPlayerIds instanceof Set && p.player_id && !squadPlayerIds.has(p.player_id)) return false;
+        return true;
+      })
       .map(p => ({ ...p, ...getMinutes(p) }))
       .sort((a, b) => {
         if (sortBy === "juv")  return (b.juv || 0) - (a.juv || 0);

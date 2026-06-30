@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { FileSpreadsheet, TrendingUp, BarChart2, Activity, Filter, Clock, Swords, Dumbbell } from "lucide-react";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import LastSessionDashboard from "./LastSessionDashboard";
 import {
@@ -693,6 +694,7 @@ function SessionSelector({ sessions, matches, selectedId, onSelect }) {
 }
 
 export default function GpsAnalytics({ initialTab, initialDate }) {
+  const { activeSquadId } = useWorkspace();
   const [sessions, setSessions] = useState([]);
   const [matches, setMatches] = useState([]);
   const [allRows, setAllRows] = useState([]);
@@ -737,19 +739,23 @@ export default function GpsAnalytics({ initialTab, initialDate }) {
     return allRows.filter(r => r.source === sourceFilter);
   }, [allRows, sourceFilter]);
 
-  // 1. Carga sesiones y partidos
+  // 1. Carga sesiones y partidos filtrados por plantel activo
   useEffect(() => {
+    setLoading(true);
+    setAllRows([]);
+    const filter = activeSquadId ? { squad_id: activeSquadId } : {};
     Promise.all([
-      base44.entities.TrainingSession.list("-date", 200),
-      base44.entities.MatchReport.list("-date", 100),
+      base44.entities.TrainingSession.filter(filter, "-date", 200),
+      base44.entities.MatchReport.filter(filter, "-date", 100),
     ]).then(([s, m]) => {
       setSessions(s);
       setMatches(m);
     }).finally(() => setLoading(false));
-  }, []);
+  }, [activeSquadId]);
 
   // 2. Con sesiones y partidos cargados, descarga y parsea los CSVs de ambos
   useEffect(() => {
+    setAllRows([]);
     if (!sessions.length && !matches.length) return;
 
     const sessionSources = sessions
