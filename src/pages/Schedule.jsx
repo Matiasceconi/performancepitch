@@ -513,9 +513,13 @@ export default function Schedule() {
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
 
   async function loadEvents() {
-    if (!activeSquadId) { setEvents([]); setLoading(false); return; }
-    const data = await base44.entities.DayEvent.filter({ squad_id: activeSquadId }, "-date", 500);
-    setEvents(data);
+    setLoading(true);
+    const all = await base44.entities.DayEvent.list("-date", 500);
+    // Mostrar eventos del plantel activo + eventos sin squad_id (legados)
+    const filtered = activeSquadId
+      ? all.filter(e => !e.squad_id || e.squad_id === activeSquadId)
+      : all;
+    setEvents(filtered);
     setLoading(false);
   }
 
