@@ -16,7 +16,7 @@ export default function PlayerDayCard({
   const [showMovePanel, setShowMovePanel] = useState(false);
   const [tagInput, setTagInput] = useState("");
 
-  const { status, tags, notes, temporary, active_in_target_squad, base_squad_id, base_squad_name, target_squad_name, movement_type } = dayStatus;
+  const { status, tags, notes, temporary, active_in_target_squad, base_squad_name, target_squad_name, movement_type } = dayStatus;
   const statusClass = STATUS_COLORS[status] || "bg-zinc-700 text-zinc-300 border-zinc-600";
 
   const isTemporaryVisitor = temporary && active_in_target_squad;
@@ -35,57 +35,26 @@ export default function PlayerDayCard({
       <div className={`bg-zinc-900 border rounded-xl transition-all ${
         hasPending ? "border-amber-500/40" : isTemporaryVisitor ? "border-sky-500/30" : "border-zinc-800"
       }`}>
-        {/* Temporary movement badge */}
-        {isTemporaryVisitor && (() => {
-          const isCurrentSquadBase = dayStatus.base_squad_id === selectedSquadId;
-          if (movement_type === "sube_temporal") {
-            return isCurrentSquadBase ? (
-              // Base = este plantel → sube a otro
-              <div className="px-3 pt-2">
-                <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-full px-2 py-0.5 font-medium inline-flex items-center gap-1">
-                  ↑ Sube a {target_squad_name || "otro plantel"}
-                  <span className="text-zinc-500 mx-0.5">·</span>
-                  <span className="text-zinc-400">Base: {base_squad_name}</span>
-                </span>
-              </div>
+        {/* Temporary visitor badge */}
+        {isTemporaryVisitor && (
+          <div className="px-3 pt-2 flex items-center gap-1.5 flex-wrap">
+            {movement_type === "sube_temporal" ? (
+              <span className="text-[10px] bg-sky-500/20 text-sky-300 border border-sky-500/30 rounded-full px-2 py-0.5 font-medium">
+                ↑ Sube desde {base_squad_name || "otro plantel"}
+                {target_squad_name ? ` → ${target_squad_name}` : ""}
+              </span>
+            ) : movement_type === "baja_temporal" ? (
+              <span className="text-[10px] bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium">
+                ↓ Baja desde {base_squad_name || "otro plantel"}
+                {target_squad_name ? ` → ${target_squad_name}` : ""}
+              </span>
             ) : (
-              // Base = otro plantel → viene a este
-              <div className="px-3 pt-2">
-                <span className="text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 rounded-full px-2 py-0.5 font-medium inline-flex items-center gap-1">
-                  ↑ Sube a {target_squad_name || "este plantel"}
-                  <span className="text-zinc-500 mx-0.5">·</span>
-                  <span className="text-zinc-400">Base: {base_squad_name}</span>
-                </span>
-              </div>
-            );
-          }
-          if (movement_type === "baja_temporal") {
-            return isCurrentSquadBase ? (
-              <div className="px-3 pt-2">
-                <span className="text-[10px] bg-orange-500/20 text-orange-300 border border-orange-500/30 rounded-full px-2 py-0.5 font-medium inline-flex items-center gap-1">
-                  ↓ Baja a {target_squad_name || "otro plantel"}
-                  <span className="text-zinc-500 mx-0.5">·</span>
-                  <span className="text-zinc-400">Base: {base_squad_name}</span>
-                </span>
-              </div>
-            ) : (
-              <div className="px-3 pt-2">
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 rounded-full px-2 py-0.5 font-medium inline-flex items-center gap-1">
-                  ↓ Baja a {target_squad_name || "este plantel"}
-                  <span className="text-zinc-500 mx-0.5">·</span>
-                  <span className="text-zinc-400">Base: {base_squad_name}</span>
-                </span>
-              </div>
-            );
-          }
-          return (
-            <div className="px-3 pt-2">
               <span className="text-[10px] bg-zinc-700/40 text-zinc-300 border border-zinc-700 rounded-full px-2 py-0.5 font-medium">
                 Temporal · {base_squad_name || "otro plantel"}
               </span>
-            </div>
-          );
-        })()}
+            )}
+          </div>
+        )}
 
         {/* Card header */}
         <div className="p-3">
