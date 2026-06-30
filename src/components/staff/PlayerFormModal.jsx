@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/components/ui/use-toast";
 import { base44 } from "@/api/base44Client";
 import { Camera, Trash2 } from "lucide-react";
+import { resolvePlayerType, resolvePositionGroup } from "@/components/squad/squadConstants";
 
 const positions = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
 const dominantFeet = ["Derecha", "Izquierda", "Ambidiestro"];
@@ -63,6 +64,11 @@ export default function PlayerFormModal({ player, divisions, statuses, onClose, 
       const payload = { ...form, number: form.number ? Number(form.number) : undefined };
       if (form.first_name || form.last_name) {
         payload.full_name = `${form.first_name} ${form.last_name}`.trim();
+      }
+      // Auto-derive player_type and position_group from position
+      if (payload.position) {
+        payload.player_type = resolvePlayerType(payload.position);
+        payload.position_group = resolvePositionGroup(payload.position);
       }
       Object.keys(payload).forEach((k) => { if (payload[k] === "") delete payload[k]; });
       await onSave(payload);

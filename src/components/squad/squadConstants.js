@@ -40,3 +40,22 @@ export const POSITION_GROUPS = {
   "Extremos":       ["Extremo"],
   "Delanteros":     ["Delantero Centro"],
 };
+
+// Helper: determina si un jugador es arquero por su posición
+export function isGoalkeeper(player) {
+  const pos = player?.position || "";
+  return pos === "Arquero";
+}
+
+// Helper: determina el player_type según posición
+export function resolvePlayerType(position) {
+  return position === "Arquero" ? "arquero" : "jugador_campo";
+}
+
+// Helper: determina el position_group según posición
+export function resolvePositionGroup(position) {
+  for (const [group, positions] of Object.entries(POSITION_GROUPS)) {
+    if (positions.includes(position)) return group;
+  }
+  return null;
+}

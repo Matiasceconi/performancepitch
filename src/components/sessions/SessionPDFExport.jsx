@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { FileText, X, Loader } from "lucide-react";
+import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
 import { fmtMetric, fmtSmax } from "@/utils";
 import moment from "moment";
@@ -262,6 +263,8 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
       const lesionados = sessionPlayers.filter(sp =>
         sp.status_at_session === "lesionado" || sp.status_at_session === "molestia"
       );
+      const presentesField = presentes.filter(sp => !isGoalkeeper({ position: sp.position }));
+      const presentesGK = presentes.filter(sp => isGoalkeeper({ position: sp.position }));
 
       if (sessionPlayers.length === 0) {
         doc.setFontSize(8);
@@ -269,7 +272,8 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
         doc.text("Sin jugadores registrados", margin, y + 5);
         y += 10;
       } else {
-        drawPlayersGroup(presentes, "Presentes");
+        drawPlayersGroup(presentesField, "Jugadores de campo presentes");
+        drawPlayersGroup(presentesGK, "Arqueros presentes");
         drawPlayersGroup(diferenciados, "Diferenciados");
         drawPlayersGroup(lesionados, "Lesionados / Molestia");
         drawPlayersGroup(ausentes, "Ausentes");
@@ -357,25 +361,31 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
         doc.text("Sin carga externa cargada", margin, y + 5);
         y += 10;
       } else {
+        // Classify GPS rows
+        const gpsField = gpsRows.filter(r => !isGoalkeeper({ position: r.player_name_original }));
+        const gpsGK = gpsRows.filter(r => isGoalkeeper({ position: r.player_name_original }));
+
         // Summary row
         addPageIfNeeded(30);
-        subSectionTitle(`Resumen del equipo — ${gpsRows.length} jugadores con GPS`);
+        subSectionTitle(`Resumen del equipo — ${gpsRows.length} jugadores con GPS (Campo: ${gpsField.length} · ARQ: ${gpsGK.length})`);
 
         const summaryData = GPS_METRICS.map(m => ({
           label: m.label,
           value: fmtVal(m.key, avg(gpsRows, m.key)),
+          field: fmtVal(m.key, avg(gpsField, m.key)),
+          gk: fmtVal(m.key, avg(gpsGK, m.key)),
         }));
 
         const colW = contentW / 3;
         let sx = margin, sy = y;
         summaryData.forEach((item, i) => {
           if (i > 0 && i % 3 === 0) {
-            sy += 12;
+            sy += 16;
             sx = margin;
-            addPageIfNeeded(12);
+            addPageIfNeeded(16);
           }
           doc.setFillColor(...LIGHT);
-          doc.roundedRect(sx, sy, colW - 2, 10, 1, 1, "F");
+          doc.roundedRect(sx, sy, colW - 2, 14, 1, 1, "F");
           doc.setFontSize(6);
           doc.setFont("helvetica", "bold");
           doc.setTextColor(...GRAY);
@@ -383,9 +393,13 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
           doc.setFontSize(9);
           doc.setTextColor(...DARK);
           doc.text(item.value, sx + 2, sy + 9);
+          // Campo / ARQ sub-line
+          doc.setFontSize(5.5);
+          doc.setTextColor(...GRAY);
+          doc.text(`C: ${item.field}  A: ${item.gk}`, sx + 2, sy + 13);
           sx += colW;
         });
-        y = sy + 16;
+        y = sy + 20;
 
         // GPS Table
         addPageIfNeeded(20);

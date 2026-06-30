@@ -10,7 +10,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
 import "moment/locale/es";
 
-import { STATUS_LABELS } from "@/components/squad/squadConstants";
+import { STATUS_LABELS, isGoalkeeper } from "@/components/squad/squadConstants";
 
 moment.locale("es");
 
@@ -96,14 +96,35 @@ function NextMatchCard({ match, matchReport }) {
 }
 
 // ─── Summary stat card ─────────────────────────────────────────────────────
-function StatCard({ label, value, color, icon: Icon }) {
+function StatCard({ label, value, color, icon: Icon, sub }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-2">
-        <Icon size={16} className={color} />
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+      <div className="flex items-center justify-between mb-1">
+        <Icon size={14} className={color} />
       </div>
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-xs text-zinc-500 mt-0.5">{label}</p>
+      <p className={`text-xl font-bold ${color}`}>{value}</p>
+      <p className="text-[10px] text-zinc-500 mt-0.5 leading-tight">{label}</p>
+      {sub && (
+        <p className="text-[9px] text-zinc-600 mt-1 leading-tight">{sub}</p>
+      )}
+    </div>
+  );
+}
+
+// ─── Goalkeeper / Field split card ─────────────────────────────────────────
+function SplitStatCard({ label, fieldValue, gkValue, color, icon: Icon }) {
+  const total = (fieldValue || 0) + (gkValue || 0);
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+      <div className="flex items-center gap-1 mb-1">
+        <Icon size={14} className={color} />
+      </div>
+      <p className={`text-xl font-bold ${color}`}>{total}</p>
+      <p className="text-[10px] text-zinc-500 mt-0.5">{label}</p>
+      <div className="flex gap-2 mt-1.5">
+        <span className="text-[9px] text-zinc-400">Campo: <strong className="text-zinc-300">{fieldValue}</strong></span>
+        <span className="text-[9px] text-zinc-400">ARQ: <strong className="text-yellow-400">{gkValue}</strong></span>
+      </div>
     </div>
   );
 }
@@ -417,18 +438,18 @@ export default function Dashboard() {
 
   const totalCount = squadRecords.length;
 
-  const summaryStats = [
-    { label: "Total plantel",  value: totalCount,                          icon: Users,       color: "text-blue-400" },
-    { label: "Disponibles",    value: (byStatus.disponible || []).length,  icon: Activity,    color: "text-emerald-400" },
-    { label: "Lesionados",     value: (byStatus.lesionado || []).length,   icon: AlertCircle, color: "text-red-400" },
-    { label: "Molestias",      value: (byStatus.molestia || []).length,    icon: AlertCircle, color: "text-orange-400" },
-    { label: "Diferenciados",  value: (byStatus.diferenciado || []).length,icon: Zap,         color: "text-amber-400" },
-    { label: "Suspendidos",    value: (byStatus.suspendido || []).length,  icon: UserX,       color: "text-purple-400" },
-    { label: "Convocados",     value: (byStatus.convocado || []).length,   icon: UserCheck,   color: "text-blue-300" },
-    { label: "Suben",          value: subenDesde.length + subenA.length,   icon: ArrowUp,     color: "text-sky-400" },
-    { label: "Bajan",          value: bajanDesde.length + bajanA.length,   icon: ArrowDown,   color: "text-orange-400" },
-    { label: "Ausentes",       value: (byStatus.ausente || []).length,     icon: UserX,       color: "text-zinc-400" },
-  ];
+  // Split records by goalkeeper / field player using playerMap
+  function splitByType(records) {
+    const gk = records.filter(ds => isGoalkeeper(playerMap[ds.player_id] || { position: ds.position }));
+    const field = records.filter(ds => !isGoalkeeper(playerMap[ds.player_id] || { position: ds.position }));
+    return { gk: gk.length, field: field.length };
+  }
+
+  const dispSplit = splitByType(byStatus.disponible || []);
+  const lesioSplit = splitByType(byStatus.lesionado || []);
+  const diffSplit = splitByType(byStatus.diferenciado || []);
+  const gkTotal = splitByType(squadRecords).gk;
+  const fieldTotal = splitByType(squadRecords).field;
 
   const birthdayPlayers = useMemo(() =>
     playerList.filter(p => p.birth_date && moment(p.birth_date).format("MM-DD") === moment().format("MM-DD")),
@@ -506,8 +527,15 @@ export default function Dashboard() {
       )}
 
       {/* Summary cards */}
-      <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
-        {summaryStats.map(s => <StatCard key={s.label} {...s} />)}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+        <StatCard label="Total plantel" value={totalCount} icon={Users} color="text-blue-400"
+          sub={`Campo: ${fieldTotal} · ARQ: ${gkTotal}`} />
+        <SplitStatCard label="Disponibles" fieldValue={dispSplit.field} gkValue={dispSplit.gk} icon={Activity} color="text-emerald-400" />
+        <SplitStatCard label="Lesionados" fieldValue={lesioSplit.field} gkValue={lesioSplit.gk} icon={AlertCircle} color="text-red-400" />
+        <SplitStatCard label="Diferenciados" fieldValue={diffSplit.field} gkValue={diffSplit.gk} icon={Zap} color="text-amber-400" />
+        <StatCard label="Molestias" value={(byStatus.molestia || []).length} icon={AlertCircle} color="text-orange-400" />
+        <StatCard label="Convocados" value={(byStatus.convocado || []).length} icon={UserCheck} color="text-blue-300" />
+        <StatCard label="Suspendidos" value={(byStatus.suspendido || []).length} icon={UserX} color="text-purple-400" />
       </div>
 
       {/* Birthday */}

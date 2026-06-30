@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, CheckCircle, AlertCircle, Eye, X } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Eye, X, Filter } from "lucide-react";
+import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
 import { fmtMetric, fmtSmax } from "@/utils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -251,14 +252,28 @@ export default function SessionGPS({ session, sessionPlayers }) {
   }
 
   const [activeMetric, setActiveMetric] = useState("total_distance");
+  const [playerTypeFilter, setPlayerTypeFilter] = useState("todos"); // todos | campo | arqueros
 
   // ── Stats ──────────────────────────────────────────────────────────────────
-  function avg(key) {
-    const vals = gpsRows.map(r => r[key] || 0);
+  // Classify rows using allPlayers lookup
+  const gkRows = gpsRows.filter(r => {
+    const p = allPlayers.find(x => x.id === r.player_id);
+    return isGoalkeeper(p || { position: r.player_name });
+  });
+  const fieldRows = gpsRows.filter(r => {
+    const p = allPlayers.find(x => x.id === r.player_id);
+    return !isGoalkeeper(p || { position: r.player_name });
+  });
+  const filteredRows = playerTypeFilter === "arqueros" ? gkRows
+    : playerTypeFilter === "campo" ? fieldRows
+    : gpsRows;
+
+  function avg(key, rows = filteredRows) {
+    const vals = rows.map(r => r[key] || 0).filter(v => v > 0);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   }
   const activeMeta = METRICS.find(m => m.key === activeMetric) || METRICS[0];
-  const chartData = [...gpsRows]
+  const chartData = [...filteredRows]
     .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
     .map(r => ({
       name: (r.player_name || "").split(" ")[0],
@@ -376,24 +391,59 @@ export default function SessionGPS({ session, sessionPlayers }) {
         <p className="text-zinc-600 text-sm text-center py-2">Sin datos GPS cargados</p>
       )}
 
-      {/* Summary cards — 2 rows x 4 cols */}
+      {/* Type filter */}
       {gpsRows.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {METRICS.map(m => {
-            const a = avg(m.key);
-            const display = m.key === "smax" ? (a != null ? fmtSmax(a) : "—") : (a != null ? fmtMetric(a) : "—");
-            return (
-              <div key={m.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-zinc-500 mb-1">{m.label}</p>
-                <p className="text-xl font-bold" style={{ color: m.color }}>{display}</p>
-              </div>
-            );
-          })}
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter size={12} className="text-zinc-500" />
+          {[
+            { key: "todos", label: `Todos (${gpsRows.length})` },
+            { key: "campo", label: `Campo (${fieldRows.length})` },
+            { key: "arqueros", label: `Arqueros (${gkRows.length})` },
+          ].map(opt => (
+            <button key={opt.key} onClick={() => setPlayerTypeFilter(opt.key)}
+              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
+                playerTypeFilter === opt.key
+                  ? "bg-white text-zinc-900 border-transparent"
+                  : "bg-transparent border-zinc-700 text-zinc-400 hover:text-white"
+              }`}>
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Summary cards */}
+      {gpsRows.length > 0 && (
+        <div className="space-y-3">
+          {/* Selected group averages */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {METRICS.map(m => {
+              const a = avg(m.key, filteredRows);
+              const display = m.key === "smax" ? (a != null ? fmtSmax(a) : "—") : (a != null ? fmtMetric(a) : "—");
+              return (
+                <div key={m.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
+                  <p className="text-[10px] text-zinc-500 mb-1">{m.label}</p>
+                  <p className="text-xl font-bold" style={{ color: m.color }}>{display}</p>
+                  {/* Show field / gk breakdown when viewing all */}
+                  {playerTypeFilter === "todos" && fieldRows.length > 0 && gkRows.length > 0 && (
+                    <div className="flex justify-center gap-2 mt-1">
+                      <span className="text-[8px] text-zinc-500">
+                        C: {m.key === "smax" ? fmtSmax(avg(m.key, fieldRows) || 0) : fmtMetric(avg(m.key, fieldRows) || 0)}
+                      </span>
+                      <span className="text-[8px] text-yellow-600">
+                        A: {m.key === "smax" ? fmtSmax(avg(m.key, gkRows) || 0) : fmtMetric(avg(m.key, gkRows) || 0)}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
 
       {/* GPS Table */}
-      {gpsRows.length > 0 && (
+      {filteredRows.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
@@ -408,7 +458,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
                 </tr>
               </thead>
               <tbody>
-                {gpsRows.map((r, i) => (
+                {filteredRows.map((r, i) => (
                   <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
                     <td className="py-2.5 px-4 text-white font-semibold whitespace-nowrap">{r.player_name}</td>
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#3b82f6" }}>{fmtMetric(r.total_distance)}</td>

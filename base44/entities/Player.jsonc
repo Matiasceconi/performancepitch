@@ -53,6 +53,26 @@
       ],
       "description": "Posici\u00f3n principal"
     },
+    "position_group": {
+      "type": "string",
+      "enum": [
+        "Arqueros",
+        "Defensores",
+        "Mediocampistas",
+        "Extremos",
+        "Delanteros"
+      ],
+      "description": "Grupo posicional (calculado autom\u00e1ticamente desde position)"
+    },
+    "player_type": {
+      "type": "string",
+      "enum": [
+        "arquero",
+        "jugador_campo"
+      ],
+      "default": "jugador_campo",
+      "description": "Tipo de jugador: arquero o jugador de campo. Si position=Arquero \u2192 arquero, si no \u2192 jugador_campo"
+    },
     "secondary_position": {
       "type": "string",
       "description": "Posici\u00f3n secundaria"

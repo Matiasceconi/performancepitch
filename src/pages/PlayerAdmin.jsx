@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, Pencil, Trash2, Search, Users, Tag, X, Check, ChevronDown, ChevronUp, ToggleLeft, ToggleRight, ArrowRightLeft, IdCard } from "lucide-react";
+import { resolvePlayerType, resolvePositionGroup } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
 import PlayerFichaModal from "@/components/staff/PlayerFichaModal";
 
@@ -46,6 +47,11 @@ function PlayerForm({ player, onSave, onCancel }) {
     if (form.height) payload.height = Number(form.height);
     if (form.weight) payload.weight = Number(form.weight);
     if (form.jersey_number) payload.jersey_number = Number(form.jersey_number);
+    // Auto-derive player_type and position_group from position
+    if (payload.position) {
+      payload.player_type = resolvePlayerType(payload.position);
+      payload.position_group = resolvePositionGroup(payload.position);
+    }
     Object.keys(payload).forEach(k => { if (payload[k] === "") delete payload[k]; });
     onSave(payload);
   }
@@ -472,6 +478,9 @@ export default function PlayerAdmin() {
                       {isInactive && <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-500 border border-zinc-700">Inactivo</span>}
                     </div>
                     <div className="flex items-center gap-2 flex-wrap mt-0.5">
+                      {player.position === "Arquero" && (
+                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-500/20 border border-yellow-500/40 text-yellow-400 font-semibold">ARQ</span>
+                      )}
                       {player.position && <span className="text-xs text-zinc-500">{player.position}</span>}
                       {player.division && <span className="text-xs text-zinc-600">· {player.division}</span>}
                       {player.category && <span className="text-xs text-zinc-600">· {player.category}</span>}
