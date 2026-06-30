@@ -27,76 +27,97 @@ export function WorkspaceProvider({ children }) {
   const [activeSquad, setActiveSquadState] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState(null);
   const [needSquadSelection, setNeedSquadSelection] = useState(false);
 
   const loadWorkspace = useCallback(async () => {
-    if (!isAuthenticated || !user) { setLoadingWorkspace(false); return; }
+    if (!isAuthenticated || !user) {
+      setLoadingWorkspace(false);
+      return;
+    }
     setLoadingWorkspace(true);
+    setWorkspaceError(null);
 
-    // 1. Fetch all active squads
-    const allSquads = await base44.entities.Squad.filter({ active: true }, "name", 100);
-    setSquads(allSquads);
+    try {
+      // 1. Fetch all active squads
+      const allSquads = await base44.entities.Squad.filter({ active: true }, "name", 100);
+      setSquads(allSquads);
 
-    // 2. Find user access record by email
-    const accessRecords = await base44.entities.UserAccess.filter({ user_email: user.email }, "-created_date", 1);
-    let access = accessRecords[0] || null;
+      // 2. Find user access record by email
+      const accessRecords = await base44.entities.UserAccess.filter({ user_email: user.email }, "-created_date", 1);
+      let access = accessRecords[0] || null;
 
-    // 3. If user is platform admin (role === 'admin') and has no access record, treat as Administrador
-    if (!access && user.role === "admin") {
-      access = {
-        user_email: user.email,
-        role: "Administrador",
-        all_squads: true,
-        squad_ids: [],
-        squad_names: [],
-        ...ROLE_DEFAULTS["Administrador"],
-        active: true,
-      };
-    }
-
-    // 4. Merge role defaults with access record overrides
-    if (access) {
-      const defaults = ROLE_DEFAULTS[access.role] || ROLE_DEFAULTS["Solo lectura"];
-      access = { ...defaults, ...access };
-      // Platform admins always keep full admin rights regardless of UserAccess record
-      if (user.role === "admin") {
-        access.can_admin = true;
-        access.can_manage_users = true;
-        access.all_squads = true;
+      // 3. If platform admin with no access record → treat as Administrador
+      if (!access && user.role === "admin") {
+        access = {
+          user_email: user.email,
+          role: "Administrador",
+          all_squads: true,
+          squad_ids: [],
+          squad_names: [],
+          ...ROLE_DEFAULTS["Administrador"],
+          active: true,
+        };
       }
+
+      // 4. Merge role defaults with access record
+      if (access) {
+        const defaults = ROLE_DEFAULTS[access.role] || ROLE_DEFAULTS["Solo lectura"];
+        access = { ...defaults, ...access };
+        if (user.role === "admin") {
+          access.can_admin = true;
+          access.can_manage_users = true;
+          access.all_squads = true;
+        }
+      }
+
+      setUserAccess(access);
+
+      // 5. Determine which squads this user can access
+      const mySquads = access?.all_squads
+        ? allSquads
+        : allSquads.filter(s => (access?.squad_ids || []).includes(s.id));
+
+      // 6. Restore last active squad or prompt selection
+      const savedId = localStorage.getItem("activeSquadId");
+      // Clear cached squad if it belongs to a different user
+      const savedUser = localStorage.getItem("activeSquadUserId");
+      if (savedUser && savedUser !== user.id) {
+        localStorage.removeItem("activeSquadId");
+        localStorage.removeItem("activeSquadUserId");
+      }
+
+      const validSavedId = savedUser === user.id ? savedId : null;
+      const restoredSquad = mySquads.find(s => s.id === validSavedId) || null;
+
+      if (restoredSquad) {
+        setActiveSquadState(restoredSquad);
+        setNeedSquadSelection(false);
+      } else if (mySquads.length === 1) {
+        setActiveSquadState(mySquads[0]);
+        localStorage.setItem("activeSquadId", mySquads[0].id);
+        localStorage.setItem("activeSquadUserId", user.id);
+        setNeedSquadSelection(false);
+      } else if (mySquads.length > 1) {
+        setNeedSquadSelection(true);
+      } else {
+        // No squads assigned — still allow access, just no active squad
+        setActiveSquadState(null);
+        setNeedSquadSelection(false);
+      }
+
+      // 7. Update last_seen (fire and forget)
+      if (accessRecords[0]) {
+        base44.entities.UserAccess.update(accessRecords[0].id, {
+          last_seen: new Date().toISOString(),
+        }).catch(() => {});
+      }
+    } catch (err) {
+      console.error("WorkspaceContext error:", err);
+      setWorkspaceError(err?.message || "Error al cargar el espacio de trabajo.");
+    } finally {
+      setLoadingWorkspace(false);
     }
-
-    setUserAccess(access);
-
-    // 5. Determine which squads this user can access
-    const mySquads = access?.all_squads
-      ? allSquads
-      : allSquads.filter(s => (access?.squad_ids || []).includes(s.id));
-
-    // 6. Restore last active squad from localStorage or ask user to pick
-    const savedId = localStorage.getItem("activeSquadId");
-    const restoredSquad = mySquads.find(s => s.id === savedId) || null;
-
-    if (restoredSquad) {
-      setActiveSquadState(restoredSquad);
-    } else if (mySquads.length === 1) {
-      setActiveSquadState(mySquads[0]);
-      localStorage.setItem("activeSquadId", mySquads[0].id);
-    } else if (mySquads.length > 1) {
-      // Multiple squads, no saved preference → show selector
-      setNeedSquadSelection(true);
-    } else {
-      setActiveSquadState(null);
-    }
-
-    // 7. Update last_seen on access record (fire and forget)
-    if (accessRecords[0]) {
-      base44.entities.UserAccess.update(accessRecords[0].id, {
-        last_seen: new Date().toISOString(),
-      }).catch(() => {});
-    }
-
-    setLoadingWorkspace(false);
   }, [isAuthenticated, user]);
 
   useEffect(() => { loadWorkspace(); }, [loadWorkspace]);
@@ -104,15 +125,16 @@ export function WorkspaceProvider({ children }) {
   function setActiveSquad(squad) {
     setActiveSquadState(squad);
     setNeedSquadSelection(false);
-    if (squad) localStorage.setItem("activeSquadId", squad.id);
+    if (squad) {
+      localStorage.setItem("activeSquadId", squad.id);
+      localStorage.setItem("activeSquadUserId", user?.id || "");
+    }
   }
 
-  // Accessible squads for this user
   const mySquads = userAccess?.all_squads
     ? squads
     : squads.filter(s => (userAccess?.squad_ids || []).includes(s.id));
 
-  // Permission helpers
   function can(action) {
     if (!userAccess) return false;
     return !!userAccess[`can_${action}`];
@@ -129,8 +151,91 @@ export function WorkspaceProvider({ children }) {
     return (userAccess.squad_ids || []).includes(squadId);
   }
 
-  // Show squad picker before rendering app
-  if (needSquadSelection && isAuthenticated) {
+  // ── Loading state ───────────────────────────────────────────────────────
+  if (loadingWorkspace) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-8 h-8 border-2 border-zinc-700 border-t-blue-400 rounded-full animate-spin mx-auto" />
+          <p className="text-zinc-500 text-sm">Cargando espacio de trabajo…</p>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Error state ─────────────────────────────────────────────────────────
+  if (workspaceError) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center mx-auto">
+            <span className="text-red-400 text-xl">!</span>
+          </div>
+          <h2 className="text-white font-bold text-lg">Error al cargar</h2>
+          <p className="text-zinc-400 text-sm">{workspaceError}</p>
+          <div className="flex flex-col gap-2 pt-2">
+            <button
+              onClick={loadWorkspace}
+              className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-semibold rounded-xl transition-colors">
+              Reintentar
+            </button>
+            <button
+              onClick={() => base44.auth.logout(window.location.origin)}
+              className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
+              Cerrar sesión
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── No access record (non-admin user with no UserAccess) ────────────────
+  if (!userAccess) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto">
+            <span className="text-yellow-400 text-xl">⚠</span>
+          </div>
+          <h2 className="text-white font-bold text-lg">Sin permisos configurados</h2>
+          <p className="text-zinc-400 text-sm">
+            Tu usuario no tiene permisos configurados en la plataforma. Contactá al administrador.
+          </p>
+          <button
+            onClick={() => base44.auth.logout(window.location.origin)}
+            className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── No squads assigned ──────────────────────────────────────────────────
+  if (!userAccess.can_admin && mySquads.length === 0) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-blue-500/10 border border-blue-500/30 flex items-center justify-center mx-auto">
+            <span className="text-blue-400 text-xl">🏟</span>
+          </div>
+          <h2 className="text-white font-bold text-lg">Sin planteles asignados</h2>
+          <p className="text-zinc-400 text-sm">
+            Tu usuario no tiene planteles asignados. Contactá al administrador para que te asigne acceso.
+          </p>
+          <button
+            onClick={() => base44.auth.logout(window.location.origin)}
+            className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Squad selection required ────────────────────────────────────────────
+  if (needSquadSelection) {
     return (
       <SquadSelectModal
         squads={mySquads}
@@ -142,20 +247,16 @@ export function WorkspaceProvider({ children }) {
 
   return (
     <WorkspaceContext.Provider value={{
-      // Squads
       squads,
       mySquads,
       activeSquad,
       setActiveSquad,
-      // User access
       userAccess,
       loadingWorkspace,
       reloadWorkspace: loadWorkspace,
-      // Permission helpers
       can,
       canModule,
       canAccessSquad,
-      // Shorthand
       activeSquadId: activeSquad?.id || null,
       activeSquadName: activeSquad?.name || "",
       isAdmin: userAccess?.can_admin || false,
