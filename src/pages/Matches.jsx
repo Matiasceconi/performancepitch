@@ -780,16 +780,15 @@ export default function Matches() {
 
   async function loadAll() {
     setLoading(true);
-    // Filter by squad_id if set; also exclude Juveniles competition tag
-    const squadQuery = activeSquadId
-      ? { squad_id: activeSquadId }
-      : {};
-    const [m, p] = await Promise.all([
-      base44.entities.MatchReport.filter(squadQuery, "-date", 100),
+    const [all, p] = await Promise.all([
+      base44.entities.MatchReport.list("-date", 200),
       base44.entities.Player.list("-created_date", 100),
     ]);
-    // Client-side exclude Juveniles competition (legacy data without squad_id)
-    setMatches(m.filter(x => x.competition !== "Juveniles"));
+    // Mostrar partidos del plantel activo + legados sin squad_id; excluir tag Juveniles
+    const filtered = all
+      .filter(x => x.competition !== "Juveniles")
+      .filter(x => !activeSquadId || !x.squad_id || x.squad_id === activeSquadId);
+    setMatches(filtered);
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
     setLoading(false);
   }
