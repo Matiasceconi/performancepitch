@@ -11,6 +11,8 @@ import moment from "moment";
 import "moment/locale/es";
 
 import { STATUS_LABELS, isGoalkeeper, resolvePlayerType } from "@/components/squad/squadConstants";
+import PlayerAvatar from "@/components/player/PlayerAvatar";
+import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
 
 moment.locale("es");
 
@@ -131,17 +133,15 @@ function SplitStatCard({ label, fieldValue, gkValue, color, icon: Icon }) {
 
 // ─── Player row (read-only) — driven by DailySquadStatus record ────────────
 function PlayerRow({ ds, playerMap, showMovement = false }) {
+  const { openCard } = usePlayerCard360();
   const player = playerMap[ds.player_id] || {};
   const col = statusColor(ds.status);
   const name = ds.player_name || player.full_name || "—";
   const position = player.position || ds.position || "";
+  const playerObj = player.id ? player : { id: ds.player_id, full_name: name, photo_url: player.photo_url };
   return (
     <div className={`flex items-center gap-3 px-3 py-2 rounded-xl border ${col.bg} ${col.border}`}>
-      {player.photo_url
-        ? <img src={player.photo_url} alt={name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
-        : <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-            <span className="text-xs font-bold text-zinc-500">{name.charAt(0)}</span>
-          </div>}
+      <PlayerAvatar player={playerObj} size="sm" />
       <div className="flex-1 min-w-0">
         <p className="text-sm text-white font-medium truncate">{name}</p>
         {showMovement && ds.base_squad_name && ds.target_squad_name ? (

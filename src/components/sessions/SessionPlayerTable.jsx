@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import PlayerAvatar from "@/components/player/PlayerAvatar";
 import { base44 } from "@/api/base44Client";
 import { Save } from "lucide-react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
@@ -62,7 +63,9 @@ export default function SessionPlayerTable({ sessionPlayers, sessionId }) {
       const globalIdx = rows.indexOf(sp);
       return (
         <tr key={sp.player_id} className="border-b border-zinc-800/50 hover:bg-zinc-800/20">
-          <td className="py-1.5 px-2 text-white font-medium truncate max-w-[180px]">{sp.player_name}</td>
+          <td className="py-1.5 px-2">
+              <PlayerAvatar player={{ id: sp.player_id, full_name: sp.player_name }} size="xs" showName className="max-w-[180px]" />
+            </td>
           <td className="py-1.5 px-2 text-zinc-500">{sp.position}</td>
           <td className="py-1.5 px-2">
             <span className={`font-semibold ${STATUS_COLORS[sp.status_at_session] || "text-zinc-400"}`}>

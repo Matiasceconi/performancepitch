@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { ChevronDown, Tag, FileText, Clock, X, ArrowUp, ArrowDown, RotateCcw, LogOut } from "lucide-react";
 import { STATUS_LABELS, STATUS_COLORS, ALL_TAGS } from "@/components/squad/squadConstants";
 import PlayerHistoryModal from "@/components/squad/PlayerHistoryModal";
+import PlayerAvatar from "@/components/player/PlayerAvatar";
 
 const STATUS_LIST = Object.keys(STATUS_LABELS);
 
@@ -58,13 +59,7 @@ export default function PlayerDayCard({
         {/* Card header */}
         <div className="p-3">
           <div className="flex items-center gap-2.5">
-            {player.photo_url ? (
-              <img src={player.photo_url} alt={player.full_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700 shrink-0" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                <span className="text-sm font-bold text-zinc-500">{(player.full_name || "?").charAt(0)}</span>
-              </div>
-            )}
+            <PlayerAvatar player={player} size="md" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white truncate">{player.full_name}</p>
               <p className="text-xs text-zinc-500 truncate">

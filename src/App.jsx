@@ -14,6 +14,8 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Layout from '@/components/staff/Layout';
 import { WorkspaceProvider } from '@/lib/WorkspaceContext';
+import { PlayerCard360Provider } from '@/components/player/PlayerCard360Context';
+import PlayerCard360 from '@/components/player/PlayerCard360';
 import Dashboard from '@/pages/Dashboard';
 import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
@@ -97,7 +99,10 @@ function App() {
         <Router>
           <ScrollToTop />
           <WorkspaceProvider>
-            <AuthenticatedApp />
+            <PlayerCard360Provider>
+              <AuthenticatedApp />
+              <PlayerCard360 />
+            </PlayerCard360Provider>
           </WorkspaceProvider>
         </Router>
         <Toaster />
