@@ -87,10 +87,11 @@ export default function WeeklyPlannerBoard() {
       setLoading(true);
       setRecordId(null);
       try {
-        const filter = activeSquadId
-          ? { week_start: startDate, squad_id: activeSquadId }
-          : { week_start: startDate };
-        const records = await base44.entities.WeeklyPlan.filter(filter);
+        // Buscar planes de esta semana; incluir legados sin squad_id
+        const all = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
+        const records = activeSquadId
+          ? all.filter(r => !r.squad_id || r.squad_id === activeSquadId)
+          : all;
         if (records.length > 0) {
           const rec = records[0];
           setRecordId(rec.id);

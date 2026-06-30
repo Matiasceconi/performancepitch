@@ -739,17 +739,17 @@ export default function GpsAnalytics({ initialTab, initialDate }) {
     return allRows.filter(r => r.source === sourceFilter);
   }, [allRows, sourceFilter]);
 
-  // 1. Carga sesiones y partidos filtrados por plantel activo
+  // 1. Carga sesiones y partidos — incluye registros legados sin squad_id
   useEffect(() => {
     setLoading(true);
     setAllRows([]);
-    const filter = activeSquadId ? { squad_id: activeSquadId } : {};
     Promise.all([
-      base44.entities.TrainingSession.filter(filter, "-date", 200),
-      base44.entities.MatchReport.filter(filter, "-date", 100),
-    ]).then(([s, m]) => {
-      setSessions(s);
-      setMatches(m);
+      base44.entities.TrainingSession.list("-date", 200),
+      base44.entities.MatchReport.list("-date", 100),
+    ]).then(([allS, allM]) => {
+      const filterFn = x => !activeSquadId || !x.squad_id || x.squad_id === activeSquadId;
+      setSessions(allS.filter(filterFn));
+      setMatches(allM.filter(x => filterFn(x) && x.competition !== "Juveniles"));
     }).finally(() => setLoading(false));
   }, [activeSquadId]);
 
