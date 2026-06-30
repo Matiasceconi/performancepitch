@@ -13,6 +13,7 @@ import "moment/locale/es";
 import { STATUS_LABELS, isGoalkeeper, resolvePlayerType } from "@/components/squad/squadConstants";
 import PlayerAvatar from "@/components/player/PlayerAvatar";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
+import MovementBoardCard from "@/components/dashboard/MovementBoardCard";
 
 moment.locale("es");
 
@@ -669,22 +670,24 @@ export default function Dashboard() {
 
         {subenA.length > 0 && (
           <ErrorBoundary>
-            <GroupCard
+            <MovementBoardCard
               title={selectedSquadId ? `Suben a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Suben (visitantes)"}
-              dotColor="bg-cyan-400"
-              records={subenA} playerMap={playerMap}
-              emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
+              originLabel="Otros planteles"
+              destLabel={squads.find(s => s.id === selectedSquadId)?.name?.trim() || "este plantel"}
+              colorScheme="sky"
+              records={subenA} playerMap={playerMap} isGKFn={isGK}
             />
           </ErrorBoundary>
         )}
 
         {subenReservaAPrimera.length > 0 && (
           <ErrorBoundary>
-            <GroupCard
+            <MovementBoardCard
               title="Suben desde Reserva a Primera"
-              dotColor="bg-indigo-400"
-              records={subenReservaAPrimera} playerMap={playerMap}
-              emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
+              originLabel="Reserva"
+              destLabel="Primera"
+              colorScheme="violet"
+              records={subenReservaAPrimera} playerMap={playerMap} isGKFn={isGK}
             />
           </ErrorBoundary>
         )}
