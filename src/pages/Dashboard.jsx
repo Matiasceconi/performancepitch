@@ -154,6 +154,9 @@ function PlayerRow({ ds, playerMap, showMovement = false }) {
         ) : (
           <p className="text-xs text-zinc-500 truncate">{position}</p>
         )}
+        {showMovement && ds.date && (
+          <p className="text-[10px] text-zinc-600">Desde: {moment(ds.date).format("DD/MM/YYYY")}</p>
+        )}
         {ds.notes && <p className="text-[10px] text-zinc-500 italic truncate">"{ds.notes}"</p>}
       </div>
       <div className="flex flex-col items-end gap-1 shrink-0">
@@ -430,7 +433,12 @@ export default function Dashboard() {
   }, [squadRecords]);
 
   // ── Movement groups (only when a squad is selected) ───────────────────
+  // Reserva / Primera squad lookups (used to isolate the dedicated "Reserva → Primera" board)
+  const reservaSquad = useMemo(() => squads.find(s => (s.name || "").trim().toLowerCase() === "reserva"), [squads]);
+  const primeraSquad = useMemo(() => squads.find(s => (s.name || "").trim().toLowerCase() === "primera"), [squads]);
+
   // "Suben DESDE este plantel" → base = selectedSquad, target = otro plantel superior
+  // Excluye Reserva→Primera, que tiene su propio tablero dedicado
   const subenDesde = useMemo(() => {
     if (!selectedSquadId) return (byStatus["subió"] || []);
     return squadRecords.filter(ds =>
@@ -438,9 +446,22 @@ export default function Dashboard() {
       ds.active_in_target_squad &&
       ds.base_squad_id === selectedSquadId &&
       ds.target_squad_id !== selectedSquadId &&
-      ["sube_temporal", "subió"].includes(ds.movement_type || ds.status)
+      ["sube_temporal", "subió"].includes(ds.movement_type || ds.status) &&
+      !(reservaSquad && primeraSquad && ds.base_squad_id === reservaSquad.id && ds.target_squad_id === primeraSquad.id)
     );
-  }, [squadRecords, selectedSquadId, byStatus]);
+  }, [squadRecords, selectedSquadId, byStatus, reservaSquad, primeraSquad]);
+
+  // "Suben desde Reserva a Primera" → tablero dedicado, solo visible en el dashboard de Reserva
+  const subenReservaAPrimera = useMemo(() => {
+    if (!selectedSquadId || !reservaSquad || !primeraSquad || selectedSquadId !== reservaSquad.id) return [];
+    return squadRecords.filter(ds =>
+      ds.temporary &&
+      ds.active_in_target_squad &&
+      ds.movement_type === "sube_temporal" &&
+      ds.base_squad_id === reservaSquad.id &&
+      ds.target_squad_id === primeraSquad.id
+    );
+  }, [squadRecords, selectedSquadId, reservaSquad, primeraSquad]);
 
   // "Suben A este plantel" → base = otro plantel, target = selectedSquad
   const subenA = useMemo(() => {
@@ -655,6 +676,17 @@ export default function Dashboard() {
               title={selectedSquadId ? `Suben a ${squads.find(s => s.id === selectedSquadId)?.name || "este plantel"}` : "Suben (visitantes)"}
               dotColor="bg-cyan-400"
               records={subenA} playerMap={playerMap}
+              emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
+            />
+          </ErrorBoundary>
+        )}
+
+        {subenReservaAPrimera.length > 0 && (
+          <ErrorBoundary>
+            <GroupCard
+              title="Suben desde Reserva a Primera"
+              dotColor="bg-indigo-400"
+              records={subenReservaAPrimera} playerMap={playerMap}
               emptyText="" linkTo="/daily-squad" showMovement isGKFn={isGK}
             />
           </ErrorBoundary>
