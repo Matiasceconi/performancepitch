@@ -10,6 +10,7 @@ import DailySquadFilters from "@/components/squad/DailySquadFilters";
 import DailySquadWhatsApp from "@/components/squad/DailySquadWhatsApp";
 import { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS, isGoalkeeper } from "@/components/squad/squadConstants";
 import { ensureDailyStatusForDate } from "@/lib/dailySquadUtils";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 export { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS };
 moment.locale("es");
 
@@ -26,15 +27,22 @@ export default function DailySquad() {
   const [showWhatsApp, setShowWhatsApp] = useState(false);
   const [filters, setFilters] = useState({ team: "", category: "", position: "", status: "", tag: "", search: "" });
   const { toast } = useToast();
+  const { activeSquadId } = useWorkspace();
 
-  // Load squads once
+  // Load squads once — por defecto entra al plantel activo del workspace
   useEffect(() => {
     base44.entities.Squad.list("name", 100).then(sq => {
       const active = sq.filter(s => s.active !== false);
       setSquads(active);
-      if (active.length > 0 && !selectedSquadId) setSelectedSquadId(active[0].id);
+      if (!selectedSquadId) {
+        if (activeSquadId && active.some(s => s.id === activeSquadId)) {
+          setSelectedSquadId(activeSquadId);
+        } else if (active.length > 0) {
+          setSelectedSquadId(active[0].id);
+        }
+      }
     });
-  }, []);
+  }, [activeSquadId]);
 
   const load = useCallback(async () => {
     setLoading(true);
