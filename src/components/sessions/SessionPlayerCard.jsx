@@ -4,6 +4,9 @@ import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { STATUS_LABELS, STATUS_COLORS } from "./sessionPlayerUtils";
 import { Check, HeartPulse, Moon, UserX, Trash2, ChevronDown, ChevronUp, Save } from "lucide-react";
 
+// Solo estos estados aportan información relevante como etiqueta en la tarjeta
+const KEEP_STATUS_TAGS = ["disponible", "diferenciado", "lesionado", "molestia", "suspendido", "bajó", "subió"];
+
 const ACTIONS = [
   { key: "presente", label: "Presente", icon: Check, activeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
   { key: "diferenciado", label: "Diferenciado", icon: Moon, activeClass: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
@@ -17,7 +20,9 @@ export default function SessionPlayerCard({ sp, photoUrl, onAction, onSaveDetail
   const [rpe, setRpe] = useState(sp.rpe || "");
   const [notes, setNotes] = useState(sp.notes || "");
   const gk = isGoalkeeper({ position: sp.position });
-  const tag = ["bajó", "subió"].includes(sp.status_at_session) ? STATUS_LABELS[sp.status_at_session] : null;
+  const statusTag = sp.attendance !== "kinesiologia" && KEEP_STATUS_TAGS.includes(sp.status_at_session)
+    ? STATUS_LABELS[sp.status_at_session]
+    : null;
 
   return (
     <div className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-3 space-y-2.5">
@@ -28,17 +33,22 @@ export default function SessionPlayerCard({ sp, photoUrl, onAction, onSaveDetail
         </button>
       </div>
 
+      <p className="text-[11px] text-zinc-400 -mt-1.5">{sp.position || "—"}</p>
+
       <div className="flex flex-wrap items-center gap-1.5 text-[10px]">
-        <span className="px-2 py-0.5 rounded-full bg-zinc-900 border border-zinc-700 text-zinc-400">{sp.position || "—"}</span>
-        <span className={`px-2 py-0.5 rounded-full border font-medium ${gk ? "bg-yellow-500/15 text-yellow-300 border-yellow-500/30" : "bg-sky-500/10 text-sky-300 border-sky-500/30"}`}>
-          {gk ? "Arquero" : "Campo"}
-        </span>
-        <span className={`px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[sp.status_at_session] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
-          {STATUS_LABELS[sp.status_at_session] || sp.status_at_session || "—"}
-        </span>
-        {tag && (
-          <span className="px-2 py-0.5 rounded-full border border-violet-500/30 bg-violet-500/15 text-violet-300 font-medium">
-            {tag}
+        {gk && (
+          <span className="px-2 py-0.5 rounded-full border font-medium bg-yellow-500/15 text-yellow-300 border-yellow-500/30">
+            ARQ
+          </span>
+        )}
+        {sp.attendance === "kinesiologia" && (
+          <span className="px-2 py-0.5 rounded-full border font-medium bg-sky-500/15 text-sky-300 border-sky-500/30">
+            Kinesiología
+          </span>
+        )}
+        {statusTag && (
+          <span className={`px-2 py-0.5 rounded-full border font-medium ${STATUS_COLORS[sp.status_at_session] || "bg-zinc-800 text-zinc-400 border-zinc-700"}`}>
+            {statusTag}
           </span>
         )}
         {sp.squad_name && <span className="text-zinc-600 truncate">{sp.squad_name}</span>}

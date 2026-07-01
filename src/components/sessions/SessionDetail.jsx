@@ -12,8 +12,6 @@ import SessionVideoObs from "@/components/sessions/SessionVideoObs";
 import { useToast } from "@/components/ui/use-toast";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 
-const AVAILABLE_STATUSES = ["disponible", "subió", "convocado"];
-
 const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
 const MD_CODES = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4", "Otro"];
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
@@ -78,7 +76,7 @@ export default function SessionDetail({ session, onBack }) {
   }
 
   const presentRows = sessionPlayers.filter(sp => sp.attendance === "presente");
-  const disponibles = sessionPlayers.filter(sp => AVAILABLE_STATUSES.includes(sp.status_at_session)).length;
+  const disponibles = presentRows.length;
   const diferenciados = sessionPlayers.filter(sp => sp.attendance === "diferenciado").length;
   const kinesiologia = sessionPlayers.filter(sp => sp.attendance === "kinesiologia").length;
   const presentesField = presentRows.filter(sp => !isGoalkeeper({ position: sp.position })).length;
@@ -249,10 +247,9 @@ export default function SessionDetail({ session, onBack }) {
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {[
                 { label: "Disponibles", value: disponibles, color: "text-blue-400" },
-                { label: "Presentes", value: presentRows.length, color: "text-emerald-400" },
                 { label: "Diferenciados", value: diferenciados, color: "text-amber-400" },
                 { label: "Kinesiología", value: kinesiologia, color: "text-sky-400" },
                 { label: "Arqueros", value: presentesGK, color: "text-yellow-400" },
