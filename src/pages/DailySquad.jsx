@@ -9,6 +9,7 @@ import DailySquadGrid from "@/components/squad/DailySquadGrid";
 import DailySquadFilters from "@/components/squad/DailySquadFilters";
 import DailySquadWhatsApp from "@/components/squad/DailySquadWhatsApp";
 import { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS, isGoalkeeper } from "@/components/squad/squadConstants";
+import { ensureDailyStatusForDate } from "@/lib/dailySquadUtils";
 export { ALL_TAGS, STATUS_LABELS, STATUS_COLORS, POSITION_GROUPS };
 moment.locale("es");
 
@@ -40,7 +41,7 @@ export default function DailySquad() {
     const [allPlayers, mb, dayStatuses] = await Promise.all([
       base44.entities.Player.list("-created_date", 500),
       base44.entities.SquadMembership.list("-effective_from", 1000),
-      base44.entities.DailySquadStatus.filter({ date: selectedDate }, "-updated_at", 500),
+      ensureDailyStatusForDate(selectedDate),
     ]);
 
     setPlayers(allPlayers.filter(p => p.active !== false));

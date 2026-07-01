@@ -18,6 +18,7 @@ import DashboardHeader from "@/components/dashboard/DashboardHeader";
 import QuickActionsBar from "@/components/dashboard/QuickActionsBar";
 import DaySummarySection from "@/components/dashboard/DaySummarySection";
 import DayScheduleAgenda from "@/components/dashboard/DayScheduleAgenda";
+import { ensureDailyStatusForDate } from "@/lib/dailySquadUtils";
 
 moment.locale("es");
 
@@ -239,7 +240,7 @@ export default function Dashboard() {
 
     const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw] = await Promise.all([
       base44.entities.Player.list("-created_date", 500),
-      base44.entities.DailySquadStatus.filter({ date: today }, "-updated_at", 500),
+      ensureDailyStatusForDate(today),
       base44.entities.Squad.list("name", 100),
       base44.entities.SquadMembership.list("-effective_from", 1000),
       base44.entities.DayEvent.list("date", 200),
