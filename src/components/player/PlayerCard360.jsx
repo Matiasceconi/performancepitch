@@ -87,7 +87,10 @@ const STATUS_OPTIONS = [
 // ─────────────────────────────────────────────────────────────────────────────
 export default function PlayerCard360() {
   const { playerId, playerData: preloaded, closeCard } = usePlayerCard360();
-  const { canEdit } = useWorkspace();
+  const { can, canAccessSquad, squads } = useWorkspace();
+  const canEdit = can("edit");
+  const reservaSquad = squads.find(s => (s.name || "").trim().toLowerCase() === "reserva");
+  const canUploadPhoto = canEdit || (reservaSquad && canAccessSquad(reservaSquad.id));
   const { toast } = useToast();
 
   const [player, setPlayer] = useState(null);
@@ -235,7 +238,7 @@ export default function PlayerCard360() {
                   </div>
                 )}
               </div>
-              {canEdit && (
+              {canUploadPhoto && (
                 <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center cursor-pointer hover:bg-zinc-600 transition-colors">
                   <Camera size={11} className="text-zinc-300" />
                   <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
