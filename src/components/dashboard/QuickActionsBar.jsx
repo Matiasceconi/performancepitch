@@ -6,7 +6,7 @@ const ACTIONS = [
   { label: "Armar Sesión", icon: PlusCircle, to: "/sessions", color: "text-emerald-400" },
   { label: "Planificar Semana", icon: CalendarRange, to: "/weekly-planner", color: "text-sky-400" },
   { label: "Ver Calendario", icon: Calendar, to: "/schedule", color: "text-blue-400" },
-  { label: "Reportes GPS", icon: Activity, to: "/catapult", color: "text-amber-400" },
+  { label: "Reportes GPS", icon: Activity, to: "/performance?tab=external_gps", color: "text-amber-400" },
 ];
 
 export default function QuickActionsBar() {

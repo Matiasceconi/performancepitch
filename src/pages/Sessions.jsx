@@ -25,6 +25,13 @@ export default function Sessions() {
         : all;
       setSessions(filtered);
       setLoading(false);
+
+      const urlParams = new URLSearchParams(window.location.search);
+      const sessionId = urlParams.get("session");
+      if (sessionId) {
+        const found = filtered.find(s => s.id === sessionId);
+        if (found) { setSelectedSession(found); setView("detail"); }
+      }
     });
   }, [activeSquadId]);
 
