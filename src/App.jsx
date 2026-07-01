@@ -22,7 +22,11 @@ import Dashboard from '@/pages/Dashboard';
 import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
 import Tactical from '@/pages/Tactical';
-import Performance from '@/pages/Performance';
+import PerformanceExternalLoad from '@/pages/PerformanceExternalLoad';
+import PerformanceInternalLoad from '@/pages/PerformanceInternalLoad';
+import PerformanceMedical from '@/pages/PerformanceMedical';
+import PerformanceNutrition from '@/pages/PerformanceNutrition';
+import PerformanceMinutes from '@/pages/PerformanceMinutes';
 import Team from '@/pages/Team';
 import Schedule from '@/pages/Schedule';
 import Matches from '@/pages/Matches';
@@ -107,7 +111,11 @@ const AuthenticatedApp = () => {
           <Route path="/sessions" element={<Sessions />} />
           <Route path="/catapult" element={<Catapult />} />
           <Route path="/tactical" element={<Tactical />} />
-          <Route path="/performance" element={<Performance />} />
+          <Route path="/performance/external-load" element={<PerformanceExternalLoad />} />
+          <Route path="/performance/internal-load" element={<PerformanceInternalLoad />} />
+          <Route path="/performance/medical" element={<PerformanceMedical />} />
+          <Route path="/performance/nutrition" element={<PerformanceNutrition />} />
+          <Route path="/performance/minutes" element={<PerformanceMinutes />} />
           <Route path="/team" element={<Team />} />
           <Route path="/schedule" element={<Schedule />} />
           <Route path="/matches" element={<Matches />} />

@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Video, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound,
   CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen,
-  Dumbbell, ChevronDown, ChevronRight, LogOut, User
+  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
@@ -19,7 +19,12 @@ const NAV_ITEMS = [
   { module: "strength_library",  label: "Biblioteca Fuerza", path: "/strength-library",icon: Dumbbell, group: "sesiones" },
   { module: "matches",           label: "Partidos",          path: "/matches",         icon: Trophy },
   { module: "tactical",          label: "Mapa táctico",      path: "/tactical",        icon: Map },
-  { module: "performance",       label: "Rendimiento",       path: "/performance",     icon: TrendingUp },
+  // "performance" group — shown if any child module is allowed
+  { module: "performance",       label: "Carga Externa",     path: "/performance/external-load", icon: Gauge,     group: "rendimiento" },
+  { module: "performance",       label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
+  { module: "performance",       label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
+  { module: "performance",       label: "Nutrición",         path: "/performance/nutrition",     icon: Apple,     group: "rendimiento" },
+  { module: "performance",       label: "Minutos Jugados",   path: "/performance/minutes",       icon: Clock,     group: "rendimiento" },
   { module: "schedule",          label: "Calendario",        path: "/schedule",        icon: CalendarDays },
   { module: "team",              label: "Cuerpo Técnico",    path: "/team",            icon: UsersRound },
   { module: "weekly_planner",    label: "Plan Semanal",      path: "/weekly-planner",  icon: ClipboardList },
@@ -29,11 +34,14 @@ const NAV_ITEMS = [
 ];
 
 const SESSION_PATHS = ["/sessions", "/field-library", "/strength-library"];
+const PERFORMANCE_PATHS = ["/performance/external-load", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes"];
+const BEFORE_PERFORMANCE_MODULES = ["matches", "tactical"];
 
 export default function Sidebar() {
   const location = useLocation();
   const [open, setOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(SESSION_PATHS.includes(location.pathname));
+  const [performanceOpen, setPerformanceOpen] = useState(PERFORMANCE_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
   const { canModule, isAdmin, userAccess, loadingWorkspace } = useWorkspace();
@@ -46,7 +54,10 @@ export default function Sidebar() {
     return canModule(item.module);
   }
   const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canSee(i));
+  const performanceItems = NAV_ITEMS.filter(i => i.group === "rendimiento" && canSee(i));
   const topItems = NAV_ITEMS.filter(i => !i.group && canSee(i));
+  const beforePerformanceItems = topItems.filter(i => BEFORE_PERFORMANCE_MODULES.includes(i.module));
+  const afterPerformanceItems = topItems.filter(i => i.module !== "dashboard" && !BEFORE_PERFORMANCE_MODULES.includes(i.module));
 
   function NavLink({ item }) {
     const isActive = location.pathname === item.path;
@@ -126,8 +137,46 @@ export default function Sidebar() {
             </div>
           )}
 
+          {/* Items before Rendimiento group */}
+          {beforePerformanceItems.map(i => <NavLink key={i.path} item={i} />)}
+
+          {/* Rendimiento group */}
+          {performanceItems.length > 0 && (
+            <div>
+              <button
+                onClick={() => setPerformanceOpen(p => !p)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  PERFORMANCE_PATHS.includes(location.pathname) ? "text-white" : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                }`}>
+                <TrendingUp size={18} />
+                <span className="flex-1 text-left">Rendimiento</span>
+                {performanceOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              </button>
+              {performanceOpen && (
+                <div className="ml-4 mt-0.5 space-y-0.5 border-l border-zinc-800 pl-3">
+                  {performanceItems.map(child => {
+                    const isActive = location.pathname === child.path;
+                    return (
+                      <Link
+                        key={child.path}
+                        to={child.path}
+                        onClick={() => setOpen(false)}
+                        className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                          isActive ? "text-zinc-900 font-semibold" : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
+                        }`}
+                        style={isActive ? { backgroundColor: "#F0C800", color: "#1a1a1a" } : {}}>
+                        <child.icon size={15} />
+                        {child.label}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Rest of top-level items */}
-          {topItems.filter(i => i.module !== "dashboard").map(i => <NavLink key={i.path} item={i} />)}
+          {afterPerformanceItems.map(i => <NavLink key={i.path} item={i} />)}
         </nav>
 
         {/* User footer */}
