@@ -41,19 +41,25 @@ const TABS = [
   { key: "video",      label: "Video / Obs.", icon: Video },
 ];
 
-export default function SessionDetail({ session, onBack }) {
+export default function SessionDetail({ session, onBack, initialTab = "players", autoOpenPDF = false }) {
   const { toast } = useToast();
   const [sessionPlayers, setSessionPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("players");
+  const [tab, setTab] = useState(initialTab);
   const [currentSession, setCurrentSession] = useState(session);
   const [showVideoPanel, setShowVideoPanel] = useState(false);
-  const [showPDFExport, setShowPDFExport] = useState(false);
+  const [showPDFExport, setShowPDFExport] = useState(autoOpenPDF);
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(session);
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => { setCurrentSession(session); setEditForm(session); }, [session]);
+  useEffect(() => {
+    setCurrentSession(session);
+    setEditForm(session);
+    setTab(initialTab);
+    if (autoOpenPDF) setShowPDFExport(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.id, initialTab, autoOpenPDF]);
 
   useEffect(() => {
     base44.entities.SessionPlayer.filter({ session_id: session.id }, "player_name", 200)

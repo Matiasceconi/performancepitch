@@ -16,17 +16,26 @@ export default function Sessions() {
   const [view, setView] = useState("list"); // "list" | "new" | "detail"
   const [selectedSession, setSelectedSession] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
+  const [exerciseCounts, setExerciseCounts] = useState({});
+  const [selectedTab, setSelectedTab] = useState("players");
+  const [autoOpenPDF, setAutoOpenPDF] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
     setLoading(true);
     setView("list");
     setSelectedSession(null);
-    base44.entities.TrainingSession.list("-date", 200).then(all => {
+    Promise.all([
+      base44.entities.TrainingSession.list("-date", 200),
+      base44.entities.SessionExercise.list("-order", 3000),
+    ]).then(([all, allExercises]) => {
       const filtered = activeSquadId
         ? all.filter(s => s.squad_id === activeSquadId)
         : all;
       setSessions(filtered);
+      const counts = {};
+      allExercises.forEach(ex => { counts[ex.session_id] = (counts[ex.session_id] || 0) + 1; });
+      setExerciseCounts(counts);
       setLoading(false);
 
       const urlParams = new URLSearchParams(window.location.search);
@@ -45,8 +54,10 @@ export default function Sessions() {
     toast({ title: "✓ Sesión creada" });
   }
 
-  function handleSelect(session) {
+  function handleSelect(session, tab = "players", openPdf = false) {
     setSelectedSession(session);
+    setSelectedTab(tab);
+    setAutoOpenPDF(openPdf);
     setView("detail");
   }
 
@@ -138,13 +149,13 @@ export default function Sessions() {
         ) : (
           <>
             <SessionFilters filters={filters} onChange={setFilters} />
-            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} />
+            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} />
           </>
         )
       )}
 
       {view === "detail" && selectedSession && (
-        <SessionDetail session={selectedSession} onBack={handleBack} />
+        <SessionDetail session={selectedSession} onBack={handleBack} initialTab={selectedTab} autoOpenPDF={autoOpenPDF} />
       )}
     </div>
   );
