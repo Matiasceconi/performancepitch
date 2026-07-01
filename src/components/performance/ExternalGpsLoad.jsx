@@ -15,6 +15,7 @@ import ExternalGpsComparison from "./ExternalGpsComparison";
 import ExternalGpsSessionList from "./ExternalGpsSessionList";
 import ExternalGpsAlerts from "./ExternalGpsAlerts";
 import ExternalGpsExcludedList from "./ExternalGpsExcludedList";
+import TeamGPSProfileSection from "./TeamGPSProfileSection";
 import MonthlyReport from "@/pages/MonthlyReport";
 import { avg, fmtInt, computeAlerts, classifyGpsInclusion } from "./externalGpsLoadUtils";
 import { useToast } from "@/components/ui/use-toast";
@@ -28,6 +29,7 @@ const TABS = [
   { key: "sesion",      label: "Por sesión",              icon: CalendarRange },
   { key: "jugador",     label: "Por jugador",             icon: Users },
   { key: "excluidos",   label: "Excluidos del promedio",  icon: UserX },
+  { key: "perfil_equipo",label: "Perfil GPS del Equipo",   icon: Users },
   { key: "comparativas",label: "Comparativas",            icon: Zap },
   { key: "reportes",    label: "Reportes",                icon: FileDown },
 ];
@@ -269,6 +271,9 @@ export default function ExternalGpsLoad() {
     if (affectedPlayerIds.length > 0) {
       base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: affectedPlayerIds });
     }
+    if (activeSquadId) {
+      base44.functions.invoke("recalculateTeamGPSProfile", { squad_id: activeSquadId });
+    }
   }
 
   if (loading) return (
@@ -332,6 +337,9 @@ export default function ExternalGpsLoad() {
           )}
           {tab === "excluidos" && (
             <ExternalGpsExcludedList rows={filteredExcludedRows} />
+          )}
+          {tab === "perfil_equipo" && (
+            <TeamGPSProfileSection />
           )}
           {tab === "comparativas" && (
             <ExternalGpsComparison fieldRows={fieldRows} gkRows={gkRows} />

@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Upload, CheckCircle, AlertCircle, Eye, X, Filter, RefreshCw } from "lucide-react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { fmtMetric, fmtSmax } from "@/utils";
 import { classifyGpsInclusion, EXCLUSION_REASON_LABELS } from "@/components/performance/externalGpsLoadUtils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
@@ -90,6 +91,7 @@ const SUMMARY_ROW_NAMES = new Set([
 ]);
 
 export default function SessionGPS({ session, sessionPlayers }) {
+  const { activeSquadId } = useWorkspace();
   const [uploading, setUploading] = useState(false);
   const [gpsRows, setGpsRows] = useState([]);
   const [unmatched, setUnmatched] = useState([]);
@@ -240,6 +242,9 @@ export default function SessionGPS({ session, sessionPlayers }) {
     if (affectedPlayerIds.length > 0) {
       base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: affectedPlayerIds });
     }
+    if (activeSquadId) {
+      base44.functions.invoke("recalculateTeamGPSProfile", { squad_id: activeSquadId });
+    }
   }
 
   // ── Recalcular inclusión/exclusión de promedios según estado actual ───────
@@ -268,6 +273,9 @@ export default function SessionGPS({ session, sessionPlayers }) {
     const affectedPlayerIds = [...new Set(refreshed.map(r => r.player_id).filter(Boolean))];
     if (affectedPlayerIds.length > 0) {
       base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: affectedPlayerIds });
+    }
+    if (activeSquadId) {
+      base44.functions.invoke("recalculateTeamGPSProfile", { squad_id: activeSquadId });
     }
   }
 
