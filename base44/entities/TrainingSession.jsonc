@@ -35,6 +35,8 @@
     "match_day_code": {
       "type": "string",
       "enum": [
+        "MD-6",
+        "MD-5",
         "MD-4",
         "MD-3",
         "MD-2",
@@ -42,9 +44,23 @@
         "MD",
         "MD+1",
         "MD+2",
+        "MD+3",
+        "MD+4",
         "Otro"
       ],
       "description": "C\u00f3digo relativo al partido"
+    },
+    "session_objective": {
+      "type": "string",
+      "enum": [
+        "Tensi\u00f3n",
+        "Volumen",
+        "Activaci\u00f3n",
+        "Velocidad",
+        "Recuperaci\u00f3n",
+        "Otro"
+      ],
+      "description": "Objetivo f\u00edsico de la sesi\u00f3n"
     },
     "duration_minutes": {
       "type": "number",
@@ -65,7 +81,7 @@
         "Media",
         "Alta"
       ],
-      "description": "Intensidad objetivo"
+      "description": "Intensidad objetivo (legado)"
     },
     "players_available": {
       "type": "number",

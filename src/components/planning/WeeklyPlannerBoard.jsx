@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Save, ChevronLeft, ChevronRight, Plus, X, Calendar } from "lucide-react";
+import { Save, ChevronLeft, ChevronRight, Plus, X, Calendar, Dumbbell } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { Link } from "react-router-dom";
 import moment from "moment";
 import "moment/locale/es";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 moment.locale("es");
 
 // ─── Constantes ────────────────────────────────────────────────────────────────
-const MD_OPTIONS = ["— MD —", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2"];
+const MD_OPTIONS = ["— MD —", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4"];
 const OBJETIVO_OPTIONS = ["—", "Tensión", "Volumen", "Velocidad", "Activación", "Compensación", "Recuperación", "Fuerza", "Intermitente", "Aceleración", "Velocidad Máxima", "Resistencia", "Táctica", "Regenerativo"];
 
 const OBJETIVO_COLORS = {
@@ -80,6 +81,30 @@ export default function WeeklyPlannerBoard() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [recordId, setRecordId] = useState(null);
+  const [squadSessions, setSquadSessions] = useState([]);
+
+  // Cargar sesiones reales de Sesiones para reflejarlas en la planificación
+  useEffect(() => {
+    async function loadSessions() {
+      if (!days.length) { setSquadSessions([]); return; }
+      const dates = days.map(d => d.date).filter(Boolean);
+      if (!dates.length) { setSquadSessions([]); return; }
+      const minDate = dates.reduce((a, b) => a < b ? a : b);
+      const maxDate = dates.reduce((a, b) => a > b ? a : b);
+      const all = await base44.entities.TrainingSession.list("-date", 200);
+      setSquadSessions(all.filter(s =>
+        (!activeSquadId || !s.squad_id || s.squad_id === activeSquadId) &&
+        s.date >= minDate && s.date <= maxDate
+      ));
+    }
+    loadSessions();
+  }, [startDate, days.length, activeSquadId]);
+
+  const sessionsByDate = useMemo(() => {
+    const map = {};
+    squadSessions.forEach(s => { (map[s.date] = map[s.date] || []).push(s); });
+    return map;
+  }, [squadSessions]);
 
   // Cargar plan desde BD cuando cambia la fecha de inicio o el plantel activo
   useEffect(() => {
@@ -289,6 +314,13 @@ export default function WeeklyPlannerBoard() {
                           <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${col.bg} ${col.text} ${col.border}`}>
                             {d.objetivo}
                           </span>
+                        )}
+                        {sessionsByDate[d.date]?.length > 0 && (
+                          <Link to={`/sessions?session=${sessionsByDate[d.date][0].id}`}
+                            title="Ver sesión"
+                            className="flex items-center gap-1 text-[9px] text-blue-300 bg-blue-900/30 border border-blue-800/40 rounded-full px-2 py-0.5 hover:bg-blue-900/50 transition-colors max-w-[130px] truncate">
+                            <Dumbbell size={9} className="shrink-0" /> {sessionsByDate[d.date][0].title}
+                          </Link>
                         )}
                       </div>
                     </th>

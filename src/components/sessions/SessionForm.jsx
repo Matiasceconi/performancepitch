@@ -6,8 +6,8 @@ import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
 const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
-const MD_CODES = ["MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "Otro"];
-const INTENSITY_OPTS = ["Baja", "Media", "Alta"];
+const MD_CODES = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4", "Otro"];
+const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
 
 const AVAILABLE_STATUSES = ["disponible", "subió", "convocado", "reintegro"];
 const UNAVAILABLE_STATUSES = ["lesionado", "molestia", "diferenciado", "suspendido", "ausente", "bajó", "diferenciado"];
@@ -25,7 +25,7 @@ export default function SessionForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({
     title: "", date: moment().format("YYYY-MM-DD"),
     squad_id: activeSquadId || "", session_type: "Campo", match_day_code: "MD-1",
-    duration_minutes: 90, objective: "", location: "", intensity_goal: "Media", notes: "",
+    duration_minutes: 90, objective: "", location: "", session_objective: "Volumen", notes: "",
   });
   const [squadPlayers, setSquadPlayers] = useState([]); // {player, ds}
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -231,10 +231,10 @@ export default function SessionForm({ onCreated, onCancel }) {
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
           </div>
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Intensidad objetivo</label>
-            <select value={form.intensity_goal} onChange={e => setF("intensity_goal", e.target.value)}
+            <label className="text-xs text-zinc-400 mb-1 block">Objetivo físico</label>
+            <select value={form.session_objective} onChange={e => setF("session_objective", e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
-              {INTENSITY_OPTS.map(i => <option key={i}>{i}</option>)}
+              {OBJECTIVE_OPTS.map(i => <option key={i}>{i}</option>)}
             </select>
           </div>
           <div>
