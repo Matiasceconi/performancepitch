@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Users, CheckSquare, Square, Search, X } from "lucide-react";
+import { Users, CheckSquare, Square, Search, X, Sparkles, Loader2 } from "lucide-react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
@@ -33,6 +33,7 @@ export default function SessionForm({ onCreated, onCancel }) {
   const [posFilter, setPosFilter] = useState("");
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [aiLoadingTitle, setAiLoadingTitle] = useState(false);
 
   useEffect(() => {
     base44.entities.Squad.list("name", 100).then(sq => {
@@ -124,6 +125,40 @@ export default function SessionForm({ onCreated, onCancel }) {
     setSelectedIds(new Set(ids));
   }
 
+  function selectOnlyField() {
+    const ids = squadPlayers
+      .filter(({ ds, player }) => AVAILABLE_STATUSES.includes(ds?.status || "disponible") && !isGoalkeeper(player))
+      .map(({ player }) => player.id);
+    setSelectedIds(new Set(ids));
+  }
+
+  function selectOnlyGK() {
+    const ids = squadPlayers
+      .filter(({ ds, player }) => AVAILABLE_STATUSES.includes(ds?.status || "disponible") && isGoalkeeper(player))
+      .map(({ player }) => player.id);
+    setSelectedIds(new Set(ids));
+  }
+
+  async function suggestSessionName() {
+    setAiLoadingTitle(true);
+    try {
+      const squad = squads.find(s => s.id === form.squad_id);
+      const res = await base44.integrations.Core.InvokeLLM({
+        prompt: `Sugerí un nombre breve y profesional (estilo "MD-2 | Activación + Velocidad") para una sesión de entrenamiento de fútbol con estos datos:
+Plantel: ${squad?.name || "—"}
+Fecha: ${form.date}
+MD: ${form.match_day_code}
+Tipo de sesión: ${form.session_type}
+Objetivo físico: ${form.session_objective}
+Objetivo: ${form.objective || "no especificado"}
+Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
+      });
+      setF("title", (res || "").trim());
+    } finally {
+      setAiLoadingTitle(false);
+    }
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.squad_id) return;
@@ -172,6 +207,8 @@ export default function SessionForm({ onCreated, onCancel }) {
 
   const availableFiltered = filtered.filter(({ ds }) => AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
   const unavailableFiltered = filtered.filter(({ ds }) => !AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
+  const diferenciadosFiltered = unavailableFiltered.filter(({ ds }) => ds?.status === "diferenciado");
+  const otherUnavailableFiltered = unavailableFiltered.filter(({ ds }) => ds?.status !== "diferenciado");
 
   // Split counts by type
   const availableField = availableFiltered.filter(({ player }) => !isGoalkeeper(player));
@@ -194,7 +231,14 @@ export default function SessionForm({ onCreated, onCancel }) {
         <h2 className="text-sm font-semibold text-white">Datos de la sesión</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2">
-            <label className="text-xs text-zinc-400 mb-1 block">Título *</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs text-zinc-400 block">Título *</label>
+              <button type="button" onClick={suggestSessionName} disabled={aiLoadingTitle}
+                className="flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200 transition-colors disabled:opacity-50">
+                {aiLoadingTitle ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+                Sugerir nombre con IA
+              </button>
+            </div>
             <input required value={form.title} onChange={e => setF("title", e.target.value)}
               placeholder="Ej: Entrenamiento martes"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
@@ -271,10 +315,20 @@ export default function SessionForm({ onCreated, onCancel }) {
               Campo: {selectedField} · <span className="text-yellow-400">ARQ: {selectedGK}</span> · Total: {selectedIds.size}
             </span>
           </h2>
-          <button type="button" onClick={selectAllAvailable}
-            className="text-xs px-3 py-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-lg hover:bg-emerald-500/25 transition-colors">
-            Seleccionar todos los disponibles
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <button type="button" onClick={selectAllAvailable}
+              className="text-xs px-3 py-1.5 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-lg hover:bg-emerald-500/25 transition-colors">
+              Seleccionar todos los disponibles
+            </button>
+            <button type="button" onClick={selectOnlyField}
+              className="text-xs px-3 py-1.5 bg-sky-500/15 border border-sky-500/30 text-sky-300 rounded-lg hover:bg-sky-500/25 transition-colors">
+              Solo campo
+            </button>
+            <button type="button" onClick={selectOnlyGK}
+              className="text-xs px-3 py-1.5 bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 rounded-lg hover:bg-yellow-500/25 transition-colors">
+              Solo arqueros
+            </button>
+          </div>
         </div>
 
         {/* Filters */}
@@ -315,14 +369,29 @@ export default function SessionForm({ onCreated, onCancel }) {
                   </div>}
             </div>
 
-            {/* Unavailable */}
-            {unavailableFiltered.length > 0 && (
+            {/* Diferenciados */}
+            {diferenciadosFiltered.length > 0 && (
               <div>
-                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2">
-                  No disponibles ({unavailableFiltered.length})
+                <p className="text-xs text-amber-400 font-semibold uppercase tracking-wider mb-2">
+                  Diferenciados ({diferenciadosFiltered.length})
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
-                  {unavailableFiltered.map(({ player, ds }) => (
+                  {diferenciadosFiltered.map(({ player, ds }) => (
+                    <PlayerSelectRow key={player.id} player={player} ds={ds}
+                      selected={selectedIds.has(player.id)} onToggle={() => togglePlayer(player.id)} />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Ausentes / no disponibles */}
+            {otherUnavailableFiltered.length > 0 && (
+              <div>
+                <p className="text-xs text-zinc-500 font-semibold uppercase tracking-wider mb-2">
+                  Ausentes / No disponibles ({otherUnavailableFiltered.length})
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {otherUnavailableFiltered.map(({ player, ds }) => (
                     <PlayerSelectRow key={player.id} player={player} ds={ds}
                       selected={selectedIds.has(player.id)} onToggle={() => togglePlayer(player.id)} />
                   ))}

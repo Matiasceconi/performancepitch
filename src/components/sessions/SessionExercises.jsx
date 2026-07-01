@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen, Search, Activity } from "lucide-react";
+import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen, Search, Sparkles, Loader2 } from "lucide-react";
 import ExerciseGPS from "@/components/sessions/ExerciseGPS";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
@@ -80,13 +80,34 @@ const EMPTY_FORM = {
   image_url: "", video_url: "", notes: "",
 };
 
+// Extrae el primer número de un texto tipo "4 min" o "4'"
+function parseMinutes(str) {
+  if (!str) return 0;
+  const m = String(str).match(/(\d+(\.\d+)?)/);
+  return m ? parseFloat(m[1]) : 0;
+}
+
 function calcDerived(f) {
   const l = parseFloat(f.length_m) || 0;
   const w = parseFloat(f.width_m) || 0;
   const p = parseFloat(f.players_count) || 0;
   const total_area = l && w ? parseFloat((l * w).toFixed(1)) : undefined;
   const eii = total_area && p ? parseFloat((total_area / p).toFixed(2)) : undefined;
-  return { total_area, eii };
+
+  // Tiempo total = bloques x trabajo + pausas entre bloques (bloques - 1)
+  const blocks = parseFloat(f.blocks) || 0;
+  const work = parseMinutes(f.work_time);
+  const rest = parseMinutes(f.rest_time);
+  const totalTime = (blocks && work) ? (blocks * work + Math.max(blocks - 1, 0) * rest) : undefined;
+
+  return { total_area, eii, totalTime };
+}
+
+function eiiInterpretation(eii) {
+  if (eii == null) return null;
+  if (eii < 8) return { label: "EII bajo", color: "text-red-300 bg-red-500/10 border-red-500/30" };
+  if (eii <= 15) return { label: "EII medio", color: "text-amber-300 bg-amber-500/10 border-amber-500/30" };
+  return { label: "EII alto", color: "text-emerald-300 bg-emerald-500/10 border-emerald-500/30" };
 }
 
 function num(v) { const n = parseFloat(v); return isNaN(n) ? undefined : n; }
@@ -97,12 +118,15 @@ export default function SessionExercises({ session, sessionPlayers }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [expanded, setExpanded] = useState({});
   const [saving, setSaving] = useState(false);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [showLibrary, setShowLibrary] = useState(false);
   const [libraryExercises, setLibraryExercises] = useState([]);
   const [libSearch, setLibSearch] = useState("");
+  const [nameSuggestions, setNameSuggestions] = useState([]);
+  const [aiLoading, setAiLoading] = useState({ name: false, description: false, objective: false });
   const { toast } = useToast();
 
   async function handleImageUpload(file) {
@@ -121,7 +145,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
 
   function setF(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
-  function openNew() { setForm(EMPTY_FORM); setEditId(null); setShowForm(true); }
+  function openNew() { setForm(EMPTY_FORM); setEditId(null); setShowAdvanced(false); setNameSuggestions([]); setShowForm(true); }
 
   function openEdit(ex) {
     setForm({
@@ -134,18 +158,20 @@ export default function SessionExercises({ session, sessionPlayers }) {
       video_url: ex.video_url || "", notes: ex.notes || "",
     });
     setEditId(ex.id);
+    setShowAdvanced(!!ex.notes);
+    setNameSuggestions([]);
     setShowForm(true);
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setSaving(true);
-    const { total_area, eii } = calcDerived(form);
+    const { total_area, eii, totalTime } = calcDerived(form);
     const payload = {
       session_id: sessionId,
       name: form.name,
       type: form.type,
-      duration_min: num(form.duration_min),
+      duration_min: num(form.duration_min) ?? totalTime,
       blocks: num(form.blocks),
       work_time: form.work_time || undefined,
       rest_time: form.rest_time || undefined,
@@ -207,6 +233,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
       video_url: ex.video_url || "", notes: ex.notes || "",
     });
     setEditId(null);
+    setShowAdvanced(!!ex.notes);
     setShowLibrary(false);
     setShowForm(true);
     // Update library usage
@@ -236,7 +263,63 @@ export default function SessionExercises({ session, sessionPlayers }) {
 
   function toggleExpand(id) { setExpanded(p => ({ ...p, [id]: !p[id] })); }
 
+  // ── IA: sugerencias ────────────────────────────────────────────────────
+  async function aiSuggestName() {
+    setAiLoading(s => ({ ...s, name: true }));
+    try {
+      const res = await base44.integrations.Core.InvokeLLM({
+        prompt: `Sos un preparador físico/entrenador de fútbol. Sugerí 3 nombres breves y profesionales para un ejercicio de entrenamiento con estas características:
+Tipo: ${form.type || "no especificado"}
+Objetivo: ${form.objective || "no especificado"}
+Cantidad de jugadores: ${form.players_count || "no especificado"}
+Espacio: ${form.length_m || "?"}x${form.width_m || "?"} m
+Duración: ${form.duration_min || "no especificada"} min
+Devolvé solo los nombres, sin numeración.`,
+        response_json_schema: { type: "object", properties: { names: { type: "array", items: { type: "string" } } }, required: ["names"] },
+      });
+      setNameSuggestions(res.names || []);
+    } finally {
+      setAiLoading(s => ({ ...s, name: false }));
+    }
+  }
+
+  async function aiSuggestDescription() {
+    setAiLoading(s => ({ ...s, description: true }));
+    try {
+      const res = await base44.integrations.Core.InvokeLLM({
+        prompt: `Generá una descripción corta (máximo 2 líneas, en español) para este ejercicio de entrenamiento de fútbol:
+Nombre: ${form.name || "sin nombre"}
+Tipo: ${form.type}
+Jugadores: ${form.players_count || "?"}
+Espacio: ${form.length_m || "?"}x${form.width_m || "?"} m
+Objetivo: ${form.objective || "no especificado"}
+Respondé solo con la descripción, sin introducciones ni comillas.`,
+      });
+      setF("description", (res || "").trim());
+    } finally {
+      setAiLoading(s => ({ ...s, description: false }));
+    }
+  }
+
+  async function aiSuggestObjective() {
+    setAiLoading(s => ({ ...s, objective: true }));
+    try {
+      const res = await base44.integrations.Core.InvokeLLM({
+        prompt: `Según estos datos de un ejercicio de entrenamiento de fútbol, sugerí en una sola línea breve el objetivo táctico, el objetivo físico y la intensidad esperada:
+Tipo: ${form.type}
+Jugadores: ${form.players_count || "?"}
+Espacio: ${form.length_m || "?"}x${form.width_m || "?"} m
+Duración: ${form.duration_min || "?"} min
+Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja/Media/Alta". Sin comillas.`,
+      });
+      setF("objective", (res || "").trim());
+    } finally {
+      setAiLoading(s => ({ ...s, objective: false }));
+    }
+  }
+
   const derived = calcDerived(form);
+  const eiiInterp = eiiInterpretation(derived.eii);
 
   return (
     <div className="space-y-4">
@@ -244,21 +327,17 @@ export default function SessionExercises({ session, sessionPlayers }) {
         <p className="text-zinc-600 text-sm text-center py-6">Sin ejercicios cargados</p>
       )}
 
-      {/* Exercise cards */}
+      {/* Exercise cards — vista compacta */}
       {exercises.map((ex, i) => {
         const tc = TYPE_COLORS[ex.type] || TYPE_COLORS["Otro"];
         const isExpanded = expanded[ex.id];
+        const exEii = eiiInterpretation(ex.eii);
         return (
           <div key={ex.id} className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
-            {/* Full-width image at top */}
-            {ex.image_url && (
-              <img src={ex.image_url} alt={ex.name}
-                className="w-full max-h-56 object-cover" />
-            )}
-            {/* Card header */}
-            <div className="flex items-center gap-3 p-4">
+            {/* Card header — compacto */}
+            <div className="flex items-center gap-3 p-3 cursor-pointer" onClick={() => toggleExpand(ex.id)}>
               {/* Order controls */}
-              <div className="flex flex-col gap-0.5 shrink-0">
+              <div className="flex flex-col gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
                 <button onClick={() => moveUp(i)} className="text-zinc-600 hover:text-zinc-300 transition-colors">
                   <ChevronUp size={13} />
                 </button>
@@ -269,27 +348,23 @@ export default function SessionExercises({ session, sessionPlayers }) {
               </div>
 
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                  <p className="text-sm font-semibold text-white">{ex.name}</p>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${tc}`}>{ex.type}</span>
-                  {ex.duration_min && <span className="text-[10px] text-zinc-500">{ex.duration_min} min</span>}
-                  {ex.blocks && <span className="text-[10px] text-zinc-500">{ex.blocks} bloques</span>}
                 </div>
-                <p className="text-sm font-semibold text-white">{ex.name}</p>
-                {ex.objective && <p className="text-xs text-zinc-400 mt-0.5 truncate">{ex.objective}</p>}
+                <div className="flex items-center gap-3 flex-wrap text-[10px] text-zinc-400">
+                  {ex.blocks != null && <span>Bloques: <strong className="text-zinc-200">{ex.blocks}</strong></span>}
+                  {ex.work_time && <span>Trabajo: <strong className="text-zinc-200">{ex.work_time}</strong></span>}
+                  {ex.rest_time && <span>Pausa: <strong className="text-zinc-200">{ex.rest_time}</strong></span>}
+                  {ex.duration_min != null && <span>Total: <strong className="text-zinc-200">{ex.duration_min}'</strong></span>}
+                  {ex.eii != null && (
+                    <span className={`px-1.5 py-0.5 rounded-full border ${exEii?.color}`}>{exEii?.label} ({ex.eii})</span>
+                  )}
+                </div>
               </div>
 
-              {/* Metrics quick view */}
-              {(ex.total_area || ex.eii || ex.players_count) && (
-                <div className="hidden sm:flex items-center gap-3 text-[10px] text-zinc-500 shrink-0">
-                  {ex.length_m && ex.width_m && <span>{ex.length_m}×{ex.width_m}m</span>}
-                  {ex.players_count && <span>{ex.players_count} jug.</span>}
-                  {ex.total_area && <span>{ex.total_area}m²</span>}
-                  {ex.eii && <span className="text-amber-400 font-semibold">EII {ex.eii}</span>}
-                </div>
-              )}
-
               {/* Actions */}
-              <div className="flex items-center gap-1 shrink-0">
+              <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                 {ex.video_url && (
                   <a href={ex.video_url} target="_blank" rel="noreferrer"
                     className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-400 transition-colors">
@@ -311,20 +386,21 @@ export default function SessionExercises({ session, sessionPlayers }) {
               </div>
             </div>
 
-            {/* Expanded details */}
+            {/* Expanded details — detalle avanzado */}
             {isExpanded && (
               <div className="border-t border-zinc-700 p-4 space-y-3">
+                {ex.image_url && (
+                  <img src={ex.image_url} alt={ex.name} className="w-full max-h-56 object-cover rounded-lg" />
+                )}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                  {ex.work_time && <div><p className="text-zinc-500">Tiempo trabajo</p><p className="text-white font-medium">{ex.work_time}</p></div>}
-                  {ex.rest_time && <div><p className="text-zinc-500">Pausa</p><p className="text-white font-medium">{ex.rest_time}</p></div>}
                   {ex.length_m && <div><p className="text-zinc-500">Largo</p><p className="text-white font-medium">{ex.length_m} m</p></div>}
                   {ex.width_m && <div><p className="text-zinc-500">Ancho</p><p className="text-white font-medium">{ex.width_m} m</p></div>}
                   {ex.players_count && <div><p className="text-zinc-500">Jugadores</p><p className="text-white font-medium">{ex.players_count}</p></div>}
                   {ex.total_area && <div><p className="text-zinc-500">Superficie</p><p className="text-white font-medium">{ex.total_area} m²</p></div>}
-                  {ex.eii && <div><p className="text-zinc-500">EII</p><p className="text-amber-300 font-bold">{ex.eii} m²/jug</p></div>}
                 </div>
-                {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
-                {ex.notes && <p className="text-xs text-zinc-500 italic">{ex.notes}</p>}
+                {ex.objective && <div><p className="text-zinc-500 text-xs">Objetivo</p><p className="text-xs text-zinc-300">{ex.objective}</p></div>}
+                {ex.description && <div><p className="text-zinc-500 text-xs">Descripción</p><p className="text-xs text-zinc-400">{ex.description}</p></div>}
+                {ex.notes && <div><p className="text-zinc-500 text-xs">Observaciones avanzadas</p><p className="text-xs text-zinc-500 italic">{ex.notes}</p></div>}
                 {/* GPS por ejercicio */}
                 <ExerciseGPS session={session} exercise={ex} sessionPlayers={sessionPlayers || []} />
               </div>
@@ -340,10 +416,27 @@ export default function SessionExercises({ session, sessionPlayers }) {
 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="text-[10px] text-zinc-400 mb-1 block">Nombre *</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] text-zinc-400 block">Nombre *</label>
+                <button type="button" onClick={aiSuggestName} disabled={aiLoading.name}
+                  className="flex items-center gap-1 text-[10px] text-violet-300 hover:text-violet-200 transition-colors disabled:opacity-50">
+                  {aiLoading.name ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                  Sugerir con IA
+                </button>
+              </div>
               <input required value={form.name} onChange={e => setF("name", e.target.value)}
                 placeholder="Nombre del ejercicio"
                 className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+              {nameSuggestions.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mt-1.5">
+                  {nameSuggestions.map((n, idx) => (
+                    <button key={idx} type="button" onClick={() => { setF("name", n); setNameSuggestions([]); }}
+                      className="px-2 py-1 rounded-lg text-[10px] bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-colors">
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div>
@@ -354,10 +447,12 @@ export default function SessionExercises({ session, sessionPlayers }) {
               </select>
             </div>
             <div>
-              <label className="text-[10px] text-zinc-400 mb-1 block">Duración (min)</label>
-              <input type="number" value={form.duration_min} onChange={e => setF("duration_min", e.target.value)}
+              <label className="text-[10px] text-zinc-400 mb-1 block">N° jugadores</label>
+              <input type="number" value={form.players_count} onChange={e => setF("players_count", e.target.value)}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
             </div>
+
+            {/* Tiempos */}
             <div>
               <label className="text-[10px] text-zinc-400 mb-1 block">Bloques</label>
               <input type="number" value={form.blocks} onChange={e => setF("blocks", e.target.value)}
@@ -370,9 +465,27 @@ export default function SessionExercises({ session, sessionPlayers }) {
             </div>
             <div>
               <label className="text-[10px] text-zinc-400 mb-1 block">Pausa</label>
-              <input value={form.rest_time} onChange={e => setF("rest_time", e.target.value)} placeholder="ej: 2 min"
+              <input value={form.rest_time} onChange={e => setF("rest_time", e.target.value)} placeholder="ej: 1 min"
                 className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
             </div>
+            <div>
+              <label className="text-[10px] text-zinc-400 mb-1 block">Duración manual (min, opcional)</label>
+              <input type="number" value={form.duration_min} onChange={e => setF("duration_min", e.target.value)}
+                placeholder="Auto si se deja vacío"
+                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+            </div>
+
+            {/* Tiempo total calculado */}
+            {derived.totalTime != null && (
+              <div className="col-span-2 flex items-center gap-4 px-3 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs">
+                <span className="text-zinc-300">
+                  Tiempo total calculado: <strong className="text-emerald-300">{derived.totalTime}'</strong>
+                </span>
+                <span className="text-zinc-500 text-[10px]">
+                  ({form.blocks} bloques × {parseMinutes(form.work_time)}' + {Math.max((parseFloat(form.blocks) || 0) - 1, 0)} pausas × {parseMinutes(form.rest_time)}')
+                </span>
+              </div>
+            )}
 
             {/* Space */}
             <div>
@@ -385,27 +498,41 @@ export default function SessionExercises({ session, sessionPlayers }) {
               <input type="number" value={form.width_m} onChange={e => setF("width_m", e.target.value)}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
             </div>
-            <div>
-              <label className="text-[10px] text-zinc-400 mb-1 block">N° jugadores</label>
-              <input type="number" value={form.players_count} onChange={e => setF("players_count", e.target.value)}
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
-            </div>
 
-            {/* Auto-calculated */}
+            {/* Auto-calculated superficie / EII */}
             {(derived.total_area || derived.eii) && (
-              <div className="flex items-center gap-4 col-span-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs">
+              <div className="flex items-center gap-4 col-span-2 px-3 py-2 bg-amber-500/10 border border-amber-500/20 rounded-lg text-xs flex-wrap">
                 {derived.total_area && <span className="text-zinc-300">Superficie: <strong className="text-white">{derived.total_area} m²</strong></span>}
-                {derived.eii && <span className="text-zinc-300">EII: <strong className="text-amber-300">{derived.eii} m²/jug</strong></span>}
+                {derived.eii && (
+                  <span className="text-zinc-300 flex items-center gap-1.5">
+                    EII: <strong className="text-amber-300">{derived.eii} m²/jug</strong>
+                    {eiiInterp && <span className={`px-1.5 py-0.5 rounded-full border text-[10px] ${eiiInterp.color}`}>{eiiInterp.label}</span>}
+                  </span>
+                )}
               </div>
             )}
 
             <div className="col-span-2">
-              <label className="text-[10px] text-zinc-400 mb-1 block">Objetivo</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] text-zinc-400 block">Objetivo</label>
+                <button type="button" onClick={aiSuggestObjective} disabled={aiLoading.objective}
+                  className="flex items-center gap-1 text-[10px] text-violet-300 hover:text-violet-200 transition-colors disabled:opacity-50">
+                  {aiLoading.objective ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                  Sugerir con IA
+                </button>
+              </div>
               <input value={form.objective} onChange={e => setF("objective", e.target.value)}
                 className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
             </div>
             <div className="col-span-2">
-              <label className="text-[10px] text-zinc-400 mb-1 block">Descripción</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[10px] text-zinc-400 block">Descripción corta</label>
+                <button type="button" onClick={aiSuggestDescription} disabled={aiLoading.description}
+                  className="flex items-center gap-1 text-[10px] text-violet-300 hover:text-violet-200 transition-colors disabled:opacity-50">
+                  {aiLoading.description ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+                  Generar con IA
+                </button>
+              </div>
               <textarea value={form.description} onChange={e => setF("description", e.target.value)}
                 rows={2} className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none resize-none" />
             </div>
@@ -433,10 +560,19 @@ export default function SessionExercises({ session, sessionPlayers }) {
               <input value={form.video_url} onChange={e => setF("video_url", e.target.value)} placeholder="https://youtube.com/..."
                 className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
             </div>
+
+            {/* Observaciones avanzadas — oculto por defecto */}
             <div className="col-span-2">
-              <label className="text-[10px] text-zinc-400 mb-1 block">Notas</label>
-              <input value={form.notes} onChange={e => setF("notes", e.target.value)}
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+              <button type="button" onClick={() => setShowAdvanced(s => !s)}
+                className="flex items-center gap-1 text-[10px] text-zinc-500 hover:text-zinc-300 transition-colors">
+                {showAdvanced ? <ChevronUp size={11} /> : <ChevronDown size={11} />}
+                Observaciones avanzadas {form.notes && !showAdvanced ? "(con contenido)" : ""}
+              </button>
+              {showAdvanced && (
+                <input value={form.notes} onChange={e => setF("notes", e.target.value)}
+                  placeholder="Observaciones adicionales (opcional)"
+                  className="mt-1.5 w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+              )}
             </div>
           </div>
 
