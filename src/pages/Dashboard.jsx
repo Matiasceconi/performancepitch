@@ -521,7 +521,7 @@ export default function Dashboard() {
       />
 
       {/* Cronograma del Día */}
-      <DayScheduleAgenda events={todayEvents} />
+      <DayScheduleAgenda events={todayEvents} onRefresh={refresh} />
 
       {/* Birthday */}
       {birthdayPlayers.length > 0 && (

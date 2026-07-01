@@ -1,6 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Activity, Dumbbell, ClipboardList, Trophy, HeartPulse, Users, CalendarDays, ChevronRight } from "lucide-react";
+import { Activity, Dumbbell, ClipboardList, Trophy, HeartPulse, Users, CalendarDays, ChevronRight, Plus, Pencil } from "lucide-react";
+import { useWorkspace } from "@/lib/WorkspaceContext";
+import moment from "moment";
+import QuickEventModal from "@/components/dashboard/QuickEventModal";
 
 function getEventStyle(type = "") {
   const t = type.toLowerCase();
@@ -13,13 +16,23 @@ function getEventStyle(type = "") {
   return { icon: CalendarDays, color: "text-zinc-400", bg: "bg-zinc-800/40", border: "border-zinc-700" };
 }
 
-export default function DayScheduleAgenda({ events }) {
+export default function DayScheduleAgenda({ events, onRefresh }) {
+  const { activeSquadId, activeSquad } = useWorkspace();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
   const sorted = [...events].sort((a, b) => (a.time || "").localeCompare(b.time || ""));
+
+  function openNew() { setEditingEvent(null); setModalOpen(true); }
+  function openEdit(ev) { setEditingEvent(ev); setModalOpen(true); }
+  function handleSaved() { if (onRefresh) onRefresh(); }
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
         <h2 className="text-sm font-semibold text-white">Cronograma del Día</h2>
+        <button onClick={openNew} className="flex items-center gap-1 text-xs text-zinc-400 hover:text-white px-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors">
+          <Plus size={13} /> Agregar
+        </button>
       </div>
       <div className="p-4">
         {sorted.length === 0 ? (
@@ -30,13 +43,16 @@ export default function DayScheduleAgenda({ events }) {
               const style = getEventStyle(ev.type);
               const Icon = style.icon;
               return (
-                <div key={ev.id} className={`flex items-center gap-3 px-3 py-2 rounded-lg border ${style.bg} ${style.border}`}>
+                <div key={ev.id} className={`group flex items-center gap-3 px-3 py-2 rounded-lg border ${style.bg} ${style.border}`}>
                   <span className="text-xs font-semibold text-zinc-300 w-12 shrink-0">{ev.time || "--:--"}</span>
                   <Icon size={15} className={`${style.color} shrink-0`} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-white font-medium truncate">{ev.title}</p>
                     {ev.location && <p className="text-[10px] text-zinc-500 truncate">{ev.location}</p>}
                   </div>
+                  <button onClick={() => openEdit(ev)} className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg hover:bg-white/10 text-zinc-400 hover:text-white transition-all shrink-0" title="Editar">
+                    <Pencil size={13} />
+                  </button>
                 </div>
               );
             })}
@@ -47,6 +63,16 @@ export default function DayScheduleAgenda({ events }) {
           Abrir Calendario Completo <ChevronRight size={13} />
         </Link>
       </div>
+
+      <QuickEventModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        onSaved={handleSaved}
+        event={editingEvent}
+        date={moment().format("YYYY-MM-DD")}
+        squadId={activeSquadId}
+        squadName={activeSquad?.name || ""}
+      />
     </div>
   );
 }
