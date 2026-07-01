@@ -234,6 +234,12 @@ export default function SessionGPS({ session, sessionPlayers }) {
     setPreview(null);
     setImporting(false);
     toast({ title: `GPS importado: ${toCreate.length} jugadores OK, ${unmatchedList.length} sin reconocer` });
+
+    // Actualizar perfiles individuales de carga externa de los jugadores afectados
+    const affectedPlayerIds = [...new Set(toCreate.map(r => r.player_id).filter(Boolean))];
+    if (affectedPlayerIds.length > 0) {
+      base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: affectedPlayerIds });
+    }
   }
 
   // ── Recalcular inclusión/exclusión de promedios según estado actual ───────
@@ -257,6 +263,12 @@ export default function SessionGPS({ session, sessionPlayers }) {
     setGpsRows(refreshed);
     setRecalculating(false);
     toast({ title: `✓ Promedios recalculados (${updates.length} actualizados)` });
+
+    // Actualizar perfiles individuales de carga externa
+    const affectedPlayerIds = [...new Set(refreshed.map(r => r.player_id).filter(Boolean))];
+    if (affectedPlayerIds.length > 0) {
+      base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: affectedPlayerIds });
+    }
   }
 
   // ── Manual alias ──────────────────────────────────────────────────────────

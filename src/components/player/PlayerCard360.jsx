@@ -9,8 +9,9 @@ import "moment/locale/es";
 import {
   X, Edit2, Save, User, Shield, Activity, Zap, Heart,
   Award, Tag, Paperclip, BarChart2, CheckCircle, AlertCircle,
-  Camera, ChevronRight, Clock, Copy, Check
+  Camera, ChevronRight, Clock, Copy, Check, TrendingUp
 } from "lucide-react";
+import PlayerGPSProfileTab from "@/components/player/PlayerGPSProfileTab";
 
 moment.locale("es");
 
@@ -64,6 +65,7 @@ const TABS = [
   { id: "planteles",  label: "Planteles",     icon: Shield },
   { id: "sesiones",   label: "Sesiones",      icon: Activity },
   { id: "gps",        label: "GPS",           icon: Zap },
+  { id: "carga_externa", label: "Carga Externa", icon: TrendingUp },
   { id: "partidos",   label: "Partidos",      icon: BarChart2 },
   { id: "medico",     label: "Médico",        icon: Heart },
   { id: "wellness",   label: "Wellness",      icon: CheckCircle },
@@ -409,6 +411,7 @@ export default function PlayerCard360() {
               {activeTab === "planteles" && <TabPlanteles memberships={memberships} />}
               {activeTab === "sesiones" && <TabSesiones sessions={sessions} sessionPlayers={sessionPlayers} playerId={player.id} />}
               {activeTab === "gps" && <TabGPS gpsData={gpsData} />}
+              {activeTab === "carga_externa" && <PlayerGPSProfileTab playerId={player.id} />}
               {activeTab === "partidos" && <TabPartidos minutes={minutes} />}
               {activeTab === "medico" && <TabMedico medical={medical} />}
               {activeTab === "wellness" && <TabWellness playerId={player.id} />}

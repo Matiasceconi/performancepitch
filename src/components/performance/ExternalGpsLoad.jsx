@@ -263,6 +263,12 @@ export default function ExternalGpsLoad() {
     await load(true);
     setRecalculating(false);
     toast({ title: `✓ Promedios recalculados (${updatedCount} registros actualizados)` });
+
+    // Actualizar perfiles individuales de carga externa de todos los jugadores de la semana
+    const affectedPlayerIds = [...new Set(enrichedRows.map((r) => r.player_id).filter(Boolean))];
+    if (affectedPlayerIds.length > 0) {
+      base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: affectedPlayerIds });
+    }
   }
 
   if (loading) return (
