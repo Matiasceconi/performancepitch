@@ -1,11 +1,11 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { PlusCircle, CalendarRange, Users, Activity } from "lucide-react";
+import { PlusCircle, CalendarRange, Calendar, Activity } from "lucide-react";
 
 const ACTIONS = [
   { label: "Armar Sesión", icon: PlusCircle, to: "/sessions", color: "text-emerald-400" },
   { label: "Planificar Semana", icon: CalendarRange, to: "/weekly-planner", color: "text-sky-400" },
-  { label: "Ver Plantel", icon: Users, to: "/team", color: "text-blue-400" },
+  { label: "Ver Calendario", icon: Calendar, to: "/schedule", color: "text-blue-400" },
   { label: "Reportes GPS", icon: Activity, to: "/catapult", color: "text-amber-400" },
 ];
 

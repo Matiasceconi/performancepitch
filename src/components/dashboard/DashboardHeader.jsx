@@ -21,7 +21,7 @@ export default function DashboardHeader({ activeSquad, mySquads, setActiveSquad,
       <div className="flex items-center gap-4">
         <div className="w-16 h-16 rounded-2xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0 overflow-hidden p-1.5">
           <img
-            src="https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/b77b5674e_image.png"
+            src="https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/a8608f7d3_defensa.png"
             alt="Defensa y Justicia"
             className="w-full h-full object-contain"
           />
