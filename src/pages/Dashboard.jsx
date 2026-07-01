@@ -211,6 +211,7 @@ function NextTrainingPanel({ byStatus, playerMap }) {
 // ─── Main Dashboard ────────────────────────────────────────────────────────
 export default function Dashboard() {
   const today = moment().format("YYYY-MM-DD");
+  const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
   const { activeSquadId, activeSquad, mySquads, setActiveSquad } = useWorkspace();
 
   // Use activeSquadId from context as selectedSquadId
@@ -227,6 +228,7 @@ export default function Dashboard() {
   const [nextMatchReport, setNextMatchReport] = useState(null);
   const [lastMatchEvent, setLastMatchEvent] = useState(null);
   const [todayEvents, setTodayEvents] = useState([]);
+  const [tomorrowEvents, setTomorrowEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -238,7 +240,7 @@ export default function Dashboard() {
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
 
-    const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw] = await Promise.all([
+    const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw, tomorrowEventsRaw] = await Promise.all([
       base44.entities.Player.list("-created_date", 500),
       ensureDailyStatusForDate(today),
       base44.entities.Squad.list("name", 100),
@@ -247,6 +249,7 @@ export default function Dashboard() {
       base44.entities.TrainingSession.list("-date", 50),
       base44.entities.MatchReport.list("-date", 20),
       base44.entities.DayEvent.filter({ date: today }, "time", 100),
+      base44.entities.DayEvent.filter({ date: tomorrow }, "time", 100),
     ]);
 
     const map = {};
@@ -259,18 +262,30 @@ export default function Dashboard() {
     setSquads(allSquads.filter(sq => sq.active !== false));
     setSessions(s.filter(filterBySquad).slice(0, 5));
 
-    const match = events.find(e => e.type === "Partido" && e.date >= today);
-    setNextMatch(match || null);
-    if (match) setNextMatchReport(matchReports.find(r => r.date === match.date) || null);
+    // Estricto por plantel activo: nunca mezclar partidos de otro plantel
+    const squadEvents = selectedSquadId ? events.filter(e => e.squad_id === selectedSquadId) : events;
+    const squadMatchReports = selectedSquadId ? matchReports.filter(r => r.squad_id === selectedSquadId) : matchReports;
 
-    const pastMatches = events.filter(e => e.type === "Partido" && e.date < today);
+    const match = squadEvents.find(e => e.type === "Partido" && e.date >= today);
+    setNextMatch(match || null);
+    if (match) setNextMatchReport(squadMatchReports.find(r => r.date === match.date) || null);
+
+    const pastMatches = squadEvents.filter(e => e.type === "Partido" && e.date < today);
     setLastMatchEvent(pastMatches.length > 0 ? pastMatches[pastMatches.length - 1] : null);
 
     setTodayEvents(todayEventsRaw.filter(filterBySquad));
+    setTomorrowEvents(tomorrowEventsRaw.filter(filterBySquad));
 
     setLastSync(new Date());
     if (!silent) setLoading(false); else setRefreshing(false);
-  }, [today]);
+  }, [today, tomorrow, selectedSquadId]);
+
+  // Refresh automatically when calendar events or matches change (create/update/delete)
+  useEffect(() => {
+    const unsubDayEvent = base44.entities.DayEvent.subscribe(() => { loadData(true); });
+    const unsubMatchReport = base44.entities.MatchReport.subscribe(() => { loadData(true); });
+    return () => { unsubDayEvent(); unsubMatchReport(); };
+  }, [loadData]);
 
   // Real-time subscription — DailySquadStatus is the source of truth
   useEffect(() => {
@@ -521,8 +536,14 @@ export default function Dashboard() {
         squadName={squads.find(s => s.id === selectedSquadId)?.name}
       />
 
-      {/* Cronograma del Día */}
-      <DayScheduleAgenda events={todayEvents} onRefresh={refresh} />
+      {/* Cronograma del Día (o de mañana si hoy ya finalizó) */}
+      <DayScheduleAgenda
+        todayEvents={todayEvents}
+        tomorrowEvents={tomorrowEvents}
+        todayDate={today}
+        tomorrowDate={tomorrow}
+        onRefresh={refresh}
+      />
 
       {/* Birthday */}
       {birthdayPlayers.length > 0 && (

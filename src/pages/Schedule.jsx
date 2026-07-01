@@ -525,6 +525,17 @@ export default function Schedule() {
 
   useEffect(() => { setLoading(true); loadEvents(); }, [activeSquadId]);
 
+  // Si se llega con ?date=YYYY-MM-DD (ej: desde el cronograma del Dashboard), abrir esa semana
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const dateParam = params.get("date");
+    if (dateParam && moment(dateParam, "YYYY-MM-DD", true).isValid()) {
+      setView("week");
+      setCurrentWeekStart(getCustomWeekStart(moment(dateParam), weekStartDay));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Re-compute week start when weekStartDay changes
   useEffect(() => {
     setCurrentWeekStart(getCustomWeekStart(moment(), weekStartDay));
