@@ -111,6 +111,11 @@
       "type": "string",
       "description": "Nombre del archivo CSV GPS"
     },
+    "pdf_exported": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el PDF de la sesi\u00f3n fue exportado al menos una vez"
+    },
     "notes": {
       "type": "string",
       "description": "Observaciones generales"

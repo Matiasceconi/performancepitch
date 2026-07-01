@@ -484,6 +484,7 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
 
       const filename = `sesion_${moment(session.date).format("YYYY-MM-DD")}_${session.title.replace(/\s+/g, "_")}.pdf`;
       doc.save(filename);
+      if (!session.pdf_exported) await base44.entities.TrainingSession.update(session.id, { pdf_exported: true });
       toast({ title: "✓ PDF exportado correctamente" });
     } catch (err) {
       console.error(err);

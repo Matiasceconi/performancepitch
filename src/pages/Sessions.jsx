@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, ClipboardList } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -6,6 +6,8 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import SessionList from "@/components/sessions/SessionList";
 import SessionForm from "@/components/sessions/SessionForm";
 import SessionDetail from "@/components/sessions/SessionDetail";
+import SessionFilters, { DEFAULT_FILTERS } from "@/components/sessions/SessionFilters";
+import moment from "moment";
 
 export default function Sessions() {
   const { activeSquadId, activeSquad } = useWorkspace();
@@ -13,6 +15,7 @@ export default function Sessions() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "new" | "detail"
   const [selectedSession, setSelectedSession] = useState(null);
+  const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -59,6 +62,42 @@ export default function Sessions() {
     setView("list");
   }
 
+  const filteredSessions = useMemo(() => {
+    let list = [...sessions];
+    const f = filters;
+
+    if (f.search.trim()) {
+      const q = f.search.trim().toLowerCase();
+      list = list.filter(s => {
+        const haystack = [
+          s.title, moment(s.date).format("DD/MM/YYYY"), s.date, s.session_type,
+          s.match_day_code, s.squad_name, s.objective,
+        ].filter(Boolean).join(" ").toLowerCase();
+        return haystack.includes(q);
+      });
+    }
+    if (f.dateFrom) list = list.filter(s => s.date >= f.dateFrom);
+    if (f.dateTo) list = list.filter(s => s.date <= f.dateTo);
+    if (f.type) list = list.filter(s => s.session_type === f.type);
+    if (f.md) list = list.filter(s => s.match_day_code === f.md);
+    if (f.minPlayers) list = list.filter(s => (s.players_selected || 0) >= parseInt(f.minPlayers));
+    if (f.gps === "con") list = list.filter(s => !!s.csv_label);
+    if (f.gps === "sin") list = list.filter(s => !s.csv_label);
+    if (f.video === "con") list = list.filter(s => !!s.video_url);
+    if (f.video === "sin") list = list.filter(s => !s.video_url);
+    if (f.pdf === "con") list = list.filter(s => !!s.pdf_exported);
+    if (f.pdf === "sin") list = list.filter(s => !s.pdf_exported);
+
+    if (f.sort === "antiguas") list.sort((a, b) => a.date.localeCompare(b.date));
+    else if (f.sort === "duracion") list.sort((a, b) => (b.duration_minutes || 0) - (a.duration_minutes || 0));
+    else if (f.sort === "jugadores") list.sort((a, b) => (b.players_selected || 0) - (a.players_selected || 0));
+    else list.sort((a, b) => b.date.localeCompare(a.date));
+
+    return list;
+  }, [sessions, filters]);
+
+  const hasActiveFilters = Object.entries(filters).some(([k, v]) => k !== "sort" && v !== "" && v !== "todos");
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -97,7 +136,10 @@ export default function Sessions() {
             <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
           </div>
         ) : (
-          <SessionList sessions={sessions} onSelect={handleSelect} onDelete={handleDelete} />
+          <>
+            <SessionFilters filters={filters} onChange={setFilters} />
+            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} />
+          </>
         )
       )}
 

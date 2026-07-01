@@ -12,12 +12,12 @@ const TYPE_COLORS = {
   Otro: "bg-zinc-500/15 text-zinc-300 border-zinc-600",
 };
 
-export default function SessionList({ sessions, onSelect, onDelete }) {
+export default function SessionList({ sessions, onSelect, onDelete, hasFilters = false }) {
   if (sessions.length === 0) {
     return (
       <div className="text-center py-16 text-zinc-600">
-        <p className="text-sm">Sin sesiones creadas</p>
-        <p className="text-xs mt-1">Creá la primera sesión para comenzar</p>
+        <p className="text-sm">{hasFilters ? "No se encontraron sesiones" : "Sin sesiones creadas"}</p>
+        {!hasFilters && <p className="text-xs mt-1">Creá la primera sesión para comenzar</p>}
       </div>
     );
   }
