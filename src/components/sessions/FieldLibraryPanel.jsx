@@ -32,10 +32,9 @@ export default function FieldLibraryPanel() {
 
   useEffect(() => {
     base44.entities.FieldExerciseLibrary.list("-times_used", 500).then(data => {
-      // Mostrar: globales + los del plantel activo (sin squad_id legacy = global)
+      // Mostrar únicamente: ejercicios globales o del plantel activo
       const visible = data.filter(e =>
-        e.global !== false ||
-        !e.squad_id ||
+        e.global === true ||
         e.squad_id === activeSquadId
       );
       setExercises(visible);

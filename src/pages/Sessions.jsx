@@ -21,7 +21,7 @@ export default function Sessions() {
     setSelectedSession(null);
     base44.entities.TrainingSession.list("-date", 200).then(all => {
       const filtered = activeSquadId
-        ? all.filter(s => !s.squad_id || s.squad_id === activeSquadId)
+        ? all.filter(s => s.squad_id === activeSquadId)
         : all;
       setSessions(filtered);
       setLoading(false);

@@ -10,13 +10,14 @@ function normalize(s) {
 }
 
 // Returns the library exercise id (existing or newly created)
-async function syncToFieldLibrary(form, sessionId) {
+async function syncToFieldLibrary(form, sessionId, squadId, squadName) {
   const today = moment().format("YYYY-MM-DD");
   const all = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
   const match = all.find(e =>
     normalize(e.name) === normalize(form.name) &&
     e.length_m === (parseFloat(form.length_m) || undefined) &&
-    e.width_m === (parseFloat(form.width_m) || undefined)
+    e.width_m === (parseFloat(form.width_m) || undefined) &&
+    (e.global === true || e.squad_id === squadId)
   );
   if (match) {
     await base44.entities.FieldExerciseLibrary.update(match.id, {
@@ -47,6 +48,9 @@ async function syncToFieldLibrary(form, sessionId) {
       image_url: form.image_url || undefined,
       video_url: form.video_url || undefined,
       notes: form.notes || undefined,
+      squad_id: squadId || undefined,
+      squad_name: squadName || undefined,
+      global: false,
       times_used: 1,
       first_created_at: today,
       last_used_at: today,
@@ -165,7 +169,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
       payload.order = exercises.length + 1;
       const created = await base44.entities.SessionExercise.create(payload);
       // Sync automático a biblioteca de campo y guardar library_exercise_id
-      const libId = await syncToFieldLibrary(form, sessionId);
+      const libId = await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name);
       if (libId) {
         await base44.entities.SessionExercise.update(created.id, { library_exercise_id: libId });
         created.library_exercise_id = libId;
@@ -187,7 +191,8 @@ export default function SessionExercises({ session, sessionPlayers }) {
 
   async function openLibrary() {
     const data = await base44.entities.FieldExerciseLibrary.list("-times_used", 300);
-    setLibraryExercises(data);
+    const visible = data.filter(e => e.global === true || e.squad_id === session?.squad_id);
+    setLibraryExercises(visible);
     setShowLibrary(true);
   }
 

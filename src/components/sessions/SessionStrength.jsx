@@ -17,12 +17,12 @@ function normalize(s) {
   return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
 
-async function syncToLibrary(stationData, sessionId) {
+async function syncToLibrary(stationData, sessionId, squadId, squadName) {
   const name = stationData.exercise_restore || stationData.exercise_compensate || stationData.method || "";
   if (!name) return;
   const today = moment().format("YYYY-MM-DD");
   const existing = await base44.entities.StrengthExerciseLibrary.filter({}, "-times_used", 500);
-  const match = existing.find(e => normalize(e.name) === normalize(name));
+  const match = existing.find(e => normalize(e.name) === normalize(name) && (e.global === true || e.squad_id === squadId));
   if (match) {
     await base44.entities.StrengthExerciseLibrary.update(match.id, {
       times_used: (match.times_used || 1) + 1,
@@ -40,6 +40,9 @@ async function syncToLibrary(stationData, sessionId) {
       video_url: stationData.video_url || undefined,
       description: stationData.description || undefined,
       notes: stationData.notes || undefined,
+      squad_id: squadId || undefined,
+      squad_name: squadName || undefined,
+      global: false,
       times_used: 1,
       first_created_at: today,
       last_used_at: today,
@@ -146,7 +149,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       setStations(prev => [...prev, created]);
       toast({ title: "✓ Estación agregada" });
       // Sync to library
-      await syncToLibrary(form, session.id);
+      await syncToLibrary(form, session.id, session?.squad_id, session?.squad_name);
     }
     setShowForm(false);
     setEditId(null);
@@ -189,7 +192,8 @@ export default function SessionStrength({ session, onSessionUpdate }) {
 
   async function openLibrary() {
     const data = await base44.entities.StrengthExerciseLibrary.list("-times_used", 300);
-    setLibraryExercises(data);
+    const visible = data.filter(e => e.global === true || e.squad_id === session?.squad_id);
+    setLibraryExercises(visible);
     setShowLibrary(true);
   }
 

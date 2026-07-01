@@ -783,8 +783,8 @@ export default function Matches() {
       base44.entities.MatchReport.list("-date", 200),
       base44.entities.Player.list("-created_date", 100),
     ]);
-    // Filtrar por plantel activo + legados sin squad_id
-    const filtered = all.filter(x => !activeSquadId || !x.squad_id || x.squad_id === activeSquadId);
+    // Filtrar estrictamente por plantel activo (sin fallback a registros sin squad_id)
+    const filtered = all.filter(x => !activeSquadId || x.squad_id === activeSquadId);
     setMatches(filtered);
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
     setLoading(false);

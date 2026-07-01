@@ -93,7 +93,7 @@ export default function WeeklyPlannerBoard() {
       const maxDate = dates.reduce((a, b) => a > b ? a : b);
       const all = await base44.entities.TrainingSession.list("-date", 200);
       setSquadSessions(all.filter(s =>
-        (!activeSquadId || !s.squad_id || s.squad_id === activeSquadId) &&
+        (!activeSquadId || s.squad_id === activeSquadId) &&
         s.date >= minDate && s.date <= maxDate
       ));
     }
@@ -112,10 +112,10 @@ export default function WeeklyPlannerBoard() {
       setLoading(true);
       setRecordId(null);
       try {
-        // Buscar planes de esta semana; incluir legados sin squad_id
+        // Buscar planes de esta semana del plantel activo
         const all = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
         const records = activeSquadId
-          ? all.filter(r => !r.squad_id || r.squad_id === activeSquadId)
+          ? all.filter(r => r.squad_id === activeSquadId)
           : all;
         if (records.length > 0) {
           const rec = records[0];

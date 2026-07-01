@@ -515,9 +515,9 @@ export default function Schedule() {
   async function loadEvents() {
     setLoading(true);
     const all = await base44.entities.DayEvent.list("-date", 500);
-    // Mostrar eventos del plantel activo + eventos sin squad_id (legados)
+    // Mostrar únicamente eventos del plantel activo
     const filtered = activeSquadId
-      ? all.filter(e => !e.squad_id || e.squad_id === activeSquadId)
+      ? all.filter(e => e.squad_id === activeSquadId)
       : all;
     setEvents(filtered);
     setLoading(false);
