@@ -9,8 +9,9 @@ const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partid
 const MD_CODES = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4", "Otro"];
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
 
-const AVAILABLE_STATUSES = ["disponible", "subió", "convocado", "reintegro"];
-const UNAVAILABLE_STATUSES = ["lesionado", "molestia", "diferenciado", "suspendido", "ausente", "bajó", "diferenciado"];
+const AVAILABLE_STATUSES = ["disponible", "subió", "convocado"];
+const KINESIO_STATUSES = ["lesionado", "reintegro"];
+const UNAVAILABLE_STATUSES = ["molestia", "diferenciado", "suspendido", "ausente", "bajó"];
 
 const STATUS_LABELS = {
   disponible: "Disponible", lesionado: "Lesionado", molestia: "Molestia",
@@ -178,18 +179,24 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
     });
 
     // Save SessionPlayer snapshot for each member
-    const spRecords = squadPlayers.map(({ player, ds }) => ({
-      session_id: session.id,
-      player_id: player.id,
-      player_name: player.full_name || "",
-      position: player.position || "",
-      squad_name: ds?.base_squad_name || squad?.name || "",
-      status_at_session: ds?.status || "disponible",
-      attendance: selectedIds.has(player.id)
-        ? (UNAVAILABLE_STATUSES.includes(ds?.status) ? "diferenciado" : "presente")
-        : "ausente",
-      minutes: selectedIds.has(player.id) ? (form.duration_minutes || 90) : 0,
-    }));
+    const spRecords = squadPlayers.map(({ player, ds }) => {
+      const status = ds?.status || "disponible";
+      const attendance = KINESIO_STATUSES.includes(status)
+        ? "kinesiologia"
+        : selectedIds.has(player.id)
+          ? (UNAVAILABLE_STATUSES.includes(status) ? "diferenciado" : "presente")
+          : "ausente";
+      return {
+        session_id: session.id,
+        player_id: player.id,
+        player_name: player.full_name || "",
+        position: player.position || "",
+        squad_name: ds?.base_squad_name || squad?.name || "",
+        status_at_session: status,
+        attendance,
+        minutes: attendance === "presente" ? (form.duration_minutes || 90) : 0,
+      };
+    });
 
     if (spRecords.length > 0) await base44.entities.SessionPlayer.bulkCreate(spRecords);
 
@@ -207,8 +214,9 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
 
   const availableFiltered = filtered.filter(({ ds }) => AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
   const unavailableFiltered = filtered.filter(({ ds }) => !AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
+  const kinesioFiltered = unavailableFiltered.filter(({ ds }) => KINESIO_STATUSES.includes(ds?.status));
   const diferenciadosFiltered = unavailableFiltered.filter(({ ds }) => ds?.status === "diferenciado");
-  const otherUnavailableFiltered = unavailableFiltered.filter(({ ds }) => ds?.status !== "diferenciado");
+  const otherUnavailableFiltered = unavailableFiltered.filter(({ ds }) => !KINESIO_STATUSES.includes(ds?.status) && ds?.status !== "diferenciado");
 
   // Split counts by type
   const availableField = availableFiltered.filter(({ player }) => !isGoalkeeper(player));
@@ -381,6 +389,29 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
                       selected={selectedIds.has(player.id)} onToggle={() => togglePlayer(player.id)} />
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Trabajaron en kinesiología */}
+            {kinesioFiltered.length > 0 && (
+              <div>
+                <p className="text-xs text-sky-400 font-semibold uppercase tracking-wider mb-2">
+                  Trabajarán en kinesiología ({kinesioFiltered.length})
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                  {kinesioFiltered.map(({ player, ds }) => (
+                    <div key={player.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg border bg-sky-500/10 border-sky-500/30">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-white truncate">{player.full_name}</p>
+                        <p className="text-[10px] text-zinc-500 truncate">{player.position}</p>
+                      </div>
+                      <span className="text-[10px] font-semibold shrink-0 text-sky-300">
+                        {STATUS_LABELS[ds?.status] || ds?.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="text-[10px] text-zinc-600 mt-1">No entrenan normal ni cuentan como ausentes: quedan registrados en la sesión como kinesiología.</p>
               </div>
             )}
 

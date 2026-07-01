@@ -10,6 +10,9 @@ import SessionGPS from "@/components/sessions/SessionGPS";
 import SessionStrength from "@/components/sessions/SessionStrength";
 import SessionVideoObs from "@/components/sessions/SessionVideoObs";
 import { useToast } from "@/components/ui/use-toast";
+import { isGoalkeeper } from "@/components/squad/squadConstants";
+
+const AVAILABLE_STATUSES = ["disponible", "subió", "convocado"];
 
 const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
 const MD_CODES = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4", "Otro"];
@@ -74,9 +77,12 @@ export default function SessionDetail({ session, onBack }) {
     toast({ title: "✓ Sesión actualizada" });
   }
 
-  const present = sessionPlayers.filter(sp => sp.attendance === "presente").length;
-  const absent = sessionPlayers.filter(sp => sp.attendance === "ausente").length;
-  const diff = sessionPlayers.filter(sp => sp.attendance === "diferenciado").length;
+  const presentRows = sessionPlayers.filter(sp => sp.attendance === "presente");
+  const disponibles = sessionPlayers.filter(sp => AVAILABLE_STATUSES.includes(sp.status_at_session)).length;
+  const diferenciados = sessionPlayers.filter(sp => sp.attendance === "diferenciado").length;
+  const kinesiologia = sessionPlayers.filter(sp => sp.attendance === "kinesiologia").length;
+  const presentesField = presentRows.filter(sp => !isGoalkeeper({ position: sp.position })).length;
+  const presentesGK = presentRows.filter(sp => isGoalkeeper({ position: sp.position })).length;
   const typeClass = TYPE_COLORS[currentSession.session_type] || TYPE_COLORS["Otro"];
 
   return (
@@ -243,12 +249,14 @@ export default function SessionDetail({ session, onBack }) {
             )}
 
             {/* Stats */}
-            <div className="grid grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
               {[
-                { label: "Total", value: sessionPlayers.length, color: "text-blue-400" },
-                { label: "Presentes", value: present, color: "text-emerald-400" },
-                { label: "Diferenciados", value: diff, color: "text-amber-400" },
-                { label: "Ausentes", value: absent, color: "text-zinc-500" },
+                { label: "Disponibles", value: disponibles, color: "text-blue-400" },
+                { label: "Presentes", value: presentRows.length, color: "text-emerald-400" },
+                { label: "Diferenciados", value: diferenciados, color: "text-amber-400" },
+                { label: "Kinesiología", value: kinesiologia, color: "text-sky-400" },
+                { label: "Arqueros", value: presentesGK, color: "text-yellow-400" },
+                { label: "Jugadores de campo", value: presentesField, color: "text-teal-400" },
               ].map(s => (
                 <div key={s.label} className="text-center bg-zinc-800/50 rounded-xl p-3">
                   <p className={`text-xl font-bold ${s.color}`}>{s.value}</p>
@@ -300,7 +308,7 @@ export default function SessionDetail({ session, onBack }) {
           </div>
         ) : (
           <>
-            {tab === "players"   && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} />}
+            {tab === "players"   && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} onPlayersUpdate={setSessionPlayers} />}
             {tab === "exercises" && <SessionExercises session={currentSession} sessionPlayers={sessionPlayers} />}
             {tab === "strength"  && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
             {tab === "gps"       && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}

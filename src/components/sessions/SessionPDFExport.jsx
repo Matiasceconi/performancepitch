@@ -260,9 +260,7 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
       const presentes = sessionPlayers.filter(sp => sp.attendance === "presente");
       const diferenciados = sessionPlayers.filter(sp => sp.attendance === "diferenciado");
       const ausentes = sessionPlayers.filter(sp => sp.attendance === "ausente");
-      const lesionados = sessionPlayers.filter(sp =>
-        sp.status_at_session === "lesionado" || sp.status_at_session === "molestia"
-      );
+      const kinesiologia = sessionPlayers.filter(sp => sp.attendance === "kinesiologia");
       const presentesField = presentes.filter(sp => !isGoalkeeper({ position: sp.position }));
       const presentesGK = presentes.filter(sp => isGoalkeeper({ position: sp.position }));
 
@@ -275,7 +273,7 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
         drawPlayersGroup(presentesField, "Jugadores de campo presentes");
         drawPlayersGroup(presentesGK, "Arqueros presentes");
         drawPlayersGroup(diferenciados, "Diferenciados");
-        drawPlayersGroup(lesionados, "Lesionados / Molestia");
+        drawPlayersGroup(kinesiologia, "Trabajaron en kinesiología");
         drawPlayersGroup(ausentes, "Ausentes");
       }
 

@@ -45,10 +45,11 @@
         "presente",
         "ausente",
         "diferenciado",
+        "kinesiologia",
         "no_entrena"
       ],
       "default": "presente",
-      "description": "Asistencia real a la sesi\u00f3n"
+      "description": "Asistencia real a la sesi\u00f3n. 'kinesiologia' = estuvo presente pero trabaj\u00f3 con el \u00e1rea m\u00e9dica/kinesiolog\u00eda, no cuenta como presente en campo ni como ausente"
     },
     "minutes": {
       "type": "number",

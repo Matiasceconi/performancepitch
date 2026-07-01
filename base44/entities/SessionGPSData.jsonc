@@ -65,6 +65,44 @@
     "source_file": {
       "type": "string",
       "description": "Nombre del archivo CSV origen"
+    },
+    "include_in_session_average": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el registro se incluye en el promedio del grupo principal de la sesi\u00f3n"
+    },
+    "gps_group": {
+      "type": "string",
+      "enum": [
+        "principal",
+        "diferenciado",
+        "kinesiologia",
+        "arqueros",
+        "reintegro",
+        "individual",
+        "otro"
+      ],
+      "default": "principal",
+      "description": "Grupo al que pertenece el jugador en esta sesi\u00f3n (para promedios)"
+    },
+    "exclusion_reason": {
+      "type": "string",
+      "enum": [
+        "diferenciado",
+        "kinesiologia",
+        "reintegro",
+        "lesion",
+        "arquero",
+        "carga_parcial",
+        "error_gps",
+        "otro"
+      ],
+      "description": "Motivo por el cual el jugador fue excluido del promedio principal"
+    },
+    "visible_in_report": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el jugador aparece en el detalle de los reportes"
     }
   },
   "required": [

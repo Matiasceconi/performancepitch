@@ -23,10 +23,11 @@ export function fmtSmax(v) {
 export function classifyGpsInclusion(sp) {
   const status = sp?.status_at_session || "disponible";
   const attendance = sp?.attendance || "presente";
+  if (attendance === "kinesiologia") return { include: false, group: "kinesiologia", reason: "kinesiologia" };
   if (attendance === "ausente" || status === "ausente") return { include: false, group: "otro", reason: "otro" };
   if (status === "diferenciado" || attendance === "diferenciado") return { include: false, group: "diferenciado", reason: "diferenciado" };
   if (status === "reintegro") return { include: false, group: "reintegro", reason: "reintegro" };
-  if (status === "lesionado" || status === "molestia") return { include: false, group: "otro", reason: "lesion" };
+  if (status === "lesionado" || status === "molestia") return { include: false, group: "kinesiologia", reason: "kinesiologia" };
   if (status === "suspendido") return { include: false, group: "otro", reason: "otro" };
   if (attendance === "no_entrena") return { include: false, group: "otro", reason: "otro" };
   return { include: true, group: "principal", reason: undefined };
@@ -34,6 +35,7 @@ export function classifyGpsInclusion(sp) {
 
 export const EXCLUSION_REASON_LABELS = {
   diferenciado: "Diferenciado",
+  kinesiologia: "Kinesiología",
   reintegro: "Reintegro",
   lesion: "Lesión / Molestia",
   arquero: "Arquero",
