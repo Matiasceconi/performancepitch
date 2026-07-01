@@ -361,17 +361,21 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
         doc.text("Sin carga externa cargada", margin, y + 5);
         y += 10;
       } else {
-        // Classify GPS rows
-        const gpsField = gpsRows.filter(r => !isGoalkeeper({ position: r.player_name_original }));
-        const gpsGK = gpsRows.filter(r => isGoalkeeper({ position: r.player_name_original }));
+        // Solo el grupo principal (include_in_session_average !== false) entra en los promedios
+        const principalRows = gpsRows.filter(r => r.include_in_session_average !== false);
+        const excludedGpsRows = gpsRows.filter(r => r.include_in_session_average === false);
+
+        // Classify GPS rows (grupo principal)
+        const gpsField = principalRows.filter(r => !isGoalkeeper({ position: r.player_name_original }));
+        const gpsGK = principalRows.filter(r => isGoalkeeper({ position: r.player_name_original }));
 
         // Summary row
         addPageIfNeeded(30);
-        subSectionTitle(`Resumen del equipo — ${gpsRows.length} jugadores con GPS (Campo: ${gpsField.length} · ARQ: ${gpsGK.length})`);
+        subSectionTitle(`Resumen del equipo — ${principalRows.length} jugadores en promedio (Campo: ${gpsField.length} · ARQ: ${gpsGK.length})${excludedGpsRows.length ? ` · ${excludedGpsRows.length} excluidos` : ""}`);
 
         const summaryData = GPS_METRICS.map(m => ({
           label: m.label,
-          value: fmtVal(m.key, avg(gpsRows, m.key)),
+          value: fmtVal(m.key, avg(principalRows, m.key)),
           field: fmtVal(m.key, avg(gpsField, m.key)),
           gk: fmtVal(m.key, avg(gpsGK, m.key)),
         }));
@@ -422,15 +426,17 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
 
         gpsRows.forEach((row, idx) => {
           addPageIfNeeded(6);
+          const isExcluded = row.include_in_session_average === false;
           if (idx % 2 === 0) {
             doc.setFillColor(248, 248, 248);
             doc.rect(margin, y, contentW, 5.5, "F");
           }
           doc.setFontSize(6);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...DARK);
+          doc.setFont("helvetica", isExcluded ? "italic" : "normal");
+          doc.setTextColor(isExcluded ? 180 : DARK[0], isExcluded ? 130 : DARK[1], isExcluded ? 0 : DARK[2]);
           let rx = margin;
-          const cells = [row.player_name || "—", ...GPS_METRICS.map(m => fmtVal(m.key, row[m.key]))];
+          const nameLabel = (row.player_name || "—") + (isExcluded ? " (excluido)" : "");
+          const cells = [nameLabel, ...GPS_METRICS.map(m => fmtVal(m.key, row[m.key]))];
           cells.forEach((cell, i) => {
             doc.text(String(cell), rx + 1, y + 4, { maxWidth: colWidths[i] - 2 });
             rx += colWidths[i];

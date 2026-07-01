@@ -1,11 +1,11 @@
 import React from "react";
 import moment from "moment";
 import "moment/locale/es";
-import { ChevronLeft, ChevronRight, Download, RefreshCw, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, RefreshCw, CalendarDays, Calculator } from "lucide-react";
 
 moment.locale("es");
 
-export default function ExternalGpsLoadHeader({ activeSquad, weekStart, weekEnd, onPrevWeek, onNextWeek, onThisWeek, onExport, onRefresh, refreshing }) {
+export default function ExternalGpsLoadHeader({ activeSquad, weekStart, weekEnd, onPrevWeek, onNextWeek, onThisWeek, onExport, onRefresh, refreshing, onRecalculate, recalculating }) {
   const isCurrentWeek = moment().isBetween(weekStart, weekEnd, "day", "[]");
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 flex flex-col gap-3">
@@ -25,6 +25,9 @@ export default function ExternalGpsLoadHeader({ activeSquad, weekStart, weekEnd,
           </button>
           <button onClick={onRefresh} disabled={refreshing} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm font-medium transition-colors">
             <RefreshCw size={14} className={refreshing ? "animate-spin" : ""} /> Actualizar
+          </button>
+          <button onClick={onRecalculate} disabled={recalculating} className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 hover:bg-amber-500/25 text-amber-300 text-sm font-medium transition-colors disabled:opacity-50">
+            <Calculator size={14} className={recalculating ? "animate-spin" : ""} /> Recalcular promedios GPS
           </button>
         </div>
       </div>

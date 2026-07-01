@@ -1,9 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, CheckCircle, AlertCircle, Eye, X, Filter } from "lucide-react";
+import { Upload, CheckCircle, AlertCircle, Eye, X, Filter, RefreshCw } from "lucide-react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
 import { fmtMetric, fmtSmax } from "@/utils";
+import { classifyGpsInclusion, EXCLUSION_REASON_LABELS } from "@/components/performance/externalGpsLoadUtils";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
 
 // Métricas con sus colores de referencia
@@ -96,6 +97,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
   const [allPlayers, setAllPlayers] = useState([]);
   const [preview, setPreview] = useState(null); // { detectedCols, missingCols, parsedRows, fileName, file }
   const [importing, setImporting] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -157,6 +159,8 @@ export default function SessionGPS({ session, sessionPlayers }) {
     sessionPlayers.forEach(sp => { spMap[normalize(sp.player_name)] = sp.player_id; });
     const allPlayerMap = {};
     allPlayers.forEach(p => { allPlayerMap[normalize(p.full_name || "")] = p.id; });
+    const spByPlayerId = {};
+    sessionPlayers.forEach(sp => { spByPlayerId[sp.player_id] = sp; });
 
     const toCreate = [];
     const unmatchedList = [];
@@ -167,12 +171,16 @@ export default function SessionGPS({ session, sessionPlayers }) {
       const playerId = aliasMap[normName] || spMap[normName] || allPlayerMap[normName];
       const playerRecord = allPlayers.find(p => p.id === playerId);
 
+      const cls = classifyGpsInclusion(spByPlayerId[playerId]);
       const record = {
         session_id: session.id,
         player_name_original: rawName,
         player_id: playerId || "",
         player_name: playerRecord?.full_name || rawName,
         source_file: fileName,
+        include_in_session_average: cls.include,
+        gps_group: cls.group,
+        exclusion_reason: cls.reason,
       };
 
       // Map each detected column to its entity field
@@ -228,6 +236,29 @@ export default function SessionGPS({ session, sessionPlayers }) {
     toast({ title: `GPS importado: ${toCreate.length} jugadores OK, ${unmatchedList.length} sin reconocer` });
   }
 
+  // ── Recalcular inclusión/exclusión de promedios según estado actual ───────
+  async function recalculateAverages() {
+    setRecalculating(true);
+    const spByPlayerId = {};
+    sessionPlayers.forEach(sp => { spByPlayerId[sp.player_id] = sp; });
+
+    const updates = gpsRows.map(row => {
+      const cls = classifyGpsInclusion(spByPlayerId[row.player_id]);
+      return { id: row.id, include_in_session_average: cls.include, gps_group: cls.group, exclusion_reason: cls.reason };
+    }).filter(u =>
+      gpsRows.find(r => r.id === u.id)?.include_in_session_average !== u.include_in_session_average ||
+      gpsRows.find(r => r.id === u.id)?.gps_group !== u.gps_group
+    );
+
+    if (updates.length > 0) {
+      await base44.entities.SessionGPSData.bulkUpdate(updates);
+    }
+    const refreshed = await base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200);
+    setGpsRows(refreshed);
+    setRecalculating(false);
+    toast({ title: `✓ Promedios recalculados (${updates.length} actualizados)` });
+  }
+
   // ── Manual alias ──────────────────────────────────────────────────────────
   async function saveManualAlias(rawName, playerId) {
     if (!playerId) return;
@@ -268,12 +299,18 @@ export default function SessionGPS({ session, sessionPlayers }) {
     : playerTypeFilter === "campo" ? fieldRows
     : gpsRows;
 
-  function avg(key, rows = filteredRows) {
+  // Solo el grupo principal (include_in_session_average !== false) afecta los promedios
+  const principalRows = filteredRows.filter(r => r.include_in_session_average !== false);
+  const excludedRows = filteredRows.filter(r => r.include_in_session_average === false);
+  const principalField = fieldRows.filter(r => r.include_in_session_average !== false);
+  const principalGK = gkRows.filter(r => r.include_in_session_average !== false);
+
+  function avg(key, rows = principalRows) {
     const vals = rows.map(r => r[key] || 0).filter(v => v > 0);
     return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
   }
   const activeMeta = METRICS.find(m => m.key === activeMetric) || METRICS[0];
-  const chartData = [...filteredRows]
+  const chartData = [...principalRows]
     .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
     .map(r => ({
       name: (r.player_name || "").split(" ")[0],
@@ -293,6 +330,16 @@ export default function SessionGPS({ session, sessionPlayers }) {
         </label>
         {session.csv_label && <p className="text-xs text-zinc-500 mt-2">Último cargado: {session.csv_label}</p>}
       </div>
+
+      {gpsRows.length > 0 && (
+        <div className="flex justify-end">
+          <button onClick={recalculateAverages} disabled={recalculating}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs hover:bg-zinc-700 transition-colors disabled:opacity-50">
+            <RefreshCw size={12} className={recalculating ? "animate-spin" : ""} />
+            Recalcular promedios GPS
+          </button>
+        </div>
+      )}
 
       {/* Preview modal */}
       {preview && (
@@ -415,23 +462,27 @@ export default function SessionGPS({ session, sessionPlayers }) {
       {/* Summary cards */}
       {gpsRows.length > 0 && (
         <div className="space-y-3">
+          <p className="text-[10px] text-zinc-500">
+            Promedios calculados solo con el <strong className="text-zinc-300">Grupo principal</strong> ({principalRows.length} jugadores)
+            {excludedRows.length > 0 && <span> · {excludedRows.length} excluidos</span>}
+          </p>
           {/* Selected group averages */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {METRICS.map(m => {
-              const a = avg(m.key, filteredRows);
+              const a = avg(m.key, principalRows);
               const display = m.key === "smax" ? (a != null ? fmtSmax(a) : "—") : (a != null ? fmtMetric(a) : "—");
               return (
                 <div key={m.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
                   <p className="text-[10px] text-zinc-500 mb-1">{m.label}</p>
                   <p className="text-xl font-bold" style={{ color: m.color }}>{display}</p>
                   {/* Show field / gk breakdown when viewing all */}
-                  {playerTypeFilter === "todos" && fieldRows.length > 0 && gkRows.length > 0 && (
+                  {playerTypeFilter === "todos" && principalField.length > 0 && principalGK.length > 0 && (
                     <div className="flex justify-center gap-2 mt-1">
                       <span className="text-[8px] text-zinc-500">
-                        C: {m.key === "smax" ? fmtSmax(avg(m.key, fieldRows) || 0) : fmtMetric(avg(m.key, fieldRows) || 0)}
+                        C: {m.key === "smax" ? fmtSmax(avg(m.key, principalField) || 0) : fmtMetric(avg(m.key, principalField) || 0)}
                       </span>
                       <span className="text-[8px] text-yellow-600">
-                        A: {m.key === "smax" ? fmtSmax(avg(m.key, gkRows) || 0) : fmtMetric(avg(m.key, gkRows) || 0)}
+                        A: {m.key === "smax" ? fmtSmax(avg(m.key, principalGK) || 0) : fmtMetric(avg(m.key, principalGK) || 0)}
                       </span>
                     </div>
                   )}
@@ -442,9 +493,12 @@ export default function SessionGPS({ session, sessionPlayers }) {
         </div>
       )}
 
-      {/* GPS Table */}
-      {filteredRows.length > 0 && (
+      {/* GPS Table — Grupo principal */}
+      {principalRows.length > 0 && (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
+          <div className="p-3 border-b border-zinc-800">
+            <p className="text-xs font-semibold text-white">Grupo principal ({principalRows.length})</p>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
@@ -458,7 +512,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
                 </tr>
               </thead>
               <tbody>
-                {filteredRows.map((r, i) => (
+                {principalRows.map((r, i) => (
                   <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
                     <td className="py-2.5 px-4 text-white font-semibold whitespace-nowrap">{r.player_name}</td>
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#3b82f6" }}>{fmtMetric(r.total_distance)}</td>
@@ -469,6 +523,40 @@ export default function SessionGPS({ session, sessionPlayers }) {
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#f59e0b" }}>{fmtMetric(r.acc_3)}</td>
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#ec4899" }}>{fmtMetric(r.dec_3)}</td>
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#06b6d4" }}>{fmtMetric(r.sprints)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* GPS Table — Excluidos del promedio */}
+      {excludedRows.length > 0 && (
+        <div className="bg-zinc-900 border border-amber-500/30 rounded-xl overflow-hidden">
+          <div className="p-3 border-b border-amber-500/20">
+            <p className="text-xs font-semibold text-amber-300">Excluidos del promedio ({excludedRows.length})</p>
+            <p className="text-[10px] text-zinc-500 mt-0.5">Quedan registrados con su GPS, pero no afectan el promedio grupal.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="border-b border-zinc-800">
+                  <th className="text-left py-3 px-4 text-zinc-400 font-medium whitespace-nowrap">Jugador</th>
+                  <th className="text-left py-3 px-3 text-zinc-400 font-medium whitespace-nowrap">Motivo</th>
+                  <th className="text-right py-3 px-3 font-medium whitespace-nowrap" style={{ color: "#3b82f6" }}>Distancia</th>
+                  <th className="text-right py-3 px-3 font-medium whitespace-nowrap" style={{ color: "#a855f7" }}>P.Load</th>
+                  <th className="text-right py-3 px-3 font-medium whitespace-nowrap" style={{ color: "#ef4444" }}>Smax</th>
+                </tr>
+              </thead>
+              <tbody>
+                {excludedRows.map((r, i) => (
+                  <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-2.5 px-4 text-white font-semibold whitespace-nowrap">{r.player_name}</td>
+                    <td className="py-2.5 px-3 text-amber-300 whitespace-nowrap">{EXCLUSION_REASON_LABELS[r.exclusion_reason] || r.exclusion_reason || "—"}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#3b82f6" }}>{fmtMetric(r.total_distance)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#a855f7" }}>{fmtMetric(r.player_load)}</td>
+                    <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#ef4444" }}>{fmtSmax(r.smax)}</td>
                   </tr>
                 ))}
               </tbody>

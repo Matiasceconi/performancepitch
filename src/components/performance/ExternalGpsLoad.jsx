@@ -12,7 +12,9 @@ import ExternalGpsPlayerTable from "./ExternalGpsPlayerTable";
 import ExternalGpsComparison from "./ExternalGpsComparison";
 import ExternalGpsSessionList from "./ExternalGpsSessionList";
 import ExternalGpsAlerts from "./ExternalGpsAlerts";
-import { avg, fmtInt, computeAlerts } from "./externalGpsLoadUtils";
+import ExternalGpsExcludedList from "./ExternalGpsExcludedList";
+import { avg, fmtInt, computeAlerts, classifyGpsInclusion } from "./externalGpsLoadUtils";
+import { useToast } from "@/components/ui/use-toast";
 
 moment.locale("es");
 const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
@@ -27,6 +29,8 @@ export default function ExternalGpsLoad() {
   const [gpsRows, setGpsRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [recalculating, setRecalculating] = useState(false);
+  const { toast } = useToast();
 
   const weekEnd = useMemo(() => moment(weekStart).endOf("isoWeek"), [weekStart]);
   const dateFrom = weekStart.format("YYYY-MM-DD");
@@ -85,6 +89,7 @@ export default function ExternalGpsLoad() {
       return {
         ...r,
         date: session?.date,
+        session_title: session?.title,
         match_day_code: session?.match_day_code,
         position: player?.position || "",
         player_type: player?.player_type || (isGoalkeeper(player) ? "arquero" : "jugador_campo"),
@@ -92,26 +97,30 @@ export default function ExternalGpsLoad() {
     });
   }, [gpsRows, sessions, playerMap]);
 
-  const fieldRows = useMemo(() => enrichedRows.filter((r) => r.player_type !== "arquero"), [enrichedRows]);
-  const gkRows = useMemo(() => enrichedRows.filter((r) => r.player_type === "arquero"), [enrichedRows]);
+  // Solo el grupo principal (include_in_session_average !== false) afecta promedios/gráficos/comparaciones
+  const includedRows = useMemo(() => enrichedRows.filter((r) => r.include_in_session_average !== false), [enrichedRows]);
+  const excludedRows = useMemo(() => enrichedRows.filter((r) => r.include_in_session_average === false), [enrichedRows]);
+
+  const fieldRows = useMemo(() => includedRows.filter((r) => r.player_type !== "arquero"), [includedRows]);
+  const gkRows = useMemo(() => includedRows.filter((r) => r.player_type === "arquero"), [includedRows]);
 
   const summary = useMemo(() => ({
-    sessionsCount: new Set(enrichedRows.map((r) => r.session_id)).size,
-    playersCount: new Set(enrichedRows.map((r) => r.player_id)).size,
-    avgDistance: avg(enrichedRows.map((r) => r.total_distance)),
-    avgMMin: avg(enrichedRows.map((r) => r.m_min)),
-    avgPlayerLoad: avg(enrichedRows.map((r) => r.player_load)),
-    avgSprints: avg(enrichedRows.map((r) => r.sprints)),
-    avgAcc: avg(enrichedRows.map((r) => r.acc_3)),
-    avgDec: avg(enrichedRows.map((r) => r.dec_3)),
-    maxSmax: enrichedRows.length ? Math.max(...enrichedRows.map((r) => r.smax || 0)) : null,
-  }), [enrichedRows]);
+    sessionsCount: new Set(includedRows.map((r) => r.session_id)).size,
+    playersCount: new Set(includedRows.map((r) => r.player_id)).size,
+    avgDistance: avg(includedRows.map((r) => r.total_distance)),
+    avgMMin: avg(includedRows.map((r) => r.m_min)),
+    avgPlayerLoad: avg(includedRows.map((r) => r.player_load)),
+    avgSprints: avg(includedRows.map((r) => r.sprints)),
+    avgAcc: avg(includedRows.map((r) => r.acc_3)),
+    avgDec: avg(includedRows.map((r) => r.dec_3)),
+    maxSmax: includedRows.length ? Math.max(...includedRows.map((r) => r.smax || 0)) : null,
+  }), [includedRows]);
 
   const dailyData = useMemo(() => {
     return Array.from({ length: 7 }).map((_, i) => {
       const day = moment(weekStart).add(i, "days");
       const dayStr = day.format("YYYY-MM-DD");
-      const rows = enrichedRows.filter((r) => r.date === dayStr);
+      const rows = includedRows.filter((r) => r.date === dayStr);
       return {
         label: DAY_LABELS[i],
         date: dayStr,
@@ -120,11 +129,11 @@ export default function ExternalGpsLoad() {
         avgMMin: rows.length ? avg(rows.map((r) => r.m_min)) : null,
       };
     });
-  }, [enrichedRows, weekStart]);
+  }, [includedRows, weekStart]);
 
   const playerAgg = useMemo(() => {
     const map = {};
-    enrichedRows.forEach((r) => {
+    includedRows.forEach((r) => {
       if (!map[r.player_id]) {
         map[r.player_id] = {
           player_id: r.player_id, player_name: r.player_name || playerMap[r.player_id]?.full_name || "",
@@ -142,13 +151,13 @@ export default function ExternalGpsLoad() {
       if ((r.smax || 0) > acc.smax_max) acc.smax_max = r.smax || 0;
     });
     return Object.fromEntries(Object.entries(map).map(([pid, v]) => [pid, { ...v, sessions: v.sessions.size }]));
-  }, [enrichedRows, playerMap]);
+  }, [includedRows, playerMap]);
 
   const playerTableRows = useMemo(() => Object.values(playerAgg), [playerAgg]);
 
   const sessionList = useMemo(() => {
     return sessions.map((s) => {
-      const rows = enrichedRows.filter((r) => r.session_id === s.id);
+      const rows = includedRows.filter((r) => r.session_id === s.id);
       return {
         id: s.id, title: s.title, date: s.date, match_day_code: s.match_day_code,
         playersWithGps: new Set(rows.map((r) => r.player_id)).size,
@@ -157,10 +166,10 @@ export default function ExternalGpsLoad() {
         avgPlayerLoad: rows.length ? avg(rows.map((r) => r.player_load)) : null,
       };
     }).sort((a, b) => a.date.localeCompare(b.date));
-  }, [sessions, enrichedRows]);
+  }, [sessions, includedRows]);
 
-  const alerts = useMemo(() => computeAlerts({ squadPlayers, playerAgg, sessions, gpsRows: enrichedRows }),
-    [squadPlayers, playerAgg, sessions, enrichedRows]);
+  const alerts = useMemo(() => computeAlerts({ squadPlayers, playerAgg, sessions, gpsRows: includedRows }),
+    [squadPlayers, playerAgg, sessions, includedRows]);
 
   function handleExport() {
     const squadName = activeSquad?.name || "plantel";
@@ -186,6 +195,37 @@ export default function ExternalGpsLoad() {
     navigate(`/sessions?session=${sessionId}`);
   }
 
+  // Revisa el estado de cada jugador en cada sesión de la semana y recalcula
+  // include_in_session_average / gps_group / exclusion_reason en SessionGPSData.
+  async function recalculateAverages() {
+    setRecalculating(true);
+    let updatedCount = 0;
+    for (const s of sessions) {
+      const [sessionPlayers, sessionGpsRows] = await Promise.all([
+        base44.entities.SessionPlayer.filter({ session_id: s.id }, "-created_date", 500),
+        base44.entities.SessionGPSData.filter({ session_id: s.id }, "-created_date", 500),
+      ]);
+      const spByPlayerId = {};
+      sessionPlayers.forEach((sp) => { spByPlayerId[sp.player_id] = sp; });
+
+      const updates = sessionGpsRows.map((row) => {
+        const cls = classifyGpsInclusion(spByPlayerId[row.player_id]);
+        return { id: row.id, include_in_session_average: cls.include, gps_group: cls.group, exclusion_reason: cls.reason };
+      }).filter((u) => {
+        const orig = sessionGpsRows.find((r) => r.id === u.id);
+        return orig?.include_in_session_average !== u.include_in_session_average || orig?.gps_group !== u.gps_group;
+      });
+
+      if (updates.length > 0) {
+        await base44.entities.SessionGPSData.bulkUpdate(updates);
+        updatedCount += updates.length;
+      }
+    }
+    await load(true);
+    setRecalculating(false);
+    toast({ title: `✓ Promedios recalculados (${updatedCount} registros actualizados)` });
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
@@ -204,6 +244,8 @@ export default function ExternalGpsLoad() {
         onExport={handleExport}
         onRefresh={() => load(true)}
         refreshing={refreshing}
+        onRecalculate={recalculateAverages}
+        recalculating={recalculating}
       />
 
       {enrichedRows.length === 0 ? (
@@ -217,6 +259,7 @@ export default function ExternalGpsLoad() {
           <ExternalGpsPlayerTable rows={playerTableRows} playerMap={playerMap} />
           <ExternalGpsComparison fieldRows={fieldRows} gkRows={gkRows} />
           <ExternalGpsSessionList sessions={sessionList} onViewSession={handleViewSession} />
+          <ExternalGpsExcludedList rows={excludedRows} />
         </>
       )}
 

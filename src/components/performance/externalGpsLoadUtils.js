@@ -18,6 +18,30 @@ export function fmtSmax(v) {
   return v == null || isNaN(v) ? "—" : Number(v).toFixed(1);
 }
 
+// Determina si un jugador debe incluirse en los promedios grupales de GPS
+// según su estado en la sesión (SessionPlayer.status_at_session / attendance).
+export function classifyGpsInclusion(sp) {
+  const status = sp?.status_at_session || "disponible";
+  const attendance = sp?.attendance || "presente";
+  if (attendance === "ausente" || status === "ausente") return { include: false, group: "otro", reason: "otro" };
+  if (status === "diferenciado" || attendance === "diferenciado") return { include: false, group: "diferenciado", reason: "diferenciado" };
+  if (status === "reintegro") return { include: false, group: "reintegro", reason: "reintegro" };
+  if (status === "lesionado" || status === "molestia") return { include: false, group: "otro", reason: "lesion" };
+  if (status === "suspendido") return { include: false, group: "otro", reason: "otro" };
+  if (attendance === "no_entrena") return { include: false, group: "otro", reason: "otro" };
+  return { include: true, group: "principal", reason: undefined };
+}
+
+export const EXCLUSION_REASON_LABELS = {
+  diferenciado: "Diferenciado",
+  reintegro: "Reintegro",
+  lesion: "Lesión / Molestia",
+  arquero: "Arquero",
+  carga_parcial: "Carga parcial",
+  error_gps: "Error GPS",
+  otro: "Otro / Ausente",
+};
+
 // Genera alertas automáticas de la semana a partir de los agregados por jugador
 export function computeAlerts({ squadPlayers, playerAgg, sessions, gpsRows }) {
   const alerts = [];
