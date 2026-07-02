@@ -83,7 +83,11 @@ export default function SessionStrength({ session, onSessionUpdate }) {
 
   async function onDelete(id) {
     if (!window.confirm("¿Eliminar ejercicio?")) return;
+    const station = stations.find(s => s.id === id);
     await base44.entities.StrengthStation.delete(id);
+    if (station?.library_exercise_id) {
+      await base44.entities.StrengthExerciseLibrary.delete(station.library_exercise_id).catch(() => {});
+    }
     setStations(prev => prev.filter(s => s.id !== id));
   }
 
