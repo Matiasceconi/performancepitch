@@ -68,6 +68,15 @@ const TOOLS = [
     color: "text-yellow-400",
     bg: "bg-yellow-500/10 border-yellow-500/20",
   },
+  {
+    id: "repairStrengthLibrary",
+    label: "Reparar Biblioteca de Fuerza",
+    description: "Elimina ejercicios de la Biblioteca de Fuerza creados desde sesiones que ya no existen",
+    fn: "repairStrengthLibrary",
+    payload: {},
+    color: "text-red-400",
+    bg: "bg-red-500/10 border-red-500/20",
+  },
 ];
 
 export default function AdminTools() {
