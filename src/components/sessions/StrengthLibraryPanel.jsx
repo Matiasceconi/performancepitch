@@ -4,15 +4,16 @@ import { base44 } from "@/api/base44Client";
 import { Star, Search, ChevronDown, ChevronUp } from "lucide-react";
 import moment from "moment";
 
-const CAT_COLORS = {
-  "Empuje": "bg-orange-500/15 text-orange-300 border-orange-500/30",
-  "Tracción": "bg-blue-500/15 text-blue-300 border-blue-500/30",
-  "Bisagra": "bg-purple-500/15 text-purple-300 border-purple-500/30",
-  "Sentadilla": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  "Cargada": "bg-red-500/15 text-red-300 border-red-500/30",
-  "Core": "bg-amber-500/15 text-amber-300 border-amber-500/30",
-  "Potencia": "bg-pink-500/15 text-pink-300 border-pink-500/30",
-  "Correctivo": "bg-sky-500/15 text-sky-300 border-sky-500/30",
+const METHOD_COLORS = {
+  "Dinámicos": "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  "Balísticos": "bg-orange-500/15 text-orange-300 border-orange-500/30",
+  "Biseries": "bg-purple-500/15 text-purple-300 border-purple-500/30",
+  "Triseries": "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  "Contrastes": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  "Complejos": "bg-red-500/15 text-red-300 border-red-500/30",
+  "Isométricos": "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  "Excéntricos": "bg-sky-500/15 text-sky-300 border-sky-500/30",
+  "Preventivos": "bg-teal-500/15 text-teal-300 border-teal-500/30",
   "Otro": "bg-zinc-500/15 text-zinc-300 border-zinc-600",
 };
 
@@ -21,17 +22,13 @@ export default function StrengthLibraryPanel() {
   const [exercises, setExercises] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterCat, setFilterCat] = useState("");
+  const [filterMethod, setFilterMethod] = useState("");
   const [sortBy, setSortBy] = useState("times_used");
   const [expanded, setExpanded] = useState({});
 
   useEffect(() => {
     base44.entities.StrengthExerciseLibrary.list("-times_used", 500).then(data => {
-      // Mostrar únicamente: ejercicios globales o del plantel activo
-      const visible = data.filter(e =>
-        e.global === true ||
-        e.squad_id === activeSquadId
-      );
+      const visible = data.filter(e => e.global === true || e.squad_id === activeSquadId);
       setExercises(visible);
       setLoading(false);
     });
@@ -47,10 +44,9 @@ export default function StrengthLibraryPanel() {
       const q = search.toLowerCase();
       const matchSearch = !search ||
         (e.name || "").toLowerCase().includes(q) ||
-        (e.objective || "").toLowerCase().includes(q) ||
-        (e.muscle_group || "").toLowerCase().includes(q);
-      const matchCat = !filterCat || e.category === filterCat;
-      return matchSearch && matchCat;
+        (e.exercise_type || "").toLowerCase().includes(q);
+      const matchMethod = !filterMethod || e.method === filterMethod;
+      return matchSearch && matchMethod;
     })
     .sort((a, b) => {
       if (sortBy === "times_used") return (b.times_used || 0) - (a.times_used || 0);
@@ -59,7 +55,7 @@ export default function StrengthLibraryPanel() {
       return (a.name || "").localeCompare(b.name || "");
     });
 
-  const allCats = [...new Set(exercises.map(e => e.category).filter(Boolean))];
+  const allMethods = [...new Set(exercises.map(e => e.method).filter(Boolean))];
 
   if (loading) return <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
@@ -84,10 +80,10 @@ export default function StrengthLibraryPanel() {
           <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
             className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none" />
         </div>
-        <select value={filterCat} onChange={e => setFilterCat(e.target.value)}
+        <select value={filterMethod} onChange={e => setFilterMethod(e.target.value)}
           className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none">
-          <option value="">Todas las categorías</option>
-          {allCats.map(c => <option key={c}>{c}</option>)}
+          <option value="">Todos los métodos</option>
+          {allMethods.map(m => <option key={m}>{m}</option>)}
         </select>
         <select value={sortBy} onChange={e => setSortBy(e.target.value)}
           className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-300 focus:outline-none">
@@ -108,7 +104,7 @@ export default function StrengthLibraryPanel() {
 
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {filtered.map(ex => {
-          const tc = CAT_COLORS[ex.category] || CAT_COLORS["Otro"];
+          const mc = METHOD_COLORS[ex.method] || METHOD_COLORS["Otro"];
           const isExp = expanded[ex.id];
           return (
             <div key={ex.id} className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
@@ -117,12 +113,11 @@ export default function StrengthLibraryPanel() {
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                      {ex.category && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${tc}`}>{ex.category}</span>}
-                      {ex.vector_pattern && <span className="text-[10px] text-zinc-500">{ex.vector_pattern}</span>}
+                      {ex.method && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${mc}`}>{ex.method}</span>}
+                      {ex.exercise_type && <span className="text-[10px] text-zinc-500">{ex.exercise_type}</span>}
                       {ex.favorite && <Star size={11} className="text-amber-400 fill-amber-400" />}
                     </div>
                     <p className="text-sm font-semibold text-white truncate">{ex.name}</p>
-                    {ex.muscle_group && <p className="text-[11px] text-zinc-400 truncate">{ex.muscle_group}</p>}
                   </div>
                   <div className="flex gap-1 shrink-0">
                     <button onClick={() => toggleFavorite(ex)} className="p-1 text-zinc-500 hover:text-amber-400 transition-colors">
@@ -135,17 +130,13 @@ export default function StrengthLibraryPanel() {
                   </div>
                 </div>
                 <div className="flex items-center gap-3 text-[10px] text-zinc-500 flex-wrap">
-                  {ex.method && <span>{ex.method}</span>}
-                  {ex.sets && <span>{ex.sets} series</span>}
-                  {ex.reps && <span>{ex.reps} reps</span>}
-                  {ex.rir && <span>RIR {ex.rir}</span>}
+                  {ex.volume && <span className="text-amber-300 font-semibold">{ex.volume}</span>}
                   <span className="ml-auto text-zinc-600">✓ {ex.times_used || 1} usos</span>
                 </div>
                 {isExp && (
                   <div className="mt-3 pt-3 border-t border-zinc-700 space-y-2">
-                    {ex.objective && <p className="text-xs text-zinc-400">{ex.objective}</p>}
                     {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
-                    {ex.rest_time && <p className="text-xs text-zinc-500">Pausa: {ex.rest_time}</p>}
+                    {ex.notes && <p className="text-xs text-zinc-500">{ex.notes}</p>}
                     {ex.last_used_at && <p className="text-[10px] text-zinc-600">Último uso: {moment(ex.last_used_at).format("DD/MM/YYYY")}</p>}
                     {ex.video_url && (
                       <a href={ex.video_url} target="_blank" rel="noreferrer"

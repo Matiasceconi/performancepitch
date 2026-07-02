@@ -55,13 +55,20 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
     setGenerating(true);
     try {
       // Fetch all data in parallel
-      const [exercises, gpsRows, videoLinks] = await Promise.all([
+      const [exercises, gpsRows, videoLinks, strengthStations] = await Promise.all([
         base44.entities.SessionExercise.filter({ session_id: session.id }, "order", 100),
         base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200),
         base44.entities.SessionVideoLink.filter({ session_id: session.id }, "-created_date", 100),
+        base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 100),
       ]);
 
       exercises.sort((a, b) => (a.order || 0) - (b.order || 0));
+      strengthStations.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+      const strengthImgs = {};
+      await Promise.all(strengthStations.map(async st => {
+        if (st.image_url) strengthImgs[st.id] = await toDataURL(st.image_url);
+      }));
 
       // Pre-fetch logo
       const logoData = await toDataURL(DYJ_LOGO);
@@ -445,9 +452,86 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
         y += 4;
       }
 
+      // ── SECTION: FUERZA ────────────────────────────────────────────────────────
+      if (strengthStations.length > 0) {
+        sectionTitle("4. Plan de fuerza");
+
+        doc.setFontSize(7);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(...GRAY);
+        const strengthInfo = [
+          session.strength_microcycle && `Microciclo: ${session.strength_microcycle}`,
+          session.strength_session_number && `Sesión: ${session.strength_session_number}`,
+          session.strength_purpose && `Propósito mecánico: ${session.strength_purpose}`,
+          session.strength_vector_pattern && `Patrón vectorial: ${session.strength_vector_pattern}`,
+        ].filter(Boolean).join("   ·   ");
+        if (strengthInfo) {
+          addPageIfNeeded(8);
+          doc.text(strengthInfo, margin, y + 4, { maxWidth: contentW });
+          y += 8;
+        }
+
+        strengthStations.forEach((st, idx) => {
+          addPageIfNeeded(28);
+          const imgSize = 20;
+          const startY = y;
+          const imgData = strengthImgs[st.id];
+          if (imgData) {
+            doc.addImage(imgData, "JPEG", margin, y, imgSize, imgSize);
+          } else {
+            doc.setDrawColor(200, 200, 200);
+            doc.rect(margin, y, imgSize, imgSize);
+          }
+
+          const detailX = margin + imgSize + 4;
+          const detailW = contentW - imgSize - 4;
+          let dy = y;
+
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...DARK);
+          doc.text(`${idx + 1}. ${st.exercise_name || "—"}`, detailX, dy + 4);
+          dy += 6;
+
+          const stLine = [st.method, st.exercise_type].filter(Boolean).join(" · ");
+          if (stLine) {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...GRAY);
+            doc.text(stLine, detailX, dy + 3);
+            dy += 5;
+          }
+          if (st.volume) {
+            doc.setFontSize(7);
+            doc.setFont("helvetica", "bold");
+            doc.setTextColor(...DARK);
+            doc.text(`Volumen: ${st.volume}`, detailX, dy + 3);
+            dy += 5;
+          }
+          const obsLines = [
+            st.indications && `Indicaciones: ${st.indications}`,
+            st.compensations && `Compensaciones: ${st.compensations}`,
+            st.notes && `Obs: ${st.notes}`,
+          ].filter(Boolean);
+          if (obsLines.length) {
+            doc.setFontSize(6.5);
+            doc.setFont("helvetica", "normal");
+            doc.setTextColor(...GRAY);
+            const lines = doc.splitTextToSize(obsLines.join("   "), detailW);
+            doc.text(lines, detailX, dy + 3);
+            dy += lines.length * 4;
+          }
+
+          y = Math.max(startY + imgSize, dy) + 4;
+          doc.setDrawColor(230, 230, 230);
+          doc.line(margin, y - 2, pageW - margin, y - 2);
+        });
+        y += 2;
+      }
+
       // ── SECTION: VIDEOS ASOCIADOS ─────────────────────────────────────────────
       if (videoLinks.length > 0) {
-        sectionTitle("4. Videos asociados");
+        sectionTitle("5. Videos asociados");
         videoLinks.forEach(link => {
           addPageIfNeeded(12);
           doc.setFontSize(8);
@@ -465,7 +549,7 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
 
       // ── SECTION: NOTAS FINALES ────────────────────────────────────────────────
       if (session.notes || session.created_by) {
-        sectionTitle("5. Observaciones finales");
+        sectionTitle("6. Observaciones finales");
         if (session.notes) {
           addPageIfNeeded(20);
           doc.setFontSize(8);

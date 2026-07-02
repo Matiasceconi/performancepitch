@@ -15,79 +15,57 @@
       "default": 0,
       "description": "Orden en la sesi\u00f3n"
     },
-    "method": {
-      "type": "string",
-      "description": "M\u00e9todo (ej: Contraste, Potencia, Ondulatorio)"
-    },
-    "exercise_restore": {
-      "type": "string",
-      "description": "Ejercicio que restaura"
-    },
-    "exercise_compensate": {
-      "type": "string",
-      "description": "Ejercicio que compensa"
-    },
-    "sets": {
-      "type": "number",
-      "description": "Series"
-    },
-    "reps": {
-      "type": "string",
-      "description": "Repeticiones o tiempo"
-    },
-    "duration": {
-      "type": "string",
-      "description": "Tiempo (ej: 30s, 2min)"
-    },
-    "rest_time": {
-      "type": "string",
-      "description": "Pausa entre series"
-    },
-    "rir": {
-      "type": "string",
-      "description": "RIR (Repeticiones en Reserva)"
-    },
-    "emphasis_ce": {
-      "type": "string",
-      "enum": [
-        "\u2191",
-        "\u2193",
-        "\u2192",
-        ""
-      ],
-      "description": "\u00c9nfasis C.E."
-    },
-    "emphasis_velocity": {
-      "type": "string",
-      "enum": [
-        "\u2191",
-        "\u2193",
-        "\u2192",
-        ""
-      ],
-      "description": "\u00c9nfasis Velocidad"
-    },
-    "emphasis_time": {
-      "type": "string",
-      "enum": [
-        "\u2191",
-        "\u2193",
-        "\u2192",
-        ""
-      ],
-      "description": "\u00c9nfasis Tiempo"
-    },
     "image_url": {
       "type": "string",
-      "description": "Imagen de la estaci\u00f3n"
+      "description": "Imagen del ejercicio"
     },
-    "video_url": {
+    "method": {
       "type": "string",
-      "description": "Video de la estaci\u00f3n"
+      "enum": [
+        "Din\u00e1micos",
+        "Bal\u00edsticos",
+        "Biseries",
+        "Triseries",
+        "Contrastes",
+        "Complejos",
+        "Isom\u00e9tricos",
+        "Exc\u00e9ntricos",
+        "Preventivos",
+        "Otro"
+      ],
+      "description": "M\u00e9todo de trabajo"
     },
-    "description": {
+    "exercise_type": {
       "type": "string",
-      "description": "Descripci\u00f3n de la estaci\u00f3n"
+      "enum": [
+        "Esfuerzos repetidos",
+        "Esfuerzos din\u00e1micos",
+        "Antagonistas",
+        "Pliom\u00e9trico HI",
+        "S/CEA Estato/Din\u00e1mico",
+        "Potencia",
+        "Fuerza m\u00e1xima",
+        "Hipertrofia",
+        "Preventivo",
+        "Otro"
+      ],
+      "description": "Tipo de trabajo"
+    },
+    "exercise_name": {
+      "type": "string",
+      "description": "Nombre del ejercicio (ej: Hip Thrust Asim\u00e9trico)"
+    },
+    "volume": {
+      "type": "string",
+      "description": "Volumen en formato libre (ej: 3x8, 3+3, 12+12)"
+    },
+    "indications": {
+      "type": "string",
+      "description": "Indicaciones t\u00e9cnicas"
+    },
+    "compensations": {
+      "type": "string",
+      "description": "Compensaciones"
     },
     "notes": {
       "type": "string",
@@ -95,7 +73,7 @@
     },
     "library_exercise_id": {
       "type": "string",
-      "description": "ID en StrengthExerciseLibrary (si viene de biblioteca)"
+      "description": "ID en StrengthExerciseLibrary si viene de biblioteca"
     }
   },
   "required": [

@@ -19,63 +19,45 @@
       "default": true,
       "description": "Si true, visible desde cualquier plantel"
     },
-    "category": {
-      "type": "string",
-      "enum": [
-        "Empuje",
-        "Tracci\u00f3n",
-        "Bisagra",
-        "Sentadilla",
-        "Cargada",
-        "Core",
-        "Potencia",
-        "Correctivo",
-        "Otro"
-      ],
-      "description": "Categor\u00eda del ejercicio"
-    },
-    "muscle_group": {
-      "type": "string",
-      "description": "Grupo muscular principal"
-    },
-    "vector_pattern": {
-      "type": "string",
-      "enum": [
-        "Horizontal",
-        "Vertical",
-        "Rotacional",
-        "Diagonal",
-        "Mixto"
-      ],
-      "description": "Patr\u00f3n vectorial"
-    },
     "method": {
       "type": "string",
-      "description": "M\u00e9todo de entrenamiento"
+      "enum": [
+        "Din\u00e1micos",
+        "Bal\u00edsticos",
+        "Biseries",
+        "Triseries",
+        "Contrastes",
+        "Complejos",
+        "Isom\u00e9tricos",
+        "Exc\u00e9ntricos",
+        "Preventivos",
+        "Otro"
+      ],
+      "description": "M\u00e9todo de trabajo"
     },
-    "objective": {
+    "exercise_type": {
       "type": "string",
-      "description": "Objetivo del ejercicio"
+      "enum": [
+        "Esfuerzos repetidos",
+        "Esfuerzos din\u00e1micos",
+        "Antagonistas",
+        "Pliom\u00e9trico HI",
+        "S/CEA Estato/Din\u00e1mico",
+        "Potencia",
+        "Fuerza m\u00e1xima",
+        "Hipertrofia",
+        "Preventivo",
+        "Otro"
+      ],
+      "description": "Tipo de trabajo"
     },
     "description": {
       "type": "string",
       "description": "Descripci\u00f3n del ejercicio"
     },
-    "sets": {
-      "type": "number",
-      "description": "Series"
-    },
-    "reps": {
+    "volume": {
       "type": "string",
-      "description": "Repeticiones o tiempo"
-    },
-    "rest_time": {
-      "type": "string",
-      "description": "Pausa"
-    },
-    "rir": {
-      "type": "string",
-      "description": "RIR (Repeticiones en Reserva)"
+      "description": "Volumen sugerido en formato libre (ej: 3x8)"
     },
     "image_url": {
       "type": "string",
@@ -88,14 +70,6 @@
     "notes": {
       "type": "string",
       "description": "Observaciones"
-    },
-    "tags": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "default": [],
-      "description": "Etiquetas"
     },
     "favorite": {
       "type": "boolean",
