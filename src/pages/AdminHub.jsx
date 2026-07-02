@@ -1,9 +1,10 @@
 import React, { useState } from "react";
 import {
   Lock, Users, Fingerprint, ShieldCheck, UserCog,
-  Settings, Wrench, ClipboardList, ChevronRight
+  Settings, Wrench, ClipboardList, ChevronRight, Bug
 } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import AdminAccessDebugPanel from "@/components/workspace/AdminAccessDebugPanel";
 import UsersAccess from "@/pages/UsersAccess";
 import PlayerAdmin from "@/pages/PlayerAdmin";
 import PlayerIdentity from "@/pages/PlayerIdentity";
@@ -117,6 +118,7 @@ function SectionCard({ section, onClick }) {
 export default function AdminHub() {
   const { isAdmin } = useWorkspace();
   const [activeSection, setActiveSection] = useState(null);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Guard: solo administradores
   if (!isAdmin) {
@@ -149,10 +151,20 @@ export default function AdminHub() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Administración</h1>
-        <p className="text-zinc-500 text-sm mt-1">Centro de gestión de la plataforma · solo administradores</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Administración</h1>
+          <p className="text-zinc-500 text-sm mt-1">Centro de gestión de la plataforma · solo administradores</p>
+        </div>
+        <button
+          onClick={() => setShowDebug(true)}
+          title="Diagnóstico de acceso a Administración"
+          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs text-zinc-500 hover:text-yellow-400 border border-zinc-800 hover:border-yellow-500/30 hover:bg-zinc-900 transition-colors shrink-0">
+          <Bug size={13} /> Diagnóstico
+        </button>
       </div>
+
+      {showDebug && <AdminAccessDebugPanel onClose={() => setShowDebug(false)} />}
 
       {/* Breadcrumb / back */}
       {activeSection && (
