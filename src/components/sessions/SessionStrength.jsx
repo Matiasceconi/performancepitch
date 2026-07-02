@@ -5,6 +5,7 @@ import { Plus, Sparkles } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import StrengthHeader from "@/components/sessions/strength/StrengthHeader";
 import StrengthStationRow from "@/components/sessions/strength/StrengthStationRow";
+import StrengthPDFExport from "@/components/sessions/strength/StrengthPDFExport";
 import { METHOD_OPTIONS, TYPE_OPTIONS, syncToLibrary } from "@/components/sessions/strength/strengthOptions";
 
 export default function SessionStrength({ session, onSessionUpdate }) {
@@ -152,6 +153,7 @@ Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen e
           className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-lg text-xs hover:bg-purple-500/25 transition-colors disabled:opacity-50">
           <Sparkles size={13} /> {suggesting ? "Pensando..." : "Sugerir ejercicio"}
         </button>
+        <StrengthPDFExport session={session} stations={stations} />
       </div>
 
       {stations.length === 0 && (
