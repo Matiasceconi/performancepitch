@@ -14,8 +14,6 @@ const EMPTY_STATION = {
 
 // Header fields for the strength session
 const HEADER_FIELDS = [
-  { key: "strength_microcycle", label: "Microciclo" },
-  { key: "strength_session_number", label: "N° Sesión" },
   { key: "strength_purpose", label: "Propósito mecánico" },
   { key: "strength_session_type", label: "Tipo de sesión" },
   { key: "strength_vector_pattern", label: "Patrón vectorial" },
