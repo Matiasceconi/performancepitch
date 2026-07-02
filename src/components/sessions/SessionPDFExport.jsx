@@ -55,9 +55,10 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
     setGenerating(true);
     try {
       // Fetch all data in parallel
-      const [exercises, gpsRows] = await Promise.all([
+      const [exercises, gpsRows, videoLinks] = await Promise.all([
         base44.entities.SessionExercise.filter({ session_id: session.id }, "order", 100),
         base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200),
+        base44.entities.SessionVideoLink.filter({ session_id: session.id }, "-created_date", 100),
       ]);
 
       exercises.sort((a, b) => (a.order || 0) - (b.order || 0));
@@ -444,9 +445,27 @@ export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
         y += 4;
       }
 
+      // ── SECTION: VIDEOS ASOCIADOS ─────────────────────────────────────────────
+      if (videoLinks.length > 0) {
+        sectionTitle("4. Videos asociados");
+        videoLinks.forEach(link => {
+          addPageIfNeeded(12);
+          doc.setFontSize(8);
+          doc.setFont("helvetica", "bold");
+          doc.setTextColor(...DARK);
+          doc.text(`${link.title} (${link.source || "—"})`, margin, y + 4);
+          y += 5;
+          doc.setFont("helvetica", "normal");
+          doc.setTextColor(...GRAY);
+          const urlLines = doc.splitTextToSize(link.video_url, contentW);
+          doc.text(urlLines, margin, y + 4);
+          y += urlLines.length * 4 + 4;
+        });
+      }
+
       // ── SECTION: NOTAS FINALES ────────────────────────────────────────────────
       if (session.notes || session.created_by) {
-        sectionTitle("4. Observaciones finales");
+        sectionTitle("5. Observaciones finales");
         if (session.notes) {
           addPageIfNeeded(20);
           doc.setFontSize(8);
