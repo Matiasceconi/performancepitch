@@ -46,9 +46,24 @@ export function WorkspaceProvider({ children }) {
       const allSquads = await base44.entities.Squad.filter({ active: true }, "name", 100);
       setSquads(allSquads);
 
-      // 2. Find user access record by email
-      const accessRecords = await base44.entities.UserAccess.filter({ user_email: user.email }, "-created_date", 1);
-      let access = accessRecords[0] || null;
+      // 2. Find user access record(s) by email — un usuario puede tener más de un registro
+      // (accesos creados en distintos momentos). Se combinan todos los activos para no perder
+      // permisos (ej: can_admin, role_ids) que hayan quedado en un registro más antiguo.
+      const accessRecords = await base44.entities.UserAccess.filter({ user_email: user.email }, "-created_date", 20);
+      const activeAccessRecords = accessRecords.filter(a => a.active !== false);
+      const recordsToMerge = activeAccessRecords.length > 0 ? activeAccessRecords : accessRecords;
+      let access = recordsToMerge.length > 0
+        ? recordsToMerge.reduce((merged, rec) => ({
+            ...rec,
+            ...merged,
+            role_ids: [...new Set([...(merged.role_ids || []), ...(rec.role_ids || [])])],
+            squad_ids: [...new Set([...(merged.squad_ids || []), ...(rec.squad_ids || [])])],
+            squad_names: [...new Set([...(merged.squad_names || []), ...(rec.squad_names || [])])],
+            all_squads: merged.all_squads || !!rec.all_squads,
+            can_admin: merged.can_admin || !!rec.can_admin,
+            active: true,
+          }), recordsToMerge[0])
+        : null;
 
       const platformAdmin = user.role === "admin";
 
