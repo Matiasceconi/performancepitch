@@ -1,8 +1,9 @@
 import React, { Component } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import SessionTimeoutWatcher from "@/components/workspace/SessionTimeoutWatcher";
 import SessionExpiryBanner from "@/components/workspace/SessionExpiryBanner";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 class PageErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -27,6 +28,14 @@ class PageErrorBoundary extends Component {
 }
 
 export default function Layout() {
+  const { canSeePath } = useWorkspace();
+  const location = useLocation();
+
+  // Seguridad: si la página actual no corresponde al área/rol activo, no se renderiza (redirige al dashboard).
+  if (!canSeePath(location.pathname)) {
+    return <Navigate to="/" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-zinc-950">
       <SessionTimeoutWatcher />

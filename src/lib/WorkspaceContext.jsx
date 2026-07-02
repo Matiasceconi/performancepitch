@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
+import AreaSelectScreen from "@/components/workspace/AreaSelectScreen";
+import { AREAS, ROLE_AREAS, CUERPO_TECNICO_ROLE_PAGES, AREA_PAGES } from "@/lib/areasConfig";
 
 const WorkspaceContext = createContext(null);
 
@@ -30,6 +32,9 @@ export function WorkspaceProvider({ children }) {
   const [workspaceError, setWorkspaceError] = useState(null);
   const [needSquadSelection, setNeedSquadSelection] = useState(false);
   const [adminAccess, setAdminAccess] = useState(false);
+  const [myAreas, setMyAreas] = useState([]);
+  const [activeAreaId, setActiveAreaIdState] = useState(null);
+  const [needAreaSelection, setNeedAreaSelection] = useState(false);
 
   // Solo la primera carga bloquea toda la pantalla. Recargas posteriores (reloadWorkspace)
   // no deben desmontar el Sidebar ni ocultar módulos globales como Administración.
@@ -96,6 +101,35 @@ export function WorkspaceProvider({ children }) {
         admin_locked_for_session: adminLockRef.current,
         allowed_modules: access?.allowed_modules || [],
       });
+
+      // 4.5 Determine which areas this user can access
+      const areasForRole = ROLE_AREAS[access?.role] || [];
+      const resolvedAreaIds = Array.from(new Set([...areasForRole, ...(resolvedAdmin ? ["administracion"] : [])]));
+      const resolvedAreas = AREAS.filter(a => resolvedAreaIds.includes(a.id));
+      setMyAreas(resolvedAreas);
+
+      const savedAreaId = localStorage.getItem("activeAreaId");
+      const savedAreaUser = localStorage.getItem("activeAreaUserId");
+      if (savedAreaUser && savedAreaUser !== user.id) {
+        localStorage.removeItem("activeAreaId");
+        localStorage.removeItem("activeAreaUserId");
+      }
+      const validSavedAreaId = savedAreaUser === user.id && resolvedAreaIds.includes(savedAreaId) ? savedAreaId : null;
+
+      if (validSavedAreaId) {
+        setActiveAreaIdState(validSavedAreaId);
+        setNeedAreaSelection(false);
+      } else if (resolvedAreaIds.length === 1) {
+        setActiveAreaIdState(resolvedAreaIds[0]);
+        localStorage.setItem("activeAreaId", resolvedAreaIds[0]);
+        localStorage.setItem("activeAreaUserId", user.id);
+        setNeedAreaSelection(false);
+      } else if (resolvedAreaIds.length > 1) {
+        setNeedAreaSelection(true);
+      } else {
+        setActiveAreaIdState(null);
+        setNeedAreaSelection(false);
+      }
 
       // 5. Determine which squads this user can access
       const mySquads = access?.all_squads
@@ -181,6 +215,34 @@ export function WorkspaceProvider({ children }) {
     return (userAccess.squad_ids || []).includes(squadId);
   }
 
+  function setActiveArea(areaId) {
+    setActiveAreaIdState(areaId);
+    setNeedAreaSelection(false);
+    if (areaId) {
+      localStorage.setItem("activeAreaId", areaId);
+      localStorage.setItem("activeAreaUserId", user?.id || "");
+    }
+  }
+
+  function requestAreaChange() {
+    setNeedAreaSelection(true);
+  }
+
+  // Seguridad: valida si la página (path) puede verse desde el área activa y el rol del usuario.
+  function canSeePath(path) {
+    if (!activeAreaId) return false;
+    if (activeAreaId === "cuerpo_tecnico") {
+      const pages = CUERPO_TECNICO_ROLE_PAGES[userAccess?.role];
+      if (pages === undefined) return false;
+      if (pages === null) return true;
+      return pages.includes(path);
+    }
+    const pages = AREA_PAGES[activeAreaId];
+    if (pages === undefined) return false;
+    if (pages === null) return true;
+    return pages.includes(path);
+  }
+
   // ── Loading state (solo bloquea en la carga inicial de la sesión) ───────
   if (loadingWorkspace && !hasLoadedOnceRef.current) {
     return (
@@ -264,6 +326,18 @@ export function WorkspaceProvider({ children }) {
     );
   }
 
+  // ── Area selection required (antes de entrar al sistema general) ───────
+  if (needAreaSelection) {
+    return (
+      <AreaSelectScreen
+        areas={myAreas}
+        userName={user?.full_name || ""}
+        currentAreaId={activeAreaId}
+        onSelect={setActiveArea}
+      />
+    );
+  }
+
   // ── Squad selection required ────────────────────────────────────────────
   if (needSquadSelection) {
     return (
@@ -287,6 +361,12 @@ export function WorkspaceProvider({ children }) {
       can,
       canModule,
       canAccessSquad,
+      myAreas,
+      activeAreaId,
+      activeAreaName: myAreas.find(a => a.id === activeAreaId)?.name || "",
+      setActiveArea,
+      requestAreaChange,
+      canSeePath,
       activeSquadId: activeSquad?.id || null,
       activeSquadName: activeSquad?.name || "",
       activeSeasonId: activeSquad?.season || null,

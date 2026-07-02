@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Video, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound,
   CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen,
-  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock
+  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock, Repeat
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
@@ -44,7 +44,7 @@ export default function Sidebar() {
   const [performanceOpen, setPerformanceOpen] = useState(PERFORMANCE_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
-  const { canModule, isAdmin } = useWorkspace();
+  const { canModule, isAdmin, activeAreaName, canSeePath, requestAreaChange, myAreas } = useWorkspace();
 
   // Administración es un módulo GLOBAL: depende únicamente de isAdmin (rol/permiso de admin),
   // nunca del plantel activo ni de si el workspace está recargando en segundo plano.
@@ -54,7 +54,7 @@ export default function Sidebar() {
       console.info(`[Sidebar] Administración ${isAdmin ? "visible" : "oculta"} — motivo: isAdmin=${isAdmin} (independiente del plantel activo)`);
       return isAdmin;
     }
-    return canModule(item.module);
+    return canModule(item.module) && canSeePath(item.path);
   }
   const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canSee(i));
   const performanceItems = NAV_ITEMS.filter(i => i.group === "rendimiento" && canSee(i));
@@ -96,6 +96,15 @@ export default function Sidebar() {
             <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Defensa y Justicia</h1>
             <p className="text-xs mt-0.5" style={{ color: "#F0C800" }}>PerformancePitch</p>
           </div>
+          {myAreas.length > 1 && (
+            <button
+              onClick={requestAreaChange}
+              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-colors text-left"
+            >
+              <span className="text-xs text-zinc-300 truncate">{activeAreaName || "Área"}</span>
+              <Repeat size={12} className="text-zinc-500 shrink-0" />
+            </button>
+          )}
           <SquadSelector />
         </div>
 
