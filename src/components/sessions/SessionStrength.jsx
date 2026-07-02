@@ -1,16 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { DragDropContext, Droppable } from "@hello-pangea/dnd";
-import { Plus, Sparkles } from "lucide-react";
+import { Plus, Sparkles, ImagePlus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import StrengthHeader from "@/components/sessions/strength/StrengthHeader";
 import StrengthStationRow from "@/components/sessions/strength/StrengthStationRow";
 import StrengthPDFExport from "@/components/sessions/strength/StrengthPDFExport";
+import StrengthImageImportModal from "@/components/sessions/strength/StrengthImageImportModal";
 import { METHOD_OPTIONS, TYPE_OPTIONS, syncToLibrary } from "@/components/sessions/strength/strengthOptions";
 
 export default function SessionStrength({ session, onSessionUpdate }) {
   const [stations, setStations] = useState([]);
   const [suggesting, setSuggesting] = useState(false);
+  const [showImageImport, setShowImageImport] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -153,8 +155,26 @@ Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen e
           className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-lg text-xs hover:bg-purple-500/25 transition-colors disabled:opacity-50">
           <Sparkles size={13} /> {suggesting ? "Pensando..." : "Sugerir ejercicio"}
         </button>
+        <button onClick={() => setShowImageImport(true)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs hover:bg-emerald-500/25 transition-colors">
+          <ImagePlus size={13} /> Importar fuerza desde imagen
+        </button>
         <StrengthPDFExport session={session} stations={stations} />
       </div>
+
+      {showImageImport && (
+        <StrengthImageImportModal
+          session={session}
+          hasExisting={stations.length > 0}
+          onClose={() => setShowImageImport(false)}
+          onImported={(updatedSession) => {
+            setShowImageImport(false);
+            if (onSessionUpdate) onSessionUpdate(updatedSession);
+            base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 200)
+              .then(rows => setStations(rows.sort((a, b) => (a.order || 0) - (b.order || 0))));
+          }}
+        />
+      )}
 
       {stations.length === 0 && (
         <p className="text-zinc-600 text-sm text-center py-6">Sin ejercicios cargados</p>
