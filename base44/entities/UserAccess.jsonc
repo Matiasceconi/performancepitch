@@ -20,21 +20,15 @@
     },
     "role": {
       "type": "string",
-      "enum": [
-        "Administrador",
-        "Coordinador",
-        "Director Deportivo",
-        "Entrenador",
-        "Preparador F\u00edsico",
-        "Analista de Rendimiento",
-        "M\u00e9dico",
-        "Kinesi\u00f3logo",
-        "Nutricionista",
-        "Videoanalista",
-        "Utilero",
-        "Solo lectura"
-      ],
-      "description": "Rol del usuario"
+      "description": "Rol de negocio legado (texto libre, mantenido por compatibilidad). Los permisos reales se definen por role_ids"
+    },
+    "role_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de AppRole asignados a este usuario. Un usuario puede tener varios roles; los permisos y \u00e1reas se combinan (uni\u00f3n)"
     },
     "squad_ids": {
       "type": "array",
@@ -57,42 +51,6 @@
       "default": false,
       "description": "Si true, tiene acceso a todos los planteles"
     },
-    "allowed_modules": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "default": [
-        "dashboard"
-      ],
-      "description": "M\u00f3dulos habilitados"
-    },
-    "can_create": {
-      "type": "boolean",
-      "default": false
-    },
-    "can_edit": {
-      "type": "boolean",
-      "default": false
-    },
-    "can_delete": {
-      "type": "boolean",
-      "default": false
-    },
-    "can_export": {
-      "type": "boolean",
-      "default": false
-    },
-    "can_admin": {
-      "type": "boolean",
-      "default": false,
-      "description": "Acceso a m\u00f3dulo Administraci\u00f3n"
-    },
-    "can_manage_users": {
-      "type": "boolean",
-      "default": false,
-      "description": "Puede gestionar usuarios/accesos"
-    },
     "active": {
       "type": "boolean",
       "default": true
@@ -107,7 +65,6 @@
   },
   "required": [
     "staff_id",
-    "user_email",
-    "role"
+    "user_email"
   ]
 }

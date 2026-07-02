@@ -10,10 +10,10 @@ export default function AdminAccessDebugPanel({ onClose }) {
   const rows = [
     ["Usuario", debugInfo.user_email],
     ["Rol de plataforma", debugInfo.platform_role],
-    ["Rol de negocio (UserAccess)", debugInfo.business_role || "—"],
+    ["Roles asignados (AppRole)", (debugInfo.role_names || []).join(", ") || "—"],
     ["can_admin (última carga)", String(debugInfo.can_admin)],
     ["Admin confirmado en sesión (sticky)", String(debugInfo.admin_locked_for_session)],
-    ["Módulos permitidos", (debugInfo.allowed_modules || []).join(", ") || "—"],
+    ["Áreas permitidas", (debugInfo.allowed_areas || []).join(", ") || "—"],
     ["active_squad_id", debugInfo.active_squad_id || "—"],
     ["active_season_id", debugInfo.active_season_id || "—"],
     ["Workspace recargando", String(debugInfo.loading_workspace)],
