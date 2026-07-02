@@ -49,5 +49,5 @@ export const AREA_PAGES = {
   nutricion:            ["/", "/performance/nutrition", "/schedule"],
   psicologia:           ["/", "/schedule"],
   coordinacion_general: null,
-  administracion:       ["/admin"],
+  administracion:       ["/", "/admin"],
 };
