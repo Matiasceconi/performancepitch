@@ -230,6 +230,8 @@ export function WorkspaceProvider({ children }) {
 
   // Seguridad: valida si la página (path) puede verse desde el área activa y el rol del usuario.
   function canSeePath(path) {
+    // Administración es global y sticky: siempre accesible para admins, sin importar el área activa.
+    if (path === "/admin") return adminAccess;
     if (!activeAreaId) return false;
     if (activeAreaId === "cuerpo_tecnico") {
       const pages = CUERPO_TECNICO_ROLE_PAGES[userAccess?.role];
