@@ -22,6 +22,7 @@ import PlayerMatchesTab from "@/components/player/tabs/PlayerMatchesTab";
 import PlayerMinutesTab from "@/components/player/tabs/PlayerMinutesTab";
 import PlayerMedicalTab from "@/components/player/tabs/PlayerMedicalTab";
 import PlayerHistoryTab from "@/components/player/tabs/PlayerHistoryTab";
+import { getValidMinuteRecords } from "@/lib/minutesUtils";
 
 moment.locale("es");
 
@@ -211,10 +212,9 @@ export default function PlayerCard360() {
   const badge = resolveBadge(dayStatus, todaysAttendance, player);
   const activeInjury = medical.find(m => ["Activa", "activa", "En tratamiento"].includes(m.status)) || null;
 
-  // Solo se consideran válidos los minutos vinculados a un partido existente del plantel activo
-  const matchReportsMap = {};
-  matchReports.forEach(m => { matchReportsMap[m.id] = m; });
-  const validMinutes = minutes.filter(m => m.match_id && matchReportsMap[m.match_id] && (!activeSquadId || matchReportsMap[m.match_id].squad_id === activeSquadId));
+  // Solo se consideran válidos los minutos vinculados a un partido real, activo (no archivado),
+  // del plantel activo y con minutes > 0 (los convocados con 0 minutos no cuentan como partido jugado)
+  const validMinutes = getValidMinuteRecords(minutes, matchReports, { squadId: activeSquadId });
   const orphanMinutesCount = minutes.length - validMinutes.length;
   const totalMinutes = validMinutes.reduce((s, r) => s + (r.minutes || 0), 0);
 

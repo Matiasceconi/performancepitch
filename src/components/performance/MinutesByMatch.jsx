@@ -3,6 +3,8 @@ import { Search, ChevronDown, ChevronUp } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { getRivalLogo } from "@/lib/match-utils";
+import { useWorkspace } from "@/lib/WorkspaceContext";
+import { buildActiveMatchMap } from "@/lib/minutesUtils";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
@@ -19,6 +21,7 @@ function norm(s) {
 }
 
 export default function MinutesByMatch({ selectedPlayer }) {
+  const { activeSquadId } = useWorkspace();
   const [search, setSearch] = useState("");
   const [tournamentFilter, setTournamentFilter] = useState("all");
   const [fechaFilter, setFechaFilter] = useState("all");
@@ -44,11 +47,13 @@ export default function MinutesByMatch({ selectedPlayer }) {
     ]).then(([recs, matches, plrs]) => {
       setMinutesRecords(recs);
       setMatchReports(matches
+        .filter(m => m.status !== "archivado")
+        .filter(m => !activeSquadId || m.squad_id === activeSquadId)
         .filter(m => !m.competition?.includes("Juveniles"))
       );
       setPlayers(plrs);
     }).finally(() => setLoading(false));
-  }, []);
+  }, [activeSquadId]);
 
   // Agrupar partidos por torneo y asignar fecha
   const groupedMatches = useMemo(() => {
@@ -94,13 +99,16 @@ export default function MinutesByMatch({ selectedPlayer }) {
   }, [tournamentFilter, groupedMatches]);
 
   // Mapa de minutos: match_date+tournament -> { player_id/name -> minutes }
+  // Solo se consideran registros vinculados a un partido real/activo, con minutos > 0.
   // Si hay duplicados con mismo key, se toma el registro más reciente (mayor minutos en caso de edición)
   const minutesMap = useMemo(() => {
+    const activeMatchMap = buildActiveMatchMap(matchReports);
     const map = {};
     // Ordenar por created_date desc para que el más reciente gane en caso de duplicado
     const sorted = [...minutesRecords].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
     for (const r of sorted) {
       if (!r.minutes || r.minutes <= 0) continue;
+      if (!r.match_id || !activeMatchMap[r.match_id]) continue;
       const date = r.match_date;
       const key = r.player_id || `name:${norm(r.player_name)}`;
       const t = (r.tournament || "").toLowerCase().trim();
@@ -113,7 +121,7 @@ export default function MinutesByMatch({ selectedPlayer }) {
       }
     }
     return map;
-  }, [minutesRecords]);
+  }, [minutesRecords, matchReports]);
 
   function matchTournamentsForLookup(match) {
     const comp = match.competition || "";

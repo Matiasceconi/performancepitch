@@ -786,8 +786,8 @@ export default function Matches() {
       base44.entities.MatchReport.list("-date", 200),
       base44.entities.Player.list("-created_date", 100),
     ]);
-    // Filtrar estrictamente por plantel activo (sin fallback a registros sin squad_id)
-    const filtered = all.filter(x => !activeSquadId || x.squad_id === activeSquadId);
+    // Filtrar estrictamente por plantel activo (sin fallback a registros sin squad_id) y ocultar archivados
+    const filtered = all.filter(x => (!activeSquadId || x.squad_id === activeSquadId) && x.status !== "archivado");
     setMatches(filtered);
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
     setLoading(false);
@@ -829,14 +829,16 @@ export default function Matches() {
     const target = deleteTarget;
     setDeleteTarget(null);
     if (!target || option === "cancel") return;
-    const linkedMinutes = await base44.entities.MinutesRecord.filter({ match_id: target.id }, "-created_date", 500);
     if (option === "delete_minutes") {
+      const linkedMinutes = await base44.entities.MinutesRecord.filter({ match_id: target.id }, "-created_date", 500);
       await Promise.all(linkedMinutes.map(r => base44.entities.MinutesRecord.delete(r.id)));
-    } else if (option === "keep_hidden") {
-      await Promise.all(linkedMinutes.map(r => base44.entities.MinutesRecord.update(r.id, { hidden_from_reports: true })));
+      await base44.entities.MatchReport.delete(target.id);
+      toast({ title: "Partido y minutos asociados eliminados" });
+    } else if (option === "archive") {
+      // Se archiva el partido (no se borra) para conservar los minutos como histórico válido
+      await base44.entities.MatchReport.update(target.id, { status: "archivado" });
+      toast({ title: "Partido archivado, minutos conservados como histórico" });
     }
-    await base44.entities.MatchReport.delete(target.id);
-    toast({ title: "Partido eliminado" });
     loadAll();
   }
 
@@ -878,11 +880,11 @@ export default function Matches() {
             <div className="space-y-2 pt-1">
               <button onClick={() => confirmDelete("delete_minutes")}
                 className="w-full text-left px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/25 transition-colors">
-                Eliminar partido y eliminar minutos asociados <span className="text-xs text-red-400/70">(recomendado)</span>
+                Eliminar partido y eliminar minutos asociados
               </button>
-              <button onClick={() => confirmDelete("keep_hidden")}
+              <button onClick={() => confirmDelete("archive")}
                 className="w-full text-left px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">
-                Eliminar partido pero conservar minutos como histórico oculto
+                Archivar partido y conservar minutos históricos <span className="text-xs text-zinc-500">(recomendado)</span>
               </button>
               <button onClick={() => confirmDelete("cancel")}
                 className="w-full text-left px-3 py-2 rounded-lg text-zinc-500 text-sm hover:text-white transition-colors">

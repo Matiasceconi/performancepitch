@@ -10,6 +10,15 @@
       "type": "string",
       "description": "Nombre del plantel (desnormalizado)"
     },
+    "status": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "archivado"
+      ],
+      "default": "activo",
+      "description": "Estado del partido. 'archivado' = oculto de todas las vistas y reportes pero conserva sus minutos como hist\u00f3rico"
+    },
     "date": {
       "type": "string",
       "format": "date",

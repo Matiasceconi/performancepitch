@@ -4,6 +4,7 @@ import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { getValidMinuteRecords } from "@/lib/minutesUtils";
 
 const TORNEOS = [
   { id: "all",                  label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
@@ -43,6 +44,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
   const [records, setRecords] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
   const [squadPlayerIds, setSquadPlayerIds] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,9 +60,11 @@ export default function MinutesTracker({ onSelectPlayer }) {
     Promise.all([
       base44.entities.MinutesRecord.list("-created_date", 500),
       base44.entities.Player.list("-created_date", 200),
-    ]).then(([recs, plrs]) => {
+      base44.entities.MatchReport.list("-date", 500),
+    ]).then(([recs, plrs, allMatches]) => {
       setRecords(recs);
       setPlayers(plrs);
+      setMatches(allMatches);
     }).finally(() => setLoading(false));
 
     // Suscripción en tiempo real con debounce para evitar rate limit
@@ -73,6 +77,12 @@ export default function MinutesTracker({ onSelectPlayer }) {
     });
     return () => { unsub(); clearTimeout(timer); };
   }, []);
+
+  // Solo registros vinculados a un partido real, activo y del plantel activo, con minutos > 0
+  const validRecords = useMemo(
+    () => getValidMinuteRecords(records, matches, { squadId: activeSquadId }),
+    [records, matches, activeSquadId]
+  );
 
   // Mapa player_id -> foto
   const photoMap = useMemo(() => {
@@ -93,7 +103,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
     const map = {};
     // Deduplicar: para mismo jugador+fecha+torneo, solo contar el registro más reciente
     const seen = new Set();
-    const sorted = [...records].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
+    const sorted = [...validRecords].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
 
     sorted.forEach(r => {
       const playerKey = r.player_id || `name:${norm(r.player_name)}`;
@@ -119,7 +129,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
     });
 
     return Object.values(map);
-  }, [records]);
+  }, [validRecords]);
 
   const torneo = TORNEOS.find(t => t.id === torneoId);
   const showRes = torneo.res_total !== null;
