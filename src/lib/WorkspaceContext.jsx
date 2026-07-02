@@ -1,33 +1,22 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
 import AreaSelectScreen from "@/components/workspace/AreaSelectScreen";
-import { AREAS, ROLE_AREAS, CUERPO_TECNICO_ROLE_PAGES, AREA_PAGES } from "@/lib/areasConfig";
+import { AREAS } from "@/lib/areasConfig";
 
 const WorkspaceContext = createContext(null);
 
-// Default modules available to all roles
-const ROLE_DEFAULTS = {
-  "Administrador":          { can_create: true,  can_edit: true,  can_delete: true,  can_export: true,  can_admin: true,  can_manage_users: true,  all_squads: true,  allowed_modules: ["dashboard","daily_squad","sessions","matches","performance","gps","field_library","strength_library","schedule","team","weekly_planner","tactical","admin","squad_manager","player_names"] },
-  "Coordinador":            { can_create: true,  can_edit: true,  can_delete: false, can_export: true,  can_admin: true,  can_manage_users: false, all_squads: true,  allowed_modules: ["dashboard","daily_squad","sessions","matches","performance","gps","field_library","strength_library","schedule","team","weekly_planner","tactical","admin","squad_manager"] },
-  "Director Deportivo":     { can_create: true,  can_edit: true,  can_delete: false, can_export: true,  can_admin: true,  can_manage_users: false, all_squads: true,  allowed_modules: ["dashboard","daily_squad","sessions","matches","performance","gps","field_library","strength_library","schedule","team","weekly_planner","tactical","admin"] },
-  "Entrenador":             { can_create: true,  can_edit: true,  can_delete: false, can_export: true,  can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","daily_squad","sessions","matches","tactical","schedule","team","weekly_planner","field_library"] },
-  "Preparador Físico":      { can_create: true,  can_edit: true,  can_delete: false, can_export: true,  can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","daily_squad","sessions","gps","performance","field_library","strength_library","schedule","team","weekly_planner"] },
-  "Analista de Rendimiento":{ can_create: true,  can_edit: true,  can_delete: false, can_export: true,  can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","sessions","gps","performance","matches","tactical","field_library","strength_library"] },
-  "Médico":                 { can_create: true,  can_edit: true,  can_delete: false, can_export: true,  can_admin: false, can_manage_users: false, all_squads: true,  allowed_modules: ["dashboard","daily_squad","team","performance","schedule"] },
-  "Kinesiólogo":            { can_create: true,  can_edit: true,  can_delete: false, can_export: false, can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","daily_squad","team","performance"] },
-  "Nutricionista":          { can_create: true,  can_edit: true,  can_delete: false, can_export: false, can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","team"] },
-  "Videoanalista":          { can_create: true,  can_edit: false, can_delete: false, can_export: true,  can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","sessions","matches","tactical","field_library"] },
-  "Utilero":                { can_create: false, can_edit: false, can_delete: false, can_export: false, can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","daily_squad","team","schedule"] },
-  "Solo lectura":           { can_create: false, can_edit: false, can_delete: false, can_export: false, can_admin: false, can_manage_users: false, all_squads: false, allowed_modules: ["dashboard","daily_squad","sessions","matches","performance","gps","field_library","strength_library"] },
-};
+const EMPTY_PERMS = { can_view: false, can_create: false, can_edit: false, can_delete: false, can_export: false, can_admin: false };
 
 export function WorkspaceProvider({ children }) {
   const { user, isAuthenticated } = useAuth();
   const [squads, setSquads] = useState([]);
   const [activeSquad, setActiveSquadState] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
+  const [roleNames, setRoleNames] = useState([]);
+  const [permissions, setPermissions] = useState(EMPTY_PERMS);
+  const [pagesByArea, setPagesByArea] = useState({}); // areaId -> [paths]
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
   const [workspaceError, setWorkspaceError] = useState(null);
   const [needSquadSelection, setNeedSquadSelection] = useState(false);
@@ -61,52 +50,80 @@ export function WorkspaceProvider({ children }) {
       const accessRecords = await base44.entities.UserAccess.filter({ user_email: user.email }, "-created_date", 1);
       let access = accessRecords[0] || null;
 
-      // 3. If platform admin with no access record → treat as Administrador
-      if (!access && user.role === "admin") {
+      const platformAdmin = user.role === "admin";
+
+      // 3. If platform admin with no access record → full access, no roles needed
+      if (!access && platformAdmin) {
         access = {
           user_email: user.email,
           role: "Administrador",
+          role_ids: [],
           all_squads: true,
           squad_ids: [],
           squad_names: [],
-          ...ROLE_DEFAULTS["Administrador"],
           active: true,
         };
       }
-
-      // 4. Merge role defaults with access record
-      if (access) {
-        const defaults = ROLE_DEFAULTS[access.role] || ROLE_DEFAULTS["Solo lectura"];
-        access = { ...defaults, ...access };
-        if (user.role === "admin") {
-          access.can_admin = true;
-          access.can_manage_users = true;
-          access.all_squads = true;
-        }
-      }
-
       setUserAccess(access);
 
-      // Permiso de Administración: depende únicamente del rol/permisos del usuario,
-      // NUNCA del plantel activo. Es "sticky" durante la sesión: una vez true, no vuelve a false.
-      const resolvedAdmin = !!access?.can_admin;
+      // 4. Fetch assigned AppRole records (permissions/areas/pages come from here)
+      const roleIds = access?.role_ids || [];
+      let roles = [];
+      if (roleIds.length > 0) {
+        const allRoles = await base44.entities.AppRole.list("name", 200);
+        roles = allRoles.filter(r => roleIds.includes(r.id) && r.active !== false);
+      }
+      setRoleNames(roles.map(r => r.name));
+
+      // 5. Merge permissions across all assigned roles (OR)
+      const mergedPerms = roles.reduce((acc, r) => ({
+        can_view: acc.can_view || !!r.can_view,
+        can_create: acc.can_create || !!r.can_create,
+        can_edit: acc.can_edit || !!r.can_edit,
+        can_delete: acc.can_delete || !!r.can_delete,
+        can_export: acc.can_export || !!r.can_export,
+        can_admin: acc.can_admin || !!r.can_admin,
+      }), { ...EMPTY_PERMS });
+      setPermissions(mergedPerms);
+
+      const resolvedAdmin = platformAdmin || mergedPerms.can_admin;
       if (resolvedAdmin) adminLockRef.current = true;
       setAdminAccess(adminLockRef.current);
+
+      // 6. Merge areas + allowed pages per area across all assigned roles
+      const allowedAreaIds = new Set();
+      const pagesMap = {};
+      roles.forEach(r => {
+        (r.areas || []).forEach(areaId => {
+          allowedAreaIds.add(areaId);
+          if (!pagesMap[areaId]) pagesMap[areaId] = new Set();
+          (r.allowed_pages || []).forEach(p => pagesMap[areaId].add(p));
+        });
+      });
+      if (adminLockRef.current) {
+        AREAS.forEach(a => {
+          allowedAreaIds.add(a.id);
+          pagesMap[a.id] = new Set(["/", "/daily-squad", "/sessions", "/field-library", "/strength-library", "/matches", "/tactical",
+            "/performance/external-load", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes",
+            "/schedule", "/team", "/weekly-planner", "/squad-manager", "/admin"]);
+        });
+      }
+      const pagesByAreaArrays = {};
+      Object.entries(pagesMap).forEach(([areaId, set]) => { pagesByAreaArrays[areaId] = Array.from(set); });
+      setPagesByArea(pagesByAreaArrays);
+
+      const resolvedAreaIds = Array.from(allowedAreaIds);
+      const resolvedAreas = AREAS.filter(a => resolvedAreaIds.includes(a.id));
+      setMyAreas(resolvedAreas);
 
       console.info("[Workspace] Diagnóstico de acceso", {
         user_email: user.email,
         platform_role: user.role,
-        business_role: access?.role || null,
+        role_names: roles.map(r => r.name),
         can_admin_this_load: resolvedAdmin,
         admin_locked_for_session: adminLockRef.current,
-        allowed_modules: access?.allowed_modules || [],
+        allowed_areas: resolvedAreaIds,
       });
-
-      // 4.5 Determine which areas this user can access
-      const areasForRole = ROLE_AREAS[access?.role] || [];
-      const resolvedAreaIds = Array.from(new Set([...areasForRole, ...(resolvedAdmin ? ["administracion"] : [])]));
-      const resolvedAreas = AREAS.filter(a => resolvedAreaIds.includes(a.id));
-      setMyAreas(resolvedAreas);
 
       const savedAreaId = localStorage.getItem("activeAreaId");
       const savedAreaUser = localStorage.getItem("activeAreaUserId");
@@ -131,14 +148,13 @@ export function WorkspaceProvider({ children }) {
         setNeedAreaSelection(false);
       }
 
-      // 5. Determine which squads this user can access
+      // 7. Determine which squads this user can access
       const mySquads = access?.all_squads
         ? allSquads
         : allSquads.filter(s => (access?.squad_ids || []).includes(s.id));
 
-      // 6. Restore last active squad or prompt selection
+      // 8. Restore last active squad or prompt selection
       const savedId = localStorage.getItem("activeSquadId");
-      // Clear cached squad if it belongs to a different user
       const savedUser = localStorage.getItem("activeSquadUserId");
       if (savedUser && savedUser !== user.id) {
         localStorage.removeItem("activeSquadId");
@@ -159,12 +175,11 @@ export function WorkspaceProvider({ children }) {
       } else if (mySquads.length > 1) {
         setNeedSquadSelection(true);
       } else {
-        // No squads assigned — still allow access, just no active squad
         setActiveSquadState(null);
         setNeedSquadSelection(false);
       }
 
-      // 7. Update last_seen (fire and forget)
+      // 9. Update last_seen (fire and forget)
       if (accessRecords[0]) {
         base44.entities.UserAccess.update(accessRecords[0].id, {
           last_seen: new Date().toISOString(),
@@ -173,8 +188,6 @@ export function WorkspaceProvider({ children }) {
     } catch (err) {
       console.error("WorkspaceContext error:", err);
       console.warn("[Workspace] Falla al cargar el workspace — Administración se mantiene según el último estado confirmado (admin_locked_for_session):", adminLockRef.current);
-      // Solo mostramos la pantalla de error bloqueante en la carga inicial.
-      // En recargas posteriores, un error transitorio no debe tirar abajo toda la app ni el menú.
       if (!hasLoadedOnceRef.current) {
         setWorkspaceError(err?.message || "Error al cargar el espacio de trabajo.");
       }
@@ -200,13 +213,8 @@ export function WorkspaceProvider({ children }) {
     : squads.filter(s => (userAccess?.squad_ids || []).includes(s.id));
 
   function can(action) {
-    if (!userAccess) return false;
-    return !!userAccess[`can_${action}`];
-  }
-
-  function canModule(moduleKey) {
-    if (!userAccess) return false;
-    return (userAccess.allowed_modules || []).includes(moduleKey);
+    if (adminAccess) return true;
+    return !!permissions[`can_${action}`];
   }
 
   function canAccessSquad(squadId) {
@@ -229,20 +237,11 @@ export function WorkspaceProvider({ children }) {
   }
 
   // Seguridad: valida si la página (path) puede verse desde el área activa y el rol del usuario.
+  // Administradores tienen acceso total, sin importar el área activa (bypass sticky).
   function canSeePath(path) {
-    // Administración es global y sticky: siempre accesible para admins, sin importar el área activa.
-    if (path === "/admin") return adminAccess;
+    if (adminAccess) return true;
     if (!activeAreaId) return false;
-    if (activeAreaId === "cuerpo_tecnico") {
-      const pages = CUERPO_TECNICO_ROLE_PAGES[userAccess?.role];
-      if (pages === undefined) return false;
-      if (pages === null) return true;
-      return pages.includes(path);
-    }
-    const pages = AREA_PAGES[activeAreaId];
-    if (pages === undefined) return false;
-    if (pages === null) return true;
-    return pages.includes(path);
+    return (pagesByArea[activeAreaId] || []).includes(path);
   }
 
   // ── Loading state (solo bloquea en la carga inicial de la sesión) ───────
@@ -306,8 +305,30 @@ export function WorkspaceProvider({ children }) {
     );
   }
 
+  // ── No areas assigned ────────────────────────────────────────────────────
+  if (!adminAccess && myAreas.length === 0) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
+        <div className="w-full max-w-sm text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto">
+            <span className="text-yellow-400 text-xl">⚠</span>
+          </div>
+          <h2 className="text-white font-bold text-lg">Sin roles/áreas asignadas</h2>
+          <p className="text-zinc-400 text-sm">
+            Tu usuario no tiene ningún rol asignado. Contactá al administrador para que te asigne un rol en Administración → Roles, Áreas y Permisos.
+          </p>
+          <button
+            onClick={() => base44.auth.logout(window.location.origin)}
+            className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
+            Cerrar sesión
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // ── No squads assigned ──────────────────────────────────────────────────
-  if (!userAccess.can_admin && mySquads.length === 0) {
+  if (!adminAccess && mySquads.length === 0) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
         <div className="w-full max-w-sm text-center space-y-4">
@@ -361,7 +382,6 @@ export function WorkspaceProvider({ children }) {
       loadingWorkspace,
       reloadWorkspace: loadWorkspace,
       can,
-      canModule,
       canAccessSquad,
       myAreas,
       activeAreaId,
@@ -372,16 +392,18 @@ export function WorkspaceProvider({ children }) {
       activeSquadId: activeSquad?.id || null,
       activeSquadName: activeSquad?.name || "",
       activeSeasonId: activeSquad?.season || null,
-      // Global, sticky para la sesión — nunca depende del plantel activo.
+      // Global, sticky para la sesión — nunca depende del plantel ni del área activa.
       isAdmin: adminAccess,
-      canManageUsers: userAccess?.can_manage_users || false,
+      canManageUsers: adminAccess,
+      roleNames,
+      permissions,
       debugInfo: {
         user_email: user?.email || null,
         platform_role: user?.role || null,
-        business_role: userAccess?.role || null,
-        can_admin: userAccess?.can_admin || false,
+        role_names: roleNames,
+        can_admin: permissions.can_admin || false,
         admin_locked_for_session: adminLockRef.current,
-        allowed_modules: userAccess?.allowed_modules || [],
+        allowed_areas: myAreas.map(a => a.id),
         active_squad_id: activeSquad?.id || null,
         active_season_id: activeSquad?.season || null,
         loading_workspace: loadingWorkspace,
@@ -397,5 +419,3 @@ export function useWorkspace() {
   if (!ctx) throw new Error("useWorkspace must be used within WorkspaceProvider");
   return ctx;
 }
-
-export { ROLE_DEFAULTS };

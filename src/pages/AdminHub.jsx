@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Lock, Users, Fingerprint, ShieldCheck, UserCog,
-  Settings, Wrench, ClipboardList, ChevronRight, Bug
+  Settings, Wrench, ClipboardList, ChevronRight, Bug, KeyRound
 } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AdminAccessDebugPanel from "@/components/workspace/AdminAccessDebugPanel";
@@ -13,6 +13,7 @@ import StaffManager from "@/pages/StaffManager";
 import AdminTools from "@/components/admin/AdminTools";
 import AdminConfig from "@/components/admin/AdminConfig";
 import AdminAudit from "@/components/admin/AdminAudit";
+import RolesPermissions from "@/pages/RolesPermissions";
 
 const SECTIONS = [
   {
@@ -23,6 +24,15 @@ const SECTIONS = [
     bg: "bg-blue-500/10 border-blue-500/20",
     description: "Usuarios, roles, permisos, planteles asignados e invitaciones",
     tags: ["Usuarios", "Roles", "Permisos", "Planteles asignados", "Invitaciones", "Auditoría"],
+  },
+  {
+    id: "roles",
+    label: "Roles, Áreas y Permisos",
+    icon: KeyRound,
+    color: "text-red-400",
+    bg: "bg-red-500/10 border-red-500/20",
+    description: "Crear roles, asignar áreas, páginas permitidas y permisos por acción",
+    tags: ["Crear roles", "Áreas por rol", "Páginas por rol", "Permisos por acción"],
   },
   {
     id: "players",
@@ -137,6 +147,7 @@ export default function AdminHub() {
   function renderContent() {
     switch (activeSection) {
       case "users":    return <UsersAccess />;
+      case "roles":    return <RolesPermissions />;
       case "players":  return <PlayerAdmin />;
       case "identity": return <PlayerIdentity />;
       case "squads":   return <SquadManager />;

@@ -10,32 +10,32 @@ import UserProfileModal from "@/components/workspace/UserProfileModal";
 import { useAuth } from "@/lib/AuthContext";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
-// module key → path and label mapping
+// Ítems de navegación — visibilidad determinada por canSeePath(path), según roles/áreas dinámicos
 const NAV_ITEMS = [
-  { module: "dashboard",         label: "Dashboard",         path: "/",                icon: LayoutDashboard },
-  // "sessions" group — shown if any child module is allowed
-  { module: "sessions",          label: "Sesiones",          path: "/sessions",        icon: Video,    group: "sesiones" },
-  { module: "field_library",     label: "Biblioteca Campo",  path: "/field-library",   icon: BookOpen, group: "sesiones" },
-  { module: "strength_library",  label: "Biblioteca Fuerza", path: "/strength-library",icon: Dumbbell, group: "sesiones" },
-  { module: "matches",           label: "Partidos",          path: "/matches",         icon: Trophy },
-  { module: "tactical",          label: "Mapa táctico",      path: "/tactical",        icon: Map },
-  // "performance" group — shown if any child module is allowed
-  { module: "performance",       label: "Carga Externa",     path: "/performance/external-load", icon: Gauge,     group: "rendimiento" },
-  { module: "performance",       label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
-  { module: "performance",       label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
-  { module: "performance",       label: "Nutrición",         path: "/performance/nutrition",     icon: Apple,     group: "rendimiento" },
-  { module: "performance",       label: "Minutos Jugados",   path: "/performance/minutes",       icon: Clock,     group: "rendimiento" },
-  { module: "schedule",          label: "Calendario",        path: "/schedule",        icon: CalendarDays },
-  { module: "team",              label: "Cuerpo Técnico",    path: "/team",            icon: UsersRound },
-  { module: "weekly_planner",    label: "Plan Semanal",      path: "/weekly-planner",  icon: ClipboardList },
-  { module: "daily_squad",       label: "Estado del Plantel",path: "/daily-squad",     icon: ShieldCheck },
-  { module: "squad_manager",     label: "Planteles",         path: "/squad-manager",   icon: Users },
-  { module: "admin",             label: "Administración",    path: "/admin",           icon: Settings2 },
+  { label: "Dashboard",         path: "/",                icon: LayoutDashboard },
+  // "sessions" group — shown if any child page is allowed
+  { label: "Sesiones",          path: "/sessions",        icon: Video,    group: "sesiones" },
+  { label: "Biblioteca Campo",  path: "/field-library",   icon: BookOpen, group: "sesiones" },
+  { label: "Biblioteca Fuerza", path: "/strength-library",icon: Dumbbell, group: "sesiones" },
+  { label: "Partidos",          path: "/matches",         icon: Trophy },
+  { label: "Mapa táctico",      path: "/tactical",        icon: Map },
+  // "performance" group — shown if any child page is allowed
+  { label: "Carga Externa",     path: "/performance/external-load", icon: Gauge,     group: "rendimiento" },
+  { label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
+  { label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
+  { label: "Nutrición",         path: "/performance/nutrition",     icon: Apple,     group: "rendimiento" },
+  { label: "Minutos Jugados",   path: "/performance/minutes",       icon: Clock,     group: "rendimiento" },
+  { label: "Calendario",        path: "/schedule",        icon: CalendarDays },
+  { label: "Cuerpo Técnico",    path: "/team",            icon: UsersRound },
+  { label: "Plan Semanal",      path: "/weekly-planner",  icon: ClipboardList },
+  { label: "Estado del Plantel",path: "/daily-squad",     icon: ShieldCheck },
+  { label: "Planteles",         path: "/squad-manager",   icon: Users },
+  { label: "Administración",    path: "/admin",           icon: Settings2 },
 ];
 
 const SESSION_PATHS = ["/sessions", "/field-library", "/strength-library"];
 const PERFORMANCE_PATHS = ["/performance/external-load", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes"];
-const BEFORE_PERFORMANCE_MODULES = ["matches", "tactical"];
+const BEFORE_PERFORMANCE_PATHS = ["/matches", "/tactical"];
 
 export default function Sidebar() {
   const location = useLocation();
@@ -44,23 +44,17 @@ export default function Sidebar() {
   const [performanceOpen, setPerformanceOpen] = useState(PERFORMANCE_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
-  const { canModule, isAdmin, activeAreaName, canSeePath, requestAreaChange, myAreas } = useWorkspace();
+  const { isAdmin, activeAreaName, canSeePath, requestAreaChange, myAreas } = useWorkspace();
 
-  // Administración es un módulo GLOBAL: depende únicamente de isAdmin (rol/permiso de admin),
-  // nunca del plantel activo ni de si el workspace está recargando en segundo plano.
-  // isAdmin es "sticky" durante la sesión (ver WorkspaceContext), por eso nunca parpadea.
+  // canSeePath ya contempla el bypass sticky de administrador (isAdmin) y el área activa.
   function canSee(item) {
-    if (item.module === "admin") {
-      console.info(`[Sidebar] Administración ${isAdmin ? "visible" : "oculta"} — motivo: isAdmin=${isAdmin} (independiente del plantel activo)`);
-      return isAdmin;
-    }
-    return canModule(item.module) && canSeePath(item.path);
+    return canSeePath(item.path);
   }
   const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canSee(i));
   const performanceItems = NAV_ITEMS.filter(i => i.group === "rendimiento" && canSee(i));
   const topItems = NAV_ITEMS.filter(i => !i.group && canSee(i));
-  const beforePerformanceItems = topItems.filter(i => BEFORE_PERFORMANCE_MODULES.includes(i.module));
-  const afterPerformanceItems = topItems.filter(i => i.module !== "dashboard" && !BEFORE_PERFORMANCE_MODULES.includes(i.module));
+  const beforePerformanceItems = topItems.filter(i => BEFORE_PERFORMANCE_PATHS.includes(i.path));
+  const afterPerformanceItems = topItems.filter(i => i.path !== "/" && !BEFORE_PERFORMANCE_PATHS.includes(i.path));
 
   function NavLink({ item }) {
     const isActive = location.pathname === item.path;
@@ -112,7 +106,7 @@ export default function Sidebar() {
         <nav className="p-3 space-y-0.5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 148px)" }}>
 
           {/* Top-level items before session group */}
-          {topItems.filter(i => i.module === "dashboard").map(i => <NavLink key={i.path} item={i} />)}
+          {topItems.filter(i => i.path === "/").map(i => <NavLink key={i.path} item={i} />)}
 
           {/* Sessions group */}
           {sessionItems.length > 0 && (
