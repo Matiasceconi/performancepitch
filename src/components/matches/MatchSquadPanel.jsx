@@ -117,9 +117,13 @@ export default function MatchSquadPanel({ match, players, onMatchUpdated, squadI
         const map = {};
         records.forEach(r => {
           if (r.player_id && !(r.player_id in map)) {
+            // Registros antiguos no tienen el campo is_starter guardado (undefined).
+            // Para esos, se infiere titular si jugó 60 minutos o más.
+            const hasExplicitStarter = Object.prototype.hasOwnProperty.call(r, "is_starter") && r.is_starter !== null && r.is_starter !== undefined;
+            const isStarter = hasExplicitStarter ? !!r.is_starter : (r.minutes || 0) >= 60;
             map[r.player_id] = {
               minutes: r.minutes ?? "",
-              is_starter: !!r.is_starter,
+              is_starter: isStarter,
               sub_in_minute: r.sub_in_minute ?? "",
             };
           }
