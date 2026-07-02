@@ -1,5 +1,6 @@
-import React from "react";
-import { Calendar, Users, Clock, ChevronRight, Trash2, Dumbbell, Zap, Video, FileText } from "lucide-react";
+import React, { useState } from "react";
+import { Calendar, Users, Clock, ChevronRight, Trash2, Dumbbell, Zap, Video, FileText, Eye } from "lucide-react";
+import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
 import moment from "moment";
 
 const TYPE_COLORS = {
@@ -14,7 +15,9 @@ const TYPE_COLORS = {
 
 const actionBtn = "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors whitespace-nowrap";
 
-export default function SessionList({ sessions, onSelect, onDelete, hasFilters = false, exerciseCounts = {} }) {
+export default function SessionList({ sessions, onSelect, onDelete, hasFilters = false, exerciseCounts = {}, videoLinksBySession = {} }) {
+  const [preview, setPreview] = useState(null);
+
   if (sessions.length === 0) {
     return (
       <div className="text-center py-16 text-zinc-600">
@@ -30,7 +33,8 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
         const typeClass = TYPE_COLORS[session.session_type] || TYPE_COLORS["Otro"];
         const exercisesCount = exerciseCounts[session.id] || 0;
         const hasGPS = !!session.csv_label;
-        const hasVideo = !!session.video_url;
+        const sessionVideoLinks = videoLinksBySession[session.id] || [];
+        const hasVideo = !!session.video_url || sessionVideoLinks.length > 0;
         const hasPDF = !!session.pdf_exported;
 
         return (
@@ -85,10 +89,14 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
                   <Zap size={11} /> GPS
                 </button>
                 {hasVideo ? (
-                  <a href={session.video_url} target="_blank" rel="noreferrer"
+                  <button
+                    onClick={() => setPreview({
+                      url: session.video_url || sessionVideoLinks[0].video_url,
+                      title: session.video_url ? session.title : sessionVideoLinks[0].title,
+                    })}
                     className={`${actionBtn} bg-blue-500/15 border-blue-500/30 text-blue-300 hover:bg-blue-500/25`}>
-                    <Video size={11} /> Ver video
-                  </a>
+                    <Eye size={11} /> Ver video
+                  </button>
                 ) : (
                   <span className={`${actionBtn} bg-zinc-800/50 border-zinc-800 text-zinc-600`}>
                     <Video size={11} /> Sin video
@@ -108,6 +116,8 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
           </div>
         );
       })}
+
+      {preview && <VideoPreviewModal url={preview.url} title={preview.title} onClose={() => setPreview(null)} />}
     </div>
   );
 }

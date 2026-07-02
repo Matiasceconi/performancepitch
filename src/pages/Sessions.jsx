@@ -17,6 +17,7 @@ export default function Sessions() {
   const [selectedSession, setSelectedSession] = useState(null);
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [exerciseCounts, setExerciseCounts] = useState({});
+  const [videoLinksBySession, setVideoLinksBySession] = useState({});
   const [selectedTab, setSelectedTab] = useState("players");
   const [autoOpenPDF, setAutoOpenPDF] = useState(false);
   const { toast } = useToast();
@@ -28,7 +29,8 @@ export default function Sessions() {
     Promise.all([
       base44.entities.TrainingSession.list("-date", 200),
       base44.entities.SessionExercise.list("-order", 3000),
-    ]).then(([all, allExercises]) => {
+      base44.entities.SessionVideoLink.list("-created_date", 1000),
+    ]).then(([all, allExercises, allVideoLinks]) => {
       const filtered = activeSquadId
         ? all.filter(s => s.squad_id === activeSquadId)
         : all;
@@ -36,6 +38,12 @@ export default function Sessions() {
       const counts = {};
       allExercises.forEach(ex => { counts[ex.session_id] = (counts[ex.session_id] || 0) + 1; });
       setExerciseCounts(counts);
+      const linksMap = {};
+      allVideoLinks.forEach(l => {
+        if (!linksMap[l.session_id]) linksMap[l.session_id] = [];
+        linksMap[l.session_id].push(l);
+      });
+      setVideoLinksBySession(linksMap);
       setLoading(false);
 
       const urlParams = new URLSearchParams(window.location.search);
@@ -149,7 +157,7 @@ export default function Sessions() {
         ) : (
           <>
             <SessionFilters filters={filters} onChange={setFilters} />
-            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} />
+            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} videoLinksBySession={videoLinksBySession} />
           </>
         )
       )}
