@@ -3,10 +3,11 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Video, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound,
   CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen,
-  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock
+  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock, Bug
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
+import AdminAccessDebugPanel from "@/components/workspace/AdminAccessDebugPanel";
 import { useAuth } from "@/lib/AuthContext";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
@@ -43,14 +44,18 @@ export default function Sidebar() {
   const [sessionsOpen, setSessionsOpen] = useState(SESSION_PATHS.includes(location.pathname));
   const [performanceOpen, setPerformanceOpen] = useState(PERFORMANCE_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const { user } = useAuth();
-  const { canModule, isAdmin, userAccess, loadingWorkspace } = useWorkspace();
+  const { canModule, isAdmin } = useWorkspace();
 
-  // Filter items by permission; admins always see the admin module
-  // While workspace is loading, show all items to avoid flicker/disappearing
+  // Administración es un módulo GLOBAL: depende únicamente de isAdmin (rol/permiso de admin),
+  // nunca del plantel activo ni de si el workspace está recargando en segundo plano.
+  // isAdmin es "sticky" durante la sesión (ver WorkspaceContext), por eso nunca parpadea.
   function canSee(item) {
-    if (loadingWorkspace) return true;
-    if (item.module === "admin" && isAdmin) return true;
+    if (item.module === "admin") {
+      console.info(`[Sidebar] Administración ${isAdmin ? "visible" : "oculta"} — motivo: isAdmin=${isAdmin} (independiente del plantel activo)`);
+      return isAdmin;
+    }
     return canModule(item.module);
   }
   const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canSee(i));
@@ -180,10 +185,10 @@ export default function Sidebar() {
         </nav>
 
         {/* User footer */}
-        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-zinc-800 bg-zinc-950">
+        <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-zinc-800 bg-zinc-950 flex items-center gap-1.5">
           <button
             onClick={() => setShowProfile(true)}
-            className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-left group"
+            className="flex-1 flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-left group min-w-0"
           >
             <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
               {user?.photo_url
@@ -197,6 +202,14 @@ export default function Sidebar() {
             </div>
             <LogOut size={13} className="text-zinc-600 group-hover:text-zinc-400 transition-colors shrink-0" />
           </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowDebug(true)}
+              title="Diagnóstico de acceso a Administración"
+              className="p-2 rounded-lg text-zinc-600 hover:text-yellow-400 hover:bg-zinc-800 transition-colors shrink-0">
+              <Bug size={14} />
+            </button>
+          )}
         </div>
 
         <button onClick={() => setOpen(false)} className="lg:hidden absolute top-4 right-4 text-zinc-500">
@@ -205,6 +218,7 @@ export default function Sidebar() {
       </aside>
 
       {showProfile && <UserProfileModal onClose={() => setShowProfile(false)} />}
+      {showDebug && <AdminAccessDebugPanel onClose={() => setShowDebug(false)} />}
     </>
   );
 }

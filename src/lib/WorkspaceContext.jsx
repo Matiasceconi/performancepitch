@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
@@ -29,6 +29,15 @@ export function WorkspaceProvider({ children }) {
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
   const [workspaceError, setWorkspaceError] = useState(null);
   const [needSquadSelection, setNeedSquadSelection] = useState(false);
+  const [adminAccess, setAdminAccess] = useState(false);
+
+  // Solo la primera carga bloquea toda la pantalla. Recargas posteriores (reloadWorkspace)
+  // no deben desmontar el Sidebar ni ocultar módulos globales como Administración.
+  const hasLoadedOnceRef = useRef(false);
+  // Una vez confirmado el permiso de admin en la sesión, queda "trabado" en true:
+  // así una falla transitoria al recargar el workspace (red, rate limit, etc.)
+  // nunca hace que Administración desaparezca del menú a mitad de sesión.
+  const adminLockRef = useRef(false);
 
   const loadWorkspace = useCallback(async () => {
     if (!isAuthenticated || !user) {
@@ -73,6 +82,21 @@ export function WorkspaceProvider({ children }) {
 
       setUserAccess(access);
 
+      // Permiso de Administración: depende únicamente del rol/permisos del usuario,
+      // NUNCA del plantel activo. Es "sticky" durante la sesión: una vez true, no vuelve a false.
+      const resolvedAdmin = !!access?.can_admin;
+      if (resolvedAdmin) adminLockRef.current = true;
+      setAdminAccess(adminLockRef.current);
+
+      console.info("[Workspace] Diagnóstico de acceso", {
+        user_email: user.email,
+        platform_role: user.role,
+        business_role: access?.role || null,
+        can_admin_this_load: resolvedAdmin,
+        admin_locked_for_session: adminLockRef.current,
+        allowed_modules: access?.allowed_modules || [],
+      });
+
       // 5. Determine which squads this user can access
       const mySquads = access?.all_squads
         ? allSquads
@@ -114,8 +138,14 @@ export function WorkspaceProvider({ children }) {
       }
     } catch (err) {
       console.error("WorkspaceContext error:", err);
-      setWorkspaceError(err?.message || "Error al cargar el espacio de trabajo.");
+      console.warn("[Workspace] Falla al cargar el workspace — Administración se mantiene según el último estado confirmado (admin_locked_for_session):", adminLockRef.current);
+      // Solo mostramos la pantalla de error bloqueante en la carga inicial.
+      // En recargas posteriores, un error transitorio no debe tirar abajo toda la app ni el menú.
+      if (!hasLoadedOnceRef.current) {
+        setWorkspaceError(err?.message || "Error al cargar el espacio de trabajo.");
+      }
     } finally {
+      hasLoadedOnceRef.current = true;
       setLoadingWorkspace(false);
     }
   }, [isAuthenticated, user]);
@@ -151,8 +181,8 @@ export function WorkspaceProvider({ children }) {
     return (userAccess.squad_ids || []).includes(squadId);
   }
 
-  // ── Loading state ───────────────────────────────────────────────────────
-  if (loadingWorkspace) {
+  // ── Loading state (solo bloquea en la carga inicial de la sesión) ───────
+  if (loadingWorkspace && !hasLoadedOnceRef.current) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -259,8 +289,21 @@ export function WorkspaceProvider({ children }) {
       canAccessSquad,
       activeSquadId: activeSquad?.id || null,
       activeSquadName: activeSquad?.name || "",
-      isAdmin: userAccess?.can_admin || false,
+      activeSeasonId: activeSquad?.season || null,
+      // Global, sticky para la sesión — nunca depende del plantel activo.
+      isAdmin: adminAccess,
       canManageUsers: userAccess?.can_manage_users || false,
+      debugInfo: {
+        user_email: user?.email || null,
+        platform_role: user?.role || null,
+        business_role: userAccess?.role || null,
+        can_admin: userAccess?.can_admin || false,
+        admin_locked_for_session: adminLockRef.current,
+        allowed_modules: userAccess?.allowed_modules || [],
+        active_squad_id: activeSquad?.id || null,
+        active_season_id: activeSquad?.season || null,
+        loading_workspace: loadingWorkspace,
+      },
     }}>
       {children}
     </WorkspaceContext.Provider>
