@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { base44 } from "@/api/base44Client";
-import { Star, Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Star, Search, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 
 const METHOD_COLORS = {
@@ -25,6 +26,7 @@ export default function StrengthLibraryPanel() {
   const [filterMethod, setFilterMethod] = useState("");
   const [sortBy, setSortBy] = useState("times_used");
   const [expanded, setExpanded] = useState({});
+  const { toast } = useToast();
 
   useEffect(() => {
     base44.entities.StrengthExerciseLibrary.list("-times_used", 500).then(data => {
@@ -37,6 +39,13 @@ export default function StrengthLibraryPanel() {
   async function toggleFavorite(ex) {
     const updated = await base44.entities.StrengthExerciseLibrary.update(ex.id, { favorite: !ex.favorite });
     setExercises(prev => prev.map(e => e.id === ex.id ? { ...e, ...updated } : e));
+  }
+
+  async function handleDelete(ex) {
+    if (!window.confirm(`¿Eliminar "${ex.name}" de la biblioteca?`)) return;
+    await base44.entities.StrengthExerciseLibrary.delete(ex.id);
+    setExercises(prev => prev.filter(e => e.id !== ex.id));
+    toast({ title: "✓ Ejercicio eliminado de la biblioteca" });
   }
 
   const filtered = exercises
@@ -126,6 +135,9 @@ export default function StrengthLibraryPanel() {
                     <button onClick={() => setExpanded(p => ({ ...p, [ex.id]: !p[ex.id] }))}
                       className="p-1 text-zinc-500 hover:text-white transition-colors">
                       {isExp ? <ChevronUp size={13} /> : <ChevronDown size={13} />}
+                    </button>
+                    <button onClick={() => handleDelete(ex)} className="p-1 text-zinc-500 hover:text-red-400 transition-colors">
+                      <Trash2 size={13} />
                     </button>
                   </div>
                 </div>
