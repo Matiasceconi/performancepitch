@@ -8,7 +8,7 @@
     },
     "station_number": {
       "type": "number",
-      "description": "N\u00famero de estaci\u00f3n"
+      "description": "N\u00famero de fila"
     },
     "order": {
       "type": "number",
@@ -17,55 +17,23 @@
     },
     "image_url": {
       "type": "string",
-      "description": "Imagen del ejercicio"
+      "description": "Imagen del ejercicio (heredada de biblioteca)"
     },
     "method": {
       "type": "string",
-      "enum": [
-        "Din\u00e1micos",
-        "Bal\u00edsticos",
-        "Biseries",
-        "Triseries",
-        "Contrastes",
-        "Complejos",
-        "Isom\u00e9tricos",
-        "Exc\u00e9ntricos",
-        "Preventivos",
-        "Otro"
-      ],
-      "description": "M\u00e9todo de trabajo"
+      "description": "M\u00e9todo de trabajo (ej: Din\u00e1micos, Contrastes)"
     },
     "exercise_type": {
       "type": "string",
-      "enum": [
-        "Esfuerzos repetidos",
-        "Esfuerzos din\u00e1micos",
-        "Antagonistas",
-        "Pliom\u00e9trico HI",
-        "S/CEA Estato/Din\u00e1mico",
-        "Potencia",
-        "Fuerza m\u00e1xima",
-        "Hipertrofia",
-        "Preventivo",
-        "Otro"
-      ],
-      "description": "Tipo de trabajo"
+      "description": "Tipo de trabajo (ej: Potencia, Fuerza m\u00e1xima)"
     },
     "exercise_name": {
       "type": "string",
-      "description": "Nombre del ejercicio (ej: Hip Thrust Asim\u00e9trico)"
+      "description": "Nombre del ejercicio"
     },
     "volume": {
       "type": "string",
       "description": "Volumen en formato libre (ej: 3x8, 3+3, 12+12)"
-    },
-    "indications": {
-      "type": "string",
-      "description": "Indicaciones t\u00e9cnicas"
-    },
-    "compensations": {
-      "type": "string",
-      "description": "Compensaciones"
     },
     "notes": {
       "type": "string",
