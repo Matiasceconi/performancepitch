@@ -10,31 +10,32 @@ import UserProfileModal from "@/components/workspace/UserProfileModal";
 import { useAuth } from "@/lib/AuthContext";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
-// Ítems de navegación — visibilidad determinada por canSeePath(path), según roles/áreas dinámicos
+// module key → path and label mapping
 const NAV_ITEMS = [
-  { label: "Dashboard",         path: "/",                icon: LayoutDashboard },
-  // "sessions" group — shown if any child page is allowed
-  { label: "Sesiones",          path: "/sessions",        icon: Video,    group: "sesiones" },
-  { label: "Biblioteca Campo",  path: "/field-library",   icon: BookOpen, group: "sesiones" },
-  { label: "Biblioteca Fuerza", path: "/strength-library",icon: Dumbbell, group: "sesiones" },
-  { label: "Partidos",          path: "/matches",         icon: Trophy },
-  { label: "Mapa táctico",      path: "/tactical",        icon: Map },
-  // "performance" group — shown if any child page is allowed
-  { label: "Carga Externa",     path: "/performance/external-load", icon: Gauge,     group: "rendimiento" },
-  { label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
-  { label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
-  { label: "Nutrición",         path: "/performance/nutrition",     icon: Apple,     group: "rendimiento" },
-  { label: "Minutos Jugados",   path: "/performance/minutes",       icon: Clock,     group: "rendimiento" },
-  { label: "Calendario",        path: "/schedule",        icon: CalendarDays },
-  { label: "Cuerpo Técnico",    path: "/team",            icon: UsersRound },
-  { label: "Plan Semanal",      path: "/weekly-planner",  icon: ClipboardList },
-  { label: "Estado del Plantel",path: "/daily-squad",     icon: ShieldCheck },
-  { label: "Planteles",         path: "/squad-manager",   icon: Users },
+  { module: "dashboard",         label: "Dashboard",         path: "/",                icon: LayoutDashboard },
+  // "sessions" group — shown if any child module is allowed
+  { module: "sessions",          label: "Sesiones",          path: "/sessions",        icon: Video,    group: "sesiones" },
+  { module: "field_library",     label: "Biblioteca Campo",  path: "/field-library",   icon: BookOpen, group: "sesiones" },
+  { module: "strength_library",  label: "Biblioteca Fuerza", path: "/strength-library",icon: Dumbbell, group: "sesiones" },
+  { module: "matches",           label: "Partidos",          path: "/matches",         icon: Trophy },
+  { module: "tactical",          label: "Mapa táctico",      path: "/tactical",        icon: Map },
+  // "performance" group — shown if any child module is allowed
+  { module: "performance",       label: "Carga Externa",     path: "/performance/external-load", icon: Gauge,     group: "rendimiento" },
+  { module: "performance",       label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
+  { module: "performance",       label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
+  { module: "performance",       label: "Nutrición",         path: "/performance/nutrition",     icon: Apple,     group: "rendimiento" },
+  { module: "performance",       label: "Minutos Jugados",   path: "/performance/minutes",       icon: Clock,     group: "rendimiento" },
+  { module: "schedule",          label: "Calendario",        path: "/schedule",        icon: CalendarDays },
+  { module: "team",              label: "Cuerpo Técnico",    path: "/team",            icon: UsersRound },
+  { module: "weekly_planner",    label: "Plan Semanal",      path: "/weekly-planner",  icon: ClipboardList },
+  { module: "daily_squad",       label: "Estado del Plantel",path: "/daily-squad",     icon: ShieldCheck },
+  { module: "squad_manager",     label: "Planteles",         path: "/squad-manager",   icon: Users },
+  { module: "admin",             label: "Administración",    path: "/admin",           icon: Settings2 },
 ];
 
 const SESSION_PATHS = ["/sessions", "/field-library", "/strength-library"];
 const PERFORMANCE_PATHS = ["/performance/external-load", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes"];
-const BEFORE_PERFORMANCE_PATHS = ["/matches", "/tactical"];
+const BEFORE_PERFORMANCE_MODULES = ["matches", "tactical"];
 
 export default function Sidebar() {
   const location = useLocation();
@@ -43,20 +44,23 @@ export default function Sidebar() {
   const [performanceOpen, setPerformanceOpen] = useState(PERFORMANCE_PATHS.includes(location.pathname));
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
-  const { isAdmin, activeAreaName, canSeePath, requestAreaChange, myAreas } = useWorkspace();
+  const { canModule, isAdmin, activeAreaName, canSeePath, requestAreaChange, myAreas } = useWorkspace();
 
-  // canSeePath ya contempla el bypass sticky de administrador (isAdmin) y el área activa.
+  // Administración es un módulo GLOBAL: depende únicamente de isAdmin (rol/permiso de admin),
+  // nunca del plantel activo ni de si el workspace está recargando en segundo plano.
+  // isAdmin es "sticky" durante la sesión (ver WorkspaceContext), por eso nunca parpadea.
   function canSee(item) {
-    return canSeePath(item.path);
+    if (item.module === "admin") {
+      console.info(`[Sidebar] Administración ${isAdmin ? "visible" : "oculta"} — motivo: isAdmin=${isAdmin} (independiente del plantel activo)`);
+      return isAdmin;
+    }
+    return canModule(item.module) && canSeePath(item.path);
   }
-  // Dashboard ("Inicio") y Administración son módulos de PLATAFORMA: no dependen del área activa.
-  // Administración depende únicamente del permiso de administrador del usuario, nunca del área.
-  const dashboardItem = NAV_ITEMS.find(i => i.path === "/");
   const sessionItems = NAV_ITEMS.filter(i => i.group === "sesiones" && canSee(i));
   const performanceItems = NAV_ITEMS.filter(i => i.group === "rendimiento" && canSee(i));
-  const topItems = NAV_ITEMS.filter(i => !i.group && i.path !== "/" && canSee(i));
-  const beforePerformanceItems = topItems.filter(i => BEFORE_PERFORMANCE_PATHS.includes(i.path));
-  const afterPerformanceItems = topItems.filter(i => !BEFORE_PERFORMANCE_PATHS.includes(i.path));
+  const topItems = NAV_ITEMS.filter(i => !i.group && canSee(i));
+  const beforePerformanceItems = topItems.filter(i => BEFORE_PERFORMANCE_MODULES.includes(i.module));
+  const afterPerformanceItems = topItems.filter(i => i.module !== "dashboard" && !BEFORE_PERFORMANCE_MODULES.includes(i.module));
 
   function NavLink({ item }) {
     const isActive = location.pathname === item.path;
@@ -92,10 +96,14 @@ export default function Sidebar() {
             <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Defensa y Justicia</h1>
             <p className="text-xs mt-0.5" style={{ color: "#F0C800" }}>PerformancePitch</p>
           </div>
-          {activeAreaName && (
-            <div className="px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800">
-              <span className="text-xs text-zinc-300 truncate block">{activeAreaName}</span>
-            </div>
+          {myAreas.length > 1 && (
+            <button
+              onClick={requestAreaChange}
+              className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-colors text-left"
+            >
+              <span className="text-xs text-zinc-300 truncate">{activeAreaName || "Área"}</span>
+              <Repeat size={12} className="text-zinc-500 shrink-0" />
+            </button>
           )}
           <SquadSelector />
         </div>
@@ -103,32 +111,8 @@ export default function Sidebar() {
         {/* Nav */}
         <nav className="p-3 space-y-0.5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 148px)" }}>
 
-          {/* ── PLATAFORMA — global, no depende del área activa ────────────── */}
-          <p className="px-3 pt-1 pb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Plataforma</p>
-          {dashboardItem && <NavLink item={dashboardItem} />}
-          {myAreas.length > 1 && (
-            <button
-              onClick={requestAreaChange}
-              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-zinc-400 hover:text-white hover:bg-zinc-800/60 transition-all">
-              <Repeat size={18} />
-              Cambiar Área
-            </button>
-          )}
-          {isAdmin && (
-            <Link
-              to="/admin"
-              onClick={() => setOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                location.pathname === "/admin" ? "text-zinc-900 font-semibold" : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"
-              }`}
-              style={location.pathname === "/admin" ? { backgroundColor: "#F0C800", color: "#1a1a1a" } : {}}>
-              <Settings2 size={18} />
-              Administración
-            </Link>
-          )}
-
-          {/* ── ÁREA DE TRABAJO — cambia según el área seleccionada ────────── */}
-          <p className="px-3 pt-3 pb-1.5 text-[10px] font-semibold text-zinc-600 uppercase tracking-wider">Área de Trabajo</p>
+          {/* Top-level items before session group */}
+          {topItems.filter(i => i.module === "dashboard").map(i => <NavLink key={i.path} item={i} />)}
 
           {/* Sessions group */}
           {sessionItems.length > 0 && (

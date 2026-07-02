@@ -1,33 +1,93 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { X, Shield, Check, Mail } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { ROLE_DEFAULTS } from "@/lib/WorkspaceContext";
+
+const ROLES = Object.keys(ROLE_DEFAULTS);
+
+const MODULES = [
+  { key: "dashboard",        label: "Dashboard" },
+  { key: "daily_squad",      label: "Estado del Plantel" },
+  { key: "sessions",         label: "Sesiones" },
+  { key: "field_library",    label: "Bib. Campo" },
+  { key: "strength_library", label: "Bib. Fuerza" },
+  { key: "matches",          label: "Partidos" },
+  { key: "performance",      label: "Rendimiento" },
+  { key: "gps",              label: "GPS" },
+  { key: "tactical",         label: "Táctico" },
+  { key: "schedule",         label: "Calendario" },
+  { key: "team",             label: "Cuerpo Técnico" },
+  { key: "weekly_planner",   label: "Plan Semanal" },
+  { key: "squad_manager",    label: "Planteles" },
+  { key: "admin",            label: "Administración" },
+];
+
+const PERMS = [
+  { key: "can_create", label: "Crear" },
+  { key: "can_edit",   label: "Editar" },
+  { key: "can_delete", label: "Eliminar" },
+  { key: "can_export", label: "Exportar" },
+  { key: "can_admin",  label: "Admin" },
+  { key: "can_manage_users", label: "Gestionar usuarios" },
+];
 
 export default function StaffPermissionsModal({ member, squads, existingAccess, onSaved, onClose }) {
-  const [roles, setRoles] = useState([]);
-  const [loadingRoles, setLoadingRoles] = useState(true);
-  const [form, setForm] = useState(() => ({
-    user_email: existingAccess?.user_email || member.email || "",
-    role_ids: existingAccess?.role_ids || [],
-    all_squads: existingAccess?.all_squads || false,
-    squad_ids: existingAccess?.squad_ids || member.squad_ids || [],
-    squad_names: existingAccess?.squad_names || member.squad_names || [],
-    active: existingAccess ? existingAccess.active !== false : true,
-    notes: existingAccess?.notes || "",
-  }));
+  const [form, setForm] = useState(() => {
+    if (existingAccess) {
+      return {
+        user_email: existingAccess.user_email || member.email || "",
+        role: existingAccess.role || "Solo lectura",
+        all_squads: existingAccess.all_squads || false,
+        squad_ids: existingAccess.squad_ids || [],
+        squad_names: existingAccess.squad_names || [],
+        allowed_modules: existingAccess.allowed_modules || [],
+        can_create: existingAccess.can_create || false,
+        can_edit: existingAccess.can_edit || false,
+        can_delete: existingAccess.can_delete || false,
+        can_export: existingAccess.can_export || false,
+        can_admin: existingAccess.can_admin || false,
+        can_manage_users: existingAccess.can_manage_users || false,
+        active: existingAccess.active !== false,
+        notes: existingAccess.notes || "",
+      };
+    }
+    // New access: pre-fill email from staff member
+    const defaults = ROLE_DEFAULTS["Solo lectura"];
+    return {
+      user_email: member.email || "",
+      role: "Solo lectura",
+      all_squads: false,
+      squad_ids: member.squad_ids || [],
+      squad_names: member.squad_names || [],
+      allowed_modules: defaults.allowed_modules || [],
+      can_create: false, can_edit: false, can_delete: false,
+      can_export: false, can_admin: false, can_manage_users: false,
+      active: true, notes: "",
+    };
+  });
 
   const [saving, setSaving] = useState(false);
   const [inviting, setInviting] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    base44.entities.AppRole.filter({ active: true }, "name", 200).then(r => {
-      setRoles(r);
-      setLoadingRoles(false);
-    });
-  }, []);
-
   function setF(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  function applyRoleDefaults(role) {
+    const d = ROLE_DEFAULTS[role] || {};
+    setForm(f => ({
+      ...f,
+      role,
+      allowed_modules: d.allowed_modules || [],
+      can_create: d.can_create ?? false,
+      can_edit: d.can_edit ?? false,
+      can_delete: d.can_delete ?? false,
+      can_export: d.can_export ?? false,
+      can_admin: d.can_admin ?? false,
+      can_manage_users: d.can_manage_users ?? false,
+      all_squads: d.all_squads ?? false,
+    }));
+  }
 
   function toggleSquad(id) {
     setForm(f => {
@@ -37,10 +97,12 @@ export default function StaffPermissionsModal({ member, squads, existingAccess, 
     });
   }
 
-  function toggleRole(id) {
+  function toggleModule(key) {
     setForm(f => ({
       ...f,
-      role_ids: f.role_ids.includes(id) ? f.role_ids.filter(r => r !== id) : [...f.role_ids, id],
+      allowed_modules: f.allowed_modules.includes(key)
+        ? f.allowed_modules.filter(m => m !== key)
+        : [...f.allowed_modules, key],
     }));
   }
 
@@ -50,10 +112,8 @@ export default function StaffPermissionsModal({ member, squads, existingAccess, 
       return;
     }
     setSaving(true);
-    const roleNames = roles.filter(r => form.role_ids.includes(r.id)).map(r => r.name);
     const payload = {
       ...form,
-      role: roleNames.join(", "),
       staff_id: member.id,
       staff_name: `${member.first_name} ${member.last_name}`,
       user_name: `${member.first_name} ${member.last_name}`,
@@ -120,32 +180,14 @@ export default function StaffPermissionsModal({ member, squads, existingAccess, 
             <p className="text-[10px] text-zinc-600 mt-1">Envía una invitación para que el usuario pueda ingresar a la plataforma.</p>
           </div>
 
-          {/* Roles (multi) */}
+          {/* Role */}
           <div>
-            <label className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mb-2">
-              Roles asignados <span className="text-zinc-600 normal-case font-normal">(un usuario puede tener varios)</span>
-            </label>
-            {loadingRoles ? (
-              <p className="text-[10px] text-zinc-600">Cargando roles...</p>
-            ) : roles.length === 0 ? (
-              <p className="text-[10px] text-zinc-600">
-                No hay roles creados. Creá roles desde Administración → Roles, Áreas y Permisos.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {roles.map(r => (
-                  <button key={r.id} type="button" onClick={() => toggleRole(r.id)}
-                    className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${
-                      form.role_ids.includes(r.id)
-                        ? "bg-blue-500/20 border-blue-500/40 text-blue-300"
-                        : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:border-zinc-500"
-                    }`}>
-                    {form.role_ids.includes(r.id) && <Check size={8} className="inline mr-1" />}
-                    {r.name}
-                  </button>
-                ))}
-              </div>
-            )}
+            <label className="text-[10px] text-zinc-400 mb-1 block">Rol de plataforma</label>
+            <select value={form.role} onChange={e => applyRoleDefaults(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-xs text-white focus:outline-none">
+              {ROLES.map(r => <option key={r}>{r}</option>)}
+            </select>
+            <p className="text-[10px] text-zinc-600 mt-1">Al cambiar el rol se aplican los permisos por defecto de ese rol.</p>
           </div>
 
           {/* Planteles */}
@@ -174,6 +216,41 @@ export default function StaffPermissionsModal({ member, squads, existingAccess, 
                 {squads.length === 0 && <p className="text-[10px] text-zinc-600">No hay planteles creados.</p>}
               </div>
             )}
+          </div>
+
+          {/* Módulos */}
+          <div>
+            <label className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mb-2">Módulos habilitados</label>
+            <div className="flex flex-wrap gap-1.5">
+              {MODULES.map(m => (
+                <button key={m.key} type="button" onClick={() => toggleModule(m.key)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-medium border transition-colors ${
+                    form.allowed_modules.includes(m.key)
+                      ? "bg-blue-500/20 border-blue-500/40 text-blue-300"
+                      : "bg-zinc-800 border-zinc-700 text-zinc-500 hover:border-zinc-500"
+                  }`}>
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Permisos */}
+          <div>
+            <label className="text-[10px] text-zinc-400 font-semibold uppercase tracking-wider block mb-2">Permisos de acción</label>
+            <div className="flex flex-wrap gap-2">
+              {PERMS.map(p => (
+                <button key={p.key} type="button" onClick={() => setF(p.key, !form[p.key])}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-medium border transition-colors ${
+                    form[p.key]
+                      ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-300"
+                      : "bg-zinc-800 border-zinc-700 text-zinc-500"
+                  }`}>
+                  <span className={`w-2.5 h-2.5 rounded border ${form[p.key] ? "bg-emerald-400 border-emerald-400" : "border-zinc-600"}`} />
+                  {p.label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Active toggle */}

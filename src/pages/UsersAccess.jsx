@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { useWorkspace } from "@/lib/WorkspaceContext";
+import { useWorkspace, ROLE_DEFAULTS } from "@/lib/WorkspaceContext";
 import { useToast } from "@/components/ui/use-toast";
 import { Shield, UserX, UserCheck, Mail, Edit2, AlertTriangle, Users } from "lucide-react";
 import moment from "moment";
@@ -11,7 +11,6 @@ export default function UsersAccess() {
   const { toast } = useToast();
   const [accesses, setAccesses] = useState([]);
   const [staffMap, setStaffMap] = useState({}); // staffId → StaffMember
-  const [roleMap, setRoleMap] = useState({}); // roleId → AppRole
   const [orphanStaff, setOrphanStaff] = useState([]); // StaffMember sin UserAccess
   const [loading, setLoading] = useState(true);
   const [editAccess, setEditAccess] = useState(null); // { access, member }
@@ -19,21 +18,15 @@ export default function UsersAccess() {
 
   async function load() {
     setLoading(true);
-    const [allAccesses, allStaff, allRoles] = await Promise.all([
+    const [allAccesses, allStaff] = await Promise.all([
       base44.entities.UserAccess.list("-created_date", 200),
       base44.entities.StaffMember.filter({ active: true }, "first_name", 200),
-      base44.entities.AppRole.list("name", 200),
     ]);
 
     // Build staffMap
     const sMap = {};
     allStaff.forEach(s => { sMap[s.id] = s; });
     setStaffMap(sMap);
-
-    // Build roleMap
-    const rMap = {};
-    allRoles.forEach(r => { rMap[r.id] = r; });
-    setRoleMap(rMap);
 
     // StaffMember ids that have a UserAccess
     const withAccess = new Set(allAccesses.map(a => a.staff_id).filter(Boolean));
@@ -161,17 +154,9 @@ export default function UsersAccess() {
                     </div>
                   </td>
                   <td className="py-3 px-3">
-                    <div className="flex flex-wrap gap-1">
-                      {(acc.role_ids || []).length > 0 ? (acc.role_ids || []).map(rid => (
-                        <span key={rid} className="px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-300 text-[10px] font-medium">
-                          {roleMap[rid]?.name || "—"}
-                        </span>
-                      )) : (
-                        <span className="px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-500 text-[10px]">
-                          {acc.role || "Sin rol"}
-                        </span>
-                      )}
-                    </div>
+                    <span className="px-2 py-0.5 bg-zinc-800 border border-zinc-700 rounded-full text-zinc-300 text-[10px] font-medium">
+                      {acc.role}
+                    </span>
                   </td>
                   <td className="py-3 px-3 hidden sm:table-cell">
                     {acc.all_squads
