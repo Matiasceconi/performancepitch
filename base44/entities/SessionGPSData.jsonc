@@ -30,6 +30,10 @@
       "type": "number",
       "description": "Metros por minuto"
     },
+    "distance_14_19_8": {
+      "type": "number",
+      "description": "D 14,0-19,8 km/h (m)"
+    },
     "distance_19_8": {
       "type": "number",
       "description": "Distancia D 19,8-25,0 km/h (m)"
@@ -42,17 +46,53 @@
       "type": "number",
       "description": "Sprint Efforts"
     },
+    "acc_2_3_distance": {
+      "type": "number",
+      "description": "Acc 2-3 Mts/s distancia (m)"
+    },
+    "acc_2_3_eff": {
+      "type": "number",
+      "description": "Acc 2-3 Mts/s Eff"
+    },
+    "acc_3_distance": {
+      "type": "number",
+      "description": "Acc + 3mt/s distancia (m)"
+    },
     "acc_3": {
       "type": "number",
       "description": "Acc + 3mt/s eff"
+    },
+    "dec_2_3_distance": {
+      "type": "number",
+      "description": "Dec 2-3 mts/s distancia (m)"
+    },
+    "dec_2_3_eff": {
+      "type": "number",
+      "description": "Dec 2-3 mts/s Eff"
+    },
+    "dec_3_distance": {
+      "type": "number",
+      "description": "Dec +3mts/s distancia (m)"
     },
     "dec_3": {
       "type": "number",
       "description": "Dec +3mts/s Eff"
     },
+    "hmld": {
+      "type": "number",
+      "description": "H Meta Load D (m)"
+    },
     "player_load": {
       "type": "number",
       "description": "Total Player Load"
+    },
+    "player_load_per_min": {
+      "type": "number",
+      "description": "Player Load Per Minute"
+    },
+    "rhie_bouts": {
+      "type": "number",
+      "description": "RHIE Total Bouts"
     },
     "smax": {
       "type": "number",
@@ -61,6 +101,10 @@
     "max_vel_percent": {
       "type": "number",
       "description": "Max Vel (% Max)"
+    },
+    "extra_metrics": {
+      "type": "object",
+      "description": "Columnas adicionales detectadas en el CSV que no tienen un campo dedicado (clave: nombre de columna, valor: dato)"
     },
     "source_file": {
       "type": "string",
