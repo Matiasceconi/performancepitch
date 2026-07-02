@@ -9,6 +9,7 @@ import "moment/locale/es";
 import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
 import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
+import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -171,207 +172,6 @@ function MatchCsvPanel({ match, onCsvSaved }) {
           </label>
         </div>
       )}
-    </div>
-  );
-}
-
-// ── Convocados con minutos ────────────────────────────────────────────────────
-function SquadMinutesPanel({ match, players, onMatchUpdated, squadId }) {
-  const { toast } = useToast();
-  const [minutesMap, setMinutesMap] = useState({});
-  const [existingRecords, setExistingRecords] = useState([]);
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [squadIds, setSquadIds] = useState(match.squad_called || []);
-  const [showAddPanel, setShowAddPanel] = useState(false);
-
-  const convocados = players.filter(p => squadIds.includes(p.id));
-  const available = players.filter(p => !squadIds.includes(p.id));
-
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const records = await base44.entities.MinutesRecord.filter({ match_id: match.id }, "-created_date", 200);
-        setExistingRecords(records);
-        const map = {};
-        // Solo tomar el registro más reciente por player_id (deduplicar)
-        records.forEach(r => {
-          if (r.player_id && !(r.player_id in map)) {
-            map[r.player_id] = r.minutes ?? "";
-          }
-        });
-        setMinutesMap(map);
-      } finally {
-        setLoading(false);
-      }
-    }
-    load();
-  }, [match.id, match.date]);
-
-  function getTournament() {
-    const comp = match.competition || "";
-    if (comp.includes("Apertura")) return "Proyección Apertura";
-    if (comp.includes("Clausura")) return "Clausura";
-    if (comp === "Amistosos") return "Amistosos";
-    return "Proyección Apertura";
-  }
-
-  function toggleSquadPlayer(player) {
-    const already = squadIds.includes(player.id);
-    if (already) {
-      setSquadIds(ids => ids.filter(id => id !== player.id));
-    } else {
-      setSquadIds(ids => [...ids, player.id]);
-    }
-  }
-
-  async function saveAll() {
-    setSaving(true);
-    try {
-      const matchLabel = `vs ${match.rival} ${moment(match.date).format("DD/MM/YY")}`;
-      const tournament = getTournament();
-      // Mapa: player_id -> registro más reciente (deduplicado)
-      const existingMap = {};
-      existingRecords.forEach(r => {
-        if (r.player_id && !(r.player_id in existingMap)) existingMap[r.player_id] = r;
-      });
-      // Eliminar duplicados extra (mismo player_id, mismo match_date)
-      const duplicates = existingRecords.filter(r => r.player_id && existingMap[r.player_id]?.id !== r.id);
-      for (const dup of duplicates) {
-        await base44.entities.MinutesRecord.delete(dup.id);
-      }
-
-      // Guardar minutos de todos los convocados actuales
-      for (const player of convocados) {
-        const mins = minutesMap[player.id];
-        const existing = existingMap[player.id];
-        const minutesVal = mins !== "" && mins !== undefined ? Number(mins) : 0;
-        if (existing) {
-          await base44.entities.MinutesRecord.update(existing.id, { minutes: minutesVal, tournament, match_id: match.id, squad_id: squadId });
-        } else {
-          await base44.entities.MinutesRecord.create({
-            player_id: player.id,
-            player_name: player.full_name,
-            player_number: player.jersey_number || player.number,
-            tournament,
-            match_label: matchLabel,
-            match_date: match.date,
-            rival: match.rival,
-            minutes: minutesVal,
-            match_id: match.id,
-            squad_id: squadId,
-          });
-        }
-      }
-
-      // Actualizar convocados en el partido
-      const newNames = convocados.map(p => p.full_name || p.name);
-      await base44.entities.MatchReport.update(match.id, {
-        squad_called: squadIds,
-        squad_names: newNames,
-      });
-      onMatchUpdated?.(match.id, {
-        squad_called: squadIds,
-        squad_names: newNames,
-      });
-
-      toast({ title: "Cambios guardados correctamente" });
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) return (
-    <div className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4 flex justify-center">
-      <div className="w-4 h-4 border border-zinc-700 border-t-white rounded-full animate-spin" />
-    </div>
-  );
-
-  return (
-    <div className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-4">
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-white flex items-center gap-2">
-          <Clock size={14} className="text-yellow-400" /> Minutos jugados — Convocados ({convocados.length})
-        </p>
-        <button
-          onClick={saveAll}
-          disabled={saving}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg transition-colors disabled:opacity-50"
-        >
-          {saving ? <div className="w-3 h-3 border border-yellow-400 border-t-transparent rounded-full animate-spin" /> : <Save size={12} />}
-          Guardar
-        </button>
-      </div>
-
-      <div className="space-y-1.5 max-h-72 overflow-y-auto mb-3">
-        {convocados.map(player => (
-          <div key={player.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-700/30 transition-colors group">
-            {player.photo_url ? (
-              <img src={player.photo_url} alt={player.full_name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
-            ) : (
-              <div className="w-7 h-7 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-zinc-400">{player.full_name?.charAt(0)}</span>
-              </div>
-            )}
-            <span className="text-xs text-zinc-400 font-mono w-5 text-center shrink-0">{player.jersey_number || player.number || "—"}</span>
-            <span className="text-sm text-white flex-1 truncate">{player.full_name}</span>
-            <span className="text-xs text-zinc-500 shrink-0">{player.position?.split(" ")[0] || ""}</span>
-            <input
-              type="number"
-              min="0"
-              max="120"
-              placeholder="min"
-              value={minutesMap[player.id] ?? ""}
-              onChange={e => setMinutesMap(m => ({ ...m, [player.id]: e.target.value }))}
-              className="w-16 bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-xs text-white text-center focus:outline-none focus:border-yellow-500/50 shrink-0"
-            />
-            <button
-              onClick={() => toggleSquadPlayer(player)}
-              title="Quitar de convocados"
-              className="p-1 rounded text-zinc-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
-            >
-              <X size={12} />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      {convocados.length === 0 && (
-        <p className="text-zinc-500 text-sm text-center mb-3">Sin convocados</p>
-      )}
-
-      {/* Agregar jugadores */}
-      <div>
-        <button
-          onClick={() => setShowAddPanel(!showAddPanel)}
-          className="text-xs text-zinc-500 hover:text-zinc-300 flex items-center gap-1 transition-colors"
-        >
-          {showAddPanel ? "▼" : "▶"} {showAddPanel ? "Cerrar" : "+ Agregar jugador"}
-        </button>
-        {showAddPanel && (
-          <div className="mt-2 space-y-1 max-h-40 overflow-y-auto border-t border-zinc-800 pt-2">
-            {available.length === 0 ? (
-              <p className="text-xs text-zinc-600 py-2">Todos los jugadores están convocados</p>
-            ) : (
-              available.map(p => (
-                <button
-                  key={p.id}
-                  onClick={() => toggleSquadPlayer(p)}
-                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-700/30 transition-colors text-left"
-                >
-                  <span className="font-mono w-5 text-center shrink-0">{p.jersey_number || p.number || "—"}</span>
-                  <span className="flex-1 truncate">{p.full_name || p.name}</span>
-                  <span className="text-zinc-600">{p.position?.split(" ")[0] || ""}</span>
-                  <span className="text-zinc-600">+</span>
-                </button>
-              ))
-            )}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
@@ -616,7 +416,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId }
           <MatchGpsReport match={matchData} />
 
           {/* Convocados + Minutos */}
-          <SquadMinutesPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} squadId={squadId} />
+          <MatchSquadPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} squadId={squadId} />
 
           {/* Análisis del rival */}
           {match.rival_notes && (

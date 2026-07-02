@@ -27,6 +27,15 @@
       "default": false,
       "description": "Si est\u00e1 oculto de reportes/vistas por ser hist\u00f3rico sin partido v\u00e1lido"
     },
+    "is_starter": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el jugador fue titular en este partido. Si es false, se considera suplente"
+    },
+    "sub_in_minute": {
+      "type": "number",
+      "description": "Minuto del partido en que ingres\u00f3 (solo aplica a suplentes que ingresaron)"
+    },
     "tournament": {
       "type": "string",
       "description": "Torneo o competencia",
