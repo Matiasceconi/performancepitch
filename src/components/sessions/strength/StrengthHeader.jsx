@@ -11,22 +11,13 @@ const MANUAL_FIELDS = [
 
 export default function StrengthHeader({ session, onSessionUpdate }) {
   const [vals, setVals] = useState({});
-  const [sessionNumber, setSessionNumber] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
     const h = {};
     MANUAL_FIELDS.forEach(f => { h[f.key] = session[f.key] || ""; });
     setVals(h);
-
-    if (session.squad_id) {
-      base44.entities.TrainingSession.filter({ squad_id: session.squad_id }, "date", 1000).then(rows => {
-        const sorted = [...rows].sort((a, b) => new Date(a.date) - new Date(b.date));
-        const idx = sorted.findIndex(s => s.id === session.id);
-        setSessionNumber(idx >= 0 ? idx + 1 : null);
-      });
-    }
-  }, [session.id, session.squad_id]);
+  }, [session.id]);
 
   async function save() {
     const update = {};
@@ -44,8 +35,8 @@ export default function StrengthHeader({ session, onSessionUpdate }) {
           <p className="text-white font-medium">{moment(session.date).format("DD/MM/YYYY")}</p>
         </div>
         <div>
-          <p className="text-[10px] text-zinc-500 mb-0.5">Nº de sesión</p>
-          <p className="text-white font-medium">{sessionNumber ?? "—"}</p>
+          <p className="text-[10px] text-zinc-500 mb-0.5">Sesión</p>
+          <p className="text-white font-medium">{session.title || "—"}</p>
         </div>
         <div>
           <p className="text-[10px] text-zinc-500 mb-0.5">Plantel</p>
