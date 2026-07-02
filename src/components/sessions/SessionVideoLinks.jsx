@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Link2, Plus, Eye, Download, Copy, Trash2, X, Save, AlertTriangle } from "lucide-react";
+import { Link2, Plus, Eye, Download, Copy, Trash2, X, Save } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { useAuth } from "@/lib/AuthContext";
@@ -8,7 +8,6 @@ import moment from "moment";
 
 const SOURCES = ["Hudl", "YouTube", "Google Drive", "Vimeo", "Otro"];
 const VIDEO_TYPES = ["Sesión completa", "Ejercicio", "Fuerza", "Análisis", "Clip"];
-const TEMP_SOURCES = ["Hudl", "Otro"];
 
 const SOURCE_COLORS = {
   "Hudl": "bg-orange-500/15 text-orange-300 border-orange-500/30",
@@ -19,6 +18,50 @@ const SOURCE_COLORS = {
 };
 
 const EMPTY = { title: "", video_url: "", source: "Hudl", video_type: "Sesión completa", notes: "" };
+
+function getYoutubeId(url) {
+  const m = url.match(/(?:youtu\.be\/|v=|\/v\/|embed\/)([A-Za-z0-9_-]{11})/);
+  return m?.[1] || null;
+}
+function getVimeoId(url) {
+  const m = url.match(/vimeo\.com\/(?:.*\/)?(\d+)/);
+  return m?.[1] || null;
+}
+
+function VideoPreviewModal({ link, onClose }) {
+  const ytId = link.source === "YouTube" ? getYoutubeId(link.video_url) : getYoutubeId(link.video_url);
+  const vimeoId = link.source === "Vimeo" ? getVimeoId(link.video_url) : null;
+
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-2xl">
+        <div className="flex items-center justify-between p-4 border-b border-zinc-800">
+          <p className="text-sm font-semibold text-white truncate">{link.title}</p>
+          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors shrink-0">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-4">
+          {ytId ? (
+            <div className="relative w-full rounded-xl overflow-hidden" style={{ paddingBottom: "56.25%" }}>
+              <iframe className="absolute inset-0 w-full h-full" src={`https://www.youtube.com/embed/${ytId}`}
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen />
+            </div>
+          ) : vimeoId ? (
+            <div className="relative w-full rounded-xl overflow-hidden" style={{ paddingBottom: "56.25%" }}>
+              <iframe className="absolute inset-0 w-full h-full" src={`https://player.vimeo.com/video/${vimeoId}`}
+                allow="autoplay; fullscreen; picture-in-picture" allowFullScreen />
+            </div>
+          ) : (
+            <video src={link.video_url} controls className="w-full rounded-xl max-h-[70vh]">
+              Tu navegador no puede reproducir este video.
+            </video>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function SessionVideoLinks({ session }) {
   const { toast } = useToast();
@@ -33,6 +76,7 @@ export default function SessionVideoLinks({ session }) {
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY);
   const [saving, setSaving] = useState(false);
+  const [previewLink, setPreviewLink] = useState(null);
 
   useEffect(() => { load(); }, [session.id]);
 
@@ -160,14 +204,6 @@ export default function SessionVideoLinks({ session }) {
             <textarea rows={2} value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 resize-none" />
           </div>
-          {TEMP_SOURCES.includes(form.source) && (
-            <div className="flex items-start gap-2 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
-              <AlertTriangle size={13} className="text-amber-400 mt-0.5 shrink-0" />
-              <p className="text-xs text-amber-300">
-                Este enlace puede vencer. Recomendamos descargarlo o guardarlo en almacenamiento permanente.
-              </p>
-            </div>
-          )}
           <div className="flex justify-end gap-2 pt-1">
             <button onClick={() => { setShowForm(false); setEditing(null); }}
               className="px-3 py-1.5 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center gap-1">
@@ -193,7 +229,6 @@ export default function SessionVideoLinks({ session }) {
       ) : (
         <div className="space-y-2">
           {links.map(link => {
-            const isTemp = TEMP_SOURCES.includes(link.source);
             const linkedExercise = exercises.find(ex => ex.id === link.exercise_id);
             return (
               <div key={link.id} className="bg-zinc-800/40 border border-zinc-700/50 rounded-xl p-3 space-y-2">
@@ -214,20 +249,11 @@ export default function SessionVideoLinks({ session }) {
                   </div>
                 </div>
 
-                {isTemp && (
-                  <div className="flex items-start gap-1.5 bg-amber-500/10 border border-amber-500/30 rounded-lg px-2.5 py-1.5">
-                    <AlertTriangle size={11} className="text-amber-400 mt-0.5 shrink-0" />
-                    <p className="text-[11px] text-amber-300">
-                      Este enlace puede vencer. Recomendamos descargarlo o guardarlo en almacenamiento permanente.
-                    </p>
-                  </div>
-                )}
-
                 <div className="flex items-center gap-2 flex-wrap">
-                  <a href={link.video_url} target="_blank" rel="noreferrer"
+                  <button onClick={() => setPreviewLink(link)}
                     className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 rounded-lg transition-colors">
                     <Eye size={12} /> Ver
-                  </a>
+                  </button>
                   <a href={link.video_url} download target="_blank" rel="noreferrer"
                     className="flex items-center gap-1.5 px-2.5 py-1.5 text-xs bg-zinc-700 border border-zinc-600 text-zinc-300 hover:bg-zinc-600 rounded-lg transition-colors">
                     <Download size={12} /> Descargar
@@ -254,6 +280,8 @@ export default function SessionVideoLinks({ session }) {
           })}
         </div>
       )}
+
+      {previewLink && <VideoPreviewModal link={previewLink} onClose={() => setPreviewLink(null)} />}
     </div>
   );
 }

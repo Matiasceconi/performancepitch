@@ -10,7 +10,6 @@ import SessionGPS from "@/components/sessions/SessionGPS";
 import SessionStrength from "@/components/sessions/SessionStrength";
 import SessionVideoObs from "@/components/sessions/SessionVideoObs";
 import SessionVideoLinks from "@/components/sessions/SessionVideoLinks";
-import { Link2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 
@@ -41,7 +40,6 @@ const TABS = [
   { key: "strength",   label: "Fuerza",      icon: Zap },
   { key: "gps",        label: "GPS",         icon: Zap },
   { key: "video",      label: "Video / Obs.", icon: Video },
-  { key: "videolinks", label: "Videos ext.",  icon: Link2 },
 ];
 
 export default function SessionDetail({ session, onBack, initialTab = "players", autoOpenPDF = false }) {
@@ -318,8 +316,14 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
             {tab === "exercises" && <SessionExercises session={currentSession} sessionPlayers={sessionPlayers} />}
             {tab === "strength"  && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
             {tab === "gps"       && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}
-            {tab === "video"     && <SessionVideoObs session={currentSession} onUpdate={setCurrentSession} />}
-            {tab === "videolinks" && <SessionVideoLinks session={currentSession} />}
+            {tab === "video"     && (
+              <div className="space-y-6">
+                <SessionVideoObs session={currentSession} onUpdate={setCurrentSession} />
+                <div className="border-t border-zinc-800 pt-5">
+                  <SessionVideoLinks session={currentSession} />
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>
