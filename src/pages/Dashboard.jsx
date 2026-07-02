@@ -232,6 +232,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [lastSync, setLastSync] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState(null);
 
   useEffect(() => { loadData(); }, [activeSquadId]);
 
@@ -239,45 +240,52 @@ export default function Dashboard() {
 
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
+    setLoadError(null);
 
-    const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw, tomorrowEventsRaw] = await Promise.all([
-      base44.entities.Player.list("-created_date", 500),
-      ensureDailyStatusForDate(today),
-      base44.entities.Squad.list("name", 100),
-      base44.entities.SquadMembership.list("-effective_from", 1000),
-      base44.entities.DayEvent.list("date", 200),
-      base44.entities.TrainingSession.list("-date", 50),
-      base44.entities.MatchReport.list("-date", 20),
-      base44.entities.DayEvent.filter({ date: today }, "time", 100),
-      base44.entities.DayEvent.filter({ date: tomorrow }, "time", 100),
-    ]);
+    try {
+      const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw, tomorrowEventsRaw] = await Promise.all([
+        base44.entities.Player.list("-created_date", 500),
+        ensureDailyStatusForDate(today),
+        base44.entities.Squad.list("name", 100),
+        base44.entities.SquadMembership.list("-effective_from", 1000),
+        base44.entities.DayEvent.list("date", 200),
+        base44.entities.TrainingSession.list("-date", 50),
+        base44.entities.MatchReport.list("-date", 20),
+        base44.entities.DayEvent.filter({ date: today }, "time", 100),
+        base44.entities.DayEvent.filter({ date: tomorrow }, "time", 100),
+      ]);
 
-    const map = {};
-    allPlayers.filter(p => p.active !== false).forEach(p => { map[p.id] = p; });
-    const filterBySquad = x => !selectedSquadId || !x.squad_id || x.squad_id === selectedSquadId;
-    setPlayerMap(map);
-    setPlayerList(allPlayers.filter(p => p.active !== false));
-    setDayStatuses(statuses);
-    setMemberships(mb.filter(m => m.status === "activo"));
-    setSquads(allSquads.filter(sq => sq.active !== false));
-    setSessions(s.filter(filterBySquad).slice(0, 5));
+      const map = {};
+      allPlayers.filter(p => p.active !== false).forEach(p => { map[p.id] = p; });
+      const filterBySquad = x => !selectedSquadId || !x.squad_id || x.squad_id === selectedSquadId;
+      setPlayerMap(map);
+      setPlayerList(allPlayers.filter(p => p.active !== false));
+      setDayStatuses(statuses);
+      setMemberships(mb.filter(m => m.status === "activo"));
+      setSquads(allSquads.filter(sq => sq.active !== false));
+      setSessions(s.filter(filterBySquad).slice(0, 5));
 
-    // Estricto por plantel activo: nunca mezclar partidos de otro plantel
-    const squadEvents = selectedSquadId ? events.filter(e => e.squad_id === selectedSquadId) : events;
-    const squadMatchReports = selectedSquadId ? matchReports.filter(r => r.squad_id === selectedSquadId) : matchReports;
+      // Estricto por plantel activo: nunca mezclar partidos de otro plantel
+      const squadEvents = selectedSquadId ? events.filter(e => e.squad_id === selectedSquadId) : events;
+      const squadMatchReports = selectedSquadId ? matchReports.filter(r => r.squad_id === selectedSquadId) : matchReports;
 
-    const match = squadEvents.find(e => e.type === "Partido" && e.date >= today);
-    setNextMatch(match || null);
-    if (match) setNextMatchReport(squadMatchReports.find(r => r.date === match.date) || null);
+      const match = squadEvents.find(e => e.type === "Partido" && e.date >= today);
+      setNextMatch(match || null);
+      if (match) setNextMatchReport(squadMatchReports.find(r => r.date === match.date) || null);
 
-    const pastMatches = squadEvents.filter(e => e.type === "Partido" && e.date < today);
-    setLastMatchEvent(pastMatches.length > 0 ? pastMatches[pastMatches.length - 1] : null);
+      const pastMatches = squadEvents.filter(e => e.type === "Partido" && e.date < today);
+      setLastMatchEvent(pastMatches.length > 0 ? pastMatches[pastMatches.length - 1] : null);
 
-    setTodayEvents(todayEventsRaw.filter(filterBySquad));
-    setTomorrowEvents(tomorrowEventsRaw.filter(filterBySquad));
+      setTodayEvents(todayEventsRaw.filter(filterBySquad));
+      setTomorrowEvents(tomorrowEventsRaw.filter(filterBySquad));
 
-    setLastSync(new Date());
-    if (!silent) setLoading(false); else setRefreshing(false);
+      setLastSync(new Date());
+    } catch (err) {
+      console.error("Dashboard loadData error:", err);
+      setLoadError(err?.message || "No se pudo cargar el dashboard.");
+    } finally {
+      if (!silent) setLoading(false); else setRefreshing(false);
+    }
   }, [today, tomorrow, selectedSquadId]);
 
   // Refresh automatically when calendar events or matches change (create/update/delete)
@@ -473,6 +481,16 @@ export default function Dashboard() {
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    </div>
+  );
+
+  if (loadError) return (
+    <div className="flex flex-col items-center justify-center h-64 gap-3">
+      <p className="text-red-400 text-sm font-medium">Error al cargar el dashboard</p>
+      <p className="text-zinc-500 text-xs text-center max-w-sm">{loadError}</p>
+      <button onClick={() => loadData()} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg transition-colors">
+        Reintentar
+      </button>
     </div>
   );
 
