@@ -176,7 +176,7 @@ function MatchCsvPanel({ match, onCsvSaved }) {
 }
 
 // ── Convocados con minutos ────────────────────────────────────────────────────
-function SquadMinutesPanel({ match, players, onMatchUpdated }) {
+function SquadMinutesPanel({ match, players, onMatchUpdated, squadId }) {
   const { toast } = useToast();
   const [minutesMap, setMinutesMap] = useState({});
   const [existingRecords, setExistingRecords] = useState([]);
@@ -192,7 +192,7 @@ function SquadMinutesPanel({ match, players, onMatchUpdated }) {
     async function load() {
       setLoading(true);
       try {
-        const records = await base44.entities.MinutesRecord.filter({ match_date: match.date }, "-created_date", 200);
+        const records = await base44.entities.MinutesRecord.filter({ match_id: match.id }, "-created_date", 200);
         setExistingRecords(records);
         const map = {};
         // Solo tomar el registro más reciente por player_id (deduplicar)
@@ -248,7 +248,7 @@ function SquadMinutesPanel({ match, players, onMatchUpdated }) {
         const existing = existingMap[player.id];
         const minutesVal = mins !== "" && mins !== undefined ? Number(mins) : 0;
         if (existing) {
-          await base44.entities.MinutesRecord.update(existing.id, { minutes: minutesVal, tournament });
+          await base44.entities.MinutesRecord.update(existing.id, { minutes: minutesVal, tournament, match_id: match.id, squad_id: squadId });
         } else {
           await base44.entities.MinutesRecord.create({
             player_id: player.id,
@@ -259,6 +259,8 @@ function SquadMinutesPanel({ match, players, onMatchUpdated }) {
             match_date: match.date,
             rival: match.rival,
             minutes: minutesVal,
+            match_id: match.id,
+            squad_id: squadId,
           });
         }
       }
@@ -429,7 +431,7 @@ const COMPETITION_OPTIONS = [
 ];
 
 // ── MatchCard ─────────────────────────────────────────────────────────────────
-function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated }) {
+function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId }) {
   const [expanded, setExpanded] = useState(false);
   const [matchData, setMatchData] = useState(match);
   const [editingCompetition, setEditingCompetition] = useState(false);
@@ -614,7 +616,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated }) {
           <MatchGpsReport match={matchData} />
 
           {/* Convocados + Minutos */}
-          <SquadMinutesPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} />
+          <SquadMinutesPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} squadId={squadId} />
 
           {/* Análisis del rival */}
           {match.rival_notes && (
@@ -769,6 +771,7 @@ export default function Matches() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null); // { id, minutesCount }
   const { toast } = useToast();
 
   function handleMatchUpdated(id, data) {
@@ -811,8 +814,28 @@ export default function Matches() {
   }
 
   async function remove(id) {
-    if (!confirm("¿Eliminar este partido?")) return;
-    await base44.entities.MatchReport.delete(id);
+    const linkedMinutes = await base44.entities.MinutesRecord.filter({ match_id: id }, "-created_date", 500);
+    if (linkedMinutes.length === 0) {
+      if (!confirm("¿Eliminar este partido?")) return;
+      await base44.entities.MatchReport.delete(id);
+      toast({ title: "Partido eliminado" });
+      loadAll();
+      return;
+    }
+    setDeleteTarget({ id, minutesCount: linkedMinutes.length });
+  }
+
+  async function confirmDelete(option) {
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (!target || option === "cancel") return;
+    const linkedMinutes = await base44.entities.MinutesRecord.filter({ match_id: target.id }, "-created_date", 500);
+    if (option === "delete_minutes") {
+      await Promise.all(linkedMinutes.map(r => base44.entities.MinutesRecord.delete(r.id)));
+    } else if (option === "keep_hidden") {
+      await Promise.all(linkedMinutes.map(r => base44.entities.MinutesRecord.update(r.id, { hidden_from_reports: true })));
+    }
+    await base44.entities.MatchReport.delete(target.id);
     toast({ title: "Partido eliminado" });
     loadAll();
   }
@@ -847,6 +870,29 @@ export default function Matches() {
         />
       )}
 
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 max-w-sm w-full space-y-3">
+            <p className="text-white font-semibold">Este partido tiene minutos asociados</p>
+            <p className="text-zinc-400 text-sm">¿Qué querés hacer con los {deleteTarget.minutesCount} registro{deleteTarget.minutesCount !== 1 ? "s" : ""} de minutos vinculados?</p>
+            <div className="space-y-2 pt-1">
+              <button onClick={() => confirmDelete("delete_minutes")}
+                className="w-full text-left px-3 py-2 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 text-sm hover:bg-red-500/25 transition-colors">
+                Eliminar partido y eliminar minutos asociados <span className="text-xs text-red-400/70">(recomendado)</span>
+              </button>
+              <button onClick={() => confirmDelete("keep_hidden")}
+                className="w-full text-left px-3 py-2 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-700 transition-colors">
+                Eliminar partido pero conservar minutos como histórico oculto
+              </button>
+              <button onClick={() => confirmDelete("cancel")}
+                className="w-full text-left px-3 py-2 rounded-lg text-zinc-500 text-sm hover:text-white transition-colors">
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {matches.length === 0 && !showForm ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
           <p className="text-zinc-500 text-sm">No hay partidos registrados para {activeSquad?.name || "este plantel"}</p>
@@ -854,7 +900,7 @@ export default function Matches() {
       ) : (
         <div className="space-y-3">
           {matches.map(m => (
-            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} />
+            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} squadId={activeSquadId} />
           ))}
         </div>
       )}

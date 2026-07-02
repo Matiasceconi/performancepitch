@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
@@ -49,7 +49,7 @@ const TABS = [
 
 export default function PlayerCard360() {
   const { playerId, playerData: preloaded, closeCard } = usePlayerCard360();
-  const { can, canAccessSquad, squads, userAccess } = useWorkspace();
+  const { can, canAccessSquad, squads, userAccess, activeSquadId } = useWorkspace();
   const navigate = useNavigate();
   const canEdit = can("edit");
   const reservaSquad = squads.find(s => (s.name || "").trim().toLowerCase() === "reserva");
@@ -210,7 +210,13 @@ export default function PlayerCard360() {
 
   const badge = resolveBadge(dayStatus, todaysAttendance, player);
   const activeInjury = medical.find(m => ["Activa", "activa", "En tratamiento"].includes(m.status)) || null;
-  const totalMinutes = minutes.reduce((s, r) => s + (r.minutes || 0), 0);
+
+  // Solo se consideran válidos los minutos vinculados a un partido existente del plantel activo
+  const matchReportsMap = {};
+  matchReports.forEach(m => { matchReportsMap[m.id] = m; });
+  const validMinutes = minutes.filter(m => m.match_id && matchReportsMap[m.match_id] && (!activeSquadId || matchReportsMap[m.match_id].squad_id === activeSquadId));
+  const orphanMinutesCount = minutes.length - validMinutes.length;
+  const totalMinutes = validMinutes.reduce((s, r) => s + (r.minutes || 0), 0);
 
   let weeklyLoadLabel = "Sin datos";
   if (gpsProfile?.weekly_avg > 0) {
@@ -244,7 +250,7 @@ export default function PlayerCard360() {
           <div className="px-4">
             <PlayerSummaryCards
               lastSession={lastSession}
-              lastMatch={minutes[0]}
+              lastMatch={validMinutes[0]}
               totalMinutes={totalMinutes}
               activeInjury={activeInjury}
               weeklyLoadLabel={weeklyLoadLabel}
@@ -276,7 +282,7 @@ export default function PlayerCard360() {
                 <PlayerResumen360Tab
                   badge={badge}
                   lastSession={lastSession}
-                  lastMatch={minutes[0]}
+                  lastMatch={validMinutes[0]}
                   weeklyLoadLabel={weeklyLoadLabel}
                   activeInjury={activeInjury}
                   lastGps={gpsData[0]}
@@ -300,9 +306,9 @@ export default function PlayerCard360() {
                 <PlayerSessionsTab sessions={sessions} sessionPlayers={sessionPlayers} gpsData={gpsData} onOpenSession={handleOpenSession} />
               )}
               {activeTab === "partidos" && (
-                <PlayerMatchesTab minutes={minutes} matchReports={matchReports} onOpenMatches={handleOpenMatches} />
+                <PlayerMatchesTab minutes={validMinutes} matchReports={matchReports} onOpenMatches={handleOpenMatches} />
               )}
-              {activeTab === "minutos" && <PlayerMinutesTab minutes={minutes} />}
+              {activeTab === "minutos" && <PlayerMinutesTab minutes={validMinutes} orphanCount={orphanMinutesCount} />}
               {activeTab === "medico" && <PlayerMedicalTab medical={medical} userRole={userAccess?.role} />}
               {activeTab === "wellness" && (
                 <div className="text-center py-12">
@@ -369,7 +375,7 @@ export default function PlayerCard360() {
                 )
               )}
               {activeTab === "historial" && (
-                <PlayerHistoryTab memberships={memberships} medical={medical} minutes={minutes} />
+                <PlayerHistoryTab memberships={memberships} medical={medical} minutes={validMinutes} />
               )}
             </>
           )}

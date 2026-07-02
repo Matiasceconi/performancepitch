@@ -14,6 +14,19 @@
       "type": "number",
       "description": "N\u00famero de camiseta"
     },
+    "match_id": {
+      "type": "string",
+      "description": "ID del partido (MatchReport) al que pertenecen estos minutos. Obligatorio para que el registro sea v\u00e1lido"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel al que pertenece el partido (desnormalizado desde MatchReport)"
+    },
+    "hidden_from_reports": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si est\u00e1 oculto de reportes/vistas por ser hist\u00f3rico sin partido v\u00e1lido"
+    },
     "tournament": {
       "type": "string",
       "description": "Torneo o competencia",

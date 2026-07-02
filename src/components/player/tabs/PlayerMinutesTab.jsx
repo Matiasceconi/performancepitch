@@ -15,7 +15,7 @@ function EmptyState({ text = "Sin registros" }) {
   return <div className="text-center py-10 text-zinc-600 text-sm">{text}</div>;
 }
 
-export default function PlayerMinutesTab({ minutes }) {
+export default function PlayerMinutesTab({ minutes, orphanCount = 0 }) {
   const byCompetition = useMemo(() => {
     const map = {};
     minutes.forEach(m => {
@@ -25,7 +25,16 @@ export default function PlayerMinutesTab({ minutes }) {
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [minutes]);
 
-  if (!minutes.length) return <EmptyState />;
+  if (!minutes.length) {
+    return (
+      <>
+        <EmptyState />
+        {orphanCount > 0 && (
+          <p className="text-center text-xs text-amber-400">{orphanCount} registro{orphanCount !== 1 ? "s" : ""} huérfano{orphanCount !== 1 ? "s" : ""} (sin partido válido) no se muestran</p>
+        )}
+      </>
+    );
+  }
 
   const total = minutes.reduce((s, r) => s + (r.minutes || 0), 0);
   const played = minutes.filter(r => (r.minutes || 0) > 0).length;
@@ -52,6 +61,10 @@ export default function PlayerMinutesTab({ minutes }) {
           ))}
         </div>
       </div>
+
+      {orphanCount > 0 && (
+        <p className="text-xs text-amber-400">{orphanCount} registro{orphanCount !== 1 ? "s" : ""} huérfano{orphanCount !== 1 ? "s" : ""} (sin partido válido en Partidos) no incluido{orphanCount !== 1 ? "s" : ""} en este resumen</p>
+      )}
     </div>
   );
 }
