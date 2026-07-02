@@ -35,8 +35,7 @@ function Spinner() {
 const TABS = [
   { id: "resumen",      label: "Resumen",        icon: CheckCircle },
   { id: "datos",        label: "Datos personales", icon: User },
-  { id: "rendimiento",  label: "Rendimiento",     icon: TrendingUp },
-  { id: "gps",          label: "GPS",             icon: Zap },
+  { id: "carga_externa",label: "Carga Externa",   icon: Zap },
   { id: "sesiones",     label: "Sesiones",        icon: Activity },
   { id: "partidos",     label: "Partidos",        icon: BarChart2 },
   { id: "minutos",      label: "Minutos",         icon: Timer },
@@ -288,8 +287,15 @@ export default function PlayerCard360() {
               {activeTab === "datos" && (
                 <PlayerDatosPersonalesTab player={player} activeMembership={activeMembership} dayStatus={dayStatus} />
               )}
-              {activeTab === "rendimiento" && <PlayerGPSProfileTab playerId={player.id} />}
-              {activeTab === "gps" && <PlayerGPSTab gpsData={gpsData} />}
+              {activeTab === "carga_externa" && (
+                <div className="space-y-6">
+                  <PlayerGPSProfileTab playerId={player.id} />
+                  <div className="border-t border-zinc-800 pt-5">
+                    <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold mb-3">Registros GPS</p>
+                    <PlayerGPSTab gpsData={gpsData} />
+                  </div>
+                </div>
+              )}
               {activeTab === "sesiones" && (
                 <PlayerSessionsTab sessions={sessions} sessionPlayers={sessionPlayers} gpsData={gpsData} onOpenSession={handleOpenSession} />
               )}

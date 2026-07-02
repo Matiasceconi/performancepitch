@@ -35,7 +35,7 @@ export default function PlayerSummaryCards({
         onClick={() => onNavigate("medico")} />
       <Card icon={Zap} color="text-purple-400" label="Carga semanal"
         value={weeklyLoadLabel}
-        onClick={() => onNavigate("rendimiento")} />
+        onClick={() => onNavigate("carga_externa")} />
       <Card icon={Satellite} color="text-cyan-400" label="Último GPS"
         value={lastGps ? fmtDate(lastGps.created_date) : "—"}
         onClick={() => onNavigate("gps")} />

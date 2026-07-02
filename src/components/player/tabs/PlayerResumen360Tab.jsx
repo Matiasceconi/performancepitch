@@ -41,7 +41,7 @@ export default function PlayerResumen360Tab({
         <Row icon={Zap} color={{ bg: "bg-purple-500/15", text: "text-purple-400" }} label="Carga semanal" value={weeklyLoadLabel} />
         <Row icon={HeartPulse} color={{ bg: activeInjury ? "bg-red-500/15" : "bg-emerald-500/15", text: activeInjury ? "text-red-400" : "text-emerald-400" }}
           label="Lesiones activas" value={activeInjury ? `Sí — ${activeInjury.diagnosis || ""}` : "No"} />
-        <Row icon={Satellite} color={{ bg: "bg-cyan-500/15", text: "text-cyan-400" }} label="Último GPS"
+        <Row icon={Satellite} color={{ bg: "bg-cyan-500/15", text: "text-cyan-400" }} label="Carga Externa (GPS)"
           value={lastGps ? "Cargado correctamente" : "Sin datos cargados"} />
         <Row icon={CalendarClock} color={{ bg: "bg-violet-500/15", text: "text-violet-400" }} label="Próximo entrenamiento"
           value={nextSession ? (nextSession.match_day_code || fmtDate(nextSession.date)) : "Sin programar"} />
