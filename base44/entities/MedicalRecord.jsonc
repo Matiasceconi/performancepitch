@@ -25,12 +25,17 @@
     "status": {
       "type": "string",
       "enum": [
-        "Lesionado",
-        "En recuperaci\u00f3n",
+        "Consulta",
+        "Tratamiento sintom\u00e1tico",
         "Seguimiento",
-        "Alta m\u00e9dica"
+        "Lesi\u00f3n activa",
+        "Kinesiolog\u00eda",
+        "Reintegro",
+        "Alta m\u00e9dica",
+        "Cerrado"
       ],
-      "description": "Estado m\u00e9dico"
+      "default": "Consulta",
+      "description": "Estado del episodio m\u00e9dico"
     },
     "injury_date": {
       "type": "string",
@@ -40,7 +45,7 @@
     "expected_return": {
       "type": "string",
       "format": "date",
-      "description": "Fecha final de tratamiento / retorno estimado"
+      "description": "Fecha final de tratamiento / retorno estimado. Si est\u00e1 vac\u00eda, el episodio se considera abierto"
     },
     "days_lost": {
       "type": "number",
