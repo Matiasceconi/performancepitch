@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video, Download, FileText, Edit2, Save, X } from "lucide-react";
+import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video, Download, FileText, Edit2, Save, X, UserCog } from "lucide-react";
+import { Link } from "react-router-dom";
 import SessionVideoPanel from "@/components/sessions/SessionVideoPanel";
 import SessionPDFExport from "@/components/sessions/SessionPDFExport";
 import moment from "moment";
@@ -126,6 +127,12 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                 </button>
               </>
             )}
+            <Link
+              to="/daily-squad"
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 rounded-lg transition-colors"
+            >
+              <UserCog size={12} /> Modificar Estados
+            </Link>
             <button
               onClick={() => setShowVideoPanel(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 rounded-lg transition-colors"
