@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { RefreshCw, AlertTriangle, Users, Shield } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import { fmtMetric, fmtSmax } from "@/utils";
 import moment from "moment";
 import "moment/locale/es";
@@ -326,11 +326,13 @@ export default function TeamGPSProfileSection() {
                   <div key={chart.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
                     <p className="text-[10px] text-zinc-500 mb-1">{chart.label}</p>
                     <ResponsiveContainer width="100%" height={120}>
-                      <BarChart data={weeklyData}>
+                      <BarChart data={weeklyData} margin={{ top: 14, left: 0, right: 0, bottom: 0 }}>
                         <XAxis dataKey="week" tick={{ fill: "#71717a", fontSize: 9 }} />
                         <YAxis hide />
                         <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 11 }} />
-                        <Bar dataKey={chart.key} fill={chart.color} radius={[3, 3, 0, 0]} />
+                        <Bar dataKey={chart.key} fill={chart.color} radius={[3, 3, 0, 0]}>
+                          <LabelList dataKey={chart.key} position="top" formatter={(v) => fmt(v)} fill="#d4d4d8" fontSize={9} />
+                        </Bar>
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -345,12 +347,16 @@ export default function TeamGPSProfileSection() {
               <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold mb-2">Jugadores de campo vs. arqueros</p>
               <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
                 <ResponsiveContainer width="100%" height={160}>
-                  <BarChart data={comparisonData}>
+                  <BarChart data={comparisonData} margin={{ top: 16, left: 0, right: 0, bottom: 0 }}>
                     <XAxis dataKey="metric" tick={{ fill: "#a1a1aa", fontSize: 10 }} />
                     <YAxis hide />
                     <Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 11 }} />
-                    <Bar dataKey="campo" name="Campo" fill="#3b82f6" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="arqueros" name="Arqueros" fill="#f0c800" radius={[3, 3, 0, 0]} />
+                    <Bar dataKey="campo" name="Campo" fill="#3b82f6" radius={[3, 3, 0, 0]}>
+                      <LabelList dataKey="campo" position="top" formatter={(v) => fmt(v)} fill="#d4d4d8" fontSize={10} />
+                    </Bar>
+                    <Bar dataKey="arqueros" name="Arqueros" fill="#f0c800" radius={[3, 3, 0, 0]}>
+                      <LabelList dataKey="arqueros" position="top" formatter={(v) => fmt(v)} fill="#d4d4d8" fontSize={10} />
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>

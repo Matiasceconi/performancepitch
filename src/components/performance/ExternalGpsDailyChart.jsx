@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import { fmtInt } from "./externalGpsLoadUtils";
 
 const METRICS = [
@@ -39,7 +39,9 @@ export default function ExternalGpsDailyChart({ dailyData }) {
               contentStyle={{ backgroundColor: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 12 }}
               formatter={(v) => [fmtInt(v), meta?.label]}
             />
-            <Bar dataKey={metric} fill={meta?.color} radius={[4, 4, 0, 0]} />
+            <Bar dataKey={metric} fill={meta?.color} radius={[4, 4, 0, 0]}>
+              <LabelList dataKey={metric} position="top" formatter={fmtInt} fill="#d4d4d8" fontSize={11} />
+            </Bar>
           </BarChart>
         </ResponsiveContainer>
       )}
