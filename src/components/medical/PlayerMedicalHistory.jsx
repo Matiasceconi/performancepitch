@@ -4,20 +4,15 @@ import { X, Heart, AlertCircle, Activity, CheckCircle, Clock, FileText } from "l
 import moment from "moment";
 import "moment/locale/es";
 import { usePlayers } from "@/hooks/usePlayers";
+import { STATUS_LABELS, STATUS_BADGE } from "./medicalStatusConfig";
 moment.locale("es");
 
-const statusColors = {
-  "Lesionado": "bg-red-500/15 text-red-400 border-red-500/30",
-  "En recuperación": "bg-orange-500/15 text-orange-400 border-orange-500/30",
-  "Seguimiento": "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  "Alta médica": "bg-green-500/15 text-green-400 border-green-500/30",
-};
-
 const statusIcon = {
-  "Lesionado": AlertCircle,
-  "En recuperación": Activity,
-  "Seguimiento": Clock,
-  "Alta médica": CheckCircle,
+  lesionado: AlertCircle,
+  en_recuperacion: Activity,
+  kinesiologia: Activity,
+  consulta: Clock,
+  alta: CheckCircle,
 };
 
 export default function PlayerMedicalHistory({ player, onClose }) {
@@ -31,13 +26,13 @@ export default function PlayerMedicalHistory({ player, onClose }) {
 
   useEffect(() => {
     async function load() {
-      // Try by player_id first, fallback to player_name
+      // Try by player_id first, fallback to player_name_original
       let recs = [];
       if (player.id) {
-        recs = await base44.entities.MedicalRecord.filter({ player_id: player.id }, "-injury_date", 100);
+        recs = await base44.entities.MedicalEpisode.filter({ player_id: player.id }, "-fecha_inicio_tto", 100);
       }
       if (recs.length === 0 && player.name) {
-        recs = await base44.entities.MedicalRecord.filter({ player_name: player.name }, "-injury_date", 100);
+        recs = await base44.entities.MedicalEpisode.filter({ player_name_original: player.name }, "-fecha_inicio_tto", 100);
       }
       setRecords(recs);
       setLoading(false);
@@ -45,11 +40,11 @@ export default function PlayerMedicalHistory({ player, onClose }) {
     load();
   }, [player.id, player.name]);
 
-  const lesiones = records.filter(r => r.record_type === "Lesión" || !r.record_type);
-  const consultas = records.filter(r => r.record_type === "Consulta/Seguimiento");
+  const lesiones = records.filter(r => r.medical_status !== "consulta");
+  const consultas = records.filter(r => r.medical_status === "consulta");
   const displayed = filterType === "lesiones" ? lesiones : filterType === "consultas" ? consultas : records;
 
-  const totalDaysLost = lesiones.reduce((acc, r) => acc + (r.days_lost || 0), 0);
+  const totalDaysLost = lesiones.reduce((acc, r) => acc + (r.perdida_dias || 0), 0);
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4" onClick={onClose}>
@@ -121,40 +116,35 @@ export default function PlayerMedicalHistory({ player, onClose }) {
           ) : (
             <div className="space-y-3">
               {displayed.map(r => {
-                const Icon = statusIcon[r.status] || FileText;
+                const Icon = statusIcon[r.medical_status] || FileText;
                 return (
-                  <div key={r.id} className={`border rounded-xl p-4 ${statusColors[r.status] || "bg-zinc-800/50 border-zinc-700 text-zinc-300"}`}>
+                  <div key={r.id} className={`border rounded-xl p-4 ${STATUS_BADGE[r.medical_status] || "bg-zinc-800/50 border-zinc-700 text-zinc-300"}`}>
                     <div className="flex items-start gap-3">
                       <Icon size={16} className="mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-semibold text-sm">{r.diagnosis}</span>
-                          {r.record_type && (
-                            <span className="text-xs opacity-60 border rounded px-1.5 py-0.5 border-current">{r.record_type}</span>
+                          <span className="font-semibold text-sm">{r.lesion_consulta}</span>
+                          {r.medical_status && (
+                            <span className="text-xs opacity-60 border rounded px-1.5 py-0.5 border-current">{STATUS_LABELS[r.medical_status]}</span>
                           )}
                         </div>
 
                         <div className="flex flex-wrap gap-3 mt-2 text-xs opacity-75">
-                          {r.injury_date && <span>📅 {moment(r.injury_date).format("DD/MM/YYYY")}</span>}
-                          {r.expected_return && <span>🏁 Retorno: {moment(r.expected_return).format("DD/MM/YYYY")}</span>}
-                          {r.affected_limb && r.affected_limb !== "No corresponde" && <span>🦵 {r.affected_limb}</span>}
-                          {(r.days_lost !== undefined && r.days_lost !== null && r.days_lost > 0) && (
-                            <span className="font-semibold">⏱ {r.days_lost} días perdidos</span>
+                          {r.fecha_inicio_tto && <span>📅 {moment(r.fecha_inicio_tto).format("DD/MM/YYYY")}</span>}
+                          {r.fecha_final_tto && <span>🏁 Retorno: {moment(r.fecha_final_tto).format("DD/MM/YYYY")}</span>}
+                          {r.mmii_afectado && r.mmii_afectado !== "No corresponde" && <span>🦵 {r.mmii_afectado}</span>}
+                          {(r.perdida_dias !== undefined && r.perdida_dias !== null && r.perdida_dias > 0) && (
+                            <span className="font-semibold">⏱ {r.perdida_dias} días perdidos</span>
                           )}
                         </div>
 
-                        {r.rehab_stage && (
+                        {r.etapa_rhb && (
                           <span className="inline-block mt-2 text-xs bg-blue-500/15 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded">
-                            RHB: {r.rehab_stage}
+                            RHB: {r.etapa_rhb}
                           </span>
                         )}
-                        {r.treatment && (
-                          <p className="text-xs opacity-70 mt-1.5">
-                            <span className="font-medium">Tratamiento:</span> {r.treatment}
-                          </p>
-                        )}
-                        {r.notes && (
-                          <p className="text-xs opacity-60 mt-1 italic border-l-2 border-current/30 pl-2">{r.notes}</p>
+                        {r.observaciones && (
+                          <p className="text-xs opacity-60 mt-1 italic border-l-2 border-current/30 pl-2">{r.observaciones}</p>
                         )}
                       </div>
                     </div>

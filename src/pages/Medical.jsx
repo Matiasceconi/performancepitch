@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, Trash2, Heart, Activity, LayoutDashboard } from "lucide-react";
 import MedicalDashboard from "@/components/medical/MedicalDashboard";
+import MedicalSheetTable from "@/components/medical/MedicalSheetTable";
 import { usePlayers } from "@/hooks/usePlayers";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { Button } from "@/components/ui/button";
@@ -94,8 +95,7 @@ export default function Medical() {
       if (!b.injury_date) return -1;
       return new Date(b.injury_date) - new Date(a.injury_date);
     });
-  const consultas = filteredRecords.filter(r => r.record_type === "Consulta/Seguimiento");
-  const displayed = activeTab === "lesiones" ? lesiones : consultas;
+  const displayed = lesiones;
 
   if (loading) return <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
@@ -114,10 +114,10 @@ export default function Medical() {
         Lesiones ({lesiones.length})
       </button>
       <button
-        onClick={() => setActiveTab("consultas")}
-        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "consultas" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
+        onClick={() => setActiveTab("planilla")}
+        className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${activeTab === "planilla" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}
       >
-        Consultas ({consultas.length})
+        Planilla Médica
       </button>
     </div>
   );
@@ -133,6 +133,8 @@ export default function Medical() {
 
       {activeTab === "dashboard" ? (
         <MedicalDashboard squadPlayerIds={squadPlayerIds} />
+      ) : activeTab === "planilla" ? (
+        <MedicalSheetTable squadPlayerIds={squadPlayerIds} />
       ) : displayed.length === 0 ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
           <Heart size={36} className="text-zinc-700 mx-auto mb-3" />

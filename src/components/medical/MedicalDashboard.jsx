@@ -1,18 +1,12 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Heart, AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, Activity, ChevronRight } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, ChevronRight } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
 import PlayerMedicalHistory from "@/components/medical/PlayerMedicalHistory";
 import { usePlayers } from "@/hooks/usePlayers";
+import { STATUS_LABELS, STATUS_BADGE } from "./medicalStatusConfig";
 moment.locale("es");
-
-const statusColors = {
-  "Lesionado": { bg: "bg-red-500/15", text: "text-red-400", border: "border-red-500/30", dot: "bg-red-400" },
-  "En recuperación": { bg: "bg-orange-500/15", text: "text-orange-400", border: "border-orange-500/30", dot: "bg-orange-400" },
-  "Seguimiento": { bg: "bg-yellow-500/15", text: "text-yellow-400", border: "border-yellow-500/30", dot: "bg-yellow-400" },
-  "Alta médica": { bg: "bg-green-500/15", text: "text-green-400", border: "border-green-500/30", dot: "bg-green-400" },
-};
 
 const rehabStageOrder = ["Etapa inicial", "Etapa intermedia", "Etapa avanzada", "Readaptación", "Retorno con el grupo"];
 
@@ -62,51 +56,57 @@ function DaysCounter({ injuryDate, expectedReturn }) {
 }
 
 export default function MedicalDashboard({ squadPlayerIds }) {
-  const [records, setRecords] = useState([]);
+  const [episodes, setEpisodes] = useState([]);
+  const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
   const { getPlayer } = usePlayers();
 
   useEffect(() => {
     async function load() {
-      const recs = await base44.entities.MedicalRecord.list("-injury_date", 200);
-      setRecords(recs);
+      const [eps, sts] = await Promise.all([
+        base44.entities.MedicalEpisode.list("-fecha_inicio_tto", 2000),
+        base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
+      ]);
+      setEpisodes(eps);
+      setStatuses(sts);
       setLoading(false);
     }
     load();
   }, []);
 
   // Filtrar por plantel activo si se pasan IDs de jugadores
-  const filteredRecords = squadPlayerIds instanceof Set
-    ? records.filter(r => !r.player_id || squadPlayerIds.has(r.player_id))
-    : records;
+  const filteredStatuses = squadPlayerIds instanceof Set
+    ? statuses.filter(s => squadPlayerIds.has(s.player_id))
+    : statuses;
 
-  // Un registro se considera de alta si su fecha de retorno esperada ya pasó, aunque el status no se haya actualizado
-  const isRecordAlta = (r) => r.status === "Alta médica" || (r.expected_return && moment(r.expected_return).isBefore(moment(), "day"));
+  const activeEpisodeById = {};
+  episodes.forEach(e => { activeEpisodeById[e.id] = e; });
 
-  // Active injured: Lesionado o En recuperación, excluyendo los que ya tienen alta
-  const activeInjured = filteredRecords.filter(r =>
-    (r.status === "Lesionado" || r.status === "En recuperación") &&
-    r.record_type !== "Consulta/Seguimiento" &&
-    !isRecordAlta(r)
-  );
+  // Jugadores lesionados / en recuperación / kinesiología según MedicalCurrentStatus
+  const activeInjured = filteredStatuses
+    .filter(s => ["lesionado", "en_recuperacion", "kinesiologia"].includes(s.current_status))
+    .map(s => ({ status: s, episode: activeEpisodeById[s.active_episode_id] }))
+    .filter(x => x.episode);
 
   // Seguimiento
-  const seguimiento = filteredRecords.filter(r => r.status === "Seguimiento");
+  const seguimiento = filteredStatuses.filter(s => s.current_status === "seguimiento");
+
+  const relevantPlayerIds = new Set(filteredStatuses.map(s => s.player_id));
+  const relevantEpisodes = episodes.filter(e => e.player_id && relevantPlayerIds.has(e.player_id));
 
   // Stats
   const totalInjured = activeInjured.length;
   const totalSeguimiento = seguimiento.length;
-  const totalDaysLost = filteredRecords.reduce((acc, r) => acc + (r.days_lost || 0), 0);
-  const avgDaysLost = filteredRecords.filter(r => r.days_lost > 0).length
-    ? Math.round(totalDaysLost / filteredRecords.filter(r => r.days_lost > 0).length)
-    : 0;
+  const totalDaysLost = relevantEpisodes.reduce((acc, e) => acc + (e.perdida_dias || 0), 0);
+  const withDaysLost = relevantEpisodes.filter(e => e.perdida_dias > 0);
+  const avgDaysLost = withDaysLost.length ? Math.round(totalDaysLost / withDaysLost.length) : 0;
 
   // Most common injuries
   const diagnosisCounts = {};
-  filteredRecords.forEach(r => {
-    if (!r.diagnosis) return;
-    const key = r.diagnosis.toLowerCase().trim();
+  relevantEpisodes.forEach(e => {
+    if (!e.lesion_consulta) return;
+    const key = e.lesion_consulta.toLowerCase().trim();
     diagnosisCounts[key] = (diagnosisCounts[key] || 0) + 1;
   });
   const topInjuries = Object.entries(diagnosisCounts)
@@ -114,22 +114,22 @@ export default function MedicalDashboard({ squadPlayerIds }) {
     .slice(0, 4)
     .map(([diag, count]) => ({ diag, count }));
 
-  // Build list of players with any medical record, for the history panel
+  // Build list of players with any medical episode, for the history panel
   const playersWithRecords = (() => {
     const seen = new Map();
-    filteredRecords.forEach(r => {
-      const key = r.player_id || r.player_name;
+    relevantEpisodes.forEach(e => {
+      const key = e.player_id || e.player_name_original;
       if (!seen.has(key)) {
-        const playerData = getPlayer(r.player_id, r.player_name);
+        const playerData = getPlayer(e.player_id, e.player_name_original);
         seen.set(key, {
-          id: r.player_id,
-          name: playerData?.name || r.player_name,
+          id: e.player_id,
+          name: playerData?.name || e.player_name_original,
           photo_url: playerData?.photo_url || null,
           position: playerData?.position || "",
           number: playerData?.number || null,
-          category_division: r.category_division || "",
+          category_division: e.categoria_division || "",
           count: 0,
-          lastDate: r.injury_date || "",
+          lastDate: e.fecha_inicio_tto || "",
         });
       }
       seen.get(key).count += 1;
@@ -154,7 +154,7 @@ export default function MedicalDashboard({ squadPlayerIds }) {
         </div>
         <div className="bg-zinc-900 border border-yellow-500/20 rounded-xl p-4">
           <div className="flex items-center gap-2 mb-1">
-            <Activity size={16} className="text-yellow-400" />
+            <Clock size={16} className="text-yellow-400" />
             <span className="text-xs text-zinc-500">En seguimiento</span>
           </div>
           <p className="text-3xl font-bold text-yellow-400">{totalSeguimiento}</p>
@@ -188,16 +188,16 @@ export default function MedicalDashboard({ squadPlayerIds }) {
               <p className="text-zinc-400 text-sm">¡Plantel sin lesiones activas!</p>
             </div>
           ) : (
-            activeInjured.map(r => {
-              const sc = statusColors[r.status] || statusColors["Lesionado"];
-              const playerData = getPlayer(r.player_id, r.player_name);
-              const displayName = playerData?.name || r.player_name;
+            activeInjured.map(({ status: s, episode: e }) => {
+              const sc = STATUS_BADGE[s.current_status] || STATUS_BADGE.lesionado;
+              const playerData = getPlayer(s.player_id, e.player_name_original);
+              const displayName = playerData?.name || e.player_name_original;
               const displayPhoto = playerData?.photo_url;
               return (
-                <div key={r.id} className={`bg-zinc-900 border ${sc.border} rounded-xl p-4`}>
+                <div key={s.id} className={`bg-zinc-900 border rounded-xl p-4 ${sc.split(" ").find(c => c.startsWith("border-"))}`}>
                   <div className="flex items-start gap-3">
                     <button
-                      onClick={() => setSelectedPlayer({ id: r.player_id, name: displayName, photo_url: displayPhoto, position: playerData?.position, number: playerData?.number, category_division: r.category_division })}
+                      onClick={() => setSelectedPlayer({ id: s.player_id, name: displayName, photo_url: displayPhoto, position: playerData?.position, number: playerData?.number, category_division: e.categoria_division })}
                       className="shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
                       title="Ver historial médico"
                     >
@@ -212,16 +212,16 @@ export default function MedicalDashboard({ squadPlayerIds }) {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-white font-semibold text-sm">{displayName}</span>
-                        {r.category_division && <span className="text-xs text-zinc-500">{r.category_division}</span>}
-                        <span className={`text-xs px-2 py-0.5 rounded border ${sc.bg} ${sc.text} ${sc.border}`}>{r.status}</span>
+                        {e.categoria_division && <span className="text-xs text-zinc-500">{e.categoria_division}</span>}
+                        <span className={`text-xs px-2 py-0.5 rounded border ${sc}`}>{STATUS_LABELS[s.current_status]}</span>
                       </div>
-                      <p className="text-zinc-300 text-sm mt-0.5">{r.diagnosis}</p>
-                      {r.affected_limb && r.affected_limb !== "No corresponde" && (
-                        <p className="text-xs text-zinc-500 mt-0.5">MMII: {r.affected_limb}</p>
+                      <p className="text-zinc-300 text-sm mt-0.5">{e.lesion_consulta}</p>
+                      {e.mmii_afectado && (
+                        <p className="text-xs text-zinc-500 mt-0.5">MMII: {e.mmii_afectado}</p>
                       )}
-                      {r.injury_date && <DaysCounter injuryDate={r.injury_date} expectedReturn={r.expected_return} />}
-                      {r.rehab_stage && <RehabProgress stage={r.rehab_stage} />}
-                      {r.notes && <p className="text-xs text-zinc-600 mt-2 italic">{r.notes}</p>}
+                      {e.fecha_inicio_tto && <DaysCounter injuryDate={e.fecha_inicio_tto} expectedReturn={e.fecha_final_tto} />}
+                      {e.etapa_rhb && <RehabProgress stage={e.etapa_rhb} />}
+                      {e.observaciones && <p className="text-xs text-zinc-600 mt-2 italic">{e.observaciones}</p>}
                     </div>
                   </div>
                 </div>
@@ -242,16 +242,21 @@ export default function MedicalDashboard({ squadPlayerIds }) {
               <p className="text-xs text-zinc-600">Sin jugadores en seguimiento</p>
             ) : (
               <div className="space-y-2">
-                {seguimiento.map(r => (
-                  <div key={r.id} className="bg-zinc-900 border border-yellow-500/20 rounded-lg p-3">
-                    <div className="flex items-center gap-2">
-                      <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
-                      <span className="text-white text-sm font-medium">{r.player_name}</span>
+                {seguimiento.map(s => {
+                  const e = activeEpisodeById[s.active_episode_id];
+                  const playerData = getPlayer(s.player_id, e?.player_name_original);
+                  const displayName = playerData?.name || e?.player_name_original || "";
+                  return (
+                    <div key={s.id} className="bg-zinc-900 border border-yellow-500/20 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-yellow-400 shrink-0" />
+                        <span className="text-white text-sm font-medium">{displayName}</span>
+                      </div>
+                      {e?.lesion_consulta && <p className="text-zinc-400 text-xs mt-0.5 ml-4">{e.lesion_consulta}</p>}
+                      {e?.observaciones && <p className="text-zinc-600 text-xs mt-0.5 ml-4 italic">{e.observaciones}</p>}
                     </div>
-                    <p className="text-zinc-400 text-xs mt-0.5 ml-4">{r.diagnosis}</p>
-                    {r.notes && <p className="text-zinc-600 text-xs mt-0.5 ml-4 italic">{r.notes}</p>}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -272,7 +277,7 @@ export default function MedicalDashboard({ squadPlayerIds }) {
                   <div className="mt-1.5 h-1 bg-zinc-800 rounded-full">
                     <div
                       className="h-1 bg-blue-500 rounded-full"
-                      style={{ width: `${Math.min(100, (count / records.length) * 100 * 3)}%` }}
+                      style={{ width: `${Math.min(100, (count / Math.max(1, relevantEpisodes.length)) * 100 * 3)}%` }}
                     />
                   </div>
                 </div>

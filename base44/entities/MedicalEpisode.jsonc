@@ -75,6 +75,27 @@
       "type": "boolean",
       "default": false,
       "description": "Si el episodio qued\u00f3 vinculado a un jugador oficial de la plataforma"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "google_sheets",
+        "app"
+      ],
+      "default": "google_sheets",
+      "description": "Origen del registro: sincronizado desde Google Sheets o editado manualmente en la app"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "description": "Fecha/hora ISO de la \u00faltima sincronizaci\u00f3n desde Google Sheets"
+    },
+    "edited_by": {
+      "type": "string",
+      "description": "Nombre del usuario que edit\u00f3 manualmente este registro por \u00faltima vez"
+    },
+    "edited_at": {
+      "type": "string",
+      "description": "Fecha/hora ISO de la \u00faltima edici\u00f3n manual"
     }
   },
   "required": [

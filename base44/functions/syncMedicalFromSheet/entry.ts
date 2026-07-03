@@ -184,6 +184,8 @@ Deno.serve(async (req) => {
         medical_episode_key: episodeKey,
         linked: isLinked,
         source_sheet_row_id: String(i + 2),
+        source: 'google_sheets',
+        last_synced_at: new Date().toISOString(),
       };
       Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
 
