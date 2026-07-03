@@ -3,7 +3,6 @@ import { base44 } from "@/api/base44Client";
 import { RefreshCw, Wrench, FileDown, FileUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import OrphanMinutesRepair from "@/components/admin/OrphanMinutesRepair";
-import MedicalSyncRepair from "@/components/admin/MedicalSyncRepair";
 
 const TOOLS = [
   {
@@ -138,11 +137,6 @@ export default function AdminTools() {
       {/* Reparar minutos huérfanos */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
         <OrphanMinutesRepair />
-      </div>
-
-      {/* Reparar sincronización médica */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
-        <MedicalSyncRepair />
       </div>
 
       {/* Importaciones / Exportaciones */}
