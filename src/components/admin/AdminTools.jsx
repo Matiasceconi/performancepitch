@@ -77,15 +77,6 @@ const TOOLS = [
     color: "text-red-400",
     bg: "bg-red-500/10 border-red-500/20",
   },
-  {
-    id: "repairMedicalRecords",
-    label: "Reparar Área Médica desde Google Sheets",
-    description: "Resincroniza la planilla, elimina episodios médicos duplicados y recalcula el estado actual de cada jugador",
-    fn: "repairMedicalRecords",
-    payload: {},
-    color: "text-pink-400",
-    bg: "bg-pink-500/10 border-pink-500/20",
-  },
 ];
 
 export default function AdminTools() {
