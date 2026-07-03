@@ -63,11 +63,22 @@ export default function Medical() {
     ? records
     : records.filter(r => !r.player_id || squadPlayerIds.has(r.player_id));
 
+  const STATUS_TO_MEDICAL_STATUS = {
+    "Lesionado": "lesion_activa",
+    "En recuperación": "en_recuperacion",
+    "Seguimiento": "en_recuperacion",
+    "Alta médica": "alta_medica",
+  };
+
   async function handleSubmit(e) {
     e.preventDefault();
     try {
       const player = players.find((p) => p.id === form.player_id);
-      const payload = { ...form, player_name: player?.full_name || player?.name || form.player_name };
+      const payload = {
+        ...form,
+        player_name: player?.full_name || player?.name || form.player_name,
+        medical_status: STATUS_TO_MEDICAL_STATUS[form.status] || "lesion_activa",
+      };
       if (!payload.expected_return) delete payload.expected_return;
       if (!payload.days_lost && payload.days_lost !== 0) delete payload.days_lost;
       else payload.days_lost = Number(payload.days_lost);

@@ -30,7 +30,19 @@
         "Seguimiento",
         "Alta m\u00e9dica"
       ],
-      "description": "Estado m\u00e9dico"
+      "description": "Estado m\u00e9dico (manual, legado)"
+    },
+    "medical_status": {
+      "type": "string",
+      "enum": [
+        "lesion_activa",
+        "en_recuperacion",
+        "consulta",
+        "tratamiento_sintomatico",
+        "alta_medica",
+        "cerrado"
+      ],
+      "description": "Estado interno calculado del episodio m\u00e9dico, usado para el Dashboard"
     },
     "injury_date": {
       "type": "string",
@@ -66,6 +78,10 @@
       ],
       "default": "Lesi\u00f3n",
       "description": "Tipo de registro"
+    },
+    "sync_key": {
+      "type": "string",
+      "description": "Clave \u00fanica del episodio m\u00e9dico (player_id + fecha inicio + diagn\u00f3stico + mmii) usada para evitar duplicados en la sincronizaci\u00f3n con Google Sheets"
     }
   },
   "required": [
