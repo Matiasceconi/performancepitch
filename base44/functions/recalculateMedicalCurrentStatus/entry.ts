@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
 
     for (const [playerId, eps] of Object.entries(byPlayer)) {
       const sorted = [...eps].sort((a, b) => (b.fecha_inicio_tto || '').localeCompare(a.fecha_inicio_tto || ''));
-      const active = sorted.filter((e) => !e.fecha_final_tto);
+      const active = sorted.filter((e) => !e.fecha_final_tto && e.medical_status !== 'alta');
 
       let currentStatus = 'alta';
       let activeEpisode = null;
