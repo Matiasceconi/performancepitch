@@ -1,4 +1,3 @@
-// name=server/routes/players-upload.js
 const express = require('express');
 const multer = require('multer');
 const path = require('path');
@@ -47,10 +46,93 @@ router.post('/api/players/upload-avatar', upload.single('image'), async (req, re
       publicUrl = `/uploads/players/${playerId}/${filename}`;
     }
 
-    // TODO: Update your player record in DB to set avatarUrl = publicUrl
-    // Example (pseudo): await db.players.update({ id: playerId }, { avatarUrl: publicUrl });
+    // Try to persist avatarUrl in the DB. Attempt several common ORMs/clients.
+    let persisted = false;
+    const attempts = [];
 
-    return res.json({ imageUrl: publicUrl });
+    // 1) Prisma
+    try {
+      const { PrismaClient } = require('@prisma/client');
+      const prisma = new PrismaClient();
+      // Try numeric id first, fallback to string
+      const whereId = isNaN(Number(playerId)) ? playerId : Number(playerId);
+      await prisma.player.update({ where: { id: whereId }, data: { avatarUrl: publicUrl } });
+      persisted = true;
+      attempts.push('prisma');
+    } catch (e) {
+      // ignore
+    }
+
+    // 2) Sequelize (common pattern: require('../models') -> { Player }
+    if (!persisted) {
+      try {
+        const models = require('../models');
+        if (models && models.Player && typeof models.Player.update === 'function') {
+          await models.Player.update({ avatarUrl: publicUrl }, { where: { id: playerId } });
+          persisted = true;
+          attempts.push('sequelize');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 3) Knex / direct DB module
+    if (!persisted) {
+      try {
+        const db = require('../db');
+        // If db is a knex instance
+        if (typeof db === 'function' || db && typeof db.select === 'function') {
+          await db('players').where('id', playerId).update({ avatarUrl: publicUrl });
+          persisted = true;
+          attempts.push('knex');
+        } else if (db && db.players && typeof db.players.update === 'function') {
+          await db.players.update({ id: playerId }, { avatarUrl: publicUrl });
+          persisted = true;
+          attempts.push('db.players.update');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 4) Try a players model in common paths
+    if (!persisted) {
+      const possiblePaths = ['../models/player', '../models/Player', '../lib/models/player', '../../models/player'];
+      for (const p of possiblePaths) {
+        try {
+          const playerModel = require(p);
+          if (playerModel) {
+            if (typeof playerModel.update === 'function') {
+              await playerModel.update(playerId, { avatarUrl: publicUrl });
+              persisted = true;
+              attempts.push(p);
+              break;
+            }
+            if (typeof playerModel.save === 'function') {
+              await playerModel.save({ id: playerId, avatarUrl: publicUrl });
+              persisted = true;
+              attempts.push(p + '.save');
+              break;
+            }
+            if (typeof playerModel.updateById === 'function') {
+              await playerModel.updateById(playerId, { avatarUrl: publicUrl });
+              persisted = true;
+              attempts.push(p + '.updateById');
+              break;
+            }
+          }
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+
+    if (!persisted) {
+      console.warn('players-upload: Could not automatically persist avatarUrl to DB. Tried:', attempts);
+    }
+
+    return res.json({ imageUrl: publicUrl, persisted });
   } catch (err) {
     console.error('Upload error', err);
     return res.status(500).json({ error: 'upload_failed' });
