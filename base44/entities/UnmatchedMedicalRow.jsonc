@@ -1,0 +1,39 @@
+{
+  "name": "UnmatchedMedicalRow",
+  "type": "object",
+  "properties": {
+    "raw_name": {
+      "type": "string",
+      "description": "Nombre tal como viene en la planilla de Google Sheets"
+    },
+    "normalized_name": {
+      "type": "string",
+      "description": "Nombre normalizado para evitar duplicados"
+    },
+    "sheet_row_data": {
+      "type": "object",
+      "description": "Datos mapeados de la fila, listos para crear el registro m\u00e9dico al vincular"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pendiente",
+        "vinculado",
+        "descartado"
+      ],
+      "default": "pendiente",
+      "description": "Estado de la fila sin reconocer"
+    },
+    "linked_player_id": {
+      "type": "string",
+      "description": "ID del jugador vinculado manualmente"
+    },
+    "last_seen_at": {
+      "type": "string",
+      "description": "Fecha/hora ISO de la \u00faltima vez que apareci\u00f3 en la sincronizaci\u00f3n"
+    }
+  },
+  "required": [
+    "raw_name"
+  ]
+}

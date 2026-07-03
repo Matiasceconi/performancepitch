@@ -66,6 +66,24 @@
       ],
       "default": "Lesi\u00f3n",
       "description": "Tipo de registro"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "Google Sheets",
+        "Manual"
+      ],
+      "default": "Manual",
+      "description": "Origen del registro"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "description": "Fecha/hora ISO de la \u00faltima sincronizaci\u00f3n que actualiz\u00f3 este registro"
+    },
+    "not_found_in_last_sync": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el registro ven\u00eda de Google Sheets y desapareci\u00f3 de la \u00faltima sincronizaci\u00f3n (pendiente de confirmar eliminaci\u00f3n)"
     }
   },
   "required": [
