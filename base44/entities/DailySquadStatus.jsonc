@@ -61,6 +61,15 @@
       "default": "normal",
       "description": "Tipo de movimiento del d\u00eda"
     },
+    "movement_status": {
+      "type": "string",
+      "enum": [
+        "activo",
+        "finalizado"
+      ],
+      "default": "activo",
+      "description": "Estado del movimiento temporal. 'finalizado' significa que ya no debe considerarse activo en ning\u00fan tablero, aunque siga copi\u00e1ndose como hist\u00f3rico"
+    },
     "temporary": {
       "type": "boolean",
       "default": false,

@@ -41,7 +41,7 @@ function MovementPlayerRow({ ds, playerMap, isGK }) {
   );
 }
 
-export default function MovementBoardCard({ title, originLabel, destLabel, colorScheme = "sky", records, playerMap, isGKFn }) {
+export default function MovementBoardCard({ title, originLabel, destLabel, colorScheme = "sky", records, playerMap, isGKFn, onFinalize }) {
   const [showModal, setShowModal] = useState(false);
   const colors = COLOR_SCHEMES[colorScheme] || COLOR_SCHEMES.sky;
 
@@ -109,6 +109,7 @@ export default function MovementBoardCard({ title, originLabel, destLabel, color
           records={records}
           playerMap={playerMap}
           isGKFn={isGKFn}
+          onFinalize={onFinalize}
         />
       )}
     </div>

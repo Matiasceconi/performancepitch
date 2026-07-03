@@ -238,6 +238,19 @@ export default function Dashboard() {
 
   function refresh() { loadData(true); }
 
+  // Finaliza un movimiento temporal: deja de contar como activo en cualquier tablero
+  async function handleFinalizeMovement(ds) {
+    const payload = {
+      movement_status: "finalizado",
+      active_in_target_squad: false,
+      valid_until: today,
+      updated_at: new Date().toISOString(),
+    };
+    await base44.entities.DailySquadStatus.update(ds.id, payload);
+    setDayStatuses(prev => prev.map(r => (r.id === ds.id ? { ...r, ...payload } : r)));
+    setLastSync(new Date());
+  }
+
   const loadData = useCallback(async (silent = false) => {
     if (!silent) setLoading(true); else setRefreshing(true);
     setLoadError(null);
@@ -388,67 +401,76 @@ export default function Dashboard() {
   const reservaSquad = useMemo(() => squads.find(s => (s.name || "").trim().toLowerCase() === "reserva"), [squads]);
   const primeraSquad = useMemo(() => squads.find(s => (s.name || "").trim().toLowerCase() === "primera"), [squads]);
 
+  // Movimiento temporal realmente activo: no finalizado y dentro de su vigencia
+  function isMovementActive(ds) {
+    if (ds.movement_status === "finalizado") return false;
+    if (!ds.active_in_target_squad) return false;
+    if (ds.date && ds.date > today) return false;
+    if (ds.valid_until && ds.valid_until < today) return false;
+    return true;
+  }
+
   // "Suben DESDE este plantel" → base = selectedSquad, target = otro plantel superior
   // Excluye Reserva→Primera, que tiene su propio tablero dedicado
   const subenDesde = useMemo(() => {
     if (!selectedSquadId) return (byStatus["subió"] || []);
     return squadRecords.filter(ds =>
       ds.temporary &&
-      ds.active_in_target_squad &&
+      isMovementActive(ds) &&
       ds.base_squad_id === selectedSquadId &&
       ds.target_squad_id !== selectedSquadId &&
       ["sube_temporal", "subió"].includes(ds.movement_type || ds.status) &&
       !(reservaSquad && primeraSquad && ds.base_squad_id === reservaSquad.id && ds.target_squad_id === primeraSquad.id)
     );
-  }, [squadRecords, selectedSquadId, byStatus, reservaSquad, primeraSquad]);
+  }, [squadRecords, selectedSquadId, byStatus, reservaSquad, primeraSquad, today]);
 
   // "Suben desde Reserva a Primera" → tablero dedicado, solo visible en el dashboard de Reserva
   const subenReservaAPrimera = useMemo(() => {
     if (!selectedSquadId || !reservaSquad || !primeraSquad || selectedSquadId !== reservaSquad.id) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
-      ds.active_in_target_squad &&
+      isMovementActive(ds) &&
       ds.movement_type === "sube_temporal" &&
       ds.base_squad_id === reservaSquad.id &&
       ds.target_squad_id === primeraSquad.id
     );
-  }, [squadRecords, selectedSquadId, reservaSquad, primeraSquad]);
+  }, [squadRecords, selectedSquadId, reservaSquad, primeraSquad, today]);
 
   // "Suben A este plantel" → base = otro plantel, target = selectedSquad
   const subenA = useMemo(() => {
     if (!selectedSquadId) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
-      ds.active_in_target_squad &&
+      isMovementActive(ds) &&
       ds.base_squad_id !== selectedSquadId &&
       ds.target_squad_id === selectedSquadId &&
       ["sube_temporal", "subió"].includes(ds.movement_type || ds.status)
     );
-  }, [squadRecords, selectedSquadId]);
+  }, [squadRecords, selectedSquadId, today]);
 
   // "Bajan DESDE este plantel" → base = selectedSquad, target = otro plantel inferior
   const bajanDesde = useMemo(() => {
     if (!selectedSquadId) return (byStatus["bajó"] || []);
     return squadRecords.filter(ds =>
       ds.temporary &&
-      ds.active_in_target_squad &&
+      isMovementActive(ds) &&
       ds.base_squad_id === selectedSquadId &&
       ds.target_squad_id !== selectedSquadId &&
       ["baja_temporal", "bajó"].includes(ds.movement_type || ds.status)
     );
-  }, [squadRecords, selectedSquadId, byStatus]);
+  }, [squadRecords, selectedSquadId, byStatus, today]);
 
   // "Bajan A este plantel" → base = otro plantel superior, target = selectedSquad
   const bajanA = useMemo(() => {
     if (!selectedSquadId) return [];
     return squadRecords.filter(ds =>
       ds.temporary &&
-      ds.active_in_target_squad &&
+      isMovementActive(ds) &&
       ds.base_squad_id !== selectedSquadId &&
       ds.target_squad_id === selectedSquadId &&
       ["baja_temporal", "bajó"].includes(ds.movement_type || ds.status)
     );
-  }, [squadRecords, selectedSquadId]);
+  }, [squadRecords, selectedSquadId, today]);
 
   // ── Día del microciclo (MD-4 ... MD ... MD+2 / Libre) ──────────────────
   const microcycleLabel = useMemo(() => {
@@ -629,6 +651,7 @@ export default function Dashboard() {
               destLabel={squads.find(s => s.id === selectedSquadId)?.name?.trim() || "este plantel"}
               colorScheme="sky"
               records={subenA} playerMap={playerMap} isGKFn={isGK}
+              onFinalize={handleFinalizeMovement}
             />
           </ErrorBoundary>
         )}
@@ -641,6 +664,7 @@ export default function Dashboard() {
               destLabel="Primera"
               colorScheme="violet"
               records={subenReservaAPrimera} playerMap={playerMap} isGKFn={isGK}
+              onFinalize={handleFinalizeMovement}
             />
           </ErrorBoundary>
         )}

@@ -1,13 +1,21 @@
 import React, { useState, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Search } from "lucide-react";
+import { Search, XCircle } from "lucide-react";
 import moment from "moment";
 import PlayerAvatar from "@/components/player/PlayerAvatar";
 import { sortRecordsByPosition } from "./movementBoardUtils";
 
-export default function MovementBoardModal({ open, onClose, title, originLabel, destLabel, records, playerMap, isGKFn }) {
+export default function MovementBoardModal({ open, onClose, title, originLabel, destLabel, records, playerMap, isGKFn, onFinalize }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("todos"); // todos | campo | arqueros
+  const [finalizing, setFinalizing] = useState(null);
+
+  async function handleFinalize(ds) {
+    if (!onFinalize) return;
+    setFinalizing(ds.id);
+    await onFinalize(ds);
+    setFinalizing(null);
+  }
 
   const filtered = useMemo(() => {
     let list = records;
@@ -75,6 +83,15 @@ export default function MovementBoardModal({ open, onClose, title, originLabel, 
                   <p className="text-xs text-zinc-400 mt-0.5">Plantel base: <span className="text-zinc-300">{ds.base_squad_name || "—"}</span></p>
                   {ds.date && <p className="text-[10px] text-zinc-600 mt-0.5">Desde: {moment(ds.date).format("DD/MM/YYYY")}</p>}
                   {ds.notes && <p className="text-xs text-zinc-500 italic mt-1">"{ds.notes}"</p>}
+                  {onFinalize && (
+                    <button
+                      onClick={() => handleFinalize(ds)}
+                      disabled={finalizing === ds.id}
+                      className="flex items-center gap-1 mt-2 text-[11px] px-2 py-1 rounded-lg bg-red-500/15 border border-red-500/30 text-red-300 hover:bg-red-500/25 transition-colors disabled:opacity-50"
+                    >
+                      <XCircle size={11} /> {finalizing === ds.id ? "Finalizando..." : "Finalizar movimiento temporal"}
+                    </button>
+                  )}
                 </div>
               </div>
             );
