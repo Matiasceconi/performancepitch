@@ -50,6 +50,21 @@ export default function SessionPlayerTable({ sessionPlayers, sessionId, onPlayer
     await syncGps(sp.player_id, updatedSp);
   }
 
+  async function handleStatusChange(sp, newStatus) {
+    await base44.entities.SessionPlayer.update(sp.id, { status_at_session: newStatus });
+    const playerStatusMap = {
+      disponible: "Disponible", lesionado: "Lesionado", molestia: "En recuperación",
+      suspendido: "Suspendido", reintegro: "Disponible",
+    };
+    if (playerStatusMap[newStatus] && sp.player_id) {
+      await base44.entities.Player.update(sp.player_id, { status: playerStatusMap[newStatus] });
+    }
+    const next = rows.map(r => r.id === sp.id ? { ...r, status_at_session: newStatus } : r);
+    setRows(next);
+    onPlayersUpdate?.(next);
+    toast({ title: `Estado actualizado: ${sp.player_name}` });
+  }
+
   async function handleSaveDetails(sp, data) {
     await base44.entities.SessionPlayer.update(sp.id, data);
     const next = rows.map(r => r.id === sp.id ? { ...r, ...data } : r);
@@ -72,7 +87,7 @@ export default function SessionPlayerTable({ sessionPlayers, sessionId, onPlayer
         <p className={`text-[10px] uppercase tracking-wider font-semibold mb-2 ${colorClass}`}>{title} ({list.length})</p>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
           {list.map(sp => (
-            <SessionPlayerCard key={sp.id} sp={sp} photoUrl={playerPhotos[sp.player_id]} onAction={handleAction} onSaveDetails={handleSaveDetails} />
+            <SessionPlayerCard key={sp.id} sp={sp} photoUrl={playerPhotos[sp.player_id]} onAction={handleAction} onSaveDetails={handleSaveDetails} onStatusChange={handleStatusChange} />
           ))}
         </div>
       </div>

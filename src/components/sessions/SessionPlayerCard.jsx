@@ -7,6 +7,8 @@ import { Check, HeartPulse, Moon, UserX, Trash2, ChevronDown, ChevronUp, Save } 
 // Solo estos estados aportan información relevante como etiqueta en la tarjeta
 const KEEP_STATUS_TAGS = ["disponible", "diferenciado", "lesionado", "molestia", "suspendido", "bajó", "subió"];
 
+const STATUS_OPTIONS = ["disponible", "lesionado", "molestia", "suspendido", "diferenciado", "reintegro", "bajó", "subió"];
+
 const ACTIONS = [
   { key: "presente", label: "Presente", icon: Check, activeClass: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40" },
   { key: "diferenciado", label: "Diferenciado", icon: Moon, activeClass: "bg-amber-500/20 text-amber-300 border-amber-500/40" },
@@ -14,7 +16,7 @@ const ACTIONS = [
   { key: "ausente", label: "Ausente", icon: UserX, activeClass: "bg-zinc-600/30 text-zinc-300 border-zinc-500" },
 ];
 
-export default function SessionPlayerCard({ sp, photoUrl, onAction, onSaveDetails }) {
+export default function SessionPlayerCard({ sp, photoUrl, onAction, onSaveDetails, onStatusChange }) {
   const [expanded, setExpanded] = useState(false);
   const [minutes, setMinutes] = useState(sp.minutes || "");
   const [rpe, setRpe] = useState(sp.rpe || "");
@@ -53,6 +55,17 @@ export default function SessionPlayerCard({ sp, photoUrl, onAction, onSaveDetail
         )}
         {sp.squad_name && <span className="text-zinc-600 truncate">{sp.squad_name}</span>}
       </div>
+
+      <select
+        value={sp.status_at_session || "disponible"}
+        onChange={(e) => onStatusChange(sp, e.target.value)}
+        className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2 py-1 text-[11px] text-white focus:outline-none"
+        title="Cambiar estado del jugador"
+      >
+        {STATUS_OPTIONS.map(s => (
+          <option key={s} value={s}>{STATUS_LABELS[s] || s}</option>
+        ))}
+      </select>
 
       <div className="flex items-center gap-1 flex-wrap pt-1 border-t border-zinc-700/60">
         {ACTIONS.map(({ key, label, icon: Icon, activeClass }) => (
