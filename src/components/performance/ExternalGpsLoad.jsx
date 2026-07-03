@@ -67,6 +67,7 @@ export default function ExternalGpsLoad() {
   const [memberships, setMemberships] = useState([]);
   const [sessions, setSessions] = useState([]);
   const [gpsRows, setGpsRows] = useState([]);
+  const [weekSessionPlayers, setWeekSessionPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
@@ -94,11 +95,14 @@ export default function ExternalGpsLoad() {
 
     if (weekSessions.length === 0) {
       setGpsRows([]);
+      setWeekSessionPlayers([]);
     } else {
-      const rowsPerSession = await Promise.all(
-        weekSessions.map((s) => base44.entities.SessionGPSData.filter({ session_id: s.id }, "-created_date", 500))
-      );
+      const [rowsPerSession, playersPerSession] = await Promise.all([
+        Promise.all(weekSessions.map((s) => base44.entities.SessionGPSData.filter({ session_id: s.id }, "-created_date", 500))),
+        Promise.all(weekSessions.map((s) => base44.entities.SessionPlayer.filter({ session_id: s.id }, "-created_date", 500))),
+      ]);
       setGpsRows(rowsPerSession.flat());
+      setWeekSessionPlayers(playersPerSession.flat());
     }
     setLoading(false);
     setRefreshing(false);
@@ -209,8 +213,8 @@ export default function ExternalGpsLoad() {
     }).sort((a, b) => a.date.localeCompare(b.date));
   }, [sessionsToShow, tableRows]);
 
-  const alerts = useMemo(() => computeAlerts({ squadPlayers, playerAgg: Object.fromEntries(playerAggSummary.map(p => [p.player_id, p])), sessions, gpsRows: filteredIncludedRows }),
-    [squadPlayers, playerAggSummary, sessions, filteredIncludedRows]);
+  const alerts = useMemo(() => computeAlerts({ squadPlayers, playerAgg: Object.fromEntries(playerAggSummary.map(p => [p.player_id, p])), sessions, gpsRows: filteredIncludedRows, sessionPlayers: weekSessionPlayers }),
+    [squadPlayers, playerAggSummary, sessions, filteredIncludedRows, weekSessionPlayers]);
 
   function handleExport() {
     const squadName = activeSquad?.name || "plantel";

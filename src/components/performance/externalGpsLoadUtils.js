@@ -44,24 +44,48 @@ export const EXCLUSION_REASON_LABELS = {
   otro: "Otro / Ausente",
 };
 
-// Genera alertas automáticas de la semana a partir de los agregados por jugador
-export function computeAlerts({ squadPlayers, playerAgg, sessions, gpsRows }) {
+// Genera alertas automáticas de la semana a partir de los agregados por jugador.
+// Solo evalúa "sin GPS" / "carga baja" para jugadores que realmente tenían obligación
+// de participar (según su estado en cada SessionPlayer de la semana): un jugador
+// ausente, lesionado, en kinesiología, diferenciado, no convocado o excluido del
+// promedio no genera alerta.
+export function computeAlerts({ squadPlayers, playerAgg, sessions, gpsRows, sessionPlayers = [] }) {
   const alerts = [];
   const values = Object.values(playerAgg);
-  const withGpsIds = new Set(Object.keys(playerAgg));
+  const sessionIds = new Set(sessions.map((s) => s.id));
 
-  const withoutGps = squadPlayers.filter((p) => !withGpsIds.has(p.id));
-  if (withoutGps.length > 0) {
-    alerts.push({ type: "missing", text: `Sin GPS esta semana: ${withoutGps.map((p) => p.full_name).join(", ")}` });
-  }
+  // Sesiones válidas por jugador: aquellas donde su estado indica participación real
+  const validSessionsByPlayer = {};
+  sessionPlayers
+    .filter((sp) => sessionIds.has(sp.session_id))
+    .forEach((sp) => {
+      if (!classifyGpsInclusion(sp).include) return;
+      validSessionsByPlayer[sp.player_id] = (validSessionsByPlayer[sp.player_id] || 0) + 1;
+    });
 
-  const teamAvgDistance = avg(values.map((v) => v.total_distance));
-  if (teamAvgDistance) {
-    values.filter((v) => v.total_distance > teamAvgDistance * 1.3)
-      .forEach((v) => alerts.push({ type: "high", text: `${v.player_name}: carga muy alta (${fmtInt(v.total_distance)} m vs. prom. ${fmtInt(teamAvgDistance)} m)` }));
-    values.filter((v) => v.total_distance < teamAvgDistance * 0.7)
-      .forEach((v) => alerts.push({ type: "low", text: `${v.player_name}: carga muy baja (${fmtInt(v.total_distance)} m vs. prom. ${fmtInt(teamAvgDistance)} m)` }));
-  }
+  const evaluated = squadPlayers.map((p) => {
+    const validSessions = validSessionsByPlayer[p.id] || 0;
+    const agg = playerAgg[p.id];
+    const gpsSessions = agg?.sessions || 0;
+    const avgPerSession = gpsSessions > 0 ? agg.total_distance / gpsSessions : null;
+    return { player: p, validSessions, gpsSessions, avgPerSession };
+  });
+
+  const teamAvgPerSession = avg(evaluated.filter((e) => e.avgPerSession != null).map((e) => e.avgPerSession));
+
+  evaluated.forEach((e) => {
+    if (e.validSessions === 0) return; // no participó esta semana por un motivo válido: sin alerta
+    if (e.gpsSessions === 0) {
+      alerts.push({ type: "missing", text: `${e.player.full_name}: sin GPS (participó en ${e.validSessions} sesión${e.validSessions > 1 ? "es" : ""} sin registro GPS)` });
+      return;
+    }
+    if (!teamAvgPerSession) return;
+    if (e.avgPerSession > teamAvgPerSession * 1.3) {
+      alerts.push({ type: "high", text: `${e.player.full_name}: carga muy alta (${fmtInt(e.avgPerSession)} m/sesión vs. prom. ${fmtInt(teamAvgPerSession)} m/sesión)` });
+    } else if (e.avgPerSession < teamAvgPerSession * 0.7) {
+      alerts.push({ type: "low", text: `${e.player.full_name}: carga baja (${fmtInt(e.avgPerSession)} m/sesión vs. prom. ${fmtInt(teamAvgPerSession)} m/sesión)` });
+    }
+  });
 
   const maxSmax = Math.max(0, ...values.map((v) => v.smax_max || 0));
   if (maxSmax > 0) {
