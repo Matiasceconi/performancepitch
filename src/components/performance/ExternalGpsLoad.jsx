@@ -11,7 +11,6 @@ import ExternalGpsFilters from "./ExternalGpsFilters";
 import ExternalGpsWeeklySummary from "./ExternalGpsWeeklySummary";
 import ExternalGpsDailyChart from "./ExternalGpsDailyChart";
 import ExternalGpsPlayerTable from "./ExternalGpsPlayerTable";
-import ExternalGpsComparison from "./ExternalGpsComparison";
 import ExternalGpsSessionList from "./ExternalGpsSessionList";
 import ExternalGpsAlerts from "./ExternalGpsAlerts";
 import ExternalGpsExcludedList from "./ExternalGpsExcludedList";
@@ -22,7 +21,7 @@ import { useToast } from "@/components/ui/use-toast";
 
 moment.locale("es");
 const DAY_LABELS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const DEFAULT_FILTERS = { sessionId: "", playerId: "", position: "", type: "todos", inclusion: "todos" };
+const DEFAULT_FILTERS = { sessionId: "", playerId: "", position: "", inclusion: "todos" };
 
 const TABS = [
   { key: "resumen",     label: "Resumen semanal",         icon: BarChart2 },
@@ -30,7 +29,6 @@ const TABS = [
   { key: "jugador",     label: "Por jugador",             icon: Users },
   { key: "excluidos",   label: "Excluidos del promedio",  icon: UserX },
   { key: "perfil_equipo",label: "Perfil GPS del Equipo",   icon: Users },
-  { key: "comparativas",label: "Comparativas",            icon: Zap },
   { key: "reportes",    label: "Reportes",                icon: FileDown },
 ];
 
@@ -116,29 +114,33 @@ export default function ExternalGpsLoad() {
     return map;
   }, [players]);
 
-  // Miembros activos del plantel activo
+  // Miembros activos del plantel activo (los arqueros no usan GPS, quedan fuera de este módulo)
   const squadPlayers = useMemo(() => {
-    if (!activeSquadId) return players;
-    const ids = new Set(memberships.filter((m) => m.squad_id === activeSquadId).map((m) => m.player_id));
-    return players.filter((p) => ids.has(p.id));
+    const base = !activeSquadId ? players : (() => {
+      const ids = new Set(memberships.filter((m) => m.squad_id === activeSquadId).map((m) => m.player_id));
+      return players.filter((p) => ids.has(p.id));
+    })();
+    return base.filter((p) => !isGoalkeeper(p));
   }, [players, memberships, activeSquadId]);
 
-  // Enriquecer filas GPS con datos de sesión (fecha, MD) y jugador (posición, tipo)
+  // Enriquecer filas GPS con datos de sesión (fecha, MD) y jugador (posición, tipo) — excluye arqueros
   const enrichedRows = useMemo(() => {
     const sessionMap = {};
     sessions.forEach((s) => { sessionMap[s.id] = s; });
-    return gpsRows.map((r) => {
-      const session = sessionMap[r.session_id];
-      const player = playerMap[r.player_id];
-      return {
-        ...r,
-        date: session?.date,
-        session_title: session?.title,
-        match_day_code: session?.match_day_code,
-        position: player?.position || "",
-        player_type: player?.player_type || (isGoalkeeper(player) ? "arquero" : "jugador_campo"),
-      };
-    });
+    return gpsRows
+      .map((r) => {
+        const session = sessionMap[r.session_id];
+        const player = playerMap[r.player_id];
+        return {
+          ...r,
+          date: session?.date,
+          session_title: session?.title,
+          match_day_code: session?.match_day_code,
+          position: player?.position || "",
+          player_type: player?.player_type || (isGoalkeeper(player) ? "arquero" : "jugador_campo"),
+        };
+      })
+      .filter((r) => r.player_type !== "arquero");
   }, [gpsRows, sessions, playerMap]);
 
   // Regla: los promedios solo se calculan con include_in_session_average = true
@@ -149,8 +151,6 @@ export default function ExternalGpsLoad() {
     if (filters.sessionId && r.session_id !== filters.sessionId) return false;
     if (filters.playerId && r.player_id !== filters.playerId) return false;
     if (filters.position && r.position !== filters.position) return false;
-    if (filters.type === "campo" && r.player_type === "arquero") return false;
-    if (filters.type === "arqueros" && r.player_type !== "arquero") return false;
     return true;
   }, [filters]);
 
@@ -164,9 +164,6 @@ export default function ExternalGpsLoad() {
     if (filters.inclusion === "incluidos") return filteredIncludedRows;
     return [...filteredIncludedRows, ...filteredExcludedRows];
   }, [filters.inclusion, filteredIncludedRows, filteredExcludedRows]);
-
-  const fieldRows = useMemo(() => filteredIncludedRows.filter((r) => r.player_type !== "arquero"), [filteredIncludedRows]);
-  const gkRows = useMemo(() => filteredIncludedRows.filter((r) => r.player_type === "arquero"), [filteredIncludedRows]);
 
   const summary = useMemo(() => ({
     sessionsCount: new Set(filteredIncludedRows.map((r) => r.session_id)).size,
@@ -344,9 +341,6 @@ export default function ExternalGpsLoad() {
           )}
           {tab === "perfil_equipo" && (
             <TeamGPSProfileSection />
-          )}
-          {tab === "comparativas" && (
-            <ExternalGpsComparison fieldRows={fieldRows} gkRows={gkRows} />
           )}
           {tab === "reportes" && (
             <div className="space-y-5">

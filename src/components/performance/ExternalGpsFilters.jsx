@@ -38,13 +38,6 @@ export default function ExternalGpsFilters({ filters, onChange, sessions, player
         {positions.map(p => <option key={p} value={p}>{p}</option>)}
       </select>
 
-      <select value={filters.type} onChange={e => set("type", e.target.value)}
-        className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
-        <option value="todos">Campo y arqueros</option>
-        <option value="campo">Solo campo</option>
-        <option value="arqueros">Solo arqueros</option>
-      </select>
-
       <select value={filters.inclusion} onChange={e => set("inclusion", e.target.value)}
         className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none">
         <option value="todos">Incluidos y excluidos</option>
