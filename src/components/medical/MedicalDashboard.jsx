@@ -81,10 +81,14 @@ export default function MedicalDashboard({ squadPlayerIds }) {
     ? records.filter(r => !r.player_id || squadPlayerIds.has(r.player_id))
     : records;
 
-  // Active injured: Lesionado or En recuperación
+  // Un registro se considera de alta si su fecha de retorno esperada ya pasó, aunque el status no se haya actualizado
+  const isRecordAlta = (r) => r.status === "Alta médica" || (r.expected_return && moment(r.expected_return).isBefore(moment(), "day"));
+
+  // Active injured: Lesionado o En recuperación, excluyendo los que ya tienen alta
   const activeInjured = filteredRecords.filter(r =>
     (r.status === "Lesionado" || r.status === "En recuperación") &&
-    r.record_type !== "Consulta/Seguimiento"
+    r.record_type !== "Consulta/Seguimiento" &&
+    !isRecordAlta(r)
   );
 
   // Seguimiento
