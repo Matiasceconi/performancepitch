@@ -93,6 +93,23 @@ export default function WeeklyPlannerBoard() {
     return map;
   }, [squadSessions]);
 
+  // Traer ejercicios de fuerza y de campo reales de cada sesión, para reflejarlos automáticamente
+  const [sessionExtras, setSessionExtras] = useState({});
+  useEffect(() => {
+    async function loadExtras() {
+      if (!squadSessions.length) { setSessionExtras({}); return; }
+      const entries = await Promise.all(squadSessions.map(async (s) => {
+        const [strength, exercises] = await Promise.all([
+          base44.entities.StrengthStation.filter({ session_id: s.id }, "order"),
+          base44.entities.SessionExercise.filter({ session_id: s.id }, "order"),
+        ]);
+        return [s.id, { strength, exercises }];
+      }));
+      setSessionExtras(Object.fromEntries(entries));
+    }
+    loadExtras();
+  }, [squadSessions]);
+
   // Cargar plan desde BD cuando cambia la fecha de inicio o el plantel activo
   useEffect(() => {
     async function load() {
@@ -383,13 +400,34 @@ export default function WeeklyPlannerBoard() {
                 {days.map((d, i) => {
                   const tareas = d.tareasTecnico || [""];
                   const setTareas = (newTareas) => handleChange(i, "tareasTecnico", newTareas);
+                  const daySessions = sessionsByDate[d.date] || [];
+                  const strengthRows = daySessions.flatMap(s => sessionExtras[s.id]?.strength || []);
+                  const exerciseRows = daySessions.flatMap(s => sessionExtras[s.id]?.exercises || []);
                   return (
                     <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
                       <div className="mb-1.5">
                         <span className="text-[9px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/40">Sesión de gimnasio</span>
                       </div>
+                      {strengthRows.length > 0 && (
+                        <div className="mb-1.5 space-y-0.5 bg-blue-900/10 border border-blue-800/30 rounded px-1.5 py-1">
+                          {strengthRows.map((st, si) => (
+                            <p key={si} className="text-[9px] text-blue-200 leading-tight">
+                              • {st.exercise_name || "Ejercicio"} {st.volume ? `(${st.volume})` : ""}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                      {exerciseRows.length > 0 && (
+                        <div className="mb-1.5 space-y-0.5 bg-orange-900/10 border border-orange-800/30 rounded px-1.5 py-1">
+                          {exerciseRows.map((ex, ei) => (
+                            <p key={ei} className="text-[9px] text-orange-200 leading-tight">
+                              • {ex.name} {ex.type ? `(${ex.type})` : ""}
+                            </p>
+                          ))}
+                        </div>
+                      )}
                       <textarea rows={4} value={d.sesionGimnasio} onChange={e => handleChange(i, "sesionGimnasio", e.target.value)}
-                        placeholder="—" className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
+                        placeholder="Notas adicionales..." className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
                       <div className="border-t border-emerald-800/50 mt-2 mb-1.5 pt-1.5">
                         <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Director Técnico</span>
                       </div>
