@@ -110,9 +110,11 @@ Deno.serve(async (req) => {
       base44.asServiceRole.entities.PlayerAlias.list(),
     ]);
     const playerByNorm = {};
+    const playerNameById = {};
     players.forEach((p) => {
       const key = tokenSetKey(p.full_name || `${p.first_name || ''} ${p.last_name || ''}`);
       if (key) playerByNorm[key] = p.id;
+      playerNameById[p.id] = p.full_name || `${p.first_name || ''} ${p.last_name || ''}`.trim();
     });
     const aliasByNorm = {};
     aliases.forEach((a) => {
@@ -193,6 +195,7 @@ Deno.serve(async (req) => {
           const payload = {
             session_id: session.id,
             player_id: playerId,
+            player_name: playerNameById[playerId] || row.Jugador,
             player_name_original: row.Jugador,
             duration: minutesToHHMMSS(row.TT),
             total_distance: row.DT,
