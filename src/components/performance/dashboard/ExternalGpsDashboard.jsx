@@ -13,7 +13,10 @@ import GpsPlayerTable from "./GpsPlayerTable";
 import GpsMatchComparisonPanel from "./GpsMatchComparisonPanel";
 import GpsPositionRadar from "./GpsPositionRadar";
 import GpsExportButtons from "./GpsExportButtons";
+import GpsMicrocycleContext from "./GpsMicrocycleContext";
+import GpsLastSessionHero from "./GpsLastSessionHero";
 import { useNavigate } from "react-router-dom";
+import moment from "moment";
 
 export default function ExternalGpsDashboard() {
   const { activeSquadId, activeSquad } = useWorkspace();
@@ -27,6 +30,8 @@ export default function ExternalGpsDashboard() {
   const [sessions, setSessions] = useState([]);
   const [gpsBySession, setGpsBySession] = useState({});
   const [competitionProfiles, setCompetitionProfiles] = useState([]);
+  const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("");
@@ -52,13 +57,17 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allWeeklyPlans, allMatches] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
+        base44.entities.WeeklyPlan.list("-week_start", 100),
+        base44.entities.MatchReport.list("-date", 200),
       ]);
       setPlayers(allPlayers.filter((p) => p.active !== false));
       setCompetitionProfiles(allCompetitionProfiles);
+      setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
+      setMatches(selectedSquadId ? allMatches.filter((m) => m.squad_id === selectedSquadId) : allMatches);
 
       const squadSessions = allSessions.filter((s) => !selectedSquadId || s.squad_id === selectedSquadId);
       setSessions(squadSessions);
@@ -135,6 +144,32 @@ export default function ExternalGpsDashboard() {
     };
   }, [sessions, gpsBySession, sortedSessions, allEnrichedRows]);
 
+  const today = moment().format("YYYY-MM-DD");
+  const currentCycle = useMemo(() => {
+    if (!weeklyPlans.length) return null;
+    const withToday = weeklyPlans.find((p) => (p.days_data || []).some((d) => d.date === today));
+    if (withToday) return withToday;
+    return weeklyPlans.find((p) => p.week_start && p.week_start <= today) || weeklyPlans[0];
+  }, [weeklyPlans, today]);
+
+  const cycleDays = currentCycle?.days_data || [];
+  const cycleObjective = useMemo(() => {
+    const objectives = cycleDays.map((d) => d.objetivo).filter((o) => o && o !== "—");
+    if (!objectives.length) return "";
+    return [...new Set(objectives)].join(" / ");
+  }, [cycleDays]);
+
+  const rivalByDate = useMemo(() => {
+    const map = {};
+    cycleDays.forEach((d) => {
+      if (d.md === "MD" && d.date) {
+        const match = matches.find((m) => m.date === d.date);
+        if (match) map[d.date] = match.rival;
+      }
+    });
+    return map;
+  }, [cycleDays, matches]);
+
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
   const sessionRows = useMemo(() => {
     const rows = (gpsBySession[selectedSessionId] || []).filter((r) => r.include_in_session_average !== false);
@@ -208,6 +243,15 @@ export default function ExternalGpsDashboard() {
       />
 
       {showImportModal && <ImportHistoricalGPSModal onClose={() => { setShowImportModal(false); load(); }} />}
+
+      <GpsLastSessionHero
+        session={sortedSessions[0]}
+        playerCount={sortedSessions[0] ? new Set((gpsBySession[sortedSessions[0].id] || []).map((r) => r.player_id)).size : null}
+        md={cycleDays.find((d) => d.date === sortedSessions[0]?.date)?.md}
+        rival={rivalByDate[sortedSessions[0]?.date]}
+      />
+
+      <GpsMicrocycleContext days={cycleDays} rivalByDate={rivalByDate} objective={cycleObjective} />
 
       <GpsKpiCards kpis={kpis} />
 
