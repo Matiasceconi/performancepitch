@@ -401,22 +401,25 @@ export default function WeeklyPlannerBoard() {
                   const tareas = d.tareasTecnico || [""];
                   const setTareas = (newTareas) => handleChange(i, "tareasTecnico", newTareas);
                   const daySessions = sessionsByDate[d.date] || [];
-                  const strengthRows = daySessions.flatMap(s => sessionExtras[s.id]?.strength || []);
+                  const strengthSessions = daySessions.filter(s => (sessionExtras[s.id]?.strength || []).length > 0);
                   const exerciseRows = daySessions.flatMap(s => sessionExtras[s.id]?.exercises || []);
                   return (
                     <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
                       <div className="mb-1.5">
                         <span className="text-[9px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/40">Sesión de gimnasio</span>
                       </div>
-                      {strengthRows.length > 0 && (
+                      {strengthSessions.length > 0 && (
                         <div className="mb-1.5 space-y-0.5 bg-blue-900/10 border border-blue-800/30 rounded px-1.5 py-1">
-                          {strengthRows.map((st, si) => (
-                            <p key={si} className="text-[9px] text-blue-200 leading-tight">
-                              • {st.exercise_name || "Ejercicio"} {st.volume ? `(${st.volume})` : ""}
-                            </p>
+                          {strengthSessions.map(s => (
+                            <p key={s.id} className="text-[9px] text-blue-200 leading-tight font-semibold">• {s.title}</p>
                           ))}
                         </div>
                       )}
+                      <textarea rows={3} value={d.sesionGimnasio} onChange={e => handleChange(i, "sesionGimnasio", e.target.value)}
+                        placeholder="Notas adicionales..." className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
+                      <div className="border-t border-emerald-800/50 mt-2 mb-1.5 pt-1.5">
+                        <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Director Técnico</span>
+                      </div>
                       {exerciseRows.length > 0 && (
                         <div className="mb-1.5 space-y-0.5 bg-orange-900/10 border border-orange-800/30 rounded px-1.5 py-1">
                           {exerciseRows.map((ex, ei) => (
@@ -426,11 +429,6 @@ export default function WeeklyPlannerBoard() {
                           ))}
                         </div>
                       )}
-                      <textarea rows={4} value={d.sesionGimnasio} onChange={e => handleChange(i, "sesionGimnasio", e.target.value)}
-                        placeholder="Notas adicionales..." className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                      <div className="border-t border-emerald-800/50 mt-2 mb-1.5 pt-1.5">
-                        <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Director Técnico</span>
-                      </div>
                       <div className="space-y-1.5">
                         {tareas.map((t, ti) => (
                           <div key={ti} className="flex items-start gap-1">
