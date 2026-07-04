@@ -2,11 +2,15 @@ import React, { useMemo } from "react";
 import moment from "moment";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
+import GpsTopAccumulatedPlayers from "./GpsTopAccumulatedPlayers";
 
 const METRICS = [
   { key: "total_distance", label: "Distancia total", unit: "m", color: "#22c55e" },
+  { key: "distance_19_8", label: "Dist. 19,8-25", unit: "m", color: "#f97316" },
+  { key: "distance_25", label: "Dist. +25", unit: "m", color: "#ef4444" },
   { key: "player_load", label: "Player Load", unit: "u", color: "#3b82f6" },
-  { key: "sprints", label: "Sprints", unit: "", color: "#f59e0b" },
+  { key: "acc_3", label: "ACC +3", unit: "", color: "#a855f7" },
+  { key: "dec_3", label: "DEC +3", unit: "", color: "#14b8a6" },
 ];
 
 function avg(values) { const clean = values.filter(v => Number.isFinite(Number(v))); return clean.length ? Math.round(clean.reduce((a, b) => a + Number(b), 0) / clean.length) : 0; }
@@ -45,10 +49,22 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
         day: d.date ? moment(d.date).format("ddd DD/MM") : "—",
         objetivo: d.objetivo || "—",
         total_distance: avg(rows.map(r => r.total_distance)),
+        distance_19_8: avg(rows.map(r => r.distance_19_8)),
+        distance_25: avg(rows.map(r => r.distance_25)),
         player_load: avg(rows.map(r => r.player_load)),
-        sprints: avg(rows.map(r => r.sprints)),
+        acc_3: avg(rows.map(r => r.acc_3)),
+        dec_3: avg(rows.map(r => r.dec_3)),
       };
     });
+  }, [sessions, gpsBySession, cycleDays, playerMap]);
+
+  const cycleRows = useMemo(() => {
+    const days = cycleDays?.length ? cycleDays : Array.from({ length: 7 }, (_, i) => ({ date: moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD") }));
+    const dates = new Set(days.map(d => d.date).filter(Boolean));
+    return sessions
+      .filter(s => dates.has(s.date))
+      .flatMap(s => gpsBySession[s.id] || [])
+      .filter(r => r.include_in_session_average !== false && !isGoalkeeper(playerMap[r.player_id]));
   }, [sessions, gpsBySession, cycleDays, playerMap]);
 
   return (
@@ -61,6 +77,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         {METRICS.map(metric => <MetricChart key={metric.key} metric={metric} data={data} />)}
       </div>
+      <GpsTopAccumulatedPlayers rows={cycleRows} playerMap={playerMap} metrics={METRICS} />
     </div>
   );
 }
