@@ -35,35 +35,12 @@ function emptyDay(date) {
     date: date || "",
     md: "— MD —",
     objetivo: "—",
-    carga: 0,
-    volumen: "",
-    intensidad: "",
     sesionGimnasio: "",
     trabajoCompensatorio: "—",
     vueltaCalma: [],
     observaciones: "",
     tareasTecnico: [""],
   };
-}
-
-// ─── Gauge circular ────────────────────────────────────────────────────────────
-function CircularGauge({ value }) {
-  const r = 28;
-  const circ = Math.PI * r;
-  const pct = Math.min(Math.max(value, 0), 100) / 100;
-  const offset = circ * (1 - pct);
-  const color = value <= 0 ? "#3f3f46" : value < 50 ? "#22c55e" : value < 75 ? "#f97316" : "#ef4444";
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <svg width={72} height={42} viewBox="0 0 72 42">
-        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke="#27272a" strokeWidth={7} strokeLinecap="round" />
-        <path d="M 8 36 A 28 28 0 0 1 64 36" fill="none" stroke={color} strokeWidth={7} strokeLinecap="round"
-          strokeDasharray={circ} strokeDashoffset={offset}
-          style={{ transition: "stroke-dashoffset 0.3s, stroke 0.3s" }} />
-        <text x="36" y="33" textAnchor="middle" fontSize="11" fontWeight="bold" fill="#fff">{value}%</text>
-      </svg>
-    </div>
-  );
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
@@ -210,9 +187,6 @@ export default function WeeklyPlannerBoard() {
   const ROW_LABELS = [
     { key: "md",          label: "MD",                   bg: "bg-blue-900/50" },
     { key: "objetivo",    label: "Objetivo físico",       bg: "" },
-    { key: "carga",       label: "Carga (%)",             bg: "" },
-    { key: "volumen",     label: "Volumen (min)",         bg: "" },
-    { key: "intensidad",  label: "Intensidad",            bg: "" },
     { key: "gymDT",       label: "Sesión gym / Tareas DT",bg: "" },
     { key: "comp",        label: "Trabajo compensatorio", bg: "" },
     { key: "vuelta",      label: "Vuelta a la calma",     bg: "" },
@@ -369,46 +343,6 @@ export default function WeeklyPlannerBoard() {
                  );
                })}
                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Carga % */}
-              <tr className="border-t border-zinc-700 bg-zinc-900">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-middle">Carga (%)</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-2 align-top">
-                    <div className="flex flex-col items-center gap-1">
-                      <CircularGauge value={d.carga} />
-                      <input type="range" min={0} max={100} step={5} value={d.carga}
-                        onChange={e => handleChange(i, "carga", Number(e.target.value))}
-                        className="w-full h-1 accent-blue-500" />
-                    </div>
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Volumen */}
-              <tr className="border-t border-zinc-700 bg-zinc-900/60">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Volumen (min)</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                    <textarea rows={2} value={d.volumen} onChange={e => handleChange(i, "volumen", e.target.value)}
-                      placeholder="—" className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Intensidad */}
-              <tr className="border-t border-zinc-700 bg-zinc-900">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Intensidad</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                    <textarea rows={2} value={d.intensidad} onChange={e => handleChange(i, "intensidad", e.target.value)}
-                      placeholder="—" className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
               </tr>
 
               {/* Sesión gym + Tareas DT */}
