@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 
 const METRICS = [
   { key: "total_distance", label: "Distancia" },
@@ -18,7 +18,7 @@ export default function GpsTeamProfilePanel({ rows }) {
       <div><h2 className="text-xl font-bold text-white">Perfil del equipo</h2><p className="text-zinc-500 text-sm">Promedio general del plantel en registros GPS cargados</p></div>
       <div className="h-96">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="metric" stroke="#71717a" fontSize={11} /><YAxis stroke="#71717a" fontSize={11} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} /><Bar dataKey="promedio" fill="#3b82f6" radius={[8, 8, 0, 0]} /></BarChart>
+          <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="metric" stroke="#71717a" fontSize={11} /><YAxis stroke="#71717a" fontSize={11} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} /><Bar dataKey="promedio" fill="#3b82f6" radius={[8, 8, 0, 0]}><LabelList dataKey="promedio" position="top" fill="#e4e4e7" fontSize={11} fontWeight={700} /></Bar></BarChart>
         </ResponsiveContainer>
       </div>
     </div>

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 
 const METRICS = [
   { key: "total_distance", label: "Distancia" },
@@ -26,7 +26,7 @@ export default function GpsIndividualProfilePanel({ rows, selectedPlayerId, onSe
       </div>
       <div className="h-80">
         <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="metric" stroke="#71717a" fontSize={11} /><YAxis stroke="#71717a" fontSize={11} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} /><Bar dataKey="valor" fill="#22c55e" radius={[8, 8, 0, 0]} /></BarChart>
+          <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="metric" stroke="#71717a" fontSize={11} /><YAxis stroke="#71717a" fontSize={11} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} /><Bar dataKey="valor" fill="#22c55e" radius={[8, 8, 0, 0]}><LabelList dataKey="valor" position="top" fill="#e4e4e7" fontSize={11} fontWeight={700} /></Bar></BarChart>
         </ResponsiveContainer>
       </div>
     </div>
