@@ -402,7 +402,7 @@ export default function WeeklyPlannerBoard() {
                   const setTareas = (newTareas) => handleChange(i, "tareasTecnico", newTareas);
                   const daySessions = sessionsByDate[d.date] || [];
                   const strengthSessions = daySessions.filter(s => (sessionExtras[s.id]?.strength || []).length > 0);
-                  const exerciseRows = daySessions.flatMap(s => sessionExtras[s.id]?.exercises || []);
+                  const exerciseRows = daySessions.flatMap(s => (sessionExtras[s.id]?.exercises || []).map(ex => ({ ...ex, _sessionId: s.id })));
                   return (
                     <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
                       <div className="mb-1.5">
@@ -421,11 +421,21 @@ export default function WeeklyPlannerBoard() {
                         <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Director Técnico</span>
                       </div>
                       {exerciseRows.length > 0 && (
-                        <div className="mb-1.5 space-y-0.5 bg-orange-900/10 border border-orange-800/30 rounded px-1.5 py-1">
+                        <div className="mb-1.5 space-y-1 bg-orange-900/10 border border-orange-800/30 rounded px-1.5 py-1.5">
+                          <p className="text-[8px] text-orange-400/80 font-bold uppercase tracking-wider mb-0.5">Ejercicios de campo</p>
                           {exerciseRows.map((ex, ei) => (
-                            <p key={ei} className="text-[9px] text-orange-200 leading-tight">
-                              • {ex.name} {ex.type ? `(${ex.type})` : ""}
-                            </p>
+                            <Link
+                              key={ei}
+                              to={`/sessions?session=${ex._sessionId}`}
+                              title="Ver ejercicio en la sesión"
+                              className="flex items-center gap-1 text-[9px] text-orange-200 leading-tight hover:text-orange-100 hover:bg-orange-900/30 rounded px-1 py-0.5 -mx-1 transition-colors group"
+                            >
+                              <Dumbbell size={9} className="text-orange-400 shrink-0" />
+                              <span className="truncate flex-1 font-medium">{ex.name}</span>
+                              {ex.type && (
+                                <span className="text-[8px] text-orange-400/70 shrink-0 group-hover:text-orange-300">{ex.type}</span>
+                              )}
+                            </Link>
                           ))}
                         </div>
                       )}
