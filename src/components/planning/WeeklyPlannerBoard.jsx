@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Save, ChevronLeft, ChevronRight, Plus, X, Calendar, Dumbbell } from "lucide-react";
+import { Save, ChevronLeft, ChevronRight, Plus, X, Calendar, Dumbbell, Search } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { Link } from "react-router-dom";
 import moment from "moment";
@@ -59,6 +59,16 @@ export default function WeeklyPlannerBoard() {
   const [saving, setSaving] = useState(false);
   const [recordId, setRecordId] = useState(null);
   const [squadSessions, setSquadSessions] = useState([]);
+  const [savedPlans, setSavedPlans] = useState([]);
+
+  // Cargar lista de microciclos guardados del plantel activo, para poder buscarlos
+  useEffect(() => {
+    async function loadSavedPlans() {
+      const all = await base44.entities.WeeklyPlan.list("-week_start", 100);
+      setSavedPlans(activeSquadId ? all.filter(r => r.squad_id === activeSquadId) : all);
+    }
+    loadSavedPlans();
+  }, [activeSquadId, recordId]);
 
   // Cargar sesiones reales de Sesiones para reflejarlas en la planificación
   useEffect(() => {
@@ -216,6 +226,24 @@ export default function WeeklyPlannerBoard() {
           <button onClick={nextCycle} className="p-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white transition-colors">
             <ChevronRight size={16} />
           </button>
+
+          {savedPlans.length > 0 && (
+            <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5">
+              <Search size={13} className="text-zinc-500" />
+              <select
+                value=""
+                onChange={e => e.target.value && changeStartDate(e.target.value)}
+                className="bg-transparent text-zinc-300 text-xs focus:outline-none max-w-[220px]"
+              >
+                <option value="" className="bg-zinc-900">Buscar microciclo...</option>
+                {savedPlans.map(p => (
+                  <option key={p.id} value={p.week_start} className="bg-zinc-900">
+                    {moment(p.week_start).format("DD/MM/YYYY")} {p.week_start === startDate ? "(actual)" : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <span className="text-zinc-500 text-xs">
             {days.length} día{days.length !== 1 ? "s" : ""} ·{" "}
