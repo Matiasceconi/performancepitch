@@ -30,6 +30,18 @@ const OBJETIVO_COLORS = {
 const COMP_OPTIONS = ["—", "Intermitente", "HIIT tren superior", "HIIT tren inferior", "Movilidad", "Técnica individual", "Otro"];
 const VUELTA_OPTIONS = ["Elongación pasiva", "Elongación de a 2", "Rolo para cada uno", "Respiración diafragmática"];
 
+async function withRetry(fn, retries = 3, delay = 800) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries > 0 && String(err?.message || err).includes("Rate limit")) {
+      await new Promise(r => setTimeout(r, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+    throw err;
+  }
+}
+
 async function mapWithLimit(items, limit, fn) {
   const results = new Array(items.length);
   let index = 0;
@@ -111,11 +123,9 @@ export default function WeeklyPlannerBoard() {
   useEffect(() => {
     async function loadExtras() {
       if (!squadSessions.length) { setSessionExtras({}); return; }
-      const entries = await mapWithLimit(squadSessions, 4, async (s) => {
-        const [strength, exercises] = await Promise.all([
-          base44.entities.StrengthStation.filter({ session_id: s.id }, "order"),
-          base44.entities.SessionExercise.filter({ session_id: s.id }, "order"),
-        ]);
+      const entries = await mapWithLimit(squadSessions, 2, async (s) => {
+        const strength = await withRetry(() => base44.entities.StrengthStation.filter({ session_id: s.id }, "order"));
+        const exercises = await withRetry(() => base44.entities.SessionExercise.filter({ session_id: s.id }, "order"));
         return [s.id, { strength, exercises }];
       });
       setSessionExtras(Object.fromEntries(entries));
