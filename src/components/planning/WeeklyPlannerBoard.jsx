@@ -30,6 +30,19 @@ const OBJETIVO_COLORS = {
 const COMP_OPTIONS = ["—", "Intermitente", "HIIT tren superior", "HIIT tren inferior", "Movilidad", "Técnica individual", "Otro"];
 const VUELTA_OPTIONS = ["Elongación pasiva", "Elongación de a 2", "Rolo para cada uno", "Respiración diafragmática"];
 
+async function mapWithLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let index = 0;
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 function emptyDay(date) {
   return {
     date: date || "",
@@ -98,13 +111,13 @@ export default function WeeklyPlannerBoard() {
   useEffect(() => {
     async function loadExtras() {
       if (!squadSessions.length) { setSessionExtras({}); return; }
-      const entries = await Promise.all(squadSessions.map(async (s) => {
+      const entries = await mapWithLimit(squadSessions, 4, async (s) => {
         const [strength, exercises] = await Promise.all([
           base44.entities.StrengthStation.filter({ session_id: s.id }, "order"),
           base44.entities.SessionExercise.filter({ session_id: s.id }, "order"),
         ]);
         return [s.id, { strength, exercises }];
-      }));
+      });
       setSessionExtras(Object.fromEntries(entries));
     }
     loadExtras();
