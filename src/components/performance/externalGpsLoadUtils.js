@@ -1,5 +1,30 @@
 import moment from "moment";
 
+export async function withRetry(fn, retries = 3, delay = 800) {
+  try {
+    return await fn();
+  } catch (err) {
+    if (retries > 0 && String(err?.message || err).includes("Rate limit")) {
+      await new Promise((r) => setTimeout(r, delay));
+      return withRetry(fn, retries - 1, delay * 2);
+    }
+    throw err;
+  }
+}
+
+export async function mapWithLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let index = 0;
+  async function worker() {
+    while (index < items.length) {
+      const i = index++;
+      results[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
 export function avg(arr) {
   const v = arr.filter((x) => x != null && !isNaN(x));
   return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
