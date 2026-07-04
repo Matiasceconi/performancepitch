@@ -51,29 +51,38 @@ export default function ExternalGpsDashboard() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [allPlayers, allSessions, allCompetitionProfiles] = await Promise.all([
-      base44.entities.Player.list("-created_date", 500),
-      base44.entities.TrainingSession.list("-date", 500),
-      base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
-    ]);
-    setPlayers(allPlayers.filter((p) => p.active !== false));
-    setCompetitionProfiles(allCompetitionProfiles);
+    try {
+      const [allPlayers, allSessions, allCompetitionProfiles] = await Promise.all([
+        base44.entities.Player.list("-created_date", 500),
+        base44.entities.TrainingSession.list("-date", 500),
+        base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
+      ]);
+      setPlayers(allPlayers.filter((p) => p.active !== false));
+      setCompetitionProfiles(allCompetitionProfiles);
 
-    const squadSessions = allSessions.filter((s) => !selectedSquadId || s.squad_id === selectedSquadId);
-    setSessions(squadSessions);
+      const squadSessions = allSessions.filter((s) => !selectedSquadId || s.squad_id === selectedSquadId);
+      setSessions(squadSessions);
 
-    if (squadSessions.length > 0) {
-      const entries = await mapWithLimit(squadSessions, 2, async (s) => {
-        const rows = await withRetry(() => base44.entities.SessionGPSData.filter({ session_id: s.id }, "-created_date", 300));
-        return [s.id, rows];
-      });
-      setGpsBySession(Object.fromEntries(entries));
-      setSelectedSessionId((prev) => prev && squadSessions.some((s) => s.id === prev) ? prev : squadSessions[0].id);
-    } else {
-      setGpsBySession({});
-      setSelectedSessionId("");
+      if (squadSessions.length > 0) {
+        const entries = await mapWithLimit(squadSessions, 2, async (s) => {
+          try {
+            const rows = await withRetry(() => base44.entities.SessionGPSData.filter({ session_id: s.id }, "-created_date", 300));
+            return [s.id, rows];
+          } catch {
+            return [s.id, []];
+          }
+        });
+        setGpsBySession(Object.fromEntries(entries));
+        setSelectedSessionId((prev) => prev && squadSessions.some((s) => s.id === prev) ? prev : squadSessions[0].id);
+      } else {
+        setGpsBySession({});
+        setSelectedSessionId("");
+      }
+    } catch (err) {
+      console.error("ExternalGpsDashboard load error:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, [selectedSquadId]);
 
   useEffect(() => { load(); }, [load]);
