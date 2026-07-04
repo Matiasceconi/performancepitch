@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
-import { avg, mapWithLimit, withRetry } from "../externalGpsLoadUtils";
+import { avg, withRetry } from "../externalGpsLoadUtils";
 import ImportHistoricalGPSModal from "../ImportHistoricalGPSModal";
 import GpsDashboardHeader from "./GpsDashboardHeader";
 import GpsKpiCards from "./GpsKpiCards";
@@ -64,15 +64,15 @@ export default function ExternalGpsDashboard() {
       setSessions(squadSessions);
 
       if (squadSessions.length > 0) {
-        const entries = await mapWithLimit(squadSessions, 2, async (s) => {
-          try {
-            const rows = await withRetry(() => base44.entities.SessionGPSData.filter({ session_id: s.id }, "-created_date", 300));
-            return [s.id, rows];
-          } catch {
-            return [s.id, []];
-          }
+        const sessionIds = new Set(squadSessions.map((s) => s.id));
+        const allGpsRows = await withRetry(() => base44.entities.SessionGPSData.list("-created_date", 5000));
+        const grouped = {};
+        allGpsRows.forEach((r) => {
+          if (!sessionIds.has(r.session_id)) return;
+          if (!grouped[r.session_id]) grouped[r.session_id] = [];
+          grouped[r.session_id].push(r);
         });
-        setGpsBySession(Object.fromEntries(entries));
+        setGpsBySession(grouped);
         setSelectedSessionId((prev) => prev && squadSessions.some((s) => s.id === prev) ? prev : squadSessions[0].id);
       } else {
         setGpsBySession({});
