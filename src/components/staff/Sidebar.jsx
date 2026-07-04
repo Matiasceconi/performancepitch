@@ -19,8 +19,8 @@ const NAV_ITEMS = [
   { label: "Biblioteca Fuerza", path: "/strength-library",icon: Dumbbell, group: "sesiones" },
   { label: "Partidos",          path: "/matches",         icon: Trophy },
   { label: "Mapa táctico",      path: "/tactical",        icon: Map },
+  { label: "Carga Externa",     path: "/performance/external-load", icon: Gauge },
   // "performance" group — shown if any child page is allowed
-  { label: "Carga Externa",     path: "/performance/external-load", icon: Gauge,     group: "rendimiento" },
   { label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
   { label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
   { label: "Nutrición",         path: "/performance/nutrition",     icon: Apple,     group: "rendimiento" },
@@ -34,8 +34,8 @@ const NAV_ITEMS = [
 ];
 
 const SESSION_PATHS = ["/sessions", "/field-library", "/strength-library"];
-const PERFORMANCE_PATHS = ["/performance/external-load", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes"];
-const BEFORE_PERFORMANCE_PATHS = ["/matches", "/tactical"];
+const PERFORMANCE_PATHS = ["/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes"];
+const BEFORE_PERFORMANCE_PATHS = ["/matches", "/tactical", "/performance/external-load"];
 
 export default function Sidebar() {
   const location = useLocation();
