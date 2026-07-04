@@ -10,16 +10,16 @@ import GpsSessionListPanel from "./GpsSessionListPanel";
 import GpsSessionSummaryPanel from "./GpsSessionSummaryPanel";
 import GpsLoadAlerts from "./GpsLoadAlerts";
 import GpsPlayerTable from "./GpsPlayerTable";
-import GpsMatchComparisonPanel from "./GpsMatchComparisonPanel";
 import GpsPositionRadar from "./GpsPositionRadar";
 import GpsExportButtons from "./GpsExportButtons";
-import GpsMicrocycleContext from "./GpsMicrocycleContext";
-import GpsLastSessionHero from "./GpsLastSessionHero";
+import GpsWeeklyEvolutionPanel from "./GpsWeeklyEvolutionPanel";
+import GpsIndividualProfilePanel from "./GpsIndividualProfilePanel";
+import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 
 export default function ExternalGpsDashboard() {
-  const { activeSquadId, activeSquad } = useWorkspace();
+  const { activeSquadId } = useWorkspace();
   const navigate = useNavigate();
   const dashboardRef = useRef(null);
 
@@ -31,11 +31,11 @@ export default function ExternalGpsDashboard() {
   const [gpsBySession, setGpsBySession] = useState({});
   const [competitionProfiles, setCompetitionProfiles] = useState([]);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
-  const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
+  const [activeTab, setActiveTab] = useState("microcycle");
 
   useEffect(() => {
     if (activeSquadId) setSelectedSquadId(activeSquadId);
@@ -57,17 +57,15 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles, allWeeklyPlans, allMatches] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allWeeklyPlans] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
         base44.entities.WeeklyPlan.list("-week_start", 100),
-        base44.entities.MatchReport.list("-date", 200),
       ]);
       setPlayers(allPlayers.filter((p) => p.active !== false));
       setCompetitionProfiles(allCompetitionProfiles);
       setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
-      setMatches(selectedSquadId ? allMatches.filter((m) => m.squad_id === selectedSquadId) : allMatches);
 
       const squadSessions = allSessions.filter((s) => !selectedSquadId || s.squad_id === selectedSquadId);
       setSessions(squadSessions);
@@ -153,22 +151,6 @@ export default function ExternalGpsDashboard() {
   }, [weeklyPlans, today]);
 
   const cycleDays = currentCycle?.days_data || [];
-  const cycleObjective = useMemo(() => {
-    const objectives = cycleDays.map((d) => d.objetivo).filter((o) => o && o !== "—");
-    if (!objectives.length) return "";
-    return [...new Set(objectives)].join(" / ");
-  }, [cycleDays]);
-
-  const rivalByDate = useMemo(() => {
-    const map = {};
-    cycleDays.forEach((d) => {
-      if (d.md === "MD" && d.date) {
-        const match = matches.find((m) => m.date === d.date);
-        if (match) map[d.date] = match.rival;
-      }
-    });
-    return map;
-  }, [cycleDays, matches]);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
   const sessionRows = useMemo(() => {
@@ -219,16 +201,24 @@ export default function ExternalGpsDashboard() {
   }, [sessionRows, competitionMap]);
 
   useEffect(() => {
-    if (sessionRows.length && !sessionRows.some((r) => r.player_id === selectedPlayerId)) {
-      setSelectedPlayerId(sessionRows[0].player_id);
+    const sourceRows = sessionRows.length ? sessionRows : allEnrichedRows;
+    if (sourceRows.length && !sourceRows.some((r) => r.player_id === selectedPlayerId)) {
+      setSelectedPlayerId(sourceRows[0].player_id);
     }
-  }, [sessionRows, selectedPlayerId]);
+  }, [sessionRows, allEnrichedRows, selectedPlayerId]);
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
     </div>
   );
+
+  const tabs = [
+    { id: "microcycle", label: "Resumen del microciclo" },
+    { id: "sessions", label: "Buscar sesiones" },
+    { id: "individual", label: "Perfil individual" },
+    { id: "team", label: "Perfil del equipo" },
+  ];
 
   return (
     <div className="space-y-5" ref={dashboardRef}>
@@ -244,42 +234,48 @@ export default function ExternalGpsDashboard() {
 
       {showImportModal && <ImportHistoricalGPSModal onClose={() => { setShowImportModal(false); load(); }} />}
 
-      <GpsLastSessionHero
-        session={sortedSessions[0]}
-        playerCount={sortedSessions[0] ? new Set((gpsBySession[sortedSessions[0].id] || []).map((r) => r.player_id)).size : null}
-        md={cycleDays.find((d) => d.date === sortedSessions[0]?.date)?.md}
-        rival={rivalByDate[sortedSessions[0]?.date]}
-      />
-
-      <GpsMicrocycleContext days={cycleDays} rivalByDate={rivalByDate} objective={cycleObjective} />
-
-      <GpsKpiCards kpis={kpis} />
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <GpsSessionListPanel
-          sessions={sessionsForList}
-          selectedSessionId={selectedSessionId}
-          onSelect={setSelectedSessionId}
-          onViewReport={(id) => navigate(`/sessions?session=${id}`)}
-        />
-        <GpsSessionSummaryPanel session={selectedSession} summary={sessionSummary} highlights={highlights} />
+      <div className="flex flex-wrap gap-2 bg-zinc-950 border border-zinc-800 rounded-2xl p-2">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-emerald-600 text-white" : "text-zinc-400 hover:text-white hover:bg-zinc-900"}`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <GpsLoadAlerts counts={alertCounts} />
+      {activeTab === "microcycle" && (
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} />
+      )}
 
-      <GpsPlayerTable rows={sessionRows} />
+      {activeTab === "sessions" && (
+        <div className="space-y-4">
+          <GpsKpiCards kpis={kpis} />
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <GpsSessionListPanel
+              sessions={sessionsForList}
+              selectedSessionId={selectedSessionId}
+              onSelect={setSelectedSessionId}
+              onViewReport={(id) => navigate(`/sessions?session=${id}`)}
+            />
+            <GpsSessionSummaryPanel session={selectedSession} summary={sessionSummary} highlights={highlights} />
+          </div>
+          <GpsLoadAlerts counts={alertCounts} />
+          <GpsPlayerTable rows={sessionRows} />
+          <GpsExportButtons session={selectedSession} rows={sessionRows} dashboardRef={dashboardRef} />
+        </div>
+      )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <GpsMatchComparisonPanel
-          rows={sessionRows}
-          competitionMap={competitionMap}
-          selectedPlayerId={selectedPlayerId}
-          onSelectPlayer={setSelectedPlayerId}
-        />
-        <GpsPositionRadar rows={sessionRows} />
-      </div>
+      {activeTab === "individual" && <GpsIndividualProfilePanel rows={allEnrichedRows} selectedPlayerId={selectedPlayerId} onSelectPlayer={setSelectedPlayerId} />}
 
-      <GpsExportButtons session={selectedSession} rows={sessionRows} dashboardRef={dashboardRef} />
+      {activeTab === "team" && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <GpsTeamProfilePanel rows={allEnrichedRows} />
+          <GpsPositionRadar rows={allEnrichedRows} />
+        </div>
+      )}
     </div>
   );
 }
