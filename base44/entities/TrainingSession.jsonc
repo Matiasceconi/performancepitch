@@ -150,6 +150,10 @@
         "excel_historico"
       ],
       "description": "Origen de importaci\u00f3n masiva, usado para evitar duplicar sesiones al re-importar el mismo Excel"
+    },
+    "gps_report_observations": {
+      "type": "string",
+      "description": "Observaciones editables del Informe de Sesi\u00f3n GPS"
     }
   },
   "required": [

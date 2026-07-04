@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Upload, AlertCircle, Filter, RefreshCw } from "lucide-react";
+import { Upload, AlertCircle, Filter, RefreshCw, FileBarChart } from "lucide-react";
+import SessionGPSReportModal from "@/components/sessions/gpsReport/SessionGPSReportModal";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
@@ -42,6 +43,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
   const [visibleFields, setVisibleFields] = useState(MAIN_FIELDS);
   const [importing, setImporting] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [showReport, setShowReport] = useState(false);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -290,13 +292,22 @@ export default function SessionGPS({ session, sessionPlayers }) {
       </div>
 
       {gpsRows.length > 0 && (
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-2">
+          <button onClick={() => setShowReport(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-xs hover:bg-yellow-500/25 transition-colors">
+            <FileBarChart size={12} />
+            Informe profesional GPS
+          </button>
           <button onClick={recalculateAverages} disabled={recalculating}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-xs hover:bg-zinc-700 transition-colors disabled:opacity-50">
             <RefreshCw size={12} className={recalculating ? "animate-spin" : ""} />
             Recalcular promedios GPS
           </button>
         </div>
+      )}
+
+      {showReport && (
+        <SessionGPSReportModal session={session} sessionPlayers={sessionPlayers} onClose={() => setShowReport(false)} />
       )}
 
       {preview && (
