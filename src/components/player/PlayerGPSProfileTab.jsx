@@ -47,19 +47,23 @@ function semaphoreColor(diffPct) {
 
 export default function PlayerGPSProfileTab({ playerId }) {
   const [profile, setProfile] = useState(null);
+  const [competitionProfile, setCompetitionProfile] = useState(null);
   const [mdProfiles, setMdProfiles] = useState([]);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [recalculating, setRecalculating] = useState(false);
+  const [recalculatingCompetition, setRecalculatingCompetition] = useState(false);
 
   async function load() {
     setLoading(true);
-    const [profiles, mds, gpsRows, sessions] = await Promise.all([
+    const [profiles, competitionProfiles, mds, gpsRows, sessions] = await Promise.all([
       base44.entities.PlayerGPSProfile.filter({ player_id: playerId }, "-created_date", 1),
+      base44.entities.PlayerCompetitionProfile.filter({ player_id: playerId }, "-created_date", 1),
       base44.entities.PlayerGPSMicrocycleProfile.filter({ player_id: playerId }, "-created_date", 20),
       base44.entities.SessionGPSData.filter({ player_id: playerId }, "-created_date", 300),
       base44.entities.TrainingSession.list("-date", 1000),
     ]);
+    setCompetitionProfile(competitionProfiles[0] || null);
     const sessionMap = {};
     sessions.forEach((s) => { sessionMap[s.id] = s; });
     const enriched = gpsRows
@@ -83,6 +87,13 @@ export default function PlayerGPSProfileTab({ playerId }) {
     await base44.functions.invoke("recalculatePlayerGPSProfiles", { player_ids: [playerId] });
     await load();
     setRecalculating(false);
+  }
+
+  async function recalculateCompetition() {
+    setRecalculatingCompetition(true);
+    await base44.functions.invoke("recalculatePlayerCompetitionProfile", { player_ids: [playerId] });
+    await load();
+    setRecalculatingCompetition(false);
   }
 
   const normalRows = useMemo(() => rows.filter((r) => r.include_in_session_average !== false), [rows]);
@@ -110,6 +121,13 @@ export default function PlayerGPSProfileTab({ playerId }) {
     const diffPct = ((lastSession.total_distance - lastMdProfile.avg_total_distance) / lastMdProfile.avg_total_distance) * 100;
     return { diffPct, ...semaphoreColor(diffPct) };
   }, [lastSession, lastMdProfile]);
+
+  // Semáforo: última sesión de entrenamiento vs perfil competitivo (promedio de partidos +80')
+  const competitionSemaphore = useMemo(() => {
+    if (!lastSession || !competitionProfile || !competitionProfile.avg_total_distance) return null;
+    const diffPct = ((lastSession.total_distance - competitionProfile.avg_total_distance) / competitionProfile.avg_total_distance) * 100;
+    return { diffPct, ...semaphoreColor(diffPct) };
+  }, [lastSession, competitionProfile]);
 
   // Alertas simples basadas en perfil + últimas sesiones normales
   const alerts = useMemo(() => {
@@ -187,6 +205,40 @@ export default function PlayerGPSProfileTab({ playerId }) {
           <p className="text-xs mt-1">Diferencia: {semaphore.diffPct > 0 ? "+" : ""}{semaphore.diffPct.toFixed(1)}% — {semaphore.label}</p>
         </div>
       )}
+
+      {/* Perfil competitivo */}
+      <div>
+        <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
+          <p className="text-xs text-zinc-500 uppercase tracking-wider font-semibold">Perfil competitivo (partidos +80')</p>
+          <button onClick={recalculateCompetition} disabled={recalculatingCompetition}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-[11px] hover:bg-zinc-700 transition-colors disabled:opacity-50">
+            <RefreshCw size={11} className={recalculatingCompetition ? "animate-spin" : ""} /> Recalcular perfil competitivo
+          </button>
+        </div>
+        {!competitionProfile ? (
+          <p className="text-zinc-600 text-sm text-center py-4 bg-zinc-900 rounded-xl">Sin perfil competitivo aún (requiere partidos con +80' jugados y GPS cargado)</p>
+        ) : (
+          <div className="space-y-3">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              <MiniStat label="Partidos usados" value={competitionProfile.matches_used} color="text-blue-400" />
+              <MiniStat label="Distancia prom." value={fmt(competitionProfile.avg_total_distance)} color="text-white text-sm" sub="m" />
+              <MiniStat label="m/min prom." value={fmt(competitionProfile.avg_m_min)} color="text-white text-sm" />
+              <MiniStat label="Player Load prom." value={fmt(competitionProfile.avg_player_load)} color="text-purple-400 text-sm" />
+              <MiniStat label="Sprints prom." value={fmt(competitionProfile.avg_sprints)} color="text-cyan-400 text-sm" />
+              <MiniStat label="Smax prom." value={fmtSmax(competitionProfile.avg_smax)} color="text-red-400 text-sm" />
+            </div>
+            {competitionSemaphore && lastSession && (
+              <div className={`rounded-xl border p-4 ${competitionSemaphore.cls}`}>
+                <p className="text-xs font-semibold uppercase tracking-wider mb-1">Última sesión vs. perfil competitivo</p>
+                <p className="text-sm">
+                  Última sesión: <strong>{fmtMetric(lastSession.total_distance)} m</strong> · Promedio en partidos: <strong>{fmtMetric(competitionProfile.avg_total_distance)} m</strong>
+                </p>
+                <p className="text-xs mt-1">Diferencia: {competitionSemaphore.diffPct > 0 ? "+" : ""}{competitionSemaphore.diffPct.toFixed(1)}% — {competitionSemaphore.label}</p>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Alertas */}
       {alerts.length > 0 && (
