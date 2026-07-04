@@ -143,6 +143,13 @@
     "strength_vector_pattern": {
       "type": "string",
       "description": "Patr\u00f3n vectorial de la sesi\u00f3n de fuerza"
+    },
+    "import_source": {
+      "type": "string",
+      "enum": [
+        "excel_historico"
+      ],
+      "description": "Origen de importaci\u00f3n masiva, usado para evitar duplicar sesiones al re-importar el mismo Excel"
     }
   },
   "required": [

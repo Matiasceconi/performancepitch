@@ -7,6 +7,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { CalendarRange, Zap, Users, UserX, BarChart2, FileDown } from "lucide-react";
 import ExternalGpsLoadHeader from "./ExternalGpsLoadHeader";
+import ImportHistoricalGPSModal from "./ImportHistoricalGPSModal";
 import ExternalGpsFilters from "./ExternalGpsFilters";
 import ExternalGpsWeeklySummary from "./ExternalGpsWeeklySummary";
 import ExternalGpsDailyChart from "./ExternalGpsDailyChart";
@@ -69,6 +70,7 @@ export default function ExternalGpsLoad() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [recalculating, setRecalculating] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const { toast } = useToast();
 
   const weekEnd = useMemo(() => moment(weekStart).endOf("isoWeek"), [weekStart]);
@@ -297,7 +299,12 @@ export default function ExternalGpsLoad() {
         refreshing={refreshing}
         onRecalculate={recalculateAverages}
         recalculating={recalculating}
+        onImportHistorical={() => setShowImportModal(true)}
       />
+
+      {showImportModal && (
+        <ImportHistoricalGPSModal onClose={() => { setShowImportModal(false); load(true); }} />
+      )}
 
       <ExternalGpsFilters
         filters={filters} onChange={setFilters}
