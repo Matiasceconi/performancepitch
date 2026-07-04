@@ -11,6 +11,28 @@ function normalize(str) {
     .trim();
 }
 
+// Compara nombres sin importar el orden de nombre/apellido (Excel trae "APELLIDO NOMBRE" o variantes)
+function tokenSetKey(str) {
+  return normalize(str).split(' ').filter(Boolean).sort().join(' ');
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Reintenta una operación si falla por rate limit, con espera creciente
+async function withRetry(fn, retries = 4, delayMs = 1500) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      const isRateLimit = (e.message || '').toLowerCase().includes('rate limit');
+      if (!isRateLimit || attempt === retries) throw e;
+      await sleep(delayMs * (attempt + 1));
+    }
+  }
+}
+
 function toDateStr(v) {
   if (!v) return null;
   const d = new Date(v);
@@ -41,39 +63,31 @@ Deno.serve(async (req) => {
       json_schema: {
         type: 'object',
         properties: {
-          rows: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                Fecha: { type: 'string' },
-                Jugador: { type: 'string' },
-                DIV: { type: 'string' },
-                'E/P': { type: 'string' },
-                TT: { type: 'number' },
-                DT: { type: 'number' },
-                'D_>14.4': { type: 'number' },
-                'D_>19.8': { type: 'number' },
-                'D_>25': { type: 'number' },
-                N_Sprint: { type: 'number' },
-                'Acc 2-3m/s': { type: 'number' },
-                'EFF_ACC_2-3': { type: 'number' },
-                'Acc +3m/s': { type: 'number' },
-                'EFF_ACC+3': { type: 'number' },
-                'Dec 2-3m/s': { type: 'number' },
-                'EFF_DEC_2-3': { type: 'number' },
-                'Dec +3m/s': { type: 'number' },
-                'EFF_DEC+3': { type: 'number' },
-                D_MPHI: { type: 'number' },
-                RHIE: { type: 'number' },
-                TPL: { type: 'number' },
-                PLPM: { type: 'number' },
-                Smax: { type: 'number' },
-                Drel: { type: 'number' },
-                RPE: { type: 'number' },
-              },
-            },
-          },
+          Fecha: { type: 'string' },
+          Jugador: { type: 'string' },
+          DIV: { type: 'string' },
+          'E/P': { type: 'string' },
+          TT: { type: 'number' },
+          DT: { type: 'number' },
+          'D_>14.4': { type: 'number' },
+          'D_>19.8': { type: 'number' },
+          'D_>25': { type: 'number' },
+          N_Sprint: { type: 'number' },
+          'Acc 2-3m/s': { type: 'number' },
+          'EFF_ACC_2-3': { type: 'number' },
+          'Acc +3m/s': { type: 'number' },
+          'EFF_ACC+3': { type: 'number' },
+          'Dec 2-3m/s': { type: 'number' },
+          'EFF_DEC_2-3': { type: 'number' },
+          'Dec +3m/s': { type: 'number' },
+          'EFF_DEC+3': { type: 'number' },
+          D_MPHI: { type: 'number' },
+          RHIE: { type: 'number' },
+          TPL: { type: 'number' },
+          PLPM: { type: 'number' },
+          Smax: { type: 'number' },
+          Drel: { type: 'number' },
+          RPE: { type: 'number' },
         },
       },
     });
@@ -82,7 +96,7 @@ Deno.serve(async (req) => {
       return Response.json({ error: extractResult.details || 'Error al leer el archivo' }, { status: 400 });
     }
 
-    let rows = extractResult.output?.rows || extractResult.output || [];
+    let rows = Array.isArray(extractResult.output) ? extractResult.output : [];
     rows = rows.filter((r) => !r.DIV || String(r.DIV).toUpperCase() === 'RES');
 
     const squads = await base44.asServiceRole.entities.Squad.list();
@@ -97,12 +111,13 @@ Deno.serve(async (req) => {
     ]);
     const playerByNorm = {};
     players.forEach((p) => {
-      const norm = normalize(p.full_name || `${p.first_name || ''} ${p.last_name || ''}`);
-      if (norm) playerByNorm[norm] = p.id;
+      const key = tokenSetKey(p.full_name || `${p.first_name || ''} ${p.last_name || ''}`);
+      if (key) playerByNorm[key] = p.id;
     });
     const aliasByNorm = {};
     aliases.forEach((a) => {
-      if (a.normalized_alias) aliasByNorm[a.normalized_alias] = a.player_id;
+      const key = tokenSetKey(a.alias_name);
+      if (key) aliasByNorm[key] = a.player_id;
     });
 
     const byDate = {};
@@ -129,20 +144,22 @@ Deno.serve(async (req) => {
 
     for (const dateStr of fechas) {
       const dateRows = byDate[dateStr];
+      await sleep(900);
       try {
         const avgTT = dateRows.reduce((sum, r) => sum + (r.TT || 0), 0) / dateRows.length;
         const [y, m, d] = dateStr.split('-');
         const title = `Sesión GPS Reserva - ${d}/${m}/${y}`;
 
         let session = sessionByDate[dateStr];
+        const wasExisting = !!session;
         if (session) {
-          await base44.asServiceRole.entities.TrainingSession.update(session.id, {
+          await withRetry(() => base44.asServiceRole.entities.TrainingSession.update(session.id, {
             title,
             duration_minutes: Math.round(avgTT) || undefined,
-          });
+          }));
           sessionsUpdated++;
         } else {
-          session = await base44.asServiceRole.entities.TrainingSession.create({
+          session = await withRetry(() => base44.asServiceRole.entities.TrainingSession.create({
             title,
             date: dateStr,
             squad_id: reserveSquad.id,
@@ -151,20 +168,22 @@ Deno.serve(async (req) => {
             duration_minutes: Math.round(avgTT) || undefined,
             csv_label: 'Excel histórico',
             import_source: 'excel_historico',
-          });
+          }));
           sessionsCreated++;
         }
 
-        const existingGps = await base44.asServiceRole.entities.SessionGPSData.filter({ session_id: session.id });
         const gpsByPlayer = {};
-        existingGps.forEach((g) => { gpsByPlayer[g.player_id] = g; });
+        if (wasExisting) {
+          const existingGps = await withRetry(() => base44.asServiceRole.entities.SessionGPSData.filter({ session_id: session.id }));
+          existingGps.forEach((g) => { gpsByPlayer[g.player_id] = g; });
+        }
 
         const toCreate = [];
         const toUpdate = [];
 
         for (const row of dateRows) {
-          const norm = normalize(row.Jugador);
-          const playerId = playerByNorm[norm] || aliasByNorm[norm];
+          const key = tokenSetKey(row.Jugador);
+          const playerId = playerByNorm[key] || aliasByNorm[key];
           if (!playerId) {
             unmatchedSet.add(row.Jugador);
             continue;
@@ -209,11 +228,11 @@ Deno.serve(async (req) => {
         }
 
         if (toCreate.length > 0) {
-          await base44.asServiceRole.entities.SessionGPSData.bulkCreate(toCreate);
+          await withRetry(() => base44.asServiceRole.entities.SessionGPSData.bulkCreate(toCreate));
           gpsLoaded += toCreate.length;
         }
         if (toUpdate.length > 0) {
-          await base44.asServiceRole.entities.SessionGPSData.bulkUpdate(toUpdate);
+          await withRetry(() => base44.asServiceRole.entities.SessionGPSData.bulkUpdate(toUpdate));
           gpsLoaded += toUpdate.length;
         }
       } catch (e) {
