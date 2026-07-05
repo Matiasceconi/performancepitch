@@ -6,6 +6,7 @@ import "moment/locale/es";
 import { jsPDF } from "jspdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
+import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professionalSchedulePdf";
 
 moment.locale("es");
 
@@ -652,8 +653,14 @@ export default function Schedule() {
 
   function downloadWeekPDF() {
     const days = getWeekDays();
-    const weekLabel = `${activeSquad?.name ? activeSquad.name + " · " : ""}${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
-    const doc = buildWeekPDF(days, getEventsForDate, weekLabel);
+    const weekLabel = `${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
+    const doc = buildProfessionalWeekSchedulePDF({
+      days,
+      eventsForDate: getEventsForDate,
+      weekLabel,
+      squadName: activeSquad?.name || "Plantel",
+      season: activeSeasonId || activeSquad?.season || "",
+    });
     doc.save(`cronograma-semana-${days[0].format("YYYY-MM-DD")}.pdf`);
   }
 
