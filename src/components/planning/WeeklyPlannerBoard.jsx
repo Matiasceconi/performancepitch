@@ -1,568 +1,349 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { Save, ChevronLeft, ChevronRight, Plus, X, Calendar, Dumbbell, Search } from "lucide-react";
-import { useToast } from "@/components/ui/use-toast";
-import { Link } from "react-router-dom";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Calendar, ChevronLeft, ChevronRight, Copy, Download, GripVertical, Layers, Plus, Printer, Save, Sparkles, Trash2, X } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
+import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { MICROCycle_TEMPLATES, TEMPLATE_BLOCKS } from "@/components/planning/microcycleTemplates";
+
 moment.locale("es");
 
-// ─── Constantes ────────────────────────────────────────────────────────────────
-const MD_OPTIONS = ["— MD —", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4"];
-const OBJETIVO_OPTIONS = ["—", "Tensión", "Volumen", "Velocidad", "Activación", "Compensación", "Recuperación", "Fuerza", "Intermitente", "Aceleración", "Velocidad Máxima", "Resistencia", "Táctica", "Regenerativo"];
-
-const OBJETIVO_COLORS = {
-  "Tensión":        { bg: "bg-red-900/60",     text: "text-red-300",     border: "border-red-700/50",     header: "bg-red-800/40" },
-  "Volumen":        { bg: "bg-blue-900/60",     text: "text-blue-300",    border: "border-blue-700/50",    header: "bg-blue-800/40" },
-  "Velocidad":      { bg: "bg-yellow-900/60",   text: "text-yellow-300",  border: "border-yellow-700/50",  header: "bg-yellow-800/40" },
-  "Activación":     { bg: "bg-orange-900/60",   text: "text-orange-300",  border: "border-orange-700/50",  header: "bg-orange-800/40" },
-  "Compensación":   { bg: "bg-purple-900/60",   text: "text-purple-300",  border: "border-purple-700/50",  header: "bg-purple-800/40" },
-  "Recuperación":   { bg: "bg-emerald-900/60",  text: "text-emerald-300", border: "border-emerald-700/50", header: "bg-emerald-800/40" },
-  "Fuerza":         { bg: "bg-pink-900/60",     text: "text-pink-300",    border: "border-pink-700/50",    header: "bg-pink-800/40" },
-  "Intermitente":   { bg: "bg-cyan-900/60",     text: "text-cyan-300",    border: "border-cyan-700/50",    header: "bg-cyan-800/40" },
-  "Aceleración":    { bg: "bg-lime-900/60",     text: "text-lime-300",    border: "border-lime-700/50",    header: "bg-lime-800/40" },
-  "Velocidad Máxima": { bg: "bg-amber-900/60",  text: "text-amber-300",   border: "border-amber-700/50",   header: "bg-amber-800/40" },
-  "Resistencia":    { bg: "bg-teal-900/60",     text: "text-teal-300",    border: "border-teal-700/50",    header: "bg-teal-800/40" },
-  "Táctica":        { bg: "bg-indigo-900/60",   text: "text-indigo-300",  border: "border-indigo-700/50",  header: "bg-indigo-800/40" },
-  "Regenerativo":   { bg: "bg-zinc-800/80",     text: "text-zinc-400",    border: "border-zinc-600/50",    header: "bg-zinc-700/60" },
-};
-const COMP_OPTIONS = ["—", "Intermitente", "HIIT tren superior", "HIIT tren inferior", "Movilidad", "Técnica individual", "Otro"];
-const VUELTA_OPTIONS = ["Elongación pasiva", "Elongación de a 2", "Rolo para cada uno", "Respiración diafragmática"];
 const WEEKDAY_NAMES_ES = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+const MD_OPTIONS = ["— MD —", "MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4"];
+const WEEK_TYPES = ["Normal", "Semana corta", "Semana larga", "Doble competencia", "Descarga", "Pretemporada"];
+const GRAPH_TYPES = [{ id: "barras", label: "Barras" }, { id: "linea", label: "Línea" }, { id: "area", label: "Área" }, { id: "radar", label: "Radar" }];
+const BLOCK_TYPES = ["Objetivo físico", "Objetivo táctico", "Campo", "Gimnasio", "Compensatorio", "Vuelta a la calma", "Recuperación", "Partido", "Observaciones", "Personalizado"];
+const BLOCK_COLORS = {
+  "Objetivo físico": "#2563eb",
+  "Objetivo táctico": "#7c3aed",
+  Campo: "#16a34a",
+  Gimnasio: "#0f172a",
+  Compensatorio: "#ea580c",
+  "Vuelta a la calma": "#0891b2",
+  Recuperación: "#8b5cf6",
+  Partido: "#14532d",
+  Observaciones: "#64748b",
+  Personalizado: "#52525b",
+};
 
-function weekdayNameEs(date) {
-  return date ? WEEKDAY_NAMES_ES[moment(date).day()] : "";
-}
-
-async function withRetry(fn, retries = 3, delay = 800) {
-  try {
-    return await fn();
-  } catch (err) {
-    if (retries > 0 && String(err?.message || err).includes("Rate limit")) {
-      await new Promise(r => setTimeout(r, delay));
-      return withRetry(fn, retries - 1, delay * 2);
-    }
-    throw err;
-  }
-}
-
-async function mapWithLimit(items, limit, fn) {
-  const results = new Array(items.length);
-  let index = 0;
-  async function worker() {
-    while (index < items.length) {
-      const i = index++;
-      results[i] = await fn(items[i], i);
-    }
-  }
-  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
-  return results;
-}
-
-function emptyDay(date) {
+function uid() { return Math.random().toString(36).slice(2, 10); }
+function dayName(date) { return WEEKDAY_NAMES_ES[moment(date).day()] || "DÍA"; }
+function defaultMeta(startDate) {
+  const start = moment(startDate);
+  const end = start.clone().add(6, "days");
   return {
-    date: date || "",
-    md: "— MD —",
-    objetivo: "—",
-    sesionGimnasio: "",
-    trabajoCompensatorio: "—",
-    vueltaCalma: [],
-    observaciones: "",
-    tareasTecnico: [""],
+    week_number: String(start.isoWeek()),
+    range_label: `${start.format("DD/MM/YYYY")} - ${end.format("DD/MM/YYYY")}`,
+    next_match: "",
+    current_md: "— MD —",
+    week_type: "Normal",
   };
 }
+function emptyBlock(type = "Campo", content = "") {
+  return { id: uid(), type, title: type, content, color: BLOCK_COLORS[type] || BLOCK_COLORS.Personalizado, session_id: "", auto_sync: true };
+}
+function emptyDay(date, index = 0) {
+  return { date, md: MD_OPTIONS[Math.min(index + 1, MD_OPTIONS.length - 1)] || "— MD —", blocks: [emptyBlock("Campo"), emptyBlock("Observaciones")] };
+}
+function normalizeDay(day, fallbackDate, index) {
+  if (Array.isArray(day?.blocks)) return { ...emptyDay(fallbackDate, index), ...day, blocks: day.blocks.map(b => ({ ...emptyBlock(b.type || "Personalizado"), ...b, id: b.id || uid() })) };
+  const blocks = [];
+  if (day?.objetivo && day.objetivo !== "—") blocks.push(emptyBlock("Objetivo físico", day.objetivo));
+  if (day?.sesionGimnasio) blocks.push(emptyBlock("Gimnasio", day.sesionGimnasio));
+  if (day?.trabajoCompensatorio && day.trabajoCompensatorio !== "—") blocks.push(emptyBlock("Compensatorio", day.trabajoCompensatorio));
+  if ((day?.vueltaCalma || []).length) blocks.push(emptyBlock("Vuelta a la calma", day.vueltaCalma.join("\n")));
+  if ((day?.tareasTecnico || []).some(Boolean)) blocks.push(emptyBlock("Objetivo táctico", day.tareasTecnico.filter(Boolean).join("\n")));
+  if (day?.observaciones) blocks.push(emptyBlock("Observaciones", day.observaciones));
+  return { ...emptyDay(fallbackDate, index), ...day, blocks: blocks.length ? blocks : emptyDay(fallbackDate, index).blocks };
+}
+function sessionLoad(session) {
+  const duration = Number(session?.duration_minutes || 60);
+  const type = `${session?.session_type || ""} ${session?.objective || ""} ${session?.session_objective || ""}`.toLowerCase();
+  const multiplier = type.includes("partido") ? 1.8 : type.includes("velocidad") ? 1.35 : type.includes("fuerza") ? 0.75 : type.includes("regener") ? 0.45 : 1;
+  return {
+    total_distance: Math.round(duration * 78 * multiplier),
+    distance_19_8: Math.round(duration * 7.5 * multiplier),
+    distance_25: Math.round(duration * 2.2 * multiplier),
+    acc_3: Math.round(duration * 0.26 * multiplier),
+    dec_3: Math.round(duration * 0.24 * multiplier),
+    player_load: Math.round(duration * 7.8 * multiplier),
+  };
+}
+function addLoads(a, b) {
+  return Object.fromEntries(["total_distance", "distance_19_8", "distance_25", "acc_3", "dec_3", "player_load"].map(k => [k, (a[k] || 0) + (b[k] || 0)]));
+}
+function compactNumber(value) { return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value || 0)); }
+function blockSession(block, sessionsById) { return block.auto_sync === false && block.session_snapshot ? block.session_snapshot : sessionsById[block.session_id]; }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
+function MicrocycleExportView({ days, meta, dayLoads, summary, onExit }) {
+  return <div className="min-h-screen bg-white text-zinc-950 p-6 print:p-0">
+    <style>{`@media print { .no-print { display: none !important; } body { background: white !important; } }`}</style>
+    <div className="no-print flex justify-end gap-2 mb-4">
+      <button onClick={() => window.print()} className="px-3 py-2 bg-zinc-900 text-white rounded-lg text-sm flex items-center gap-2"><Printer size={15} /> Imprimir / PDF</button>
+      <button onClick={onExit} className="px-3 py-2 bg-zinc-200 rounded-lg text-sm">Volver</button>
+    </div>
+    <div className="border-b-4 border-emerald-700 pb-4 mb-5 flex justify-between items-start">
+      <div><p className="text-xs font-bold text-emerald-700 uppercase">PerformancePitch</p><h1 className="text-3xl font-black">Plan de Microciclo</h1><p className="text-sm text-zinc-600">Semana {meta.week_number} · {meta.range_label}</p></div>
+      <div className="text-right text-sm"><p className="font-bold">{meta.week_type}</p><p>{meta.current_md}</p><p>{meta.next_match}</p></div>
+    </div>
+    <div className="grid grid-cols-7 gap-2 mb-5">
+      {days.map((day, idx) => <div key={idx} className="border rounded-xl overflow-hidden break-inside-avoid">
+        <div className="bg-emerald-900 text-white p-2 text-center"><p className="text-xs font-bold">{dayName(day.date)}</p><p className="text-lg font-black">{moment(day.date).format("DD/MM")}</p><p className="text-xs text-emerald-200">{day.md}</p></div>
+        <div className="p-2 space-y-2 min-h-[230px]">
+          {(day.blocks || []).map(block => <div key={block.id} className="border-l-4 rounded bg-zinc-50 p-2" style={{ borderColor: block.color }}>
+            <p className="text-[10px] font-black uppercase" style={{ color: block.color }}>{block.title}</p>
+            <p className="text-xs whitespace-pre-wrap mt-1">{block.content || "—"}</p>
+          </div>)}
+        </div>
+        <div className="bg-zinc-100 p-2 text-[10px] font-bold">DT {compactNumber(dayLoads[idx]?.total_distance)} · PL {compactNumber(dayLoads[idx]?.player_load)}</div>
+      </div>)}
+    </div>
+    <div className="grid grid-cols-3 gap-3"><div className="border rounded-xl p-3"><p className="text-xs font-black text-emerald-700 uppercase">Resumen automático</p><p className="text-sm mt-2 whitespace-pre-wrap">{summary}</p></div><div className="border rounded-xl p-3 col-span-2"><LoadChart data={dayLoads} type="barras" clean /></div></div>
+  </div>;
+}
+
+function LoadChart({ data, type, clean = false }) {
+  const chartData = data.map(d => ({ day: d.day, Carga: Math.round(d.player_load || 0), Distancia: Math.round((d.total_distance || 0) / 100) }));
+  const text = clean ? "#111827" : "#a1a1aa";
+  if (type === "radar") return <ResponsiveContainer width="100%" height={260}><RadarChart data={chartData}><PolarGrid stroke="#334155" /><PolarAngleAxis dataKey="day" tick={{ fill: text, fontSize: 10 }} /><Radar dataKey="Carga" stroke="#22c55e" fill="#22c55e" fillOpacity={0.35} /></RadarChart></ResponsiveContainer>;
+  const common = <><CartesianGrid strokeDasharray="3 3" stroke={clean ? "#e5e7eb" : "#27272a"} /><XAxis dataKey="day" tick={{ fill: text, fontSize: 11 }} /><YAxis tick={{ fill: text, fontSize: 10 }} /><Tooltip /></>;
+  if (type === "linea") return <ResponsiveContainer width="100%" height={260}><LineChart data={chartData}>{common}<Line type="monotone" dataKey="Carga" stroke="#22c55e" strokeWidth={3} /></LineChart></ResponsiveContainer>;
+  if (type === "area") return <ResponsiveContainer width="100%" height={260}><AreaChart data={chartData}>{common}<Area type="monotone" dataKey="Carga" stroke="#22c55e" fill="#22c55e" fillOpacity={0.28} /></AreaChart></ResponsiveContainer>;
+  return <ResponsiveContainer width="100%" height={260}><BarChart data={chartData}>{common}<Bar dataKey="Carga" fill="#22c55e" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer>;
+}
+
 export default function WeeklyPlannerBoard() {
   const { toast } = useToast();
   const { activeSquadId, activeSquad, activeSeasonId } = useWorkspace();
-
-  // El plan se identifica por la fecha del primer día
+  const aiInputRef = useRef(null);
   const [startDate, setStartDate] = useState(moment().startOf("isoWeek").format("YYYY-MM-DD"));
-  const [days, setDays] = useState(() => {
-    return Array.from({ length: 7 }, (_, i) =>
-      emptyDay(moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD"))
-    );
-  });
-  const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
+  const [days, setDays] = useState(() => Array.from({ length: 7 }, (_, i) => emptyDay(moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD"), i)));
+  const [meta, setMeta] = useState(defaultMeta(moment().startOf("isoWeek").format("YYYY-MM-DD")));
+  const [graphType, setGraphType] = useState("barras");
   const [recordId, setRecordId] = useState(null);
-  const [squadSessions, setSquadSessions] = useState([]);
+  const [sessionLibrary, setSessionLibrary] = useState([]);
+  const [sessionDetails, setSessionDetails] = useState({});
   const [savedPlans, setSavedPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [exportMode, setExportMode] = useState(false);
 
-  // Cargar lista de microciclos guardados del plantel activo, para poder buscarlos
   useEffect(() => {
-    async function loadSavedPlans() {
+    async function loadPlans() {
       const all = await base44.entities.WeeklyPlan.list("-week_start", 100);
       setSavedPlans(activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all);
     }
-    loadSavedPlans();
+    loadPlans();
   }, [activeSquadId, activeSeasonId, recordId]);
 
-  // Cargar sesiones reales de Sesiones para reflejarlas en la planificación
   useEffect(() => {
-    async function loadSessions() {
-      if (!days.length) { setSquadSessions([]); return; }
-      const dates = days.map(d => d.date).filter(Boolean);
-      if (!dates.length) { setSquadSessions([]); return; }
-      const minDate = dates.reduce((a, b) => a < b ? a : b);
-      const maxDate = dates.reduce((a, b) => a > b ? a : b);
-      const all = await base44.entities.TrainingSession.list("-date", 200);
-      setSquadSessions(all.filter(s =>
-        (!activeSquadId || s.squad_id === activeSquadId) &&
-        (!activeSeasonId || !s.season_id || s.season_id === activeSeasonId) &&
-        s.date >= minDate && s.date <= maxDate
-      ));
-    }
-    loadSessions();
-  }, [startDate, days.length, activeSquadId, activeSeasonId]);
-
-  const sessionsByDate = useMemo(() => {
-    const map = {};
-    squadSessions.forEach(s => { (map[s.date] = map[s.date] || []).push(s); });
-    return map;
-  }, [squadSessions]);
-
-  // Traer ejercicios de fuerza y de campo reales de cada sesión, para reflejarlos automáticamente
-  const [sessionExtras, setSessionExtras] = useState({});
-  useEffect(() => {
-    async function loadExtras() {
-      if (!squadSessions.length) { setSessionExtras({}); return; }
-      const entries = await mapWithLimit(squadSessions, 2, async (s) => {
-        const strength = await withRetry(() => base44.entities.StrengthStation.filter({ session_id: s.id }, "order"));
-        const exercises = await withRetry(() => base44.entities.SessionExercise.filter({ session_id: s.id }, "order"));
-        return [s.id, { strength, exercises }];
-      });
-      setSessionExtras(Object.fromEntries(entries));
-    }
-    loadExtras();
-  }, [squadSessions]);
-
-  // Cargar plan desde BD cuando cambia la fecha de inicio o el plantel activo
-  useEffect(() => {
-    async function load() {
+    async function loadPlan() {
       setLoading(true);
-      setRecordId(null);
-      try {
-        // Buscar planes de esta semana del plantel activo
-        const all = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
-        const records = activeSquadId
-        ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId))
-        : all;
-        if (records.length > 0) {
-          const rec = records[0];
-          setRecordId(rec.id);
-          // Compatibilidad con planes viejos que no tienen `date` en cada día
-          const loaded = (rec.days_data || []).map((d, i) => ({
-            ...emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD")),
-            ...d,
-          }));
-          setDays(loaded.length > 0 ? loaded : buildDays(startDate, 7));
-        } else {
-          setRecordId(null);
-          setDays(buildDays(startDate, 7));
-        }
-      } catch {
-        setDays(buildDays(startDate, 7));
-      } finally {
-        setLoading(false);
+      const all = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
+      const records = activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all;
+      const rec = records[0];
+      if (rec) {
+        setRecordId(rec.id);
+        setMeta({ ...defaultMeta(startDate), ...(rec.microcycle_meta || {}) });
+        setGraphType(rec.graph_type || "barras");
+        const loaded = (rec.days_data || []).map((d, i) => normalizeDay(d, moment(startDate).add(i, "days").format("YYYY-MM-DD"), i));
+        setDays(loaded.length ? loaded : Array.from({ length: 7 }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
+      } else {
+        setRecordId(null);
+        setMeta(defaultMeta(startDate));
+        setGraphType("barras");
+        setDays(Array.from({ length: 7 }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
       }
+      setLoading(false);
     }
-    load();
+    loadPlan();
   }, [startDate, activeSquadId, activeSeasonId]);
 
-  function buildDays(start, count) {
-    return Array.from({ length: count }, (_, i) =>
-      emptyDay(moment(start).add(i, "days").format("YYYY-MM-DD"))
-    );
-  }
+  useEffect(() => {
+    async function loadSessions() {
+      const all = await base44.entities.TrainingSession.list("-date", 300);
+      setSessionLibrary(all.filter(s => (!activeSquadId || s.squad_id === activeSquadId) && (!activeSeasonId || !s.season_id || s.season_id === activeSeasonId)));
+    }
+    loadSessions();
+  }, [activeSquadId, activeSeasonId]);
 
-  // Cambiar fecha de inicio: preservar datos, recalcular fechas
-  function changeStartDate(newStart) {
-    setStartDate(newStart);
-    // La carga desde BD se activa sola por el useEffect
-  }
+  useEffect(() => {
+    async function detectMatchFromCalendar() {
+      const all = await base44.entities.DayEvent.list("date", 500);
+      const match = all.find(ev =>
+        ev.date >= days[0]?.date && ev.date <= days[days.length - 1]?.date &&
+        (!activeSquadId || ev.squad_id === activeSquadId) &&
+        (!activeSeasonId || !ev.season_id || ev.season_id === activeSeasonId) &&
+        `${ev.event_type || ev.type || ev.title || ""}`.toLowerCase().includes("partido")
+      );
+      if (match) setMeta(prev => prev.next_match ? prev : { ...prev, next_match: match.rival ? `vs ${match.rival}` : match.title || "Partido" });
+    }
+    if (days.length) detectMatchFromCalendar();
+  }, [days[0]?.date, days[days.length - 1]?.date, activeSquadId, activeSeasonId]);
 
-  // Navegar al ciclo anterior/siguiente según cantidad de días del plan actual
-  function prevCycle() {
-    const newStart = moment(startDate).subtract(days.length, "days").format("YYYY-MM-DD");
-    setStartDate(newStart);
-  }
-  function nextCycle() {
-    const newStart = moment(startDate).add(days.length, "days").format("YYYY-MM-DD");
-    setStartDate(newStart);
-  }
+  const sessionsById = useMemo(() => Object.fromEntries(sessionLibrary.map(s => [s.id, s])), [sessionLibrary]);
+  const linkedSessionIds = useMemo(() => [...new Set(days.flatMap(d => (d.blocks || []).map(b => b.session_id).filter(Boolean)))], [days]);
 
-  function handleChange(idx, key, value) {
-    setDays(prev => {
-      const next = [...prev];
-      next[idx] = { ...next[idx], [key]: value };
-      return next;
-    });
-  }
+  useEffect(() => {
+    async function loadDetails() {
+      const entries = await Promise.all(linkedSessionIds.map(async id => {
+        const [strength, exercises] = await Promise.all([
+          base44.entities.StrengthStation.filter({ session_id: id }, "order"),
+          base44.entities.SessionExercise.filter({ session_id: id }, "order"),
+        ]);
+        return [id, { strength, exercises }];
+      }));
+      setSessionDetails(Object.fromEntries(entries));
+    }
+    if (linkedSessionIds.length) loadDetails(); else setSessionDetails({});
+  }, [linkedSessionIds.join("|")]);
 
-  // Agregar día al final
-  function addDay() {
-    const lastDate = days[days.length - 1]?.date;
-    const nextDate = lastDate
-      ? moment(lastDate).add(1, "days").format("YYYY-MM-DD")
-      : moment(startDate).add(days.length, "days").format("YYYY-MM-DD");
-    setDays(prev => [...prev, emptyDay(nextDate)]);
-  }
+  const dayLoads = useMemo(() => days.map(day => {
+    const load = (day.blocks || []).reduce((acc, block) => {
+      const session = block.session_id ? blockSession(block, sessionsById) : null;
+      return session ? addLoads(acc, sessionLoad(session)) : acc;
+    }, {});
+    return { ...load, day: dayName(day.date).slice(0, 3), date: day.date };
+  }), [days, sessionsById]);
 
-  // Eliminar último día (mínimo 1)
-  function removeLastDay() {
-    if (days.length <= 1) return;
-    setDays(prev => prev.slice(0, -1));
-  }
+  const summary = useMemo(() => {
+    const total = dayLoads.reduce((sum, d) => sum + (d.player_load || 0), 0);
+    const peak = dayLoads.reduce((a, b) => (b.player_load || 0) > (a.player_load || 0) ? b : a, dayLoads[0] || {});
+    const recovery = days.find(d => (d.blocks || []).some(b => ["Recuperación", "Vuelta a la calma"].includes(b.type))) || days[dayLoads.findIndex(d => (d.player_load || 0) === Math.min(...dayLoads.map(x => x.player_load || 0)))] || days[0];
+    const field = days.flatMap(d => d.blocks || []).filter(b => b.type === "Campo" || sessionsById[b.session_id]?.session_type === "Campo").length;
+    const gym = days.flatMap(d => d.blocks || []).filter(b => b.type === "Gimnasio" || sessionsById[b.session_id]?.session_type === "Fuerza").length;
+    const status = total > 3500 ? "Alta demanda" : total < 1600 ? "Descarga / baja carga" : "Equilibrada";
+    return { total, peak, recovery, field, gym, status };
+  }, [days, dayLoads, sessionsById]);
 
-  // Cambiar fecha de un día individual
-  function changeDayDate(idx, newDate) {
-    handleChange(idx, "date", newDate);
-  }
+  const autoText = `La semana queda estructurada como ${meta.week_type}. El pico principal aparece el ${summary.peak?.day || "—"}, con una carga semanal aproximada de ${compactNumber(summary.total)} PL. Se planifican ${summary.field} bloques de campo y ${summary.gym} bloques de gimnasio. El día de recuperación queda ubicado en ${summary.recovery?.date ? dayName(summary.recovery.date) : "—"}. Estado general: ${summary.status}.`;
 
+  function updateDay(idx, patch) { setDays(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d)); }
+  function updateBlock(dayIdx, blockId, patch) {
+    setDays(prev => prev.map((d, i) => i !== dayIdx ? d : { ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, ...patch } : b) }));
+  }
+  function addBlock(dayIdx, type = "Campo") { updateDay(dayIdx, { blocks: [...days[dayIdx].blocks, emptyBlock(type)] }); }
+  function duplicateBlock(dayIdx, block) { updateDay(dayIdx, { blocks: [...days[dayIdx].blocks, { ...block, id: uid(), title: `${block.title} copia` }] }); }
+  function deleteBlock(dayIdx, blockId) { updateDay(dayIdx, { blocks: days[dayIdx].blocks.filter(b => b.id !== blockId) }); }
+  function onDragEnd(result) {
+    if (!result.destination) return;
+    const from = Number(result.source.droppableId);
+    const to = Number(result.destination.droppableId);
+    const next = [...days];
+    const [moved] = next[from].blocks.splice(result.source.index, 1);
+    next[to].blocks.splice(result.destination.index, 0, moved);
+    setDays(next);
+  }
+  function selectSession(dayIdx, blockId, sessionId) {
+    const session = sessionsById[sessionId];
+    updateBlock(dayIdx, blockId, { session_id: sessionId, session_snapshot: session ? { title: session.title, duration_minutes: session.duration_minutes, objective: session.objective, session_type: session.session_type } : null });
+  }
+  function addDay() { setDays(prev => [...prev, emptyDay(moment(prev[prev.length - 1]?.date || startDate).add(1, "days").format("YYYY-MM-DD"), prev.length)]); }
+  function removeDay() { if (days.length > 1) setDays(prev => prev.slice(0, -1)); }
+  function shiftWeek(delta) { setStartDate(moment(startDate).add(delta * days.length, "days").format("YYYY-MM-DD")); }
+  function applyTemplate(id) {
+    const tpl = MICROCycle_TEMPLATES.find(t => t.id === id);
+    if (!tpl) return;
+    setMeta(prev => ({ ...prev, week_type: tpl.type }));
+    setDays(tpl.days.map((md, i) => {
+      const objective = tpl.objectives[i] || "Campo";
+      return { date: moment(startDate).add(i, "days").format("YYYY-MM-DD"), md, blocks: (TEMPLATE_BLOCKS[objective] || [{ type: "Campo", title: objective, content: "" }]).map(b => ({ ...emptyBlock(b.type, b.content), title: b.title })) };
+    }));
+  }
   async function save() {
     setSaving(true);
+    const payload = { week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", microcycle_meta: meta, graph_type: graphType, template_type: meta.week_type, days_data: days, notes: autoText };
+    if (recordId) await base44.entities.WeeklyPlan.update(recordId, payload); else { const rec = await base44.entities.WeeklyPlan.create(payload); setRecordId(rec.id); }
+    setSaving(false);
+    toast({ title: "Microciclo guardado correctamente" });
+  }
+  async function handleAiFile(file) {
+    if (!file) return;
+    setAiLoading(true);
     try {
-      const payload = { days_data: days, week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "" };
-      if (recordId) {
-        await base44.entities.WeeklyPlan.update(recordId, payload);
-      } else {
-        const rec = await base44.entities.WeeklyPlan.create(payload);
-        setRecordId(rec.id);
-      }
-      toast({ title: "Plan guardado correctamente" });
+      const upload = await base44.integrations.Core.UploadFile({ file });
+      const output = await base44.integrations.Core.InvokeLLM({
+        file_urls: [upload.file_url],
+        response_json_schema: { type: "object", properties: { week_type: { type: "string" }, next_match: { type: "string" }, days: { type: "array", items: { type: "object", properties: { date: { type: "string" }, md: { type: "string" }, blocks: { type: "array", items: { type: "object", properties: { type: { type: "string" }, title: { type: "string" }, content: { type: "string" } } } } } } } } },
+        prompt: `Interpretá este cronograma o plan semanal deportivo y generá un microciclo editable. Usá fechas YYYY-MM-DD, días MD, objetivos físicos/tácticos, campo, gimnasio, preventivos y recuperación. Fecha de inicio esperada: ${startDate}.`,
+      });
+      if (output.week_type || output.next_match) setMeta(prev => ({ ...prev, week_type: output.week_type || prev.week_type, next_match: output.next_match || prev.next_match }));
+      if (Array.isArray(output.days) && output.days.length) setDays(output.days.map((d, i) => ({ date: d.date || moment(startDate).add(i, "days").format("YYYY-MM-DD"), md: d.md || "— MD —", blocks: (d.blocks || []).map(b => ({ ...emptyBlock(b.type || "Personalizado", b.content || ""), title: b.title || b.type || "Bloque" })) })));
     } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
+      toast({ title: "No se pudo crear el microciclo con IA", variant: "destructive" });
     } finally {
-      setSaving(false);
+      setAiLoading(false);
     }
   }
 
-  const ROW_LABELS = [
-    { key: "md",          label: "MD",                   bg: "bg-blue-900/50" },
-    { key: "objetivo",    label: "Objetivo físico",       bg: "" },
-    { key: "gymDT",       label: "Sesión gym / Tareas DT",bg: "" },
-    { key: "comp",        label: "Trabajo compensatorio", bg: "" },
-    { key: "vuelta",      label: "Vuelta a la calma",     bg: "" },
-    { key: "obs",         label: "Observaciones",         bg: "" },
-  ];
+  if (exportMode) return <MicrocycleExportView days={days} meta={meta} dayLoads={dayLoads} summary={autoText} onExit={() => setExportMode(false)} />;
+  if (loading) return <div className="h-64 flex items-center justify-center"><div className="w-7 h-7 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
-  return (
-    <div className="space-y-4">
-      {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={prevCycle} className="p-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-
-          <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5">
-            <Calendar size={13} className="text-zinc-500" />
-            <span className="text-xs text-zinc-400">Inicio:</span>
-            <input
-              type="date"
-              value={startDate}
-              onChange={e => changeStartDate(e.target.value)}
-              className="bg-transparent text-white text-sm font-semibold focus:outline-none"
-            />
-          </div>
-
-          <button onClick={nextCycle} className="p-1.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white transition-colors">
-            <ChevronRight size={16} />
-          </button>
-
-          {savedPlans.length > 0 && (
-            <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-1.5">
-              <Search size={13} className="text-zinc-500" />
-              <select
-                value=""
-                onChange={e => e.target.value && changeStartDate(e.target.value)}
-                className="bg-transparent text-zinc-300 text-xs focus:outline-none max-w-[220px]"
-              >
-                <option value="" className="bg-zinc-900">Buscar microciclo...</option>
-                {savedPlans.map(p => (
-                  <option key={p.id} value={p.week_start} className="bg-zinc-900">
-                    {moment(p.week_start).format("DD/MM/YYYY")} {p.week_start === startDate ? "(actual)" : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <span className="text-zinc-500 text-xs">
-            {days.length} día{days.length !== 1 ? "s" : ""} ·{" "}
-            {days[0]?.date && days[days.length - 1]?.date
-              ? `${moment(days[0].date).format("DD/MM")} → ${moment(days[days.length - 1].date).format("DD/MM/YY")}`
-              : ""}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Controles de columnas */}
-          <div className="flex items-center gap-1 bg-zinc-800 border border-zinc-700 rounded-lg p-1">
-            <button
-              onClick={removeLastDay}
-              disabled={days.length <= 1}
-              title="Quitar último día"
-              className="p-1 rounded text-zinc-400 hover:text-red-400 disabled:opacity-30 transition-colors"
-            >
-              <X size={14} />
-            </button>
-            <span className="text-xs text-zinc-500 px-1">{days.length} días</span>
-            <button
-              onClick={addDay}
-              disabled={days.length >= 10}
-              title="Agregar día"
-              className="p-1 rounded text-zinc-400 hover:text-green-400 disabled:opacity-30 transition-colors"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-
-          <button
-            onClick={save}
-            disabled={saving}
-            className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition-colors disabled:opacity-50"
-          >
-            {saving ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Save size={15} />}
-            Guardar
-          </button>
+  return <div className="space-y-6">
+    <input ref={aiInputRef} type="file" className="hidden" accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.png,.jpg,.jpeg" onChange={e => handleAiFile(e.target.files?.[0])} />
+    <section className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950/40 p-5 shadow-2xl">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div><p className="text-emerald-400 text-xs font-black uppercase tracking-widest">Centro de planificación del cuerpo técnico</p><h2 className="text-2xl font-black text-white mt-1">Microciclo editable</h2><p className="text-zinc-500 text-sm mt-1">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"}</p></div>
+        <div className="flex gap-2 flex-wrap">
+          <button onClick={() => shiftWeek(-1)} className="p-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300"><ChevronLeft size={16} /></button>
+          <button onClick={() => shiftWeek(1)} className="p-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300"><ChevronRight size={16} /></button>
+          {savedPlans.length > 0 && <select value="" onChange={e => e.target.value && setStartDate(e.target.value)} className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-300 text-sm"><option value="">Buscar microciclo...</option>{savedPlans.map(plan => <option key={plan.id} value={plan.week_start}>{moment(plan.week_start).format("DD/MM/YYYY")}</option>)}</select>}
+          <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center gap-2"><Sparkles size={15} /> {aiLoading ? "Creando..." : "Crear microciclo con IA"}</button>
+          <button onClick={save} disabled={saving} className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex items-center gap-2"><Save size={15} /> {saving ? "Guardando..." : "Guardar"}</button>
+          <button onClick={() => setExportMode(true)} className="px-3 py-2 rounded-xl bg-zinc-100 text-zinc-950 text-sm font-bold flex items-center gap-2"><Download size={15} /> Vista exportación</button>
         </div>
       </div>
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5">
+        <label className="space-y-1"><span className="text-xs text-zinc-500">Semana del año</span><input value={meta.week_number} onChange={e => setMeta({ ...meta, week_number: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white" /></label>
+        <label className="space-y-1"><span className="text-xs text-zinc-500">Rango de fechas</span><input value={meta.range_label} onChange={e => setMeta({ ...meta, range_label: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white" /></label>
+        <label className="space-y-1"><span className="text-xs text-zinc-500">Próximo partido</span><input value={meta.next_match} onChange={e => setMeta({ ...meta, next_match: e.target.value })} placeholder="Ej: vs River" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white" /></label>
+        <label className="space-y-1"><span className="text-xs text-zinc-500">Día actual</span><select value={meta.current_md} onChange={e => setMeta({ ...meta, current_md: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white">{MD_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></label>
+        <label className="space-y-1"><span className="text-xs text-zinc-500">Tipo de semana</span><select value={meta.week_type} onChange={e => setMeta({ ...meta, week_type: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white">{WEEK_TYPES.map(o => <option key={o}>{o}</option>)}</select></label>
+      </div>
+    </section>
 
-      {loading ? (
-        <div className="flex items-center justify-center h-48">
-          <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-        </div>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-zinc-700">
-          <table className="w-full border-collapse" style={{ minWidth: `${110 + days.length * 150}px` }}>
-            <thead>
-              <tr className="bg-zinc-800">
-                <th className="w-[110px] min-w-[110px] px-3 py-2.5 text-left text-xs font-bold text-zinc-400 border-r border-zinc-700">
-                  CAMPO
-                </th>
-                {days.map((d, i) => {
-                  const col = OBJETIVO_COLORS[d.objetivo] || null;
-                  return (
-                    <th key={i} className={`px-2 py-2 text-center border-r border-zinc-700 last:border-r-0 min-w-[140px] transition-colors ${col ? col.header : ""}`}>
-                      <div className="flex flex-col items-center gap-1">
-                        <p className={`text-xs font-bold tracking-wider ${col ? col.text : "text-white"}`}>
-                          {d.date ? weekdayNameEs(d.date) : `DÍA ${i + 1}`}
-                        </p>
-                        <input
-                          type="date"
-                          value={d.date || ""}
-                          onChange={e => changeDayDate(i, e.target.value)}
-                          className="bg-zinc-700 border border-zinc-600 text-blue-300 text-[10px] rounded px-1 py-0.5 focus:outline-none focus:border-blue-500 text-center"
-                        />
-                        {col && (
-                          <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${col.bg} ${col.text} ${col.border}`}>
-                            {d.objetivo}
-                          </span>
-                        )}
-                        {(d.has_match || d.has_trip || d.has_rest || d.has_training) && (
-                          <div className="flex flex-wrap gap-1 justify-center">
-                            {d.has_match && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-700/50">Partido</span>}
-                            {d.has_trip && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-violet-900/50 text-violet-300 border border-violet-700/50">Viaje</span>}
-                            {d.has_rest && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-cyan-900/50 text-cyan-300 border border-cyan-700/50">Descanso</span>}
-                            {d.has_training && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">Entreno</span>}
-                          </div>
-                        )}
-                        {(d.calendar_events || []).length > 0 && (
-                          <div className="w-full max-w-[130px] space-y-0.5">
-                            {(d.calendar_events || []).slice(0, 3).map((ev, ei) => (
-                              <p key={ei} className="text-[8px] text-zinc-300 bg-zinc-800/70 border border-zinc-700 rounded px-1 py-0.5 truncate">{ev.time ? `${ev.time} · ` : ""}{ev.title}</p>
-                            ))}
-                          </div>
-                        )}
-                        {sessionsByDate[d.date]?.length > 0 && (
-                          <Link to={`/sessions?session=${sessionsByDate[d.date][0].id}`}
-                            title="Ver sesión"
-                            className="flex items-center gap-1 text-[9px] text-blue-300 bg-blue-900/30 border border-blue-800/40 rounded-full px-2 py-0.5 hover:bg-blue-900/50 transition-colors max-w-[130px] truncate">
-                            <Dumbbell size={9} className="shrink-0" /> {sessionsByDate[d.date][0].title}
-                          </Link>
-                        )}
-                      </div>
-                    </th>
-                  );
-                })}
-                {/* Columna para agregar día rápido */}
-                <th className="px-2 py-2 text-center w-10">
-                  <button
-                    onClick={addDay}
-                    disabled={days.length >= 10}
-                    title="Agregar día"
-                    className="p-1 rounded-lg border border-dashed border-zinc-600 text-zinc-600 hover:text-green-400 hover:border-green-600 transition-colors disabled:opacity-30"
-                  >
-                    <Plus size={14} />
-                  </button>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* MD */}
-              <tr className="border-t border-zinc-700 bg-zinc-900">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">MD</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 bg-blue-900/50 align-top">
-                    <select value={d.md} onChange={e => handleChange(i, "md", e.target.value)}
-                      className="w-full bg-transparent text-white text-[11px] font-semibold focus:outline-none text-center py-2 px-1">
-                      {MD_OPTIONS.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}
-                    </select>
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Objetivo físico */}
-              <tr className="border-t border-zinc-700 bg-zinc-900/60">
-               <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Objetivo físico</td>
-               {days.map((d, i) => {
-                 const col = OBJETIVO_COLORS[d.objetivo] || null;
-                 return (
-                   <td key={i} className={`border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top transition-colors ${col ? col.bg : ""}`}>
-                     <select value={d.objetivo} onChange={e => handleChange(i, "objetivo", e.target.value)}
-                       className={`w-full bg-zinc-800 border border-zinc-700 text-[10px] rounded px-1 py-0.5 focus:outline-none ${col ? col.text : "text-white"}`}>
-                       {OBJETIVO_OPTIONS.map(o => <option key={o} value={o} className="bg-zinc-900 text-white">{o}</option>)}
-                     </select>
-                   </td>
-                 );
-               })}
-               <td className="border-zinc-700" />
-              </tr>
-
-              {/* Sesión gym + Tareas DT */}
-              <tr className="border-t border-zinc-700 bg-zinc-900/60">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">
-                  <span className="text-blue-400">Sesión gym</span>
-                  <br />
-                  <span className="font-normal text-[10px] text-emerald-400 mt-1 block">Tareas DT</span>
-                </td>
-                {days.map((d, i) => {
-                  const tareas = d.tareasTecnico || [""];
-                  const setTareas = (newTareas) => handleChange(i, "tareasTecnico", newTareas);
-                  const daySessions = sessionsByDate[d.date] || [];
-                  const strengthSessions = daySessions.filter(s => (sessionExtras[s.id]?.strength || []).length > 0);
-                  const exerciseRows = daySessions.flatMap(s => (sessionExtras[s.id]?.exercises || []).map(ex => ({ ...ex, _sessionId: s.id })));
-                  return (
-                    <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                      <div className="mb-1.5">
-                        <span className="text-[9px] text-blue-400 bg-blue-900/30 px-1.5 py-0.5 rounded border border-blue-800/40">Sesión de gimnasio</span>
-                      </div>
-                      {strengthSessions.length > 0 && (
-                        <div className="mb-1.5 space-y-0.5 bg-blue-900/10 border border-blue-800/30 rounded px-1.5 py-1">
-                          {strengthSessions.map(s => (
-                            <p key={s.id} className="text-[9px] text-blue-200 leading-tight font-semibold">• {s.title}</p>
-                          ))}
-                        </div>
-                      )}
-                      <textarea rows={3} value={d.sesionGimnasio} onChange={e => handleChange(i, "sesionGimnasio", e.target.value)}
-                        placeholder="Notas adicionales..." className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                      <div className="border-t border-emerald-800/50 mt-2 mb-1.5 pt-1.5">
-                        <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">Director Técnico</span>
-                      </div>
-                      {exerciseRows.length > 0 && (
-                        <div className="mb-1.5 space-y-1 bg-orange-900/10 border border-orange-800/30 rounded px-1.5 py-1.5">
-                          <p className="text-[8px] text-orange-400/80 font-bold uppercase tracking-wider mb-0.5">Ejercicios de campo</p>
-                          {exerciseRows.map((ex, ei) => (
-                            <Link
-                              key={ei}
-                              to={`/sessions?session=${ex._sessionId}`}
-                              title="Ver ejercicio en la sesión"
-                              className="flex items-center gap-1 text-[9px] text-orange-200 leading-tight hover:text-orange-100 hover:bg-orange-900/30 rounded px-1 py-0.5 -mx-1 transition-colors group"
-                            >
-                              <Dumbbell size={9} className="text-orange-400 shrink-0" />
-                              <span className="truncate flex-1 font-medium">{ex.name}</span>
-                              {ex.type && (
-                                <span className="text-[8px] text-orange-400/70 shrink-0 group-hover:text-orange-300">{ex.type}</span>
-                              )}
-                            </Link>
-                          ))}
-                        </div>
-                      )}
-                      <div className="space-y-1.5">
-                        {tareas.map((t, ti) => (
-                          <div key={ti} className="flex items-start gap-1">
-                            <div className="flex flex-col flex-1 min-w-0">
-                              <span className="text-[9px] text-emerald-500 font-semibold mb-0.5">Tarea {ti + 1}</span>
-                              <textarea rows={2} value={t}
-                                onChange={e => { const next = [...tareas]; next[ti] = e.target.value; setTareas(next); }}
-                                placeholder="—"
-                                className="w-full bg-emerald-900/10 border border-emerald-800/30 rounded text-white text-[10px] resize-none focus:outline-none focus:border-emerald-600/50 placeholder-zinc-600 px-1 py-0.5" />
-                            </div>
-                            {tareas.length > 1 && (
-                              <button onClick={() => setTareas(tareas.filter((_, idx) => idx !== ti))}
-                                className="mt-4 text-zinc-600 hover:text-red-400 transition-colors shrink-0">
-                                <X size={11} />
-                              </button>
-                            )}
-                          </div>
-                        ))}
-                        <button onClick={() => setTareas([...tareas, ""])}
-                          className="flex items-center gap-1 text-[9px] text-emerald-500 hover:text-emerald-300 transition-colors mt-1">
-                          <Plus size={10} /> Agregar tarea
-                        </button>
-                      </div>
-                    </td>
-                  );
-                })}
-                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Trabajo compensatorio */}
-              <tr className="border-t border-zinc-700 bg-zinc-900">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Trabajo compensatorio</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                    <select value={d.trabajoCompensatorio} onChange={e => handleChange(i, "trabajoCompensatorio", e.target.value)}
-                      className="w-full bg-zinc-800 border border-zinc-700 text-white text-[10px] rounded px-1 py-0.5 focus:outline-none">
-                      {COMP_OPTIONS.map(o => <option key={o} value={o} className="bg-zinc-900">{o}</option>)}
-                    </select>
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Vuelta a la calma */}
-              <tr className="border-t border-zinc-700 bg-zinc-900/60">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Vuelta a la calma</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-2 align-top space-y-0.5">
-                    {VUELTA_OPTIONS.map(opt => (
-                      <label key={opt} className="flex items-center gap-1.5 cursor-pointer">
-                        <input type="checkbox" checked={(d.vueltaCalma || []).includes(opt)}
-                          onChange={() => {
-                            const cur = d.vueltaCalma || [];
-                            const next = cur.includes(opt) ? cur.filter(x => x !== opt) : [...cur, opt];
-                            handleChange(i, "vueltaCalma", next);
-                          }}
-                          className="accent-blue-500 w-3 h-3 shrink-0" />
-                        <span className="text-[9px] text-zinc-400 leading-tight">{opt}</span>
-                      </label>
-                    ))}
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
-              </tr>
-
-              {/* Observaciones */}
-              <tr className="border-t border-zinc-700 bg-zinc-900">
-                <td className="px-3 py-2 text-xs font-semibold text-zinc-400 border-r border-zinc-700 bg-zinc-800 align-top">Observaciones</td>
-                {days.map((d, i) => (
-                  <td key={i} className="border-r border-zinc-700 last:border-r-0 px-2 py-1.5 align-top">
-                    <textarea rows={3} value={d.observaciones} onChange={e => handleChange(i, "observaciones", e.target.value)}
-                      placeholder="—" className="w-full bg-transparent text-white text-[10px] resize-none focus:outline-none placeholder-zinc-600" />
-                  </td>
-                ))}
-                <td className="border-zinc-700" />
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      )}
+    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
+      {[{ label: "Carga semanal", value: compactNumber(summary.total), sub: "Player Load estimado" }, { label: "Pico de carga", value: summary.peak?.day || "—", sub: compactNumber(summary.peak?.player_load) }, { label: "Día recuperación", value: summary.recovery?.date ? dayName(summary.recovery.date).slice(0, 3) : "—", sub: summary.recovery?.md || "" }, { label: "Campo", value: summary.field, sub: "bloques / sesiones" }, { label: "Gimnasio", value: summary.gym, sub: "bloques / sesiones" }, { label: "Estado", value: summary.status, sub: "automático" }].map(card => <div key={card.label} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><p className="text-xs text-zinc-500 font-bold uppercase">{card.label}</p><p className="text-2xl font-black text-white mt-2">{card.value}</p><p className="text-xs text-emerald-400 mt-1">{card.sub}</p></div>)}
     </div>
-  );
+
+    <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
+        <div><h3 className="text-white font-black text-lg">Plantillas inteligentes</h3><p className="text-zinc-500 text-sm">Generan estructura, días MD y bloques iniciales.</p></div>
+        <div className="flex gap-2 flex-wrap"><select onChange={e => applyTemplate(e.target.value)} defaultValue="" className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white text-sm"><option value="" disabled>Aplicar plantilla...</option>{MICROCycle_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select><button onClick={addDay} className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm flex items-center gap-2"><Plus size={14} /> Día</button><button onClick={removeDay} className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm flex items-center gap-2"><X size={14} /> Quitar</button></div>
+      </div>
+      <DragDropContext onDragEnd={onDragEnd}>
+        <div className="grid grid-cols-1 xl:grid-cols-7 gap-3">
+          {days.map((day, dayIdx) => <div key={dayIdx} className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden min-w-0">
+            <div className="bg-zinc-800/80 p-3 border-b border-zinc-700"><div className="flex items-center justify-between"><div><p className="text-xs text-emerald-400 font-black">{dayName(day.date)}</p><input type="date" value={day.date} onChange={e => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-white text-sm font-bold focus:outline-none" /></div><select value={day.md} onChange={e => updateDay(dayIdx, { md: e.target.value })} className="bg-zinc-900 border border-zinc-700 rounded-lg text-white text-xs px-2 py-1">{MD_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
+              <div className="grid grid-cols-3 gap-1 mt-3 text-[10px] text-zinc-400"><span>DT {compactNumber(dayLoads[dayIdx]?.total_distance)}</span><span>+19 {compactNumber(dayLoads[dayIdx]?.distance_19_8)}</span><span>+25 {compactNumber(dayLoads[dayIdx]?.distance_25)}</span><span>ACC {compactNumber(dayLoads[dayIdx]?.acc_3)}</span><span>DEC {compactNumber(dayLoads[dayIdx]?.dec_3)}</span><span>PL {compactNumber(dayLoads[dayIdx]?.player_load)}</span></div></div>
+            <Droppable droppableId={String(dayIdx)}>
+              {(provided) => <div ref={provided.innerRef} {...provided.droppableProps} className="p-3 space-y-2 min-h-[180px]">
+                {(day.blocks || []).map((block, index) => <Draggable key={block.id} draggableId={block.id} index={index}>{(dragProvided) => <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} className="rounded-xl border border-zinc-700 bg-zinc-950 p-3" style={{ borderLeft: `4px solid ${block.color}`, ...dragProvided.draggableProps.style }}>
+                  <div className="flex items-center gap-2 mb-2"><button {...dragProvided.dragHandleProps} className="text-zinc-500"><GripVertical size={14} /></button><input value={block.title} onChange={e => updateBlock(dayIdx, block.id, { title: e.target.value })} className="flex-1 bg-transparent text-white text-sm font-bold focus:outline-none" /><button onClick={() => duplicateBlock(dayIdx, block)} className="text-zinc-500 hover:text-white"><Copy size={13} /></button><button onClick={() => deleteBlock(dayIdx, block.id)} className="text-zinc-500 hover:text-red-400"><Trash2 size={13} /></button></div>
+                  <div className="grid grid-cols-2 gap-2 mb-2"><select value={block.type} onChange={e => updateBlock(dayIdx, block.id, { type: e.target.value, title: e.target.value, color: BLOCK_COLORS[e.target.value] || block.color })} className="bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-300 text-xs px-2 py-1">{BLOCK_TYPES.map(t => <option key={t}>{t}</option>)}</select><input type="color" value={block.color || "#52525b"} onChange={e => updateBlock(dayIdx, block.id, { color: e.target.value })} className="w-full h-8 bg-zinc-900 border border-zinc-700 rounded-lg" /></div>
+                  <textarea value={block.content || ""} onChange={e => updateBlock(dayIdx, block.id, { content: e.target.value })} placeholder="Escribir planificación..." rows={3} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 text-xs p-2 resize-none focus:outline-none focus:border-emerald-700" />
+                  <select value={block.session_id || ""} onChange={e => selectSession(dayIdx, block.id, e.target.value)} className="w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-300 text-xs px-2 py-2"><option value="">Vincular sesión creada...</option>{sessionLibrary.map(s => <option key={s.id} value={s.id}>{s.date ? `${moment(s.date).format("DD/MM")} · ` : ""}{s.title}</option>)}</select>
+                  {block.session_id && blockSession(block, sessionsById) && (() => {
+                    const shownSession = blockSession(block, sessionsById);
+                    return <div className="mt-2 rounded-lg bg-emerald-950/30 border border-emerald-900/40 p-2 text-xs text-emerald-100"><p className="font-bold">{shownSession.title}</p><p className="text-emerald-300">{shownSession.duration_minutes || "—"} min · {shownSession.objective || shownSession.session_objective || "Objetivo sin definir"}</p>{(sessionDetails[block.session_id]?.exercises || []).slice(0, 3).map(ex => <p key={ex.id} className="text-zinc-300 truncate">• {ex.name}</p>)}<label className="mt-2 flex items-center gap-2 text-[11px]"><input type="checkbox" checked={block.auto_sync !== false} onChange={e => updateBlock(dayIdx, block.id, { auto_sync: e.target.checked })} /> Actualizar si cambia la sesión</label></div>;
+                  })()}
+                </div>}</Draggable>)}
+                {provided.placeholder}
+                <select onChange={e => { if (e.target.value) addBlock(dayIdx, e.target.value); e.target.value = ""; }} defaultValue="" className="w-full bg-zinc-800 border border-dashed border-zinc-700 rounded-xl text-zinc-400 text-xs px-3 py-2"><option value="" disabled>+ Agregar bloque</option>{BLOCK_TYPES.map(t => <option key={t}>{t}</option>)}</select>
+              </div>}
+            </Droppable>
+          </div>)}
+        </div>
+      </DragDropContext>
+    </section>
+
+    <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+      <div className="xl:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex items-center justify-between mb-4"><div><h3 className="text-white font-black">Distribución semanal de carga</h3><p className="text-zinc-500 text-sm">Calculada desde las sesiones vinculadas.</p></div><div className="flex gap-1 bg-zinc-950 rounded-xl p-1">{GRAPH_TYPES.map(g => <button key={g.id} onClick={() => setGraphType(g.id)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${graphType === g.id ? "bg-emerald-600 text-white" : "text-zinc-400"}`}>{g.label}</button>)}</div></div><LoadChart data={dayLoads} type={graphType} /></div>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex items-center gap-2 mb-3"><Layers size={18} className="text-emerald-400" /><h3 className="text-white font-black">Resumen automático</h3></div><p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{autoText}</p><div className="mt-4 rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-500"><Calendar size={14} className="inline mr-1" /> La información queda guardada en Plan Semanal y se mantiene disponible para dashboard, calendario, sesiones y exportaciones.</div></div>
+    </section>
+  </div>;
 }
