@@ -36,6 +36,14 @@ function normalizeType(value, title = "") {
   return EVENT_TYPES.includes(value) ? value : "Otro";
 }
 
+function normalizeHomeAway(value) {
+  const text = String(value || "").toLowerCase().trim();
+  if (["local", "l", "casa"].includes(text)) return "Local";
+  if (["visitante", "visita", "v", "away"].includes(text)) return "Visitante";
+  if (["neutral", "n"].includes(text)) return "Neutral";
+  return "";
+}
+
 export function normalizeAiEvents(rawEvents = [], fallbackDate) {
   return rawEvents.map((ev) => {
     const title = String(ev.title || ev.activity || ev.actividad || ev.name || "").trim();
@@ -49,7 +57,7 @@ export function normalizeAiEvents(rawEvents = [], fallbackDate) {
       location: ev.location || ev.lugar || "",
       notes: ev.notes || ev.observaciones || "",
       rival: ev.rival || "",
-      home_away: ev.home_away || ev.condicion || "",
+      home_away: normalizeHomeAway(ev.home_away || ev.condicion),
       rival_logo_url: ev.rival_logo_url || "",
     };
   }).filter((ev) => ev.title && ev.date);
@@ -75,10 +83,17 @@ export async function upsertImportedEvents({ previewEvents, activeSquad, activeS
   for (const ev of previewEvents) {
     const type = ev.event_type || ev.type || "Otro";
     const time = ev.start_time || ev.time || "";
-    const payload = { ...ev, squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", time, start_time: time, type, event_type: type, duration_minutes: durationMinutes(time, ev.end_time), color: TYPE_COLORS[type] || "blue", source_file: sourceFile, source_file_name: sourceFileName, created_by_ai: true };
+    const payload = { ...ev, home_away: normalizeHomeAway(ev.home_away), squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", time, start_time: time, type, event_type: type, duration_minutes: durationMinutes(time, ev.end_time), color: TYPE_COLORS[type] || "blue", source_file: sourceFile, source_file_name: sourceFileName, created_by_ai: true };
     payload.import_key = importKey({ squad_id: activeSquadId, date: payload.date, time, type });
     const current = byKey[payload.import_key];
-    saved.push(current ? await base44.entities.DayEvent.update(current.id, payload) : await base44.entities.DayEvent.create(payload));
+    if (!payload.duration_minutes) delete payload.duration_minutes;
+    if (current) {
+      await base44.entities.DayEvent.update(current.id, payload);
+      saved.push({ ...payload, id: current.id });
+    } else {
+      const created = await base44.entities.DayEvent.create(payload);
+      saved.push(created || payload);
+    }
   }
   await syncWeeklyPlanFromEvents({ events: saved, activeSquad, activeSquadId, activeSeasonId });
   return saved;
