@@ -40,7 +40,9 @@ export function isFreeDay(day) {
   return day?.auto_free || String(day?.md || "").toLowerCase() === "libre";
 }
 
-export function objectiveStyle(objective) {
+export function objectiveStyle(objective, objectives = []) {
+  const match = objectives.find((item) => item.name === objective);
+  if (match) return { bg: match.color || "#fef3c7", text: match.text_color || "#0f172a", border: match.border_color || match.color || "#fcd34d" };
   return OBJECTIVE_COLORS[objective] || OBJECTIVE_COLORS["Mixto"];
 }
 
@@ -73,29 +75,33 @@ export function inferSessionForBlock(day, type, sessionLibrary = []) {
 }
 
 export function getBlockAutoContent(block, session, details = {}) {
-  if (block?.content && String(block.content).trim()) return block.content;
-  if (!session) return "";
+  const manual = String(block?.content || "").trim();
+  let automatic = "";
 
-  if (block.type === "Gimnasio") {
-    const rows = (details.strength || []).slice().sort((a, b) => (a.order || a.station_number || 0) - (b.order || b.station_number || 0));
-    if (rows.length) return rows.map(formatStrength).join("\n");
+  if (session) {
+    if (block.type === "Gimnasio") {
+      const rows = (details.strength || []).slice().sort((a, b) => (a.order || a.station_number || 0) - (b.order || b.station_number || 0));
+      if (rows.length) automatic = rows.map(formatStrength).join("\n");
+    }
+
+    if (block.type === "Campo") {
+      const excluded = ["compens", "prevent", "readapt", "vuelta", "calma", "regener", "recuper", "elong", "movilidad"];
+      const fieldRows = [...(details.field || []), ...(details.exercises || []).filter((ex) => !excluded.some((word) => clean(`${ex.name} ${ex.type} ${ex.objective} ${ex.description} ${ex.notes}`).includes(word)))];
+      if (fieldRows.length) automatic = fieldRows.map(formatField).join("\n");
+    }
+
+    if (block.type === "Compensatorio") {
+      const rows = filterExercises(details.exercises, ["compens", "prevent", "readapt", "correct", "estabil"]);
+      if (rows.length) automatic = rows.map(formatField).join("\n");
+    }
+
+    if (block.type === "Vuelta a la calma") {
+      const rows = filterExercises(details.exercises, ["vuelta", "calma", "regener", "recuper", "elong", "movilidad"]);
+      if (rows.length) automatic = rows.map(formatField).join("\n");
+    }
+
+    if (!automatic) automatic = session.objective || session.session_objective || session.title || "Sesión vinculada";
   }
 
-  if (block.type === "Campo") {
-    const excluded = ["compens", "prevent", "readapt", "vuelta", "calma", "regener", "recuper", "elong", "movilidad"];
-    const fieldRows = [...(details.field || []), ...(details.exercises || []).filter((ex) => !excluded.some((word) => clean(`${ex.name} ${ex.type} ${ex.objective} ${ex.description} ${ex.notes}`).includes(word)))];
-    if (fieldRows.length) return fieldRows.map(formatField).join("\n");
-  }
-
-  if (block.type === "Compensatorio") {
-    const rows = filterExercises(details.exercises, ["compens", "prevent", "readapt", "correct", "estabil"]);
-    if (rows.length) return rows.map(formatField).join("\n");
-  }
-
-  if (block.type === "Vuelta a la calma") {
-    const rows = filterExercises(details.exercises, ["vuelta", "calma", "regener", "recuper", "elong", "movilidad"]);
-    if (rows.length) return rows.map(formatField).join("\n");
-  }
-
-  return session.objective || session.session_objective || session.title || "Sesión vinculada";
+  return [block?.auto_sync === false ? "" : automatic, manual].filter(Boolean).join("\n");
 }

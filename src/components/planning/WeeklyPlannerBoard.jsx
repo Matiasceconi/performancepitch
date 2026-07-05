@@ -10,6 +10,7 @@ import { MICROCycle_TEMPLATES } from "@/components/planning/microcycleTemplates"
 import MicrocycleTopSummary from "@/components/planning/MicrocycleTopSummary";
 import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
 import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
+import PhysicalObjectiveManager from "@/components/planning/PhysicalObjectiveManager";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
 
 moment.locale("es");
@@ -81,13 +82,22 @@ function isFreeCalendarEvent(ev) {
 function isMatchEvent(ev) {
   return normalizeText(`${ev.title || ""} ${ev.event_type || ""} ${ev.type || ""}`).includes("partido");
 }
+function isTravelEvent(ev) {
+  const text = normalizeText(`${ev.title || ""} ${ev.event_type || ""} ${ev.type || ""}`);
+  return text.includes("viaje") || text.includes("traslado") || text.includes("salida");
+}
+function eventTime(ev) { return ev?.time || ev?.start_time || "Horario sin definir"; }
+function eventCompetition(ev) {
+  const notes = String(ev?.notes || "");
+  return ev?.competition || ev?.competencia || notes.match(/competencia\s*:?\s*([^\n·|]+)/i)?.[1] || "Competencia sin definir";
+}
 function addLoads(a, b) {
   return Object.fromEntries(["total_distance", "distance_19_8", "distance_25", "acc_3", "dec_3", "player_load"].map(k => [k, (a[k] || 0) + (b[k] || 0)]));
 }
 function compactNumber(value) { return value >= 1000 ? `${(value / 1000).toFixed(1)}k` : String(Math.round(value || 0)); }
 function blockSession(block, sessionsById) { return block.auto_sync === false && block.session_snapshot ? block.session_snapshot : sessionsById[block.session_id]; }
 
-function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, sessionsById, sessionLibrary, onExit }) {
+function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, sessionsById, sessionLibrary, calendarEvents, physicalObjectives, onExit }) {
   return <div className="min-h-screen bg-white text-zinc-950 p-6 print:p-0">
     <style>{`@media print { .no-print { display: none !important; } body { background: white !important; } .break-inside-avoid { break-inside: avoid; } }`}</style>
     <div className="no-print flex justify-end gap-2 mb-4">
@@ -100,19 +110,29 @@ function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, s
     </div>
     <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
       {days.map((day, idx) => {
-        const free = isFreeDay(day);
-        const objStyle = objectiveStyle(day.physical_objective || "Mixto");
-        return <div key={idx} className={`border rounded-xl overflow-hidden break-inside-avoid ${free ? "bg-blue-50 border-blue-100" : "bg-white border-zinc-200"}`}>
+        const dayEvents = calendarEvents.filter((ev) => ev.date === day.date);
+        const match = dayEvents.find(isMatchEvent);
+        const travel = dayEvents.find(isTravelEvent);
+        const special = match || travel;
+        const free = !special && isFreeDay(day);
+        const objStyle = objectiveStyle(day.physical_objective || "Mixto", physicalObjectives);
+        return <div key={idx} className={`border rounded-xl overflow-hidden break-inside-avoid ${free ? "bg-blue-50 border-blue-200" : special ? "bg-emerald-50 border-emerald-700" : "bg-white border-zinc-200"}`}>
           <div className="p-2 text-center border-b border-zinc-100">
             <p className="text-[10px] font-black text-zinc-500 tracking-widest">{dayName(day.date)}</p>
             <p className="text-sm font-black text-zinc-900">{moment(day.date).format("DD/MM")}</p>
             <p className={`text-2xl font-black mt-1 ${free ? "text-blue-700" : "text-slate-950"}`}>{free ? "Libre" : day.md}</p>
-            {!free && <p className="mt-1 rounded-lg px-2 py-1 text-[9px] font-black" style={{ backgroundColor: objStyle.bg, color: objStyle.text }}>{day.physical_objective || "Mixto"}</p>}
+            {!free && !special && <p className="mt-1 rounded-lg px-2 py-1 text-[9px] font-black" style={{ backgroundColor: objStyle.bg, color: objStyle.text }}>{day.physical_objective || "Mixto"}</p>}
           </div>
-          {free ? <div className="min-h-[260px] flex flex-col items-center justify-center text-blue-700"><p className="text-3xl">☾</p><p className="text-lg font-black mt-2">DÍA LIBRE</p><p className="text-[10px] font-bold text-blue-500">Sin actividad</p></div> : <div className="p-2 space-y-2 min-h-[260px]">
+          {special ? <div className="min-h-[260px] p-3 flex flex-col items-center justify-center text-center">
+            {match?.rival_logo_url && <img src={match.rival_logo_url} alt="Escudo rival" className="w-14 h-14 object-contain mb-3" />}
+            <p className="text-[10px] font-black uppercase tracking-widest text-emerald-700">{match ? "Partido" : "Viaje"}</p>
+            <p className="text-lg font-black mt-1">{match ? `vs ${match.rival || match.title || "Rival"}` : travel.title || "Viaje"}</p>
+            {match && <p className="text-[10px] font-bold text-zinc-600 mt-2">{eventCompetition(match)} · {match.home_away || "Condición"} · {eventTime(match)}</p>}
+            {travel && <p className="text-[10px] font-bold text-zinc-600 mt-2">{eventTime(travel)}</p>}
+          </div> : free ? <div className="min-h-[260px] flex flex-col items-center justify-center text-blue-700"><p className="text-3xl">☾</p><p className="text-lg font-black mt-2">DÍA LIBRE</p></div> : <div className="p-2 space-y-2 min-h-[260px]">
             {WORK_BLOCKS.map((config) => {
               const block = (day.blocks || []).find((item) => item.type === config.type) || { type: config.type };
-              const session = block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
+              const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
               const content = getBlockAutoContent(block, session, sessionDetails[block.session_id || session?.id]);
               return <div key={config.type} className="rounded-lg bg-zinc-50 border border-zinc-100 p-2">
                 <p className="text-[9px] font-black uppercase" style={{ color: config.color }}>{config.label}</p>
@@ -120,7 +140,6 @@ function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, s
               </div>;
             })}
           </div>}
-          <div className="bg-zinc-100 p-2 text-[10px] font-bold">DT {compactNumber(dayLoads[idx]?.total_distance)} · PL {compactNumber(dayLoads[idx]?.player_load)}</div>
         </div>;
       })}
     </div>
@@ -151,12 +170,20 @@ export default function WeeklyPlannerBoard() {
   const [sessionLibrary, setSessionLibrary] = useState([]);
   const [sessionDetails, setSessionDetails] = useState({});
   const [calendarEvents, setCalendarEvents] = useState([]);
+  const [physicalObjectives, setPhysicalObjectives] = useState([]);
   const [gpsRows, setGpsRows] = useState([]);
   const [savedPlans, setSavedPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [exportMode, setExportMode] = useState(false);
+
+  async function refreshPhysicalObjectives() {
+    const rows = await base44.entities.PhysicalObjective.list("order", 100);
+    setPhysicalObjectives(rows.filter((item) => item.active !== false));
+  }
+
+  useEffect(() => { refreshPhysicalObjectives(); }, []);
 
   useEffect(() => {
     async function loadPlans() {
@@ -235,10 +262,15 @@ export default function WeeklyPlannerBoard() {
 
   const sessionsById = useMemo(() => Object.fromEntries(sessionLibrary.map(s => [s.id, s])), [sessionLibrary]);
   const linkedSessionIds = useMemo(() => [...new Set(days.flatMap(day => {
+    const dayEvents = calendarEvents.filter((ev) => ev.date === day.date);
+    if (isFreeDay(day) || dayEvents.some(isMatchEvent) || dayEvents.some(isTravelEvent)) return [];
     const explicit = (day.blocks || []).map(block => block.session_id).filter(Boolean);
-    const inferred = WORK_BLOCKS.map((config) => inferSessionForBlock(day, config.type, sessionLibrary)?.id).filter(Boolean);
+    const inferred = WORK_BLOCKS.map((config) => {
+      const block = (day.blocks || []).find((item) => item.type === config.type) || { type: config.type };
+      return block.auto_sync === false ? null : inferSessionForBlock(day, config.type, sessionLibrary)?.id;
+    }).filter(Boolean);
     return [...explicit, ...inferred];
-  }))], [days, sessionLibrary]);
+  }))], [days, sessionLibrary, calendarEvents]);
   const nextMatch = useMemo(() => calendarEvents.filter(ev => isMatchEvent(ev) && ev.date >= moment().format("YYYY-MM-DD")).sort((a, b) => `${a.date} ${a.time || a.start_time || ""}`.localeCompare(`${b.date} ${b.time || b.start_time || ""}`))[0] || null, [calendarEvents]);
 
   const historicalAverages = useMemo(() => {
@@ -304,33 +336,37 @@ export default function WeeklyPlannerBoard() {
   }, [linkedSessionIds.join("|")]);
 
   const dayLoads = useMemo(() => days.map(day => {
-    if (isFreeDay(day)) return { day: dayName(day.date).slice(0, 3), date: day.date };
+    const dayEvents = calendarEvents.filter((ev) => ev.date === day.date);
+    if (isFreeDay(day) || dayEvents.some(isMatchEvent) || dayEvents.some(isTravelEvent)) return { day: dayName(day.date).slice(0, 3), date: day.date };
     const load = WORK_BLOCKS.reduce((acc, config) => {
       const block = (day.blocks || []).find((item) => item.type === config.type) || { type: config.type };
-      const session = block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
+      const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
       return session ? addLoads(acc, sessionLoad(session, historicalAverages)) : acc;
     }, {});
     return { ...load, day: dayName(day.date).slice(0, 3), date: day.date };
-  }), [days, sessionsById, sessionLibrary, historicalAverages]);
+  }), [days, calendarEvents, sessionsById, sessionLibrary, historicalAverages]);
 
   const summary = useMemo(() => {
     const total = dayLoads.reduce((sum, d) => sum + (d.player_load || 0), 0);
     const peak = dayLoads.reduce((a, b) => (b.player_load || 0) > (a.player_load || 0) ? b : a, dayLoads[0] || {});
     const recovery = days.find(d => isFreeDay(d) || (d.blocks || []).some(b => ["Compensatorio", "Vuelta a la calma"].includes(b.type) && b.session_id)) || days[dayLoads.findIndex(d => (d.player_load || 0) === Math.min(...dayLoads.map(x => x.player_load || 0)))] || days[0];
-    const activeDays = days.filter(d => !isFreeDay(d));
+    const activeDays = days.filter(d => {
+      const dayEvents = calendarEvents.filter((ev) => ev.date === d.date);
+      return !isFreeDay(d) && !dayEvents.some(isMatchEvent) && !dayEvents.some(isTravelEvent);
+    });
     const field = activeDays.filter(day => {
       const block = (day.blocks || []).find(b => b.type === "Campo") || { type: "Campo" };
-      return block.session_id || inferSessionForBlock(day, "Campo", sessionLibrary);
+      return block.auto_sync === false ? Boolean(block.content) : block.session_id || inferSessionForBlock(day, "Campo", sessionLibrary);
     }).length;
     const gym = activeDays.filter(day => {
       const block = (day.blocks || []).find(b => b.type === "Gimnasio") || { type: "Gimnasio" };
-      return block.session_id || inferSessionForBlock(day, "Gimnasio", sessionLibrary);
+      return block.auto_sync === false ? Boolean(block.content) : block.session_id || inferSessionForBlock(day, "Gimnasio", sessionLibrary);
     }).length;
     const status = total > 3500 ? "Alta demanda" : total < 1600 ? "Descarga / baja carga" : "Equilibrada";
     return { total, peak, recovery, field, gym, status };
-  }, [days, dayLoads, sessionLibrary]);
+  }, [days, dayLoads, sessionLibrary, calendarEvents]);
 
-  const autoText = `La semana queda estructurada como ${meta.week_type}. El pico principal aparece el ${summary.peak?.day || "—"}, con una carga semanal aproximada de ${compactNumber(summary.total)} PL. Se planifican ${summary.field} bloques de campo y ${summary.gym} bloques de gimnasio. El día de recuperación queda ubicado en ${summary.recovery?.date ? dayName(summary.recovery.date) : "—"}. Estado general: ${summary.status}.`;
+  const autoText = `La semana queda estructurada como ${meta.week_type}. El pico principal aparece el ${summary.peak?.day || "—"}. Se planifican ${summary.field} bloques de campo y ${summary.gym} bloques de gimnasio. El día de recuperación queda ubicado en ${summary.recovery?.date ? dayName(summary.recovery.date) : "—"}. Estado general: ${summary.status}.`;
 
   function updateDay(idx, patch) { setDays(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d)); }
   function updateBlock(dayIdx, blockId, patch) {
@@ -399,10 +435,10 @@ export default function WeeklyPlannerBoard() {
     }
   }
 
-  if (exportMode) return <MicrocycleExportView days={days} meta={meta} dayLoads={dayLoads} summary={autoText} sessionDetails={sessionDetails} sessionsById={sessionsById} sessionLibrary={sessionLibrary} onExit={() => setExportMode(false)} />;
+  if (exportMode) return <MicrocycleExportView days={days} meta={meta} dayLoads={dayLoads} summary={autoText} sessionDetails={sessionDetails} sessionsById={sessionsById} sessionLibrary={sessionLibrary} calendarEvents={calendarEvents} physicalObjectives={physicalObjectives} onExit={() => setExportMode(false)} />;
   if (loading) return <div className="h-64 flex items-center justify-center"><div className="w-7 h-7 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
-  return <div className="min-h-screen bg-zinc-50 text-zinc-950 -m-6 p-6 space-y-3">
+  return <div className="min-h-screen bg-slate-200 text-zinc-950 -m-6 p-6 space-y-3">
     <input ref={aiInputRef} type="file" className="hidden" accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.png,.jpg,.jpeg" onChange={e => handleAiFile(e.target.files?.[0])} />
 
     <header className="bg-white border border-zinc-200 rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
@@ -422,12 +458,14 @@ export default function WeeklyPlannerBoard() {
       </div>
     </header>
 
+    <PhysicalObjectiveManager objectives={physicalObjectives} onRefresh={refreshPhysicalObjectives} />
+
     <MicrocycleTopSummary meta={meta} activeSquad={activeSquad} activeSeasonId={activeSeasonId} startDateLabel={meta.range_label} nextMatch={nextMatch} dayCount={days.length} />
 
     <section className="grid grid-cols-1 xl:grid-cols-[190px_1fr_150px] gap-4 items-start">
-      <MicrocycleAreaLegend summary={summary} />
+      <MicrocycleAreaLegend objectives={physicalObjectives} />
       <div className="grid gap-3 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(185px, 1fr))` }}>
-        {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} />)}
+        {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} physicalObjectives={physicalObjectives} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
       </div>
       <aside className="bg-slate-950 text-white rounded-xl p-3 shadow-sm h-fit sticky top-3">
         <p className="text-[10px] font-black uppercase text-slate-400 mb-3">Resumen semanal</p>
