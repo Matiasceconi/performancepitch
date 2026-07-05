@@ -1,8 +1,8 @@
 import React from "react";
 import { MICRO_METRICS, fmt, loadColorClass } from "./gpsMicrocycleReportUtils";
 
-export default function GpsMicrocycleDailyTable({ dailySummaries }) {
-  const averages = Object.fromEntries(MICRO_METRICS.map((m) => {
+export default function GpsMicrocycleDailyTable({ dailySummaries, metrics = MICRO_METRICS }) {
+  const averages = Object.fromEntries(metrics.map((m) => {
     const values = dailySummaries.map((d) => d[m.key]).filter((v) => v != null);
     return [m.key, values.length ? values.reduce((a, b) => a + b, 0) / values.length : null];
   }));
@@ -11,7 +11,7 @@ export default function GpsMicrocycleDailyTable({ dailySummaries }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 overflow-x-auto">
       <div className="mb-4">
         <h3 className="text-white font-bold text-lg">Detalle diario del microciclo</h3>
-        <p className="text-zinc-500 text-sm">Promedios calculados solo con grupo principal; excluidos visibles aparte.</p>
+        <p className="text-zinc-500 text-sm">Valores calculados según los filtros aplicados; excluidos visibles aparte cuando corresponde.</p>
       </div>
       <table className="w-full min-w-[1180px] text-sm">
         <thead>
@@ -19,7 +19,7 @@ export default function GpsMicrocycleDailyTable({ dailySummaries }) {
             <th className="py-2 pr-3">Día</th>
             <th className="py-2 pr-3">MD</th>
             <th className="py-2 pr-3">Sesiones</th>
-            {MICRO_METRICS.map((m) => <th key={m.key} className="py-2 pr-3">{m.short}</th>)}
+            {metrics.map((m) => <th key={m.key} className="py-2 pr-3">{m.short}</th>)}
             <th className="py-2 pr-3">GPS</th>
             <th className="py-2 pr-3">Excluidos</th>
           </tr>
@@ -30,7 +30,7 @@ export default function GpsMicrocycleDailyTable({ dailySummaries }) {
               <td className="py-3 pr-3 text-white font-semibold">{day.label}</td>
               <td className="py-3 pr-3 text-zinc-300">{day.md}</td>
               <td className="py-3 pr-3 text-zinc-400 max-w-[180px]">{day.sessions.map((s) => s.title).join(" · ") || "Sin sesión"}</td>
-              {MICRO_METRICS.map((m) => (
+              {metrics.map((m) => (
                 <td key={m.key} className="py-3 pr-3">
                   <span className={`inline-flex px-2 py-1 rounded-lg border text-xs font-semibold ${loadColorClass(day[m.key], averages[m.key])}`}>{fmt(day[m.key], m.unit)}</span>
                 </td>

@@ -1,5 +1,5 @@
 import moment from "moment";
-import { isGoalkeeper } from "@/components/squad/squadConstants";
+import { isGoalkeeper, resolvePositionGroup } from "@/components/squad/squadConstants";
 
 export const MICRO_METRICS = [
   { key: "total_distance", label: "Distancia total", short: "Dist. total", unit: "m", color: "#22c55e", mode: "avg" },
@@ -44,43 +44,76 @@ export function getCycleDays(cycleDays) {
   return cycleDays?.length ? cycleDays : Array.from({ length: 7 }, (_, i) => ({ date: moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD"), md: "—", objetivo: "—" }));
 }
 
+function rowStatus(row) {
+  const group = String(row.gps_group || row.exclusion_reason || "").toLowerCase();
+  if (group.includes("kinesiologia")) return "kinesiologia";
+  if (group.includes("diferenciado")) return "diferenciado";
+  if (row.include_in_session_average === false || (row.gps_group && row.gps_group !== "principal")) return "excluidos";
+  return "incluidos";
+}
+
 export function normalizeRows(rows, playerMap) {
-  return rows
-    .map((r) => {
-      const player = playerMap[r.player_id];
-      const duration = r.m_min && r.total_distance ? r.total_distance / r.m_min : 0;
-      return { ...r, player, player_name: r.player_name || player?.full_name || "Jugador", player_load_per_min: r.player_load_per_min || (duration ? r.player_load / duration : 0) };
-    })
-    .filter((r) => !isGoalkeeper(r.player));
-}
-
-export function splitRows(rows, playerMap) {
-  const normalized = normalizeRows(rows, playerMap);
-  return {
-    main: normalized.filter((r) => r.include_in_session_average !== false && (!r.gps_group || r.gps_group === "principal")),
-    excluded: normalized.filter((r) => r.include_in_session_average === false || (r.gps_group && r.gps_group !== "principal")),
-  };
-}
-
-export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap }) {
-  return getCycleDays(cycleDays).map((day) => {
-    const daySessions = sessions.filter((s) => s.date === day.date);
-    const rawRows = daySessions.flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_title: s.title })));
-    const { main, excluded } = splitRows(rawRows, playerMap);
-    const metrics = Object.fromEntries(MICRO_METRICS.map((m) => [m.key, aggregate(main, m.key, m.mode)]));
-    return { date: day.date, label: day.date ? moment(day.date).format("ddd DD/MM") : "—", md: day.md || "—", objetivo: day.objetivo || "—", observations: day.observaciones || "", sessions: daySessions, mainRows: main, excludedRows: excluded, gpsPlayers: new Set(main.map((r) => r.player_id)).size, excludedCount: new Set(excluded.map((r) => r.player_id)).size, ...metrics };
+  return rows.map((r) => {
+    const player = playerMap[r.player_id];
+    const duration = r.m_min && r.total_distance ? r.total_distance / r.m_min : 0;
+    return {
+      ...r,
+      player,
+      player_name: r.player_name || player?.full_name || "Jugador",
+      position: player?.position || r.position || "",
+      position_group: player?.position_group || resolvePositionGroup(player?.position) || "",
+      player_type: isGoalkeeper(player) ? "arqueros" : "campo",
+      row_status: rowStatus(r),
+      player_load_per_min: r.player_load_per_min || (duration ? r.player_load / duration : 0),
+    };
   });
 }
 
-export function rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap, includeExcluded = false }) {
-  const dates = new Set(getCycleDays(cycleDays).map((d) => d.date).filter(Boolean));
-  const rows = sessions.filter((s) => dates.has(s.date)).flatMap((s) => gpsBySession[s.id] || []);
-  const split = splitRows(rows, playerMap);
+export function applyMicrocycleFilters(rows, filters = {}) {
+  return rows.filter((row) => {
+    if (filters.playerId && row.player_id !== filters.playerId) return false;
+    if (filters.position && row.position !== filters.position) return false;
+    if (filters.positionGroup && row.position_group !== filters.positionGroup) return false;
+    if (filters.playerType && row.player_type !== filters.playerType) return false;
+    if (filters.status && row.row_status !== filters.status) return false;
+    if (filters.md && row.md !== filters.md) return false;
+    if (filters.sessionId && row.session_id !== filters.sessionId) return false;
+    if (filters.date && row.session_date !== filters.date) return false;
+    return true;
+  });
+}
+
+export function splitRows(rows, playerMap, filters = {}) {
+  const filtered = applyMicrocycleFilters(normalizeRows(rows, playerMap), filters);
+  if (filters.status) return { main: filtered, excluded: [] };
+  return {
+    main: filtered.filter((r) => r.row_status === "incluidos"),
+    excluded: filtered.filter((r) => r.row_status !== "incluidos"),
+  };
+}
+
+export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, metrics = MICRO_METRICS }) {
+  return getCycleDays(cycleDays).filter((day) => !filters.md || day.md === filters.md).filter((day) => !filters.date || day.date === filters.date).map((day) => {
+    const daySessions = sessions.filter((s) => s.date === day.date && (!filters.sessionId || s.id === filters.sessionId));
+    const rawRows = daySessions.flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md: day.md || "—" })));
+    const { main, excluded } = splitRows(rawRows, playerMap, filters);
+    const metricValues = Object.fromEntries(metrics.map((m) => [m.key, aggregate(main, m.key, m.mode)]));
+    return { date: day.date, label: day.date ? moment(day.date).format("ddd DD/MM") : "—", md: day.md || "—", objetivo: day.objetivo || "—", observations: day.observaciones || "", sessions: daySessions, mainRows: main, excludedRows: excluded, gpsPlayers: new Set(main.map((r) => r.player_id)).size, excludedCount: new Set(excluded.map((r) => r.player_id)).size, ...metricValues };
+  });
+}
+
+export function rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, includeExcluded = false }) {
+  const days = getCycleDays(cycleDays).filter((d) => !filters.md || d.md === filters.md).filter((d) => !filters.date || d.date === filters.date);
+  const dayByDate = Object.fromEntries(days.map((d) => [d.date, d]));
+  const rows = sessions
+    .filter((s) => dayByDate[s.date] && (!filters.sessionId || s.id === filters.sessionId))
+    .flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md: dayByDate[s.date]?.md || "—" })));
+  const split = splitRows(rows, playerMap, filters);
   return includeExcluded ? [...split.main, ...split.excluded] : split.main;
 }
 
-export function buildHighlights(rows, playerMap) {
-  return HIGHLIGHT_METRICS.map((metric) => {
+export function buildHighlights(rows, playerMap, metrics = HIGHLIGHT_METRICS) {
+  return metrics.map((metric) => {
     const byPlayer = {};
     rows.forEach((row) => {
       const value = Number(row[metric.key]);
@@ -96,21 +129,19 @@ export function buildHighlights(rows, playerMap) {
   });
 }
 
-export function buildComparison({ sessions, gpsBySession, cycleDays, playerMap }) {
-  const days = getCycleDays(cycleDays);
+export function buildComparison({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, metrics = MICRO_METRICS }) {
+  const days = getCycleDays(cycleDays).filter((day) => !filters.md || day.md === filters.md).filter((day) => !filters.date || day.date === filters.date);
   const start = moment(days[0]?.date).startOf("day");
   const end = moment(days[days.length - 1]?.date).endOf("day");
-  const currentRows = rowsForCycle({ sessions, gpsBySession, cycleDays: days, playerMap });
+  const currentRows = rowsForCycle({ sessions, gpsBySession, cycleDays: days, playerMap, filters });
   const pastWeeks = [];
   for (let i = 1; i <= 4; i++) {
-    const from = start.clone().subtract(i * 7, "days");
-    const to = end.clone().subtract(i * 7, "days");
-    const weekSessions = sessions.filter((s) => s.date && moment(s.date).isBetween(from, to, "day", "[]"));
-    const rows = normalizeRows(weekSessions.flatMap((s) => gpsBySession[s.id] || []), playerMap).filter((r) => r.include_in_session_average !== false && (!r.gps_group || r.gps_group === "principal"));
+    const shiftedDays = days.map((d) => ({ ...d, date: moment(d.date).subtract(i * 7, "days").format("YYYY-MM-DD") }));
+    const rows = rowsForCycle({ sessions, gpsBySession, cycleDays: shiftedDays, playerMap, filters: { ...filters, sessionId: "", date: "" } });
     if (rows.length) pastWeeks.push(rows);
   }
   const pastRows = pastWeeks.flat();
-  return MICRO_METRICS.slice(0, 8).map((metric) => {
+  return metrics.slice(0, 8).map((metric) => {
     const current = aggregate(currentRows, metric.key, metric.mode);
     const previous = aggregate(pastRows, metric.key, metric.mode);
     const diff = current != null && previous ? ((current - previous) / previous) * 100 : null;

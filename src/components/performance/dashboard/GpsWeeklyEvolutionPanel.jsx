@@ -1,4 +1,4 @@
-import React, { useMemo, useRef } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import moment from "moment";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import GpsMicrocycleDailyTable from "./GpsMicrocycleDailyTable";
@@ -6,8 +6,10 @@ import GpsMicrocycleHighlights from "./GpsMicrocycleHighlights";
 import GpsMicrocycleComparison from "./GpsMicrocycleComparison";
 import GpsMicrocycleAiAnalysis from "./GpsMicrocycleAiAnalysis";
 import GpsMicrocyclePdfButton from "./GpsMicrocyclePdfButton";
+import GpsMicrocycleFiltersPanel, { getMicrocycleFilterLabels } from "./GpsMicrocycleFiltersPanel";
 import {
   MICRO_METRICS,
+  HIGHLIGHT_METRICS,
   buildDailySummaries,
   rowsForCycle,
   buildHighlights,
@@ -19,7 +21,7 @@ function MetricChart({ metric, data }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
       <div className="mb-3">
         <h3 className="text-white font-bold text-sm">{metric.label}</h3>
-        <p className="text-zinc-500 text-xs">Grupo principal por día</p>
+        <p className="text-zinc-500 text-xs">Datos filtrados por día</p>
       </div>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
@@ -40,10 +42,15 @@ function MetricChart({ metric, data }) {
 
 export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season }) {
   const reportCaptureRef = useRef(null);
-  const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap }), [sessions, gpsBySession, cycleDays, playerMap]);
-  const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap }), [sessions, gpsBySession, cycleDays, playerMap]);
-  const highlights = useMemo(() => buildHighlights(cycleRows, playerMap), [cycleRows, playerMap]);
-  const comparison = useMemo(() => buildComparison({ sessions, gpsBySession, cycleDays, playerMap }), [sessions, gpsBySession, cycleDays, playerMap]);
+  const [filters, setFilters] = useState({});
+  const players = useMemo(() => Object.values(playerMap || {}).filter(Boolean), [playerMap]);
+  const visibleMetrics = useMemo(() => filters.metricKey ? MICRO_METRICS.filter((m) => m.key === filters.metricKey) : MICRO_METRICS, [filters.metricKey]);
+  const visibleHighlightMetrics = useMemo(() => filters.metricKey ? HIGHLIGHT_METRICS.filter((m) => m.key === filters.metricKey) : HIGHLIGHT_METRICS, [filters.metricKey]);
+  const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, cycleDays, playerMap, filters, visibleMetrics]);
+  const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap, filters }), [sessions, gpsBySession, cycleDays, playerMap, filters]);
+  const highlights = useMemo(() => buildHighlights(cycleRows, playerMap, visibleHighlightMetrics), [cycleRows, playerMap, visibleHighlightMetrics]);
+  const comparison = useMemo(() => buildComparison({ sessions, gpsBySession, cycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, cycleDays, playerMap, filters, visibleMetrics]);
+  const filterLabels = useMemo(() => getMicrocycleFilterLabels(filters, { players, sessions, metrics: MICRO_METRICS }), [filters, players, sessions]);
   const weekStart = dailySummaries[0]?.date;
   const weekEnd = dailySummaries[dailySummaries.length - 1]?.date;
 
@@ -55,15 +62,16 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
           <h2 className="text-2xl font-bold text-white mt-1">Resumen del microciclo</h2>
           <p className="text-zinc-400 text-sm mt-1">{squadName || "Plantel activo"} · {weekStart ? moment(weekStart).format("DD/MM") : ""} - {weekEnd ? moment(weekEnd).format("DD/MM/YYYY") : ""}</p>
         </div>
-        <div className="flex gap-2 flex-wrap"><GpsMicrocycleAiAnalysis dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} captureRef={reportCaptureRef} /></div>
+        <div className="flex gap-2 flex-wrap"><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={cycleDays} metrics={MICRO_METRICS} /><GpsMicrocycleAiAnalysis dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} captureRef={reportCaptureRef} /></div>
       </div>
 
       <div ref={reportCaptureRef} className="space-y-5">
+        {filterLabels.length > 0 && <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-4"><p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Filtros aplicados</p><div className="flex flex-wrap gap-2">{filterLabels.map((label) => <span key={label} className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold">{label}</span>)}</div></div>}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {MICRO_METRICS.map((metric) => <MetricChart key={metric.key} metric={metric} data={dailySummaries} />)}
+          {visibleMetrics.map((metric) => <MetricChart key={metric.key} metric={metric} data={dailySummaries} />)}
         </div>
 
-        <GpsMicrocycleDailyTable dailySummaries={dailySummaries} />
+        <GpsMicrocycleDailyTable dailySummaries={dailySummaries} metrics={visibleMetrics} />
         <GpsMicrocycleHighlights highlights={highlights} />
         <GpsMicrocycleComparison comparison={comparison} />
       </div>
