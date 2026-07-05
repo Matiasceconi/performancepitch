@@ -44,13 +44,63 @@ function normalizeHomeAway(value) {
   return "";
 }
 
-export function normalizeAiEvents(rawEvents = [], fallbackDate) {
+const MONTHS_ES = {
+  enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+  julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+};
+
+function normalizeText(value) {
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function monthFromText(...values) {
+  const text = normalizeText(values.filter(Boolean).join(" "));
+  for (const [name, month] of Object.entries(MONTHS_ES)) if (text.includes(name)) return month;
+  const numeric = text.match(/(?:\b|\/|-)(\d{1,2})(?:\/|-)(\d{2,4})?\b/);
+  if (numeric) return Number(numeric[1]) <= 12 ? Number(numeric[1]) : undefined;
+  return undefined;
+}
+
+function contextFromOutput(output = {}, fallbackDate) {
+  const sourceText = [output.week_start, output.week_end, output.week_label, output.periodo, output.rango, output.title].filter(Boolean).join(" ");
+  const yearMatch = sourceText.match(/\b(20\d{2})\b/);
+  return {
+    year: yearMatch ? Number(yearMatch[1]) : moment(fallbackDate).year(),
+    month: monthFromText(sourceText) || moment(fallbackDate).month() + 1,
+  };
+}
+
+function buildDateFromDay(day, context, fallbackDate) {
+  const n = Number(day);
+  if (!n || n < 1 || n > 31 || !context.month) return fallbackDate;
+  return moment({ year: context.year, month: context.month - 1, day: n }).format("YYYY-MM-DD");
+}
+
+function parseAiDate(ev, fallbackDate, context) {
+  const dayText = [ev.day, ev.dia, ev.día, ev.column, ev.columna].filter(Boolean).join(" ");
+  const dayMatch = normalizeText(dayText).match(/\b(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)?\s*(\d{1,2})\b/);
+  if (dayMatch) return buildDateFromDay(dayMatch[1], context, fallbackDate);
+
+  const raw = String(ev.date || ev.fecha || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const slash = raw.match(/\b(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?\b/);
+  if (slash) {
+    const year = slash[3] ? Number(String(slash[3]).padStart(4, "20")) : context.year;
+    return moment({ year, month: Number(slash[2]) - 1, day: Number(slash[1]) }).format("YYYY-MM-DD");
+  }
+  const textDay = normalizeText(raw).match(/\b(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)?\s*(\d{1,2})\b/);
+  if (textDay) return buildDateFromDay(textDay[1], context, fallbackDate);
+  return fallbackDate;
+}
+
+export function normalizeAiEvents(rawEvents = [], fallbackDate, output = {}) {
+  const context = contextFromOutput(output, fallbackDate);
   return rawEvents.map((ev) => {
     const title = String(ev.title || ev.activity || ev.actividad || ev.name || "").trim();
     const event_type = normalizeType(ev.event_type || ev.type || ev.tipo, title);
     return {
       title: title || event_type,
-      date: moment(ev.date || ev.fecha || fallbackDate).isValid() ? moment(ev.date || ev.fecha || fallbackDate).format("YYYY-MM-DD") : fallbackDate,
+      date: parseAiDate(ev, fallbackDate, context),
       start_time: cleanTime(ev.start_time || ev.time || ev.hora_inicio || ev.horario),
       end_time: cleanTime(ev.end_time || ev.hora_fin),
       event_type,
@@ -65,12 +115,40 @@ export function normalizeAiEvents(rawEvents = [], fallbackDate) {
 
 export async function analyzeScheduleFile({ file, activeSquad }) {
   const upload = await base44.integrations.Core.UploadFile({ file });
-  const schema = { type: "object", properties: { squad_name: { type: "string" }, week_start: { type: "string" }, week_end: { type: "string" }, events: { type: "array", items: { type: "object", properties: { title: { type: "string" }, date: { type: "string" }, day: { type: "string" }, start_time: { type: "string" }, end_time: { type: "string" }, event_type: { type: "string" }, location: { type: "string" }, notes: { type: "string" }, rival: { type: "string" }, home_away: { type: "string" } } } } } };
-  const extracted = await base44.integrations.Core.ExtractDataFromUploadedFile({ file_url: upload.file_url, json_schema: schema });
-  if (extracted.status === "error") throw new Error(extracted.details || "No se pudo leer el cronograma.");
-  const output = Array.isArray(extracted.output) ? { events: extracted.output } : (extracted.output || {});
-  const fallbackDate = moment(output.week_start || undefined).isValid() ? moment(output.week_start).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
-  return { source_file: upload.file_url, source_file_name: file.name, squad_name: output.squad_name || activeSquad?.name || "", events: normalizeAiEvents(output.events || [], fallbackDate) };
+  const schema = {
+    type: "object",
+    properties: {
+      squad_name: { type: "string" },
+      week_label: { type: "string" },
+      week_start: { type: "string" },
+      week_end: { type: "string" },
+      events: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            title: { type: "string" },
+            date: { type: "string" },
+            day: { type: "string" },
+            start_time: { type: "string" },
+            end_time: { type: "string" },
+            event_type: { type: "string" },
+            location: { type: "string" },
+            notes: { type: "string" },
+            rival: { type: "string" },
+            home_away: { type: "string" }
+          }
+        }
+      }
+    }
+  };
+  const output = await base44.integrations.Core.InvokeLLM({
+    file_urls: [upload.file_url],
+    response_json_schema: schema,
+    prompt: `Extraé el cronograma deportivo del archivo y devolvé SOLO eventos reales visibles en la tabla.\n\nReglas críticas de fechas:\n- NO uses la fecha actual ni la fecha de carga del archivo.\n- Cada evento debe heredar la fecha del encabezado de su columna (por ejemplo: "LUNES 6", "MARTES 7", "MIERCOLES 8", "MARTES 14").\n- Si el encabezado trae solo número de día, usá el mes del título/rango del cronograma.\n- Si no aparece año, usá ${moment().year()}.\n- En el campo day copiá el encabezado exacto de la columna.\n- En el campo date usá formato YYYY-MM-DD.\n- No crees eventos para celdas vacías.\n- Separá desayuno, video, gimnasio, cancha, almuerzo, viajes, partidos y descansos como eventos independientes.\n\nPlantel activo esperado: ${activeSquad?.name || ""}.`,
+  });
+  const fallbackDate = moment(output.week_start, ["YYYY-MM-DD", "DD/MM/YYYY"], true).isValid() ? moment(output.week_start).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
+  return { source_file: upload.file_url, source_file_name: file.name, squad_name: output.squad_name || activeSquad?.name || "", events: normalizeAiEvents(output.events || [], fallbackDate, output) };
 }
 
 function importKey({ squad_id, date, time, type }) { return [squad_id || "", date || "", time || "", type || ""].join("|"); }
