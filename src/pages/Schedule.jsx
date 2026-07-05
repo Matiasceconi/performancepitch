@@ -174,7 +174,7 @@ function buildDayPDF(day, events) {
   doc.text("CRONOGRAMA DEL DÍA", pw/2, 9, { align: "center" });
   doc.setFontSize(8);
   doc.setFont("helvetica","normal");
-  doc.text(day.format("dddd D [de] MMMM YYYY").toUpperCase(), pw/2, 14+5, { align: "center" });
+  doc.text(`${DAY_NAMES_FULL[day.day()]} ${day.date()} DE ${day.format("MMMM YYYY")}`.toUpperCase(), pw/2, 14+5, { align: "center" });
 
   const hexToRgb = (hex) => {
     const r = parseInt(hex.slice(1,3),16);
@@ -699,7 +699,7 @@ export default function Schedule() {
               <div key={dateStr} style={{ minWidth: "200px", scrollSnapAlign: "start" }} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
                 <div className={`flex items-center justify-between px-3 py-2 border-b ${isToday ? "border-white/10" : "border-zinc-800"}`}>
                   <div>
-                    <p className="text-xs text-zinc-500 uppercase font-medium">{d.format("ddd")}</p>
+                    <p className="text-xs text-zinc-500 uppercase font-medium">{DAY_NAMES_FULL[d.day()]}</p>
                     <p className={`text-lg font-bold ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()}</p>
                   </div>
                   <div className="flex items-center gap-1">

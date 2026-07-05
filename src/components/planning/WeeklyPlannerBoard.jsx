@@ -29,6 +29,11 @@ const OBJETIVO_COLORS = {
 };
 const COMP_OPTIONS = ["—", "Intermitente", "HIIT tren superior", "HIIT tren inferior", "Movilidad", "Técnica individual", "Otro"];
 const VUELTA_OPTIONS = ["Elongación pasiva", "Elongación de a 2", "Rolo para cada uno", "Respiración diafragmática"];
+const WEEKDAY_NAMES_ES = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+
+function weekdayNameEs(date) {
+  return date ? WEEKDAY_NAMES_ES[moment(date).day()] : "";
+}
 
 async function withRetry(fn, retries = 3, delay = 800) {
   try {
@@ -345,7 +350,7 @@ export default function WeeklyPlannerBoard() {
                     <th key={i} className={`px-2 py-2 text-center border-r border-zinc-700 last:border-r-0 min-w-[140px] transition-colors ${col ? col.header : ""}`}>
                       <div className="flex flex-col items-center gap-1">
                         <p className={`text-xs font-bold tracking-wider ${col ? col.text : "text-white"}`}>
-                          {d.date ? moment(d.date).format("dddd").toUpperCase() : `DÍA ${i + 1}`}
+                          {d.date ? weekdayNameEs(d.date) : `DÍA ${i + 1}`}
                         </p>
                         <input
                           type="date"
