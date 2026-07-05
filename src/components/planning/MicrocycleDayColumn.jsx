@@ -17,8 +17,8 @@ const TYPE_LABELS = {
 };
 
 const SOFT_BG = {
-  Campo: "bg-blue-50 border-blue-100 text-blue-900",
-  Gimnasio: "bg-emerald-50 border-emerald-100 text-emerald-900",
+  Campo: "bg-emerald-50 border-emerald-100 text-emerald-900",
+  Gimnasio: "bg-blue-50 border-blue-100 text-blue-900",
   "Objetivo táctico": "bg-orange-50 border-orange-100 text-orange-900",
   Compensatorio: "bg-violet-50 border-violet-100 text-violet-900",
   Recuperación: "bg-violet-50 border-violet-100 text-violet-900",
@@ -81,7 +81,7 @@ export default function MicrocycleDayColumn({ day, dayIdx, dayLoad, mdOptions, b
       </Droppable>
       <button className="m-2 mt-0 rounded-lg border border-zinc-200 py-2 text-[11px] font-bold text-zinc-500 hover:bg-zinc-50 flex items-center justify-center gap-1"><ExternalLink size={12} /> Ver sesión</button>
       <div className="border-t border-zinc-100 p-2 space-y-1">
-        {[dayLoad.total_distance, dayLoad.distance_19_8, dayLoad.distance_25, dayLoad.acc_3, dayLoad.dec_3, dayLoad.player_load].map((v, i) => <div key={i} className="flex items-center gap-2"><span className="w-8 text-[9px] font-bold text-zinc-500">{Math.round(v || 0)}</span><span className="h-1.5 rounded-full flex-1 bg-zinc-100 overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${Math.min(100, ((v || 0) / ([10000, 1200, 650, 100, 80, 700][i])) * 100)}%`, backgroundColor: ["#2563eb", "#2563eb", "#ef4444", "#ef4444", "#22c55e", "#f97316"][i] }} /></span></div>)}
+        {[dayLoad.total_distance, dayLoad.distance_19_8, dayLoad.distance_25, dayLoad.acc_3, dayLoad.dec_3, dayLoad.player_load].map((v, i) => <div key={i} className="flex items-center gap-2"><span className="w-8 text-[9px] font-bold text-zinc-500">{Math.round(v || 0)}</span><span className="h-1.5 rounded-full flex-1 bg-zinc-100 overflow-hidden"><span className="block h-full rounded-full" style={{ width: `${Math.min(100, ((v || 0) / ([10000, 1200, 650, 100, 80, 700][i])) * 100)}%`, backgroundColor: ["#16a34a", "#16a34a", "#ef4444", "#ef4444", "#22c55e", "#2563eb"][i] }} /></span></div>)}
       </div>
     </div>
   );

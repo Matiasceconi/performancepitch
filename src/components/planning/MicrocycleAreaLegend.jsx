@@ -1,8 +1,8 @@
 import React from "react";
 
 const AREAS = [
-  ["Campo", "#2563eb"],
-  ["Gimnasio", "#16a34a"],
+  ["Campo", "#16a34a"],
+  ["Gimnasio", "#2563eb"],
   ["Táctico / DT", "#f97316"],
   ["Preventivo", "#8b5cf6"],
   ["Vuelta a la calma", "#06b6d4"],

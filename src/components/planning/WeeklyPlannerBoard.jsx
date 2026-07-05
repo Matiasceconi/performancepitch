@@ -9,7 +9,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { MICROCycle_TEMPLATES, TEMPLATE_BLOCKS } from "@/components/planning/microcycleTemplates";
 import MicrocycleTopSummary from "@/components/planning/MicrocycleTopSummary";
-import MicrocycleMetricCards from "@/components/planning/MicrocycleMetricCards";
 import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
 import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
 
@@ -21,10 +20,10 @@ const WEEK_TYPES = ["Normal", "Semana corta", "Semana larga", "Doble competencia
 const GRAPH_TYPES = [{ id: "barras", label: "Barras" }, { id: "linea", label: "Línea" }, { id: "area", label: "Área" }, { id: "radar", label: "Radar" }];
 const BLOCK_TYPES = ["Objetivo físico", "Objetivo táctico", "Campo", "Gimnasio", "Compensatorio", "Vuelta a la calma", "Recuperación", "Partido", "Observaciones", "Personalizado"];
 const BLOCK_COLORS = {
-  "Objetivo físico": "#2563eb",
+  "Objetivo físico": "#16a34a",
   "Objetivo táctico": "#7c3aed",
   Campo: "#16a34a",
-  Gimnasio: "#0f172a",
+  Gimnasio: "#2563eb",
   Compensatorio: "#ea580c",
   "Vuelta a la calma": "#0891b2",
   Recuperación: "#8b5cf6",
@@ -63,7 +62,9 @@ function normalizeDay(day, fallbackDate, index) {
   if (day?.observaciones) blocks.push(emptyBlock("Observaciones", day.observaciones));
   return { ...emptyDay(fallbackDate, index), ...day, blocks: blocks.length ? blocks : emptyDay(fallbackDate, index).blocks };
 }
-function sessionLoad(session) {
+function normalizeText(value) { return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
+function sessionSignature(session) { return [session?.session_type, session?.session_objective || session?.objective, session?.microcycle_day].map(v => normalizeText(v)).join("|"); }
+function fallbackSessionLoad(session) {
   const duration = Number(session?.duration_minutes || 60);
   const type = `${session?.session_type || ""} ${session?.objective || ""} ${session?.session_objective || ""}`.toLowerCase();
   const multiplier = type.includes("partido") ? 1.8 : type.includes("velocidad") ? 1.35 : type.includes("fuerza") ? 0.75 : type.includes("regener") ? 0.45 : 1;
@@ -75,6 +76,16 @@ function sessionLoad(session) {
     dec_3: Math.round(duration * 0.24 * multiplier),
     player_load: Math.round(duration * 7.8 * multiplier),
   };
+}
+function sessionLoad(session, historicalAverages) {
+  return historicalAverages?.[sessionSignature(session)] || fallbackSessionLoad(session);
+}
+function isFreeCalendarEvent(ev) {
+  const text = normalizeText(`${ev.title || ""} ${ev.event_type || ""} ${ev.type || ""}`);
+  return text.includes("libre") || text.includes("descanso") || text.includes("sin actividad");
+}
+function isMatchEvent(ev) {
+  return normalizeText(`${ev.title || ""} ${ev.event_type || ""} ${ev.type || ""}`).includes("partido");
 }
 function addLoads(a, b) {
   return Object.fromEntries(["total_distance", "distance_19_8", "distance_25", "acc_3", "dec_3", "player_load"].map(k => [k, (a[k] || 0) + (b[k] || 0)]));
@@ -93,7 +104,7 @@ function MicrocycleExportView({ days, meta, dayLoads, summary, onExit }) {
       <div><p className="text-xs font-bold text-emerald-700 uppercase">PerformancePitch</p><h1 className="text-3xl font-black">Plan de Microciclo</h1><p className="text-sm text-zinc-600">Semana {meta.week_number} · {meta.range_label}</p></div>
       <div className="text-right text-sm"><p className="font-bold">{meta.week_type}</p><p>{meta.current_md}</p><p>{meta.next_match}</p></div>
     </div>
-    <div className="grid grid-cols-7 gap-2 mb-5">
+    <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
       {days.map((day, idx) => <div key={idx} className="border rounded-xl overflow-hidden break-inside-avoid">
         <div className="bg-emerald-900 text-white p-2 text-center"><p className="text-xs font-bold">{dayName(day.date)}</p><p className="text-lg font-black">{moment(day.date).format("DD/MM")}</p><p className="text-xs text-emerald-200">{day.md}</p></div>
         <div className="p-2 space-y-2 min-h-[230px]">
@@ -125,11 +136,14 @@ export default function WeeklyPlannerBoard() {
   const aiInputRef = useRef(null);
   const [startDate, setStartDate] = useState(moment().startOf("isoWeek").format("YYYY-MM-DD"));
   const [days, setDays] = useState(() => Array.from({ length: 7 }, (_, i) => emptyDay(moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD"), i)));
+  const [dayCount, setDayCount] = useState(7);
   const [meta, setMeta] = useState(defaultMeta(moment().startOf("isoWeek").format("YYYY-MM-DD")));
   const [graphType, setGraphType] = useState("barras");
   const [recordId, setRecordId] = useState(null);
   const [sessionLibrary, setSessionLibrary] = useState([]);
   const [sessionDetails, setSessionDetails] = useState({});
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [gpsRows, setGpsRows] = useState([]);
   const [savedPlans, setSavedPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -155,12 +169,13 @@ export default function WeeklyPlannerBoard() {
         setMeta({ ...defaultMeta(startDate), ...(rec.microcycle_meta || {}) });
         setGraphType(rec.graph_type || "barras");
         const loaded = (rec.days_data || []).map((d, i) => normalizeDay(d, moment(startDate).add(i, "days").format("YYYY-MM-DD"), i));
-        setDays(loaded.length ? loaded : Array.from({ length: 7 }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
+        setDayCount(loaded.length || dayCount);
+        setDays(loaded.length ? loaded : Array.from({ length: dayCount }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
       } else {
         setRecordId(null);
         setMeta(defaultMeta(startDate));
         setGraphType("barras");
-        setDays(Array.from({ length: 7 }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
+        setDays(Array.from({ length: dayCount }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
       }
       setLoading(false);
     }
@@ -176,21 +191,90 @@ export default function WeeklyPlannerBoard() {
   }, [activeSquadId, activeSeasonId]);
 
   useEffect(() => {
-    async function detectMatchFromCalendar() {
+    async function loadCalendarEvents() {
       const all = await base44.entities.DayEvent.list("date", 500);
-      const match = all.find(ev =>
-        ev.date >= days[0]?.date && ev.date <= days[days.length - 1]?.date &&
-        (!activeSquadId || ev.squad_id === activeSquadId) &&
-        (!activeSeasonId || !ev.season_id || ev.season_id === activeSeasonId) &&
-        `${ev.event_type || ev.type || ev.title || ""}`.toLowerCase().includes("partido")
-      );
-      if (match) setMeta(prev => prev.next_match ? prev : { ...prev, next_match: match.rival ? `vs ${match.rival}` : match.title || "Partido" });
+      setCalendarEvents(all.filter(ev => (!activeSquadId || ev.squad_id === activeSquadId) && (!activeSeasonId || !ev.season_id || ev.season_id === activeSeasonId)));
     }
-    if (days.length) detectMatchFromCalendar();
-  }, [days[0]?.date, days[days.length - 1]?.date, activeSquadId, activeSeasonId]);
+    loadCalendarEvents();
+  }, [activeSquadId, activeSeasonId, startDate]);
+
+  useEffect(() => {
+    async function loadGpsRows() {
+      const rows = await base44.entities.SessionGPSData.list("-created_date", 2000);
+      setGpsRows(rows.filter(r => r.include_in_session_average !== false));
+    }
+    loadGpsRows();
+  }, [activeSquadId, activeSeasonId]);
+
+  useEffect(() => {
+    const refreshCalendar = async () => {
+      const all = await base44.entities.DayEvent.list("date", 500);
+      setCalendarEvents(all.filter(ev => (!activeSquadId || ev.squad_id === activeSquadId) && (!activeSeasonId || !ev.season_id || ev.season_id === activeSeasonId)));
+    };
+    const refreshSessions = async () => {
+      const all = await base44.entities.TrainingSession.list("-date", 300);
+      setSessionLibrary(all.filter(s => (!activeSquadId || s.squad_id === activeSquadId) && (!activeSeasonId || !s.season_id || s.season_id === activeSeasonId)));
+    };
+    const refreshGps = async () => {
+      const rows = await base44.entities.SessionGPSData.list("-created_date", 2000);
+      setGpsRows(rows.filter(r => r.include_in_session_average !== false));
+    };
+    const unsubDayEvent = base44.entities.DayEvent.subscribe(refreshCalendar);
+    const unsubTrainingSession = base44.entities.TrainingSession.subscribe(refreshSessions);
+    const unsubGps = base44.entities.SessionGPSData.subscribe(refreshGps);
+    return () => { unsubDayEvent?.(); unsubTrainingSession?.(); unsubGps?.(); };
+  }, [activeSquadId, activeSeasonId]);
 
   const sessionsById = useMemo(() => Object.fromEntries(sessionLibrary.map(s => [s.id, s])), [sessionLibrary]);
   const linkedSessionIds = useMemo(() => [...new Set(days.flatMap(d => (d.blocks || []).map(b => b.session_id).filter(Boolean)))], [days]);
+  const nextMatch = useMemo(() => calendarEvents.filter(ev => isMatchEvent(ev) && ev.date >= moment().format("YYYY-MM-DD")).sort((a, b) => `${a.date} ${a.time || a.start_time || ""}`.localeCompare(`${b.date} ${b.time || b.start_time || ""}`))[0] || null, [calendarEvents]);
+
+  const historicalAverages = useMemo(() => {
+    const gpsBySession = gpsRows.reduce((acc, row) => {
+      if (!row.session_id) return acc;
+      acc[row.session_id] = acc[row.session_id] || [];
+      acc[row.session_id].push(row);
+      return acc;
+    }, {});
+    const metricKeys = ["total_distance", "distance_19_8", "distance_25", "acc_3", "dec_3", "player_load"];
+    const grouped = {};
+    sessionLibrary.forEach(session => {
+      const rows = gpsBySession[session.id] || [];
+      if (!rows.length) return;
+      const sessionAvg = Object.fromEntries(metricKeys.map(key => [key, rows.reduce((sum, row) => sum + Number(row[key] || 0), 0) / rows.length]));
+      const signature = sessionSignature(session);
+      grouped[signature] = grouped[signature] || [];
+      grouped[signature].push(sessionAvg);
+    });
+    return Object.fromEntries(Object.entries(grouped).map(([signature, values]) => [signature, Object.fromEntries(metricKeys.map(key => [key, values.reduce((sum, row) => sum + Number(row[key] || 0), 0) / values.length]))]));
+  }, [gpsRows, sessionLibrary]);
+
+  useEffect(() => {
+    if (nextMatch) setMeta(prev => ({ ...prev, next_match: nextMatch.rival ? `vs ${nextMatch.rival}` : nextMatch.title || "Partido" }));
+  }, [nextMatch]);
+
+  useEffect(() => {
+    setDays(prev => {
+      let changed = false;
+      const next = prev.map((day, index) => {
+        const dayEvents = calendarEvents.filter(ev => ev.date === day.date);
+        const hasFree = dayEvents.some(isFreeCalendarEvent);
+        const hasWork = dayEvents.some(ev => !isFreeCalendarEvent(ev));
+        const isDefaultEmpty = (day.blocks || []).every(b => !b.content && !b.session_id && ["Campo", "Observaciones"].includes(b.type));
+        if (hasFree && !hasWork && (day.auto_free || isDefaultEmpty)) {
+          if (day.auto_free) return day;
+          changed = true;
+          return { ...day, auto_free: true, blocks: [{ ...emptyBlock("Recuperación", "Detectado automáticamente desde Calendario/Cronograma."), title: "Día libre" }] };
+        }
+        if (!hasFree && day.auto_free) {
+          changed = true;
+          return emptyDay(day.date, index);
+        }
+        return day;
+      });
+      return changed ? next : prev;
+    });
+  }, [calendarEvents, days.map(d => d.date).join("|")]);
 
   useEffect(() => {
     async function loadDetails() {
@@ -209,10 +293,10 @@ export default function WeeklyPlannerBoard() {
   const dayLoads = useMemo(() => days.map(day => {
     const load = (day.blocks || []).reduce((acc, block) => {
       const session = block.session_id ? blockSession(block, sessionsById) : null;
-      return session ? addLoads(acc, sessionLoad(session)) : acc;
+      return session ? addLoads(acc, sessionLoad(session, historicalAverages)) : acc;
     }, {});
     return { ...load, day: dayName(day.date).slice(0, 3), date: day.date };
-  }), [days, sessionsById]);
+  }), [days, sessionsById, historicalAverages]);
 
   const summary = useMemo(() => {
     const total = dayLoads.reduce((sum, d) => sum + (d.player_load || 0), 0);
@@ -248,11 +332,19 @@ export default function WeeklyPlannerBoard() {
   }
   function addDay() { setDays(prev => [...prev, emptyDay(moment(prev[prev.length - 1]?.date || startDate).add(1, "days").format("YYYY-MM-DD"), prev.length)]); }
   function removeDay() { if (days.length > 1) setDays(prev => prev.slice(0, -1)); }
+  function setMicrocycleLength(length) {
+    const safeLength = Math.max(1, Math.min(10, Number(length) || 7));
+    setDayCount(safeLength);
+    const endDate = moment(startDate).add(safeLength - 1, "days");
+    setMeta(prev => ({ ...prev, range_label: `${moment(startDate).format("DD/MM/YYYY")} - ${endDate.format("DD/MM/YYYY")}` }));
+    setDays(prev => Array.from({ length: safeLength }, (_, i) => prev[i] || emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
+  }
   function shiftWeek(delta) { setStartDate(moment(startDate).add(delta * days.length, "days").format("YYYY-MM-DD")); }
   function applyTemplate(id) {
     const tpl = MICROCycle_TEMPLATES.find(t => t.id === id);
     if (!tpl) return;
-    setMeta(prev => ({ ...prev, week_type: tpl.type }));
+    setDayCount(tpl.days.length);
+    setMeta(prev => ({ ...prev, week_type: tpl.type, range_label: `${moment(startDate).format("DD/MM/YYYY")} - ${moment(startDate).add(tpl.days.length - 1, "days").format("DD/MM/YYYY")}` }));
     setDays(tpl.days.map((md, i) => {
       const objective = tpl.objectives[i] || "Campo";
       return { date: moment(startDate).add(i, "days").format("YYYY-MM-DD"), md, blocks: (TEMPLATE_BLOCKS[objective] || [{ type: "Campo", title: objective, content: "" }]).map(b => ({ ...emptyBlock(b.type, b.content), title: b.title })) };
@@ -298,6 +390,7 @@ export default function WeeklyPlannerBoard() {
       <div className="flex gap-2 flex-wrap items-center">
         <button onClick={() => shiftWeek(-1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronLeft size={16} /></button>
         <button onClick={() => shiftWeek(1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronRight size={16} /></button>
+        <select value={days.length} onChange={e => setMicrocycleLength(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n} días</option>)}</select>
         <select value="" onChange={e => { if (e.target.value) applyTemplate(e.target.value); e.target.value = ""; }} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Plantillas de microciclo</option>{MICROCycle_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         {savedPlans.length > 0 && <select value="" onChange={e => e.target.value && setStartDate(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Planes guardados</option>{savedPlans.map(plan => <option key={plan.id} value={plan.week_start}>{moment(plan.week_start).format("DD/MM/YYYY")}</option>)}</select>}
         <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-2"><Sparkles size={14} /> {aiLoading ? "Creando..." : "Crear con IA"}</button>
@@ -306,13 +399,12 @@ export default function WeeklyPlannerBoard() {
       </div>
     </header>
 
-    <MicrocycleTopSummary meta={meta} activeSquad={activeSquad} activeSeasonId={activeSeasonId} startDateLabel={meta.range_label} summary={summary} />
-    <MicrocycleMetricCards summary={summary} compactNumber={compactNumber} />
+    <MicrocycleTopSummary meta={meta} activeSquad={activeSquad} activeSeasonId={activeSeasonId} startDateLabel={meta.range_label} nextMatch={nextMatch} dayCount={days.length} />
 
     <section className="grid grid-cols-1 xl:grid-cols-[96px_1fr_128px] gap-3 items-start">
       <MicrocycleAreaLegend summary={summary} />
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-2 overflow-x-auto">
+        <div className="grid gap-2 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(140px, 1fr))` }}>
           {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} dayLoad={dayLoads[dayIdx] || {}} mdOptions={MD_OPTIONS} blockTypes={BLOCK_TYPES} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} updateBlock={updateBlock} duplicateBlock={duplicateBlock} deleteBlock={deleteBlock} selectSession={selectSession} addBlock={addBlock} />)}
         </div>
       </DragDropContext>
