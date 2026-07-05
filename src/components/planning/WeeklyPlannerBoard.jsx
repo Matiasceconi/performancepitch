@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { DragDropContext } from "@hello-pangea/dnd";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Calendar, ChevronLeft, ChevronRight, Copy, Download, GripVertical, Layers, Plus, Printer, Save, Sparkles, Trash2, X } from "lucide-react";
 import moment from "moment";
@@ -8,6 +8,10 @@ import "moment/locale/es";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { MICROCycle_TEMPLATES, TEMPLATE_BLOCKS } from "@/components/planning/microcycleTemplates";
+import MicrocycleTopSummary from "@/components/planning/MicrocycleTopSummary";
+import MicrocycleMetricCards from "@/components/planning/MicrocycleMetricCards";
+import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
+import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
 
 moment.locale("es");
 
@@ -283,67 +287,46 @@ export default function WeeklyPlannerBoard() {
   if (exportMode) return <MicrocycleExportView days={days} meta={meta} dayLoads={dayLoads} summary={autoText} onExit={() => setExportMode(false)} />;
   if (loading) return <div className="h-64 flex items-center justify-center"><div className="w-7 h-7 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
-  return <div className="space-y-6">
+  return <div className="min-h-screen bg-zinc-50 text-zinc-950 -m-6 p-6 space-y-3">
     <input ref={aiInputRef} type="file" className="hidden" accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.png,.jpg,.jpeg" onChange={e => handleAiFile(e.target.files?.[0])} />
-    <section className="rounded-2xl border border-zinc-800 bg-gradient-to-br from-zinc-950 via-zinc-900 to-emerald-950/40 p-5 shadow-2xl">
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div><p className="text-emerald-400 text-xs font-black uppercase tracking-widest">Centro de planificación del cuerpo técnico</p><h2 className="text-2xl font-black text-white mt-1">Microciclo editable</h2><p className="text-zinc-500 text-sm mt-1">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"}</p></div>
-        <div className="flex gap-2 flex-wrap">
-          <button onClick={() => shiftWeek(-1)} className="p-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300"><ChevronLeft size={16} /></button>
-          <button onClick={() => shiftWeek(1)} className="p-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300"><ChevronRight size={16} /></button>
-          {savedPlans.length > 0 && <select value="" onChange={e => e.target.value && setStartDate(e.target.value)} className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-zinc-300 text-sm"><option value="">Buscar microciclo...</option>{savedPlans.map(plan => <option key={plan.id} value={plan.week_start}>{moment(plan.week_start).format("DD/MM/YYYY")}</option>)}</select>}
-          <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-bold flex items-center gap-2"><Sparkles size={15} /> {aiLoading ? "Creando..." : "Crear microciclo con IA"}</button>
-          <button onClick={save} disabled={saving} className="px-3 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex items-center gap-2"><Save size={15} /> {saving ? "Guardando..." : "Guardar"}</button>
-          <button onClick={() => setExportMode(true)} className="px-3 py-2 rounded-xl bg-zinc-100 text-zinc-950 text-sm font-bold flex items-center gap-2"><Download size={15} /> Vista exportación</button>
-        </div>
-      </div>
-      <div className="grid grid-cols-1 md:grid-cols-5 gap-3 mt-5">
-        <label className="space-y-1"><span className="text-xs text-zinc-500">Semana del año</span><input value={meta.week_number} onChange={e => setMeta({ ...meta, week_number: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white" /></label>
-        <label className="space-y-1"><span className="text-xs text-zinc-500">Rango de fechas</span><input value={meta.range_label} onChange={e => setMeta({ ...meta, range_label: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white" /></label>
-        <label className="space-y-1"><span className="text-xs text-zinc-500">Próximo partido</span><input value={meta.next_match} onChange={e => setMeta({ ...meta, next_match: e.target.value })} placeholder="Ej: vs River" className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white" /></label>
-        <label className="space-y-1"><span className="text-xs text-zinc-500">Día actual</span><select value={meta.current_md} onChange={e => setMeta({ ...meta, current_md: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white">{MD_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></label>
-        <label className="space-y-1"><span className="text-xs text-zinc-500">Tipo de semana</span><select value={meta.week_type} onChange={e => setMeta({ ...meta, week_type: e.target.value })} className="w-full bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white">{WEEK_TYPES.map(o => <option key={o}>{o}</option>)}</select></label>
-      </div>
-    </section>
 
-    <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
-      {[{ label: "Carga semanal", value: compactNumber(summary.total), sub: "Player Load estimado" }, { label: "Pico de carga", value: summary.peak?.day || "—", sub: compactNumber(summary.peak?.player_load) }, { label: "Día recuperación", value: summary.recovery?.date ? dayName(summary.recovery.date).slice(0, 3) : "—", sub: summary.recovery?.md || "" }, { label: "Campo", value: summary.field, sub: "bloques / sesiones" }, { label: "Gimnasio", value: summary.gym, sub: "bloques / sesiones" }, { label: "Estado", value: summary.status, sub: "automático" }].map(card => <div key={card.label} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><p className="text-xs text-zinc-500 font-bold uppercase">{card.label}</p><p className="text-2xl font-black text-white mt-2">{card.value}</p><p className="text-xs text-emerald-400 mt-1">{card.sub}</p></div>)}
-    </div>
-
-    <section className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <div><h3 className="text-white font-black text-lg">Plantillas inteligentes</h3><p className="text-zinc-500 text-sm">Generan estructura, días MD y bloques iniciales.</p></div>
-        <div className="flex gap-2 flex-wrap"><select onChange={e => applyTemplate(e.target.value)} defaultValue="" className="bg-zinc-900 border border-zinc-700 rounded-xl px-3 py-2 text-white text-sm"><option value="" disabled>Aplicar plantilla...</option>{MICROCycle_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select><button onClick={addDay} className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm flex items-center gap-2"><Plus size={14} /> Día</button><button onClick={removeDay} className="px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-700 text-zinc-300 text-sm flex items-center gap-2"><X size={14} /> Quitar</button></div>
+    <header className="bg-white border border-zinc-200 rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex items-center gap-3">
+        <div className="w-9 h-9 rounded-lg bg-slate-950 text-white flex items-center justify-center font-black text-xs">PP</div>
+        <div><h1 className="text-lg font-black tracking-tight">PLANIFICADOR DE MICROCICLO</h1><p className="text-xs text-zinc-500">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"}</p></div>
       </div>
+      <div className="flex gap-2 flex-wrap items-center">
+        <button onClick={() => shiftWeek(-1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronLeft size={16} /></button>
+        <button onClick={() => shiftWeek(1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronRight size={16} /></button>
+        <select value="" onChange={e => { if (e.target.value) applyTemplate(e.target.value); e.target.value = ""; }} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Plantillas de microciclo</option>{MICROCycle_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
+        {savedPlans.length > 0 && <select value="" onChange={e => e.target.value && setStartDate(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Planes guardados</option>{savedPlans.map(plan => <option key={plan.id} value={plan.week_start}>{moment(plan.week_start).format("DD/MM/YYYY")}</option>)}</select>}
+        <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-2"><Sparkles size={14} /> {aiLoading ? "Creando..." : "Crear con IA"}</button>
+        <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-black flex items-center gap-2"><Save size={14} /> {saving ? "Guardando..." : "Guardar"}</button>
+        <button onClick={() => setExportMode(true)} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-black flex items-center gap-2"><Download size={14} /> Exportar / Compartir</button>
+      </div>
+    </header>
+
+    <MicrocycleTopSummary meta={meta} activeSquad={activeSquad} activeSeasonId={activeSeasonId} startDateLabel={meta.range_label} summary={summary} />
+    <MicrocycleMetricCards summary={summary} compactNumber={compactNumber} />
+
+    <section className="grid grid-cols-1 xl:grid-cols-[96px_1fr_128px] gap-3 items-start">
+      <MicrocycleAreaLegend summary={summary} />
       <DragDropContext onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 xl:grid-cols-7 gap-3">
-          {days.map((day, dayIdx) => <div key={dayIdx} className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden min-w-0">
-            <div className="bg-zinc-800/80 p-3 border-b border-zinc-700"><div className="flex items-center justify-between"><div><p className="text-xs text-emerald-400 font-black">{dayName(day.date)}</p><input type="date" value={day.date} onChange={e => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-white text-sm font-bold focus:outline-none" /></div><select value={day.md} onChange={e => updateDay(dayIdx, { md: e.target.value })} className="bg-zinc-900 border border-zinc-700 rounded-lg text-white text-xs px-2 py-1">{MD_OPTIONS.map(o => <option key={o}>{o}</option>)}</select></div>
-              <div className="grid grid-cols-3 gap-1 mt-3 text-[10px] text-zinc-400"><span>DT {compactNumber(dayLoads[dayIdx]?.total_distance)}</span><span>+19 {compactNumber(dayLoads[dayIdx]?.distance_19_8)}</span><span>+25 {compactNumber(dayLoads[dayIdx]?.distance_25)}</span><span>ACC {compactNumber(dayLoads[dayIdx]?.acc_3)}</span><span>DEC {compactNumber(dayLoads[dayIdx]?.dec_3)}</span><span>PL {compactNumber(dayLoads[dayIdx]?.player_load)}</span></div></div>
-            <Droppable droppableId={String(dayIdx)}>
-              {(provided) => <div ref={provided.innerRef} {...provided.droppableProps} className="p-3 space-y-2 min-h-[180px]">
-                {(day.blocks || []).map((block, index) => <Draggable key={block.id} draggableId={block.id} index={index}>{(dragProvided) => <div ref={dragProvided.innerRef} {...dragProvided.draggableProps} className="rounded-xl border border-zinc-700 bg-zinc-950 p-3" style={{ borderLeft: `4px solid ${block.color}`, ...dragProvided.draggableProps.style }}>
-                  <div className="flex items-center gap-2 mb-2"><button {...dragProvided.dragHandleProps} className="text-zinc-500"><GripVertical size={14} /></button><input value={block.title} onChange={e => updateBlock(dayIdx, block.id, { title: e.target.value })} className="flex-1 bg-transparent text-white text-sm font-bold focus:outline-none" /><button onClick={() => duplicateBlock(dayIdx, block)} className="text-zinc-500 hover:text-white"><Copy size={13} /></button><button onClick={() => deleteBlock(dayIdx, block.id)} className="text-zinc-500 hover:text-red-400"><Trash2 size={13} /></button></div>
-                  <div className="grid grid-cols-2 gap-2 mb-2"><select value={block.type} onChange={e => updateBlock(dayIdx, block.id, { type: e.target.value, title: e.target.value, color: BLOCK_COLORS[e.target.value] || block.color })} className="bg-zinc-900 border border-zinc-700 rounded-lg text-zinc-300 text-xs px-2 py-1">{BLOCK_TYPES.map(t => <option key={t}>{t}</option>)}</select><input type="color" value={block.color || "#52525b"} onChange={e => updateBlock(dayIdx, block.id, { color: e.target.value })} className="w-full h-8 bg-zinc-900 border border-zinc-700 rounded-lg" /></div>
-                  <textarea value={block.content || ""} onChange={e => updateBlock(dayIdx, block.id, { content: e.target.value })} placeholder="Escribir planificación..." rows={3} className="w-full bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 text-xs p-2 resize-none focus:outline-none focus:border-emerald-700" />
-                  <select value={block.session_id || ""} onChange={e => selectSession(dayIdx, block.id, e.target.value)} className="w-full mt-2 bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-300 text-xs px-2 py-2"><option value="">Vincular sesión creada...</option>{sessionLibrary.map(s => <option key={s.id} value={s.id}>{s.date ? `${moment(s.date).format("DD/MM")} · ` : ""}{s.title}</option>)}</select>
-                  {block.session_id && blockSession(block, sessionsById) && (() => {
-                    const shownSession = blockSession(block, sessionsById);
-                    return <div className="mt-2 rounded-lg bg-emerald-950/30 border border-emerald-900/40 p-2 text-xs text-emerald-100"><p className="font-bold">{shownSession.title}</p><p className="text-emerald-300">{shownSession.duration_minutes || "—"} min · {shownSession.objective || shownSession.session_objective || "Objetivo sin definir"}</p>{(sessionDetails[block.session_id]?.exercises || []).slice(0, 3).map(ex => <p key={ex.id} className="text-zinc-300 truncate">• {ex.name}</p>)}<label className="mt-2 flex items-center gap-2 text-[11px]"><input type="checkbox" checked={block.auto_sync !== false} onChange={e => updateBlock(dayIdx, block.id, { auto_sync: e.target.checked })} /> Actualizar si cambia la sesión</label></div>;
-                  })()}
-                </div>}</Draggable>)}
-                {provided.placeholder}
-                <select onChange={e => { if (e.target.value) addBlock(dayIdx, e.target.value); e.target.value = ""; }} defaultValue="" className="w-full bg-zinc-800 border border-dashed border-zinc-700 rounded-xl text-zinc-400 text-xs px-3 py-2"><option value="" disabled>+ Agregar bloque</option>{BLOCK_TYPES.map(t => <option key={t}>{t}</option>)}</select>
-              </div>}
-            </Droppable>
-          </div>)}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-7 gap-2 overflow-x-auto">
+          {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} dayLoad={dayLoads[dayIdx] || {}} mdOptions={MD_OPTIONS} blockTypes={BLOCK_TYPES} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} updateBlock={updateBlock} duplicateBlock={duplicateBlock} deleteBlock={deleteBlock} selectSession={selectSession} addBlock={addBlock} />)}
         </div>
       </DragDropContext>
+      <aside className="bg-slate-950 text-white rounded-xl p-3 shadow-sm h-fit sticky top-3">
+        <p className="text-[10px] font-black uppercase text-slate-400 mb-3">Resumen semanal</p>
+        <div className="space-y-3 text-xs"><p><b>Pico neuromuscular:</b><br />{summary.peak?.day || "—"}</p><p><b>Pico metabólico:</b><br />{summary.peak?.day || "—"}</p><p><b>Recuperación:</b><br />{summary.recovery?.date ? dayName(summary.recovery.date) : "—"}</p></div>
+      </aside>
     </section>
 
-    <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-      <div className="xl:col-span-2 rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex items-center justify-between mb-4"><div><h3 className="text-white font-black">Distribución semanal de carga</h3><p className="text-zinc-500 text-sm">Calculada desde las sesiones vinculadas.</p></div><div className="flex gap-1 bg-zinc-950 rounded-xl p-1">{GRAPH_TYPES.map(g => <button key={g.id} onClick={() => setGraphType(g.id)} className={`px-3 py-1.5 rounded-lg text-xs font-bold ${graphType === g.id ? "bg-emerald-600 text-white" : "text-zinc-400"}`}>{g.label}</button>)}</div></div><LoadChart data={dayLoads} type={graphType} /></div>
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex items-center gap-2 mb-3"><Layers size={18} className="text-emerald-400" /><h3 className="text-white font-black">Resumen automático</h3></div><p className="text-sm text-zinc-300 leading-relaxed whitespace-pre-wrap">{autoText}</p><div className="mt-4 rounded-xl bg-zinc-950 border border-zinc-800 p-3 text-xs text-zinc-500"><Calendar size={14} className="inline mr-1" /> La información queda guardada en Plan Semanal y se mantiene disponible para dashboard, calendario, sesiones y exportaciones.</div></div>
+    <section className="bg-white border border-zinc-200 rounded-xl shadow-sm p-4">
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2"><div><h3 className="font-black text-zinc-950">Carga externa</h3><p className="text-xs text-zinc-500">Distribución conectada a sesiones y cargas esperadas.</p></div><div className="flex gap-1 bg-zinc-100 rounded-lg p-1">{GRAPH_TYPES.map(g => <button key={g.id} onClick={() => setGraphType(g.id)} className={`px-3 py-1.5 rounded-md text-xs font-black ${graphType === g.id ? "bg-white text-blue-700 shadow-sm" : "text-zinc-500"}`}>{g.label}</button>)}</div></div>
+      <LoadChart data={dayLoads} type={graphType} clean />
     </section>
+
+    <footer className="flex items-center justify-between gap-3 flex-wrap text-xs text-zinc-500 px-2"><span>ⓘ Esta planificación está conectada con las sesiones, ejercicios y cargas esperadas.</span><div className="flex gap-2"><button className="px-4 py-2 bg-white border border-zinc-200 rounded-lg font-bold text-zinc-600">Ver carga acumulada</button><button onClick={() => setExportMode(true)} className="px-4 py-2 bg-white border border-zinc-200 rounded-lg font-bold text-zinc-600">Ver reporte semanal</button></div></footer>
   </div>;
 }
