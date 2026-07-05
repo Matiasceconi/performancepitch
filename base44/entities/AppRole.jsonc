@@ -16,7 +16,7 @@
         "type": "string"
       },
       "default": [],
-      "description": "IDs de \u00e1reas de trabajo a las que da acceso este rol (ver areasConfig.js)"
+      "description": "\u00c1reas organizativas asociadas al rol. No determinan la navegaci\u00f3n por m\u00f3dulos."
     },
     "allowed_pages": {
       "type": "array",
@@ -24,37 +24,42 @@
         "type": "string"
       },
       "default": [],
-      "description": "Rutas (paths) que este rol puede ver dentro de sus \u00e1reas"
+      "description": "Rutas visibles derivadas de los m\u00f3dulos con permiso Ver; se conserva por compatibilidad."
+    },
+    "module_permissions": {
+      "type": "object",
+      "default": {},
+      "description": "Permisos independientes por m\u00f3dulo: module_id -> {can_view, can_create, can_edit, can_delete, can_export, can_admin}"
     },
     "can_view": {
       "type": "boolean",
       "default": true,
-      "description": "Puede ver las p\u00e1ginas asignadas"
+      "description": "Permiso global legado: puede ver p\u00e1ginas asignadas"
     },
     "can_create": {
       "type": "boolean",
       "default": false,
-      "description": "Puede crear registros"
+      "description": "Permiso global legado: puede crear registros"
     },
     "can_edit": {
       "type": "boolean",
       "default": false,
-      "description": "Puede editar registros"
+      "description": "Permiso global legado: puede editar registros"
     },
     "can_delete": {
       "type": "boolean",
       "default": false,
-      "description": "Puede eliminar registros"
+      "description": "Permiso global legado: puede eliminar registros"
     },
     "can_export": {
       "type": "boolean",
       "default": false,
-      "description": "Puede exportar datos/reportes"
+      "description": "Permiso global legado: puede exportar datos/reportes"
     },
     "can_admin": {
       "type": "boolean",
       "default": false,
-      "description": "Acceso total de administrador (todas las \u00e1reas y p\u00e1ginas, sin restricciones)"
+      "description": "Acceso total de administrador a todos los m\u00f3dulos"
     },
     "active": {
       "type": "boolean",

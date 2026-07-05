@@ -1,6 +1,5 @@
-// Configuración estática de Áreas de Trabajo y catálogo de páginas del sistema.
-// Los ROLES ahora son dinámicos (entidad AppRole, gestionados desde Administración → Roles, Áreas y Permisos).
-// Cada AppRole define: areas[] + allowed_pages[] + permisos por acción.
+// Configuración de áreas, módulos y catálogo de páginas del sistema.
+// La navegación y los permisos se basan en módulos independientes, no en categorías padre.
 
 export const AREAS = [
   { id: "cuerpo_tecnico",       name: "Cuerpo Técnico",       description: "Sesiones, partidos, plantel y táctica",        icon: "Users" },
@@ -13,24 +12,39 @@ export const AREAS = [
   { id: "administracion",       name: "Administración",       description: "Usuarios, roles, planteles y configuración",  icon: "Settings2" },
 ];
 
-// Catálogo de páginas del sistema (path + etiqueta) usado para armar roles y validar accesos.
+export const MODULE_ACTIONS = [
+  { key: "can_view", label: "Ver" },
+  { key: "can_create", label: "Crear" },
+  { key: "can_edit", label: "Editar" },
+  { key: "can_delete", label: "Eliminar" },
+  { key: "can_export", label: "Exportar" },
+  { key: "can_admin", label: "Administrar" },
+];
+
+export const MODULES = [
+  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "sesiones", label: "Sesiones", path: "/sessions" },
+  { id: "partidos", label: "Partidos", path: "/matches" },
+  { id: "mapa_tactico", label: "Mapa Táctico", path: "/tactical" },
+  { id: "carga_externa", label: "Carga Externa", path: "/performance/external-load" },
+  { id: "carga_interna", label: "Carga Interna", path: "/performance/internal-load" },
+  { id: "area_medica", label: "Área Médica", path: "/performance/medical" },
+  { id: "nutricion", label: "Nutrición", path: "/performance/nutrition" },
+  { id: "minutos_jugados", label: "Minutos Jugados", path: "/performance/minutes" },
+  { id: "calendario", label: "Calendario", path: "/schedule" },
+  { id: "plan_semanal", label: "Plan Semanal", path: "/weekly-planner" },
+  { id: "estado_plantel", label: "Estado del Plantel", path: "/daily-squad" },
+  { id: "biblioteca_campo", label: "Biblioteca Campo", path: "/field-library" },
+  { id: "biblioteca_fuerza", label: "Biblioteca Fuerza", path: "/strength-library" },
+  { id: "cuerpo_tecnico", label: "Cuerpo Técnico", path: "/team" },
+  { id: "configuracion", label: "Configuración", path: "/admin" },
+];
+
 export const PAGES = [
-  { path: "/",                              label: "Dashboard" },
-  { path: "/daily-squad",                   label: "Estado del Plantel" },
-  { path: "/sessions",                      label: "Sesiones" },
-  { path: "/field-library",                 label: "Biblioteca Campo" },
-  { path: "/strength-library",              label: "Biblioteca Fuerza" },
-  { path: "/matches",                       label: "Partidos" },
-  { path: "/tactical",                      label: "Mapa táctico" },
-  { path: "/performance/external-load",     label: "Carga Externa (GPS)" },
-  { path: "/performance/microcycle-history", label: "Histórico de Microciclos" },
-  { path: "/performance/internal-load",     label: "Carga Interna" },
-  { path: "/performance/medical",           label: "Área Médica" },
-  { path: "/performance/nutrition",         label: "Nutrición" },
-  { path: "/performance/minutes",           label: "Minutos Jugados" },
-  { path: "/schedule",                      label: "Calendario" },
-  { path: "/team",                          label: "Cuerpo Técnico (Staff)" },
-  { path: "/weekly-planner",                label: "Plan Semanal" },
-  { path: "/squad-manager",                 label: "Planteles" },
-  { path: "/admin",                         label: "Administración" },
+  ...MODULES.map((m) => ({ path: m.path, label: m.label, module_id: m.id })),
+  { path: "/performance/microcycle-history", label: "Histórico de Microciclos", module_id: "carga_externa" },
+  { path: "/squad-manager", label: "Planteles", module_id: "configuracion" },
+  { path: "/users-access", label: "Accesos de Usuarios", module_id: "configuracion" },
+  { path: "/player-names", label: "Gestión de Nombres", module_id: "configuracion" },
+  { path: "/plantil-diagnostic", label: "Diagnóstico de Plantel", module_id: "configuracion" },
 ];

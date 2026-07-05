@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
 import AreaSelectScreen from "@/components/workspace/AreaSelectScreen";
-import { AREAS } from "@/lib/areasConfig";
+import { AREAS, PAGES, MODULE_ACTIONS } from "@/lib/areasConfig";
 
 const WorkspaceContext = createContext(null);
 
@@ -16,7 +16,9 @@ export function WorkspaceProvider({ children }) {
   const [userAccess, setUserAccess] = useState(null);
   const [roleNames, setRoleNames] = useState([]);
   const [permissions, setPermissions] = useState(EMPTY_PERMS);
-  const [pagesByArea, setPagesByArea] = useState({}); // areaId -> [paths]
+  const [modulePermissions, setModulePermissions] = useState({});
+  const [allowedPages, setAllowedPages] = useState([]);
+  const [pagesByArea, setPagesByArea] = useState({}); // compatibilidad: areaId -> [paths]
   const [loadingWorkspace, setLoadingWorkspace] = useState(true);
   const [workspaceError, setWorkspaceError] = useState(null);
   const [needSquadSelection, setNeedSquadSelection] = useState(false);
@@ -92,24 +94,28 @@ export function WorkspaceProvider({ children }) {
       if (resolvedAdmin) adminLockRef.current = true;
       setAdminAccess(adminLockRef.current);
 
-      // 6. Merge areas + allowed pages per area across all assigned roles
+      // 6. Merge modules, pages and organizational areas across assigned roles.
+      // Navigation is module-based and no longer depends on a parent category like "Rendimiento".
       const allowedAreaIds = new Set();
       const pagesMap = {};
+      const allowedPageSet = new Set();
+      const mergedModulePermissions = {};
       roles.forEach(r => {
-        (r.areas || []).forEach(areaId => {
-          allowedAreaIds.add(areaId);
-          if (!pagesMap[areaId]) pagesMap[areaId] = new Set();
-          (r.allowed_pages || []).forEach(p => pagesMap[areaId].add(p));
+        (r.areas || []).forEach(areaId => allowedAreaIds.add(areaId));
+        (r.allowed_pages || []).forEach(p => allowedPageSet.add(p));
+        Object.entries(r.module_permissions || {}).forEach(([moduleId, perms]) => {
+          if (!mergedModulePermissions[moduleId]) mergedModulePermissions[moduleId] = {};
+          MODULE_ACTIONS.forEach(action => { mergedModulePermissions[moduleId][action.key] = !!mergedModulePermissions[moduleId][action.key] || !!perms?.[action.key]; });
         });
       });
+      PAGES.forEach(page => { if (mergedModulePermissions[page.module_id]?.can_view) allowedPageSet.add(page.path); });
       if (adminLockRef.current) {
-        AREAS.forEach(a => {
-          allowedAreaIds.add(a.id);
-          pagesMap[a.id] = new Set(["/", "/daily-squad", "/sessions", "/field-library", "/strength-library", "/matches", "/tactical",
-            "/performance/external-load", "/performance/microcycle-history", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes",
-            "/schedule", "/team", "/weekly-planner", "/squad-manager", "/admin"]);
-        });
+        AREAS.forEach(a => allowedAreaIds.add(a.id));
+        PAGES.forEach(page => allowedPageSet.add(page.path));
       }
+      AREAS.forEach(a => { pagesMap[a.id] = new Set(Array.from(allowedPageSet)); });
+      setModulePermissions(mergedModulePermissions);
+      setAllowedPages(Array.from(allowedPageSet));
       const pagesByAreaArrays = {};
       Object.entries(pagesMap).forEach(([areaId, set]) => { pagesByAreaArrays[areaId] = Array.from(set); });
       setPagesByArea(pagesByAreaArrays);
@@ -214,9 +220,15 @@ export function WorkspaceProvider({ children }) {
     ? squads
     : squads.filter(s => (userAccess?.squad_ids || []).includes(s.id));
 
-  function can(action) {
+  function can(action, path = null) {
     if (adminAccess) return true;
-    return !!permissions[`can_${action}`];
+    const key = `can_${action}`;
+    if (path) {
+      const page = PAGES.find(p => p.path === path);
+      const moduleId = page?.module_id;
+      if (moduleId && modulePermissions[moduleId]?.[key] !== undefined) return !!modulePermissions[moduleId][key];
+    }
+    return !!permissions[key];
   }
 
   function canAccessSquad(squadId) {
@@ -238,12 +250,11 @@ export function WorkspaceProvider({ children }) {
     setNeedAreaSelection(true);
   }
 
-  // Seguridad: valida si la página (path) puede verse desde el área activa y el rol del usuario.
-  // Administradores tienen acceso total, sin importar el área activa (bypass sticky).
+  // Seguridad: valida si una página puede verse por módulo independiente.
+  // Administradores tienen acceso total; ya no depende del área activa ni de un módulo padre.
   function canSeePath(path) {
     if (adminAccess) return true;
-    if (!activeAreaId) return false;
-    return (pagesByArea[activeAreaId] || []).includes(path);
+    return allowedPages.includes(path);
   }
 
   // ── Loading state (solo bloquea en la carga inicial de la sesión) ───────
@@ -307,17 +318,17 @@ export function WorkspaceProvider({ children }) {
     );
   }
 
-  // ── No areas assigned ────────────────────────────────────────────────────
-  if (!adminAccess && myAreas.length === 0) {
+  // ── No modules/areas assigned ───────────────────────────────────────────
+  if (!adminAccess && myAreas.length === 0 && allowedPages.length === 0) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
         <div className="w-full max-w-sm text-center space-y-4">
           <div className="w-12 h-12 rounded-full bg-yellow-500/10 border border-yellow-500/30 flex items-center justify-center mx-auto">
             <span className="text-yellow-400 text-xl">⚠</span>
           </div>
-          <h2 className="text-white font-bold text-lg">Sin roles/áreas asignadas</h2>
+          <h2 className="text-white font-bold text-lg">Sin módulos asignados</h2>
           <p className="text-zinc-400 text-sm">
-            Tu usuario no tiene ningún rol asignado. Contactá al administrador para que te asigne un rol en Administración → Roles, Áreas y Permisos.
+            Tu usuario no tiene módulos habilitados. Contactá al administrador para que te asigne permisos en Configuración.
           </p>
           <button
             onClick={() => base44.auth.logout(window.location.origin)}
@@ -391,6 +402,8 @@ export function WorkspaceProvider({ children }) {
       setActiveArea,
       requestAreaChange,
       canSeePath,
+      modulePermissions,
+      allowedPages,
       activeSquadId: activeSquad?.id || null,
       activeSquadName: activeSquad?.name || "",
       activeSeasonId: activeSquad?.season || null,
@@ -406,6 +419,8 @@ export function WorkspaceProvider({ children }) {
         can_admin: permissions.can_admin || false,
         admin_locked_for_session: adminLockRef.current,
         allowed_areas: myAreas.map(a => a.id),
+        allowed_pages: allowedPages,
+        module_permissions: modulePermissions,
         active_squad_id: activeSquad?.id || null,
         active_season_id: activeSquad?.season || null,
         loading_workspace: loadingWorkspace,
