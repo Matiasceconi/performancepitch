@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Nombre del plantel (desnormalizado)"
     },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada activa del plantel"
+    },
     "date": {
       "type": "string",
       "format": "date",
@@ -17,7 +21,15 @@
     },
     "time": {
       "type": "string",
-      "description": "Hora del evento (HH:MM)"
+      "description": "Hora principal del evento (HH:MM), compatible con calendario existente"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Hora de inicio detectada (HH:MM)"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "Hora de fin detectada (HH:MM)"
     },
     "title": {
       "type": "string",
@@ -25,7 +37,11 @@
     },
     "type": {
       "type": "string",
-      "description": "Tipo de evento (Comida, Viaje, Partido...)"
+      "description": "Tipo de evento compatible con calendario existente"
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Tipo normalizado del evento: Entrenamiento, Partido, Descanso, Viaje, Comida, Video, Gimnasio, Cancha, Reuni\u00f3n, Otro"
     },
     "duration_minutes": {
       "type": "number",
@@ -44,9 +60,40 @@
       "description": "Color del evento",
       "default": "blue"
     },
+    "rival": {
+      "type": "string",
+      "description": "Rival detectado si el evento es Partido"
+    },
+    "home_away": {
+      "type": "string",
+      "enum": [
+        "Local",
+        "Visitante",
+        "Neutral",
+        ""
+      ],
+      "description": "Condici\u00f3n del partido si se detecta"
+    },
     "rival_logo_url": {
       "type": "string",
       "description": "URL del escudo rival (para eventos de partido)"
+    },
+    "source_file": {
+      "type": "string",
+      "description": "URL del archivo de origen importado"
+    },
+    "source_file_name": {
+      "type": "string",
+      "description": "Nombre del archivo de origen"
+    },
+    "created_by_ai": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si el evento fue creado desde Importar cronograma con IA"
+    },
+    "import_key": {
+      "type": "string",
+      "description": "Clave de upsert: plantel + fecha + hora + tipo"
     }
   },
   "required": [

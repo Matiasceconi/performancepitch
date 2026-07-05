@@ -71,7 +71,7 @@ function emptyDay(date) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function WeeklyPlannerBoard() {
   const { toast } = useToast();
-  const { activeSquadId, activeSquad } = useWorkspace();
+  const { activeSquadId, activeSquad, activeSeasonId } = useWorkspace();
 
   // El plan se identifica por la fecha del primer día
   const [startDate, setStartDate] = useState(moment().startOf("isoWeek").format("YYYY-MM-DD"));
@@ -90,10 +90,10 @@ export default function WeeklyPlannerBoard() {
   useEffect(() => {
     async function loadSavedPlans() {
       const all = await base44.entities.WeeklyPlan.list("-week_start", 100);
-      setSavedPlans(activeSquadId ? all.filter(r => r.squad_id === activeSquadId) : all);
+      setSavedPlans(activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all);
     }
     loadSavedPlans();
-  }, [activeSquadId, recordId]);
+  }, [activeSquadId, activeSeasonId, recordId]);
 
   // Cargar sesiones reales de Sesiones para reflejarlas en la planificación
   useEffect(() => {
@@ -106,11 +106,12 @@ export default function WeeklyPlannerBoard() {
       const all = await base44.entities.TrainingSession.list("-date", 200);
       setSquadSessions(all.filter(s =>
         (!activeSquadId || s.squad_id === activeSquadId) &&
+        (!activeSeasonId || !s.season_id || s.season_id === activeSeasonId) &&
         s.date >= minDate && s.date <= maxDate
       ));
     }
     loadSessions();
-  }, [startDate, days.length, activeSquadId]);
+  }, [startDate, days.length, activeSquadId, activeSeasonId]);
 
   const sessionsByDate = useMemo(() => {
     const map = {};
@@ -142,8 +143,8 @@ export default function WeeklyPlannerBoard() {
         // Buscar planes de esta semana del plantel activo
         const all = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
         const records = activeSquadId
-          ? all.filter(r => r.squad_id === activeSquadId)
-          : all;
+        ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId))
+        : all;
         if (records.length > 0) {
           const rec = records[0];
           setRecordId(rec.id);
@@ -164,7 +165,7 @@ export default function WeeklyPlannerBoard() {
       }
     }
     load();
-  }, [startDate, activeSquadId]);
+  }, [startDate, activeSquadId, activeSeasonId]);
 
   function buildDays(start, count) {
     return Array.from({ length: count }, (_, i) =>
@@ -219,7 +220,7 @@ export default function WeeklyPlannerBoard() {
   async function save() {
     setSaving(true);
     try {
-      const payload = { days_data: days, week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "" };
+      const payload = { days_data: days, week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "" };
       if (recordId) {
         await base44.entities.WeeklyPlan.update(recordId, payload);
       } else {
@@ -356,6 +357,21 @@ export default function WeeklyPlannerBoard() {
                           <span className={`text-[9px] font-semibold px-2 py-0.5 rounded-full border ${col.bg} ${col.text} ${col.border}`}>
                             {d.objetivo}
                           </span>
+                        )}
+                        {(d.has_match || d.has_trip || d.has_rest || d.has_training) && (
+                          <div className="flex flex-wrap gap-1 justify-center">
+                            {d.has_match && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-red-900/50 text-red-300 border border-red-700/50">Partido</span>}
+                            {d.has_trip && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-violet-900/50 text-violet-300 border border-violet-700/50">Viaje</span>}
+                            {d.has_rest && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-cyan-900/50 text-cyan-300 border border-cyan-700/50">Descanso</span>}
+                            {d.has_training && <span className="text-[8px] px-1.5 py-0.5 rounded-full bg-emerald-900/50 text-emerald-300 border border-emerald-700/50">Entreno</span>}
+                          </div>
+                        )}
+                        {(d.calendar_events || []).length > 0 && (
+                          <div className="w-full max-w-[130px] space-y-0.5">
+                            {(d.calendar_events || []).slice(0, 3).map((ev, ei) => (
+                              <p key={ei} className="text-[8px] text-zinc-300 bg-zinc-800/70 border border-zinc-700 rounded px-1 py-0.5 truncate">{ev.time ? `${ev.time} · ` : ""}{ev.title}</p>
+                            ))}
+                          </div>
                         )}
                         {sessionsByDate[d.date]?.length > 0 && (
                           <Link to={`/sessions?session=${sessionsByDate[d.date][0].id}`}

@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, FileText, Copy, ArrowUp, ArrowDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, FileText, Copy, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
 import { jsPDF } from "jspdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
 
 moment.locale("es");
 
@@ -22,7 +23,7 @@ const COLOR_MAP = {
 const COLORS = ["blue","green","yellow","orange","red","purple","pink","cyan"];
 const COLOR_LABELS = { blue:"Azul", green:"Verde", yellow:"Amarillo", orange:"Naranja", red:"Rojo", purple:"Violeta", pink:"Rosa", cyan:"Celeste" };
 
-const EMPTY_FORM = { date: "", time: "", title: "", type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival_logo_url: "" };
+const EMPTY_FORM = { date: "", time: "", start_time: "", end_time: "", title: "", type: "", event_type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival: "", home_away: "", rival_logo_url: "" };
 
 const DAY_NAMES_ES = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const DAY_NAMES_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -69,76 +70,91 @@ function buildWeekPDF(days, eventsForDate, weekLabel) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
+  const typeColor = (ev) => {
+    const t = ev.event_type || ev.type || "";
+    if (t === "Partido") return "#dc2626";
+    if (t === "Descanso") return "#0891b2";
+    if (t === "Viaje") return "#7c3aed";
+    return COLOR_MAP[ev.color]?.hex || "#16a34a";
+  };
+  const hexToRgb = (hex) => [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
 
-  // Header
-  doc.setFillColor(20, 20, 20);
+  doc.setFillColor(255, 255, 255);
   doc.rect(0, 0, pw, ph, "F");
-  doc.setFillColor(34, 197, 94);
-  doc.rect(0, 0, pw, 14, "F");
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(11);
+  doc.setFillColor(0, 90, 52);
+  doc.rect(0, 0, pw, 18, "F");
+  doc.setFillColor(240, 200, 0);
+  doc.rect(0, 18, pw, 2, "F");
+  doc.setFillColor(255, 255, 255);
+  doc.circle(14, 10, 6, "F");
+  doc.setTextColor(0, 90, 52);
   doc.setFont("helvetica", "bold");
-  doc.text("CRONOGRAMA", 8, 9);
-  doc.setFontSize(9);
+  doc.setFontSize(7);
+  doc.text("DYJ", 14, 12, { align: "center" });
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.text("CALENDARIO SEMANAL", 24, 9);
+  doc.setFontSize(8);
   doc.setFont("helvetica", "normal");
-  doc.text(weekLabel, pw / 2, 9, { align: "center" });
+  doc.text(weekLabel, 24, 14);
 
-  const colW = (pw - 16) / days.length;
-  const startY = 18;
-  const headerH = 10;
-
-  // Day headers
-  days.forEach((d, i) => {
-    const x = 8 + i * colW;
-    doc.setFillColor(40, 40, 40);
-    doc.rect(x, startY, colW - 1, headerH, "F");
+  const legend = [["Partido", "#dc2626"], ["Descanso", "#0891b2"], ["Viaje", "#7c3aed"], ["Actividad", "#16a34a"]];
+  legend.forEach(([label, color], i) => {
+    const [r, g, b] = hexToRgb(color);
+    const x = pw - 72 + i * 18;
+    doc.setFillColor(r, g, b);
+    doc.roundedRect(x, 7, 4, 4, 1, 1, "F");
     doc.setTextColor(255, 255, 255);
-    doc.setFontSize(8);
-    doc.setFont("helvetica", "bold");
-    const label = d.format("dddd D").toUpperCase();
-    doc.text(label, x + colW / 2 - 0.5, startY + 7, { align: "center" });
+    doc.setFontSize(6);
+    doc.text(label, x + 5, 10.5);
   });
 
-  // Events
-  const evY = startY + headerH + 2;
-  const rowH = 9;
-  const maxRows = Math.floor((ph - evY - 8) / rowH);
-  const hexToRgb = (hex) => {
-    const r = parseInt(hex.slice(1,3),16);
-    const g = parseInt(hex.slice(3,5),16);
-    const b = parseInt(hex.slice(5,7),16);
-    return [r,g,b];
-  };
+  const colW = (pw - 16) / days.length;
+  const startY = 26;
+  const headerH = 13;
+  days.forEach((d, i) => {
+    const x = 8 + i * colW;
+    doc.setFillColor(245, 245, 245);
+    doc.roundedRect(x, startY, colW - 1, headerH, 1.5, 1.5, "F");
+    doc.setTextColor(30, 30, 30);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text(d.format("dddd").toUpperCase(), x + colW / 2 - 0.5, startY + 5, { align: "center" });
+    doc.setTextColor(90, 90, 90);
+    doc.setFontSize(7);
+    doc.text(d.format("DD/MM/YYYY"), x + colW / 2 - 0.5, startY + 10, { align: "center" });
+  });
 
+  const evY = startY + headerH + 3;
+  const rowH = 13;
+  const maxRows = Math.floor((ph - evY - 12) / rowH);
   days.forEach((d, i) => {
     const x = 8 + i * colW;
     const evs = eventsForDate(d.format("YYYY-MM-DD")).slice(0, maxRows);
     evs.forEach((ev, j) => {
       const y = evY + j * rowH;
-      const [r,g,b] = hexToRgb(COLOR_MAP[ev.color]?.hex || "#3b82f6");
-      doc.setFillColor(r,g,b);
-      doc.roundedRect(x, y, colW - 2, rowH - 1, 1, 1, "F");
-      doc.setTextColor(255,255,255);
-      doc.setFontSize(6.5);
+      const [r, g, b] = hexToRgb(typeColor(ev));
+      doc.setFillColor(r, g, b);
+      doc.roundedRect(x, y, colW - 2, rowH - 1.5, 1.5, 1.5, "F");
+      doc.setTextColor(255, 255, 255);
       doc.setFont("helvetica", "bold");
-      doc.text(ev.title, x + 2, y + 4, { maxWidth: colW - 4 });
-      if (ev.time) {
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(5.5);
-        doc.text(ev.time + (ev.duration_minutes ? ` · ${ev.duration_minutes}min` : ""), x + 2, y + 7.5);
-      }
+      doc.setFontSize((ev.event_type || ev.type) === "Partido" ? 7.2 : 6.5);
+      doc.text(ev.title, x + 2, y + 4.5, { maxWidth: colW - 4 });
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(5.5);
+      const sub = [ev.time || ev.start_time, ev.location, ev.rival && `Rival: ${ev.rival}`].filter(Boolean).join(" · ");
+      if (sub) doc.text(sub, x + 2, y + 8.5, { maxWidth: colW - 4 });
     });
     if (evs.length === 0) {
-      doc.setTextColor(100,100,100);
-      doc.setFontSize(6);
-      doc.setFont("helvetica", "italic");
-      doc.text("Sin eventos", x + colW / 2 - 0.5, evY + 5, { align: "center" });
+      doc.setTextColor(150, 150, 150);
+      doc.setFontSize(7);
+      doc.text("Sin eventos", x + colW / 2 - 0.5, evY + 6, { align: "center" });
     }
   });
 
-  doc.setTextColor(120,120,120);
-  doc.setFontSize(5.5);
-  doc.text("HORARIOS SUJETOS A MODIFICACIONES", pw / 2, ph - 4, { align: "center" });
+  doc.setTextColor(100, 100, 100);
+  doc.setFontSize(6);
+  doc.text("Documento generado desde PerformancePitch · Horarios sujetos a modificación", pw / 2, ph - 5, { align: "center" });
   return doc;
 }
 
@@ -426,7 +442,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
               <button
                 key={i}
                 type="button"
-                onClick={() => setForm((f) => ({ ...f, title: t.title, time: t.time || f.time, duration_minutes: t.duration_minutes || f.duration_minutes, color: t.color, type: t.type || f.type }))}
+                onClick={() => setForm((f) => ({ ...f, title: t.title, time: t.time || f.time, start_time: t.time || f.start_time, duration_minutes: t.duration_minutes || f.duration_minutes, color: t.color, type: t.type || f.type, event_type: t.type || f.event_type }))}
                 className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${COLOR_MAP[t.color].bg} ${COLOR_MAP[t.color].text} ${COLOR_MAP[t.color].border} hover:opacity-80`}
               >
                 {t.title}
@@ -443,7 +459,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Tipo de evento</label>
-              <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Ej: Comida, Viaje..." value={form.type} onChange={(e) => set("type", e.target.value)} />
+              <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Ej: Comida, Viaje..." value={form.event_type || form.type} onChange={(e) => { set("type", e.target.value); set("event_type", e.target.value); }} />
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
@@ -451,7 +467,11 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Hora</label>
-              <input type="time" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.time} onChange={(e) => set("time", e.target.value)} />
+              <input type="time" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.start_time || form.time} onChange={(e) => { set("time", e.target.value); set("start_time", e.target.value); }} />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-400 mb-1 block">Hora fin</label>
+              <input type="time" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.end_time || ""} onChange={(e) => set("end_time", e.target.value)} />
             </div>
             <div>
               <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
@@ -465,8 +485,12 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
               <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
               <textarea rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" placeholder="Observaciones..." value={form.notes} onChange={(e) => set("notes", e.target.value)} />
             </div>
-            {(form.type === "Partido" || form.type === "Jornada de Juveniles") && (
-              <div className="col-span-2">
+            {((form.event_type || form.type) === "Partido" || form.type === "Jornada de Juveniles") && (
+              <div className="col-span-2 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div><label className="text-xs text-zinc-400 mb-1 block">Rival</label><input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Ej: River" value={form.rival || ""} onChange={(e) => set("rival", e.target.value)} /></div>
+                  <div><label className="text-xs text-zinc-400 mb-1 block">Local/Visitante</label><select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.home_away || ""} onChange={(e) => set("home_away", e.target.value)}><option value="">—</option><option>Local</option><option>Visitante</option><option>Neutral</option></select></div>
+                </div>
                 <label className="text-xs text-zinc-400 mb-1 block">URL escudo rival (opcional)</label>
                 <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://..." value={form.rival_logo_url || ""} onChange={(e) => set("rival_logo_url", e.target.value)} />
                 {form.rival_logo_url && (
@@ -497,7 +521,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
 
 // ── Main Schedule ──
 export default function Schedule() {
-  const { activeSquadId, activeSquad } = useWorkspace();
+  const { activeSquadId, activeSquad, activeSeasonId } = useWorkspace();
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [weekStartDay, setWeekStartDay] = useState(loadWeekStartDay);
@@ -509,6 +533,7 @@ export default function Schedule() {
   const [defaultDate, setDefaultDate] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [copyData, setCopyData] = useState(null);
+  const [showAiImport, setShowAiImport] = useState(false);
   const [copyingEvent, setCopyingEvent] = useState(null); // event being copied
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
 
@@ -517,13 +542,13 @@ export default function Schedule() {
     const all = await base44.entities.DayEvent.list("-date", 500);
     // Mostrar únicamente eventos del plantel activo
     const filtered = activeSquadId
-      ? all.filter(e => e.squad_id === activeSquadId)
+      ? all.filter(e => e.squad_id === activeSquadId && (!e.season_id || e.season_id === activeSeasonId))
       : all;
     setEvents(filtered);
     setLoading(false);
   }
 
-  useEffect(() => { setLoading(true); loadEvents(); }, [activeSquadId]);
+  useEffect(() => { setLoading(true); loadEvents(); }, [activeSquadId, activeSeasonId]);
 
   // Si se llega con ?date=YYYY-MM-DD (ej: desde el cronograma del Dashboard), abrir esa semana
   useEffect(() => {
@@ -553,7 +578,9 @@ export default function Schedule() {
   }
 
   async function handleSave(form) {
-    const payload = { ...form, squad_id: activeSquadId, squad_name: activeSquad?.name || "" };
+    const eventType = form.event_type || form.type || "";
+    const startTime = form.start_time || form.time || "";
+    const payload = { ...form, time: startTime, start_time: startTime, type: eventType, event_type: eventType, squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "" };
     if (editingEvent) {
       await base44.entities.DayEvent.update(editingEvent.id, payload);
     } else {
@@ -774,11 +801,14 @@ export default function Schedule() {
           </div>
           {view === "week" && (
             <>
+              <button onClick={() => setShowAiImport(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500 transition-colors" title="Importar cronograma con IA">
+                <Sparkles size={15} /> Importar cronograma con IA
+              </button>
               <button onClick={() => setShowSettings(true)} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors" title="Configurar semana">
                 <Settings2 size={15} /> Configurar
               </button>
               <button onClick={downloadWeekPDF} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors">
-                <Download size={15} /> PDF semana
+                <Download size={15} /> Exportar calendario
               </button>
             </>
           )}
@@ -834,6 +864,15 @@ export default function Schedule() {
         onClose={() => setShowSettings(false)}
         startDay={weekStartDay}
         onChangeStartDay={handleChangeStartDay}
+      />
+
+      <AiScheduleImportModal
+        open={showAiImport}
+        onClose={() => setShowAiImport(false)}
+        activeSquad={activeSquad}
+        activeSquadId={activeSquadId}
+        activeSeasonId={activeSeasonId || activeSquad?.season || ""}
+        onImported={loadEvents}
       />
     </div>
   );

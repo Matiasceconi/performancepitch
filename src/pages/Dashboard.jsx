@@ -212,7 +212,7 @@ function NextTrainingPanel({ byStatus, playerMap }) {
 export default function Dashboard() {
   const today = moment().format("YYYY-MM-DD");
   const tomorrow = moment().add(1, "day").format("YYYY-MM-DD");
-  const { activeSquadId, activeSquad, mySquads, setActiveSquad } = useWorkspace();
+  const { activeSquadId, activeSquad, activeSeasonId, mySquads, setActiveSquad } = useWorkspace();
 
   // Use activeSquadId from context as selectedSquadId
   const selectedSquadId = activeSquadId || "";
@@ -261,7 +261,7 @@ export default function Dashboard() {
         ensureDailyStatusForDate(today),
         base44.entities.Squad.list("name", 100),
         base44.entities.SquadMembership.list("-effective_from", 1000),
-        base44.entities.DayEvent.list("date", 200),
+        base44.entities.DayEvent.list("date", 500),
         base44.entities.TrainingSession.list("-date", 50),
         base44.entities.MatchReport.list("-date", 20),
         base44.entities.DayEvent.filter({ date: today }, "time", 100),
@@ -270,7 +270,7 @@ export default function Dashboard() {
 
       const map = {};
       allPlayers.filter(p => p.active !== false).forEach(p => { map[p.id] = p; });
-      const filterBySquad = x => !selectedSquadId || !x.squad_id || x.squad_id === selectedSquadId;
+      const filterBySquad = x => (!selectedSquadId || !x.squad_id || x.squad_id === selectedSquadId) && (!x.season_id || !activeSeasonId || x.season_id === activeSeasonId);
       setPlayerMap(map);
       setPlayerList(allPlayers.filter(p => p.active !== false));
       setDayStatuses(statuses);
@@ -282,11 +282,11 @@ export default function Dashboard() {
       const squadEvents = selectedSquadId ? events.filter(e => e.squad_id === selectedSquadId) : events;
       const squadMatchReports = selectedSquadId ? matchReports.filter(r => r.squad_id === selectedSquadId) : matchReports;
 
-      const match = squadEvents.find(e => e.type === "Partido" && e.date >= today);
+      const match = squadEvents.find(e => (e.type === "Partido" || e.event_type === "Partido") && e.date >= today);
       setNextMatch(match || null);
       if (match) setNextMatchReport(squadMatchReports.find(r => r.date === match.date) || null);
 
-      const pastMatches = squadEvents.filter(e => e.type === "Partido" && e.date < today);
+      const pastMatches = squadEvents.filter(e => (e.type === "Partido" || e.event_type === "Partido") && e.date < today);
       setLastMatchEvent(pastMatches.length > 0 ? pastMatches[pastMatches.length - 1] : null);
 
       setTodayEvents(todayEventsRaw.filter(filterBySquad));
@@ -299,7 +299,7 @@ export default function Dashboard() {
     } finally {
       if (!silent) setLoading(false); else setRefreshing(false);
     }
-  }, [today, tomorrow, selectedSquadId]);
+  }, [today, tomorrow, selectedSquadId, activeSeasonId]);
 
   // Refresh automatically when calendar events or matches change (create/update/delete)
   useEffect(() => {

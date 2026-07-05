@@ -10,6 +10,10 @@
       "type": "string",
       "description": "Nombre del plantel (desnormalizado)"
     },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada activa del plantel"
+    },
     "week_start": {
       "type": "string",
       "format": "date",
@@ -20,7 +24,7 @@
       "items": {
         "type": "object"
       },
-      "description": "Array de 7 objetos con los datos de cada d\u00eda"
+      "description": "Array de d\u00edas con planificaci\u00f3n, actividades del calendario, indicadores de partido/viaje/descanso/entrenamiento y datos del microciclo"
     },
     "notes": {
       "type": "string",

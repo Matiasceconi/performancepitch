@@ -6,8 +6,9 @@ import moment from "moment";
 export default function NextMatchHeaderCard({ match, matchReport }) {
   const [logoError, setLogoError] = useState(false);
   const daysLeft = moment(match.date).diff(moment().startOf("day"), "days");
-  const rivalName = matchReport?.rival || match.title;
+  const rivalName = matchReport?.rival || match.rival || match.title;
   const logoUrl = matchReport?.rival_logo_url || match.rival_logo_url;
+  const condition = matchReport?.location || match.home_away || "";
 
   return (
     <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 flex items-center gap-4 lg:w-auto w-full">
@@ -20,18 +21,18 @@ export default function NextMatchHeaderCard({ match, matchReport }) {
         <p className="text-[10px] text-zinc-500 font-medium uppercase tracking-wider">Próximo partido</p>
         <p className="text-white font-bold text-sm truncate">{rivalName}</p>
         <p className="text-zinc-400 text-xs">
-          {matchReport?.location ? `${matchReport.location} · ` : ""}
+          {condition ? `${condition} · ` : ""}
           {moment(match.date).format("DD/MM")}
-          {match.time ? ` · ${match.time}hs` : ""}
+          {(match.time || match.start_time) ? ` · ${match.time || match.start_time}hs` : ""}
         </p>
       </div>
       <div className="text-right shrink-0">
         <p className="text-2xl font-black text-white leading-none">{daysLeft}</p>
         <p className="text-[10px] text-zinc-500 mt-0.5">{daysLeft === 1 ? "día" : "días"}</p>
       </div>
-      <Link to="/matches"
+      <Link to={`/schedule?date=${match.date}`}
         className="shrink-0 text-xs px-3 py-1.5 rounded-lg bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 transition-colors font-medium">
-        Ver partido
+        Ver calendario
       </Link>
     </div>
   );
