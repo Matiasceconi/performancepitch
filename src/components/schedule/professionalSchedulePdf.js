@@ -3,20 +3,20 @@ import { CLUB_BRAND } from "@/lib/clubBrand";
 
 const BRAND = CLUB_BRAND.colors;
 
-const SPANISH_DAYS = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
-const SPANISH_MONTHS = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+const DAYS_ES = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+const MONTHS_ES = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
 
 const TYPE_STYLES = {
-  Partido: { fill: BRAND.green, text: "#FFFFFF", label: "Partido" },
-  Descanso: { fill: "#C7C5EA", text: "#111827", label: "Descanso" },
-  Viaje: { fill: "#C661D9", text: "#111827", label: "Viaje" },
-  Comida: { fill: "#EFFFBD", text: "#111827", label: "Comida" },
-  Video: { fill: "#EA580C", text: "#111827", label: "Video" },
-  Gimnasio: { fill: "#000000", text: "#FFFFFF", label: "Gimnasio" },
-  Cancha: { fill: "#56D934", text: "#111827", label: "Cancha" },
-  Entrenamiento: { fill: "#56D934", text: "#111827", label: "Entrenamiento" },
-  Reunión: { fill: BRAND.yellow, text: "#111827", label: "Reunión" },
-  Otro: { fill: "#F4F3EF", text: "#111827", label: "Actividad" },
+  Partido: { color: BRAND.green, soft: "#E7F6EC", text: "#FFFFFF", label: "Partido" },
+  Descanso: { color: "#8B8FD6", soft: "#ECECFA", text: "#FFFFFF", label: "Descanso" },
+  Viaje: { color: "#C061D8", soft: "#F8E8FB", text: "#FFFFFF", label: "Viaje" },
+  Comida: { color: "#E8C600", soft: "#FFF8C7", text: "#111827", label: "Comida" },
+  Video: { color: "#EA580C", soft: "#FFE8D4", text: "#FFFFFF", label: "Video" },
+  Gimnasio: { color: "#111827", soft: "#E5E7EB", text: "#FFFFFF", label: "Gimnasio" },
+  Cancha: { color: "#3AC533", soft: "#E7FADC", text: "#111827", label: "Cancha" },
+  Entrenamiento: { color: "#3AC533", soft: "#E7FADC", text: "#111827", label: "Entrenamiento" },
+  Reunión: { color: "#D6A600", soft: "#FFF4C2", text: "#111827", label: "Reunión" },
+  Otro: { color: "#64748B", soft: "#EEF2F7", text: "#FFFFFF", label: "Actividad" },
 };
 
 function rgb(hex) {
@@ -27,6 +27,30 @@ function rgb(hex) {
 function setFill(doc, hex) { doc.setFillColor(...rgb(hex)); }
 function setText(doc, hex) { doc.setTextColor(...rgb(hex)); }
 function setStroke(doc, hex) { doc.setDrawColor(...rgb(hex)); }
+
+async function imageData(url) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function drawLogo(doc, x, y, size) {
+  try {
+    const logo = await imageData(CLUB_BRAND.logoUrl);
+    doc.addImage(logo, "PNG", x - size / 2, y - size / 2, size, size, undefined, "FAST");
+  } catch {
+    setFill(doc, BRAND.green);
+    doc.circle(x, y, size / 2, "F");
+    setText(doc, BRAND.yellow);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text(CLUB_BRAND.shortName, x, y + 2, { align: "center" });
+  }
+}
 
 function styleFor(ev) {
   const text = `${ev.event_type || ""} ${ev.type || ""} ${ev.title || ""} ${ev.location || ""}`.toLowerCase();
@@ -40,155 +64,160 @@ function styleFor(ev) {
   return TYPE_STYLES[ev.event_type || ev.type] || TYPE_STYLES.Otro;
 }
 
-async function loadImageDataUrl(url) {
-  const response = await fetch(url);
-  const blob = await response.blob();
-  return await new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.readAsDataURL(blob);
-  });
-}
-
-async function drawClubMark(doc, x, y, size) {
-  try {
-    const dataUrl = await loadImageDataUrl(CLUB_BRAND.logoUrl);
-    doc.addImage(dataUrl, "PNG", x - size / 2, y - size / 2, size, size, undefined, "FAST");
-  } catch {
-    setFill(doc, "#FFFFFF");
-    doc.circle(x, y, size / 2, "F");
-    setFill(doc, BRAND.green);
-    doc.circle(x, y, size / 2 - 1.5, "F");
-    setText(doc, "#FFFFFF");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text(CLUB_BRAND.shortName, x, y + 1.8, { align: "center" });
-  }
-}
-
-function spanishDayTitle(day) {
-  return `${SPANISH_DAYS[day.day()]} ${day.date()}`;
-}
-
-function formatWeekRange(days) {
-  const first = days[0];
-  const last = days[days.length - 1];
-  const sameMonth = first.month() === last.month();
-  if (sameMonth) return `SEMANA ${SPANISH_DAYS[first.day()]} ${first.date()} AL ${SPANISH_DAYS[last.day()]} ${last.date()} DE ${SPANISH_MONTHS[first.month()]}`;
-  return `SEMANA ${SPANISH_DAYS[first.day()]} ${first.date()} DE ${SPANISH_MONTHS[first.month()]} AL ${SPANISH_DAYS[last.day()]} ${last.date()} DE ${SPANISH_MONTHS[last.month()]}`;
-}
-
-function timeToMinutes(time) {
-  const match = String(time || "").match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return 0;
-  return Number(match[1]) * 60 + Number(match[2]);
-}
-
 function eventTime(ev) {
   return ev.time || ev.start_time || "";
 }
 
-function eventMainTitle(ev) {
-  const title = String(ev.title || ev.event_type || ev.type || "ACTIVIDAD").toUpperCase();
+function eventMinutes(ev) {
+  const match = eventTime(ev).match(/^(\d{1,2}):(\d{2})/);
+  return match ? Number(match[1]) * 60 + Number(match[2]) : 9999;
+}
+
+function eventTitle(ev) {
+  const title = String(ev.title || ev.event_type || ev.type || "Actividad").toUpperCase();
   const location = String(ev.location || "").trim().toUpperCase();
   if (location && title === "ENTRENAMIENTO") return location;
   return title;
 }
 
-function eventSecondLine(ev) {
+function eventDetail(ev) {
   const parts = [];
-  const time = eventTime(ev);
-  if (time) parts.push(`${time} HS`);
   if (ev.rival) parts.push(`VS ${String(ev.rival).toUpperCase()}`);
   if (ev.home_away) parts.push(String(ev.home_away).toUpperCase());
-  if (ev.location && eventMainTitle(ev) !== String(ev.location).toUpperCase()) parts.push(String(ev.location).toUpperCase());
+  if (ev.location && eventTitle(ev) !== String(ev.location).toUpperCase()) parts.push(String(ev.location).toUpperCase());
   return parts.join(" · ");
 }
 
-function splitByMoment(events) {
-  const sorted = [...events].sort((a, b) => eventTime(a).localeCompare(eventTime(b)));
-  return {
-    morning: sorted.filter((ev) => !eventTime(ev) || timeToMinutes(eventTime(ev)) < 13 * 60),
-    afternoon: sorted.filter((ev) => eventTime(ev) && timeToMinutes(eventTime(ev)) >= 13 * 60),
-  };
+function dayTitle(day) {
+  return DAYS_ES[day.day()];
 }
 
-function drawCenteredLabel(doc, text, x, y, w, h, color = "#111827") {
-  setText(doc, color);
+function rangeLabel(days) {
+  const first = days[0];
+  const last = days[days.length - 1];
+  if (first.month() === last.month()) return `${dayTitle(first)} ${first.date()} AL ${dayTitle(last)} ${last.date()} DE ${MONTHS_ES[first.month()]}`;
+  return `${dayTitle(first)} ${first.date()} ${MONTHS_ES[first.month()]} AL ${dayTitle(last)} ${last.date()} ${MONTHS_ES[last.month()]}`;
+}
+
+function drawStat(doc, x, y, value, label, color = BRAND.green) {
+  setFill(doc, "#FFFFFF");
+  doc.roundedRect(x, y, 28, 12, 3, 3, "F");
+  setFill(doc, color);
+  doc.roundedRect(x, y, 2.2, 12, 1, 1, "F");
+  setText(doc, BRAND.ink);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.8);
-  const lines = doc.splitTextToSize(text, w - 4).slice(0, 3);
-  const startY = y + h / 2 - ((lines.length - 1) * 4.2) / 2 + 1.5;
-  lines.forEach((line, idx) => doc.text(line, x + w / 2, startY + idx * 4.2, { align: "center" }));
+  doc.setFontSize(11);
+  doc.text(String(value), x + 5, y + 7.4);
+  setText(doc, BRAND.muted);
+  doc.setFontSize(4.8);
+  doc.text(label.toUpperCase(), x + 14, y + 7.2, { align: "center" });
 }
 
-function drawEvents(doc, events, x, y, w, h) {
-  if (!events.length) return;
-  const gap = 1.2;
-  const maxVisible = Math.max(1, Math.floor((h + gap) / 11));
-  const visible = events.slice(0, maxVisible);
-  const cardH = Math.min(18, Math.max(10, (h - gap * (visible.length - 1)) / visible.length));
-
-  visible.forEach((ev, idx) => {
-    const yy = y + idx * (cardH + gap);
-    const st = styleFor(ev);
-    setFill(doc, st.fill);
-    setStroke(doc, "#000000");
-    doc.roundedRect(x + 1.1, yy, w - 2.2, cardH, 0.8, 0.8, "FD");
-    drawCenteredLabel(doc, eventMainTitle(ev), x + 1.1, yy + 1.4, w - 2.2, Math.max(5.5, cardH * 0.5), st.text);
-    const second = eventSecondLine(ev);
-    if (second) {
-      setText(doc, st.text);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(cardH < 12 ? 6.2 : 7.2);
-      doc.text(doc.splitTextToSize(second, w - 5).slice(0, 2), x + w / 2, yy + cardH - (cardH < 12 ? 2.4 : 3.4), { align: "center" });
-    }
-  });
-
-  if (events.length > visible.length) {
-    setText(doc, BRAND.greenDark);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(6);
-    doc.text(`+${events.length - visible.length} ACTIVIDADES`, x + w / 2, y + h - 2, { align: "center" });
-  }
+function stats(events) {
+  return {
+    total: events.length,
+    training: events.filter((e) => ["Entrenamiento", "Cancha", "Gimnasio"].includes(e.event_type || e.type)).length,
+    match: events.filter((e) => (e.event_type || e.type) === "Partido").length,
+    trip: events.filter((e) => (e.event_type || e.type) === "Viaje").length,
+  };
 }
 
 function drawLegend(doc, x, y) {
-  const items = ["Comida", "Video", "Gimnasio", "Cancha", "Viaje", "Partido", "Descanso"];
+  const keys = ["Comida", "Video", "Gimnasio", "Cancha", "Viaje", "Partido", "Descanso"];
   let cursor = x;
-  items.forEach((key) => {
+  keys.forEach((key) => {
     const st = TYPE_STYLES[key];
-    setFill(doc, st.fill);
-    setStroke(doc, "#000000");
-    doc.roundedRect(cursor, y, 4, 4, 0.7, 0.7, "FD");
+    setFill(doc, st.color);
+    doc.circle(cursor + 2, y + 2, 2, "F");
     setText(doc, BRAND.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(5.5);
-    doc.text(st.label.toUpperCase(), cursor + 5.2, y + 3.2);
-    cursor += 24;
+    doc.setFontSize(5.3);
+    doc.text(st.label.toUpperCase(), cursor + 5.8, y + 3.5);
+    cursor += 23;
   });
 }
 
-function buildEventStats(events) {
-  return {
-    total: events.length,
-    trainings: events.filter((e) => ["Entrenamiento", "Cancha", "Gimnasio"].includes(e.event_type || e.type)).length,
-    matches: events.filter((e) => (e.event_type || e.type) === "Partido").length,
-    trips: events.filter((e) => (e.event_type || e.type) === "Viaje").length,
-  };
+function drawEventCard(doc, ev, x, y, w, h) {
+  const st = styleFor(ev);
+  setFill(doc, "#FFFFFF");
+  setStroke(doc, "#E2E8D8");
+  doc.roundedRect(x, y, w, h, 2.2, 2.2, "FD");
+  setFill(doc, st.color);
+  doc.roundedRect(x, y, 3.2, h, 1.6, 1.6, "F");
+
+  const time = eventTime(ev);
+  if (time) {
+    setFill(doc, st.soft);
+    doc.roundedRect(x + 5.5, y + 2, 12.5, 5.2, 1.8, 1.8, "F");
+    setText(doc, BRAND.ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.2);
+    doc.text(time, x + 11.8, y + 5.7, { align: "center" });
+  }
+
+  setText(doc, BRAND.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(6.6);
+  doc.text(doc.splitTextToSize(eventTitle(ev), w - 21).slice(0, 2), x + 20, y + 5.2);
+
+  const detail = eventDetail(ev);
+  if (detail) {
+    setText(doc, BRAND.muted);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(5.3);
+    doc.text(doc.splitTextToSize(detail, w - 8).slice(0, 1), x + 5.5, y + h - 2.8);
+  }
 }
 
-function drawStat(doc, x, y, value, label) {
+function drawDayCard(doc, day, events, x, y, w, h) {
+  const sorted = [...events].sort((a, b) => eventMinutes(a) - eventMinutes(b));
+  const isWeekend = [0, 6].includes(day.day());
+
   setFill(doc, "#FFFFFF");
-  setStroke(doc, BRAND.yellow);
-  doc.roundedRect(x, y, 24, 11, 2, 2, "FD");
+  setStroke(doc, "#DCE6D2");
+  doc.roundedRect(x, y, w, h, 4, 4, "FD");
+
+  setFill(doc, isWeekend ? BRAND.greenDark : BRAND.green);
+  doc.roundedRect(x, y, w, 18, 4, 4, "F");
+  setFill(doc, BRAND.yellow);
+  doc.roundedRect(x + w - 15, y + 4, 10, 10, 5, 5, "F");
+
+  setText(doc, "#FFFFFF");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.3);
+  doc.text(dayTitle(day), x + 4, y + 8);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.5);
+  doc.text(MONTHS_ES[day.month()], x + 4, y + 13.2);
   setText(doc, BRAND.greenDark);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text(String(value), x + 4, y + 6.5);
-  setText(doc, BRAND.muted);
-  doc.setFontSize(4.7);
-  doc.text(label.toUpperCase(), x + 4, y + 9.5);
+  doc.setFontSize(9);
+  doc.text(String(day.date()), x + w - 10, y + 11.2, { align: "center" });
+
+  const bodyY = y + 21;
+  const available = h - 25;
+  const gap = 1.8;
+  const maxVisible = Math.max(1, Math.floor((available + gap) / 14.2));
+  const visible = sorted.slice(0, maxVisible);
+
+  if (!visible.length) {
+    setFill(doc, "#F6F8F2");
+    doc.roundedRect(x + 4, bodyY + 18, w - 8, 18, 3, 3, "F");
+    setText(doc, "#98A18E");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6.5);
+    doc.text("SIN ACTIVIDADES", x + w / 2, bodyY + 29, { align: "center" });
+    return;
+  }
+
+  visible.forEach((ev, idx) => drawEventCard(doc, ev, x + 3.4, bodyY + idx * 14.2, w - 6.8, 12.7));
+
+  if (sorted.length > visible.length) {
+    setText(doc, BRAND.greenDark);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.7);
+    doc.text(`+${sorted.length - visible.length} actividades más`, x + w / 2, y + h - 3.5, { align: "center" });
+  }
 }
 
 export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabel, squadName, season }) {
@@ -196,110 +225,60 @@ export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, we
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
   const margin = 8;
-  const allEvents = days.flatMap((d) => eventsForDate(d.format("YYYY-MM-DD")));
-  const stats = buildEventStats(allEvents);
-  const rangeLabel = formatWeekRange(days) || weekLabel;
+  const events = days.flatMap((d) => eventsForDate(d.format("YYYY-MM-DD")));
+  const info = stats(events);
 
-  setFill(doc, "#FFFFFF");
+  setFill(doc, "#F6F8F2");
   doc.rect(0, 0, pw, ph, "F");
 
   setFill(doc, BRAND.greenDark);
-  doc.roundedRect(margin, 6, pw - margin * 2, 28, 2, 2, "F");
+  doc.rect(0, 0, pw, 35, "F");
   setFill(doc, BRAND.green);
-  doc.roundedRect(margin + 1.5, 7.5, pw - margin * 2 - 3, 23, 2, 2, "F");
+  doc.triangle(0, 0, pw * 0.62, 0, 0, 35, "F");
   setFill(doc, BRAND.yellow);
-  doc.rect(margin + 1.5, 29.2, pw - margin * 2 - 3, 2.2, "F");
+  doc.rect(0, 33.2, pw, 2.2, "F");
 
-  await drawClubMark(doc, margin + 15, 19, 21);
-  setText(doc, BRAND.yellow);
-  doc.setFont("helvetica", "bolditalic");
-  doc.setFontSize(17);
-  doc.text(`· ${CLUB_BRAND.shortName} SEMANA PLANTEL ${String(squadName || "").toUpperCase() || "EQUIPO"} ·`, pw / 2, 18.5, { align: "center" });
+  await drawLogo(doc, margin + 12, 17.5, 20);
 
-  setFill(doc, "#92861D");
-  setStroke(doc, "#2B2608");
-  doc.roundedRect(pw - 83, 12, 64, 13, 2.5, 2.5, "FD");
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(7.4);
-  doc.text(rangeLabel.replace("SEMANA ", "Semana "), pw - 51, 20.3, { align: "center", maxWidth: 58 });
-
-  drawLegend(doc, margin + 28, 38);
-  drawStat(doc, pw - 109, 36, stats.total, "eventos");
-  drawStat(doc, pw - 82, 36, stats.trainings, "cargas");
-  drawStat(doc, pw - 55, 36, stats.matches, "partidos");
-  drawStat(doc, pw - 28, 36, stats.trips, "viajes");
-
-  const gridX = margin;
-  const gridY = 50;
-  const labelW = 18;
-  const gridW = pw - margin * 2;
-  const dayW = (gridW - labelW) / days.length;
-  const headerH = 15;
-  const bodyH = ph - gridY - 20;
-  const morningH = bodyH * 0.58;
-  const afternoonH = bodyH - morningH;
-
-  setStroke(doc, "#000000");
-  doc.setLineWidth(0.55);
-  doc.rect(gridX, gridY, gridW, headerH + bodyH, "S");
-
-  setFill(doc, BRAND.yellow);
-  doc.rect(gridX, gridY, labelW, headerH + bodyH, "F");
-  doc.rect(gridX, gridY + headerH + morningH, labelW, afternoonH, "F");
-  setStroke(doc, "#000000");
-  doc.rect(gridX, gridY, labelW, headerH + bodyH, "S");
-  doc.line(gridX, gridY + headerH + morningH, gridX + labelW, gridY + headerH + morningH);
-
-  setText(doc, "#000000");
+  doc.setFontSize(16.5);
+  doc.text("AGENDA DEPORTIVA SEMANAL", margin + 27, 14);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8.2);
+  doc.text(`${String(squadName || "Plantel").toUpperCase()}${season ? ` · TEMPORADA ${season}` : ""}`, margin + 27, 20.2);
+  setText(doc, BRAND.yellow);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9.2);
-  doc.text("MAÑANA", gridX + labelW / 2, gridY + headerH + morningH / 2, { align: "center", angle: 0 });
-  doc.text("TARDE", gridX + labelW / 2, gridY + headerH + morningH + afternoonH / 2, { align: "center", angle: 0 });
+  doc.setFontSize(8.4);
+  doc.text(rangeLabel(days) || weekLabel, margin + 27, 26.4);
+
+  drawStat(doc, pw - 126, 9.5, info.total, "eventos", BRAND.yellow);
+  drawStat(doc, pw - 95, 9.5, info.training, "cargas", "#3AC533");
+  drawStat(doc, pw - 64, 9.5, info.match, "partidos", BRAND.green);
+  drawStat(doc, pw - 33, 9.5, info.trip, "viajes", "#C061D8");
+
+  drawLegend(doc, margin, 39.5);
+
+  const cardGap = 2.5;
+  const top = 48;
+  const bottom = 15;
+  const cardW = (pw - margin * 2 - cardGap * (days.length - 1)) / days.length;
+  const cardH = ph - top - bottom;
 
   days.forEach((day, idx) => {
-    const x = gridX + labelW + idx * dayW;
-    const events = eventsForDate(day.format("YYYY-MM-DD"));
-    const groups = splitByMoment(events);
-
-    setFill(doc, BRAND.greenDark);
-    doc.rect(x, gridY, dayW, headerH, "F");
-    setStroke(doc, "#000000");
-    doc.rect(x, gridY, dayW, headerH + bodyH, "S");
-    doc.line(x, gridY + headerH, x + dayW, gridY + headerH);
-    doc.line(x, gridY + headerH + morningH, x + dayW, gridY + headerH + morningH);
-
-    setText(doc, "#FFFFFF");
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(days.length > 7 ? 8.8 : 9.8);
-    doc.text(spanishDayTitle(day), x + dayW / 2, gridY + 9.5, { align: "center" });
-
-    setFill(doc, "#F6F5F0");
-    doc.rect(x, gridY + headerH, dayW, morningH, "F");
-    doc.rect(x, gridY + headerH + morningH, dayW, afternoonH, "F");
-    setStroke(doc, "#000000");
-    doc.rect(x, gridY + headerH, dayW, morningH, "S");
-    doc.rect(x, gridY + headerH + morningH, dayW, afternoonH, "S");
-
-    drawEvents(doc, groups.morning, x + 0.5, gridY + headerH + 2, dayW - 1, morningH - 4);
-    drawEvents(doc, groups.afternoon, x + 0.5, gridY + headerH + morningH + 2, dayW - 1, afternoonH - 4);
-
-    if (!events.length) {
-      setText(doc, "#9CA3AF");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(7);
-      doc.text("SIN ACTIVIDADES", x + dayW / 2, gridY + headerH + bodyH / 2, { align: "center" });
-    }
+    const x = margin + idx * (cardW + cardGap);
+    const dateKey = day.format("YYYY-MM-DD");
+    drawDayCard(doc, day, eventsForDate(dateKey), x, top, cardW, cardH);
   });
 
   setFill(doc, BRAND.greenDark);
   doc.rect(0, ph - 8, pw, 8, "F");
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(6.2);
+  doc.setFontSize(6);
   doc.text(`${CLUB_BRAND.name.toUpperCase()} · PERFORMANCEPITCH`, margin, ph - 3.2);
   doc.setFont("helvetica", "normal");
-  doc.text(`${season ? `Temporada ${season} · ` : ""}Documento operativo — horarios sujetos a modificación`, pw - margin, ph - 3.2, { align: "right" });
+  doc.text("Documento operativo del cuerpo técnico — horarios sujetos a modificación", pw - margin, ph - 3.2, { align: "right" });
 
   return doc;
 }
