@@ -1,14 +1,7 @@
 import { jsPDF } from "jspdf";
+import { CLUB_BRAND } from "@/lib/clubBrand";
 
-const BRAND = {
-  green: "#005A34",
-  greenDark: "#003D25",
-  yellow: "#F2C300",
-  ink: "#111827",
-  muted: "#6B7280",
-  panel: "#F6F7F3",
-  line: "#D8DED2",
-};
+const BRAND = CLUB_BRAND.colors;
 
 const TYPE_STYLES = {
   Partido: { fill: "#D71920", label: "Partido" },
@@ -35,17 +28,32 @@ function styleFor(ev) {
   return TYPE_STYLES[ev.event_type || ev.type] || TYPE_STYLES.Otro;
 }
 
-function drawClubMark(doc, x, y, size) {
-  setFill(doc, "#FFFFFF");
-  doc.circle(x, y, size / 2, "F");
-  setFill(doc, BRAND.green);
-  doc.circle(x, y, size / 2 - 1.5, "F");
-  setFill(doc, "#FFFFFF");
-  doc.circle(x, y, size / 2 - 4, "F");
-  setText(doc, BRAND.green);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
-  doc.text("DYJ", x, y + 1.8, { align: "center" });
+async function loadImageDataUrl(url) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
+
+async function drawClubMark(doc, x, y, size) {
+  try {
+    const dataUrl = await loadImageDataUrl(CLUB_BRAND.logoUrl);
+    doc.addImage(dataUrl, "PNG", x - size / 2, y - size / 2, size, size, undefined, "FAST");
+  } catch {
+    setFill(doc, "#FFFFFF");
+    doc.circle(x, y, size / 2, "F");
+    setFill(doc, BRAND.green);
+    doc.circle(x, y, size / 2 - 1.5, "F");
+    setFill(doc, "#FFFFFF");
+    doc.circle(x, y, size / 2 - 4, "F");
+    setText(doc, BRAND.green);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text(CLUB_BRAND.shortName, x, y + 1.8, { align: "center" });
+  }
 }
 
 function eventSubtitle(ev) {
@@ -71,7 +79,7 @@ function drawMetric(doc, x, y, value, label, color = BRAND.green) {
   doc.text(label.toUpperCase(), x + 4, y + 11);
 }
 
-export function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabel, squadName, season }) {
+export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabel, squadName, season }) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const pw = doc.internal.pageSize.getWidth();
   const ph = doc.internal.pageSize.getHeight();
@@ -89,7 +97,7 @@ export function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabe
   doc.rect(0, 0, pw, 24, "F");
   setFill(doc, BRAND.yellow);
   doc.rect(0, 24, pw, 2.2, "F");
-  drawClubMark(doc, 18, 13, 16);
+  await drawClubMark(doc, 18, 13, 18);
 
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
@@ -197,7 +205,7 @@ export function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabe
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.2);
-  doc.text("PERFORMANCEPITCH · DEFENSA Y JUSTICIA", margin, ph - 3.2);
+  doc.text(`PERFORMANCEPITCH · ${CLUB_BRAND.name.toUpperCase()}`, margin, ph - 3.2);
   doc.setFont("helvetica", "normal");
   doc.text("Documento operativo — horarios sujetos a modificación", pw - margin, ph - 3.2, { align: "right" });
 

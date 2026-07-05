@@ -651,10 +651,10 @@ export default function Schedule() {
     return Array.from({ length: 7 }, (_, i) => currentWeekStart.clone().add(i, "day"));
   }
 
-  function downloadWeekPDF() {
+  async function downloadWeekPDF() {
     const days = getWeekDays();
     const weekLabel = `${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
-    const doc = buildProfessionalWeekSchedulePDF({
+    const doc = await buildProfessionalWeekSchedulePDF({
       days,
       eventsForDate: getEventsForDate,
       weekLabel,
