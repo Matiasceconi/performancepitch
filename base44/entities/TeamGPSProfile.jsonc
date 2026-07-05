@@ -8,7 +8,7 @@
     },
     "season_id": {
       "type": "string",
-      "description": "Temporada (informativo)"
+      "description": "Temporada"
     },
     "player_type": {
       "type": "string",
@@ -18,11 +18,11 @@
         "total"
       ],
       "default": "campo",
-      "description": "Grupo del perfil: jugadores de campo, arqueros o total del equipo"
+      "description": "Grupo del perfil"
     },
     "total_sessions": {
       "type": "number",
-      "description": "Sesiones normales con GPS usadas en los promedios"
+      "description": "Sesiones usadas"
     },
     "avg_total_distance": {
       "type": "number",
@@ -38,7 +38,7 @@
     },
     "avg_distance_25": {
       "type": "number",
-      "description": "D+ 25,0 km/h promedio (m)"
+      "description": "D+25,0 km/h promedio (m)"
     },
     "avg_sprints": {
       "type": "number",
@@ -56,9 +56,17 @@
       "type": "number",
       "description": "Player Load promedio"
     },
+    "avg_player_load_per_min": {
+      "type": "number",
+      "description": "Player Load por minuto promedio"
+    },
     "avg_smax": {
       "type": "number",
       "description": "Velocidad m\u00e1xima promedio (km/h)"
+    },
+    "avg_rhie": {
+      "type": "number",
+      "description": "RHIE promedio"
     },
     "max_smax": {
       "type": "number",
@@ -66,7 +74,7 @@
     },
     "updated_at": {
       "type": "string",
-      "description": "Fecha/hora del \u00faltimo rec\u00e1lculo (ISO)"
+      "description": "\u00daltimo rec\u00e1lculo"
     }
   },
   "required": [

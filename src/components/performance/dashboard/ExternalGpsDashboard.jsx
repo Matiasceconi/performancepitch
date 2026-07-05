@@ -74,7 +74,7 @@ export default function ExternalGpsDashboard() {
       setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
       setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
 
-      const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId);
+      const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId && (!selectedSeason || !s.season_id || s.season_id === selectedSeason));
       setSessions(squadSessions);
 
       if (squadSessions.length > 0) {
@@ -294,10 +294,15 @@ export default function ExternalGpsDashboard() {
       )}
 
       {activeTab === "team" && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <GpsTeamProfilePanel rows={allEnrichedRows} />
-          <GpsPositionRadar rows={allEnrichedRows} />
-        </div>
+        <GpsTeamProfilePanel
+          squadId={selectedSquadId}
+          squadName={selectedSquad?.name}
+          season={selectedSeason || selectedSquad?.season || ""}
+          sessions={sessions}
+          gpsBySession={gpsBySession}
+          playerMap={playerMap}
+          onReload={load}
+        />
       )}
     </div>
   );

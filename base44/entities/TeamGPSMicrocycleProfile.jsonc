@@ -8,11 +8,11 @@
     },
     "season_id": {
       "type": "string",
-      "description": "Temporada (informativo)"
+      "description": "Temporada"
     },
     "md": {
       "type": "string",
-      "description": "C\u00f3digo de d\u00eda del microciclo (MD-6...MD+4, Otro)"
+      "description": "D\u00eda del microciclo"
     },
     "player_type": {
       "type": "string",
@@ -22,11 +22,15 @@
         "total"
       ],
       "default": "campo",
-      "description": "Grupo del perfil: jugadores de campo, arqueros o total del equipo"
+      "description": "Grupo del perfil"
     },
     "sessions_count": {
       "type": "number",
-      "description": "Sesiones normales usadas en el promedio para este MD"
+      "description": "Sesiones usadas en el promedio"
+    },
+    "total_sessions": {
+      "type": "number",
+      "description": "Sesiones usadas"
     },
     "avg_total_distance": {
       "type": "number",
@@ -42,7 +46,7 @@
     },
     "avg_distance_25": {
       "type": "number",
-      "description": "D+ 25,0 km/h promedio (m)"
+      "description": "D+25,0 km/h promedio (m)"
     },
     "avg_sprints": {
       "type": "number",
@@ -60,17 +64,25 @@
       "type": "number",
       "description": "Player Load promedio"
     },
+    "avg_player_load_per_min": {
+      "type": "number",
+      "description": "Player Load por minuto promedio"
+    },
     "avg_smax": {
       "type": "number",
       "description": "Velocidad m\u00e1xima promedio (km/h)"
     },
+    "avg_rhie": {
+      "type": "number",
+      "description": "RHIE promedio"
+    },
     "max_smax": {
       "type": "number",
-      "description": "Velocidad m\u00e1xima registrada en este MD (km/h)"
+      "description": "Velocidad m\u00e1xima hist\u00f3rica (km/h)"
     },
     "updated_at": {
       "type": "string",
-      "description": "Fecha/hora del \u00faltimo rec\u00e1lculo (ISO)"
+      "description": "\u00daltimo rec\u00e1lculo"
     }
   },
   "required": [
