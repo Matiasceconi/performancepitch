@@ -38,13 +38,12 @@ export default function GpsMicrocyclePdfButton({ squadName, season, dailySummari
         const canvas = await html2canvas(captureRef.current, { scale: 2, backgroundColor: "#09090b", useCORS: true });
         const pageW = 269;
         const pageH = 156;
-        const fullImgH = (canvas.height * pageW) / canvas.width;
-        const pagesNeeded = Math.min(2, Math.max(1, Math.ceil(fullImgH / pageH)));
-        const sourceH = Math.min(canvas.height, Math.ceil((canvas.width * pageH * pagesNeeded) / pageW));
+        const sourcePageH = Math.floor((canvas.width * pageH) / pageW);
+        const pagesNeeded = Math.max(1, Math.ceil(canvas.height / sourcePageH));
         for (let page = 0; page < pagesNeeded; page++) {
           if (page > 0) { doc.addPage("a4", "landscape"); await drawClubHeader(doc, logo, squadName, season, start, end); }
-          const sliceY = Math.floor((sourceH / pagesNeeded) * page);
-          const sliceH = Math.min(Math.floor(sourceH / pagesNeeded), canvas.height - sliceY);
+          const sliceY = page * sourcePageH;
+          const sliceH = Math.min(sourcePageH, canvas.height - sliceY);
           if (sliceH <= 0) break;
           const slice = document.createElement("canvas");
           slice.width = canvas.width; slice.height = sliceH;
@@ -52,9 +51,9 @@ export default function GpsMicrocyclePdfButton({ squadName, season, dailySummari
           const img = slice.toDataURL("image/png");
           const imgH = Math.min(pageH, (sliceH * pageW) / canvas.width);
           doc.addImage(img, "PNG", 14, 44, pageW, imgH);
+          doc.setTextColor(150, 150, 150); doc.setFontSize(7); doc.text(`Generado ${moment().format("DD/MM/YYYY HH:mm")} · Página ${page + 1}/${pagesNeeded}`, 14, 202);
         }
       }
-      doc.setTextColor(150, 150, 150); doc.setFontSize(7); doc.text(`Generado ${moment().format("DD/MM/YYYY HH:mm")}`, 14, 202);
       doc.save(`informe-microciclo-${start || "gps"}.pdf`);
     } finally { setExporting(false); }
   }
