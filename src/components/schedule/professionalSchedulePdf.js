@@ -3,17 +3,20 @@ import { CLUB_BRAND } from "@/lib/clubBrand";
 
 const BRAND = CLUB_BRAND.colors;
 
+const SPANISH_DAYS = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
+const SPANISH_MONTHS = ["ENERO", "FEBRERO", "MARZO", "ABRIL", "MAYO", "JUNIO", "JULIO", "AGOSTO", "SEPTIEMBRE", "OCTUBRE", "NOVIEMBRE", "DICIEMBRE"];
+
 const TYPE_STYLES = {
-  Partido: { fill: "#D71920", label: "Partido" },
-  Descanso: { fill: "#0694A2", label: "Descanso" },
-  Viaje: { fill: "#6D28D9", label: "Viaje" },
-  Comida: { fill: "#F97316", label: "Comida" },
-  Gimnasio: { fill: "#7C3AED", label: "Gimnasio" },
-  Cancha: { fill: "#16A34A", label: "Cancha" },
-  Entrenamiento: { fill: "#16A34A", label: "Entrenamiento" },
-  Video: { fill: "#2563EB", label: "Video" },
-  Reunión: { fill: "#CA8A04", label: "Reunión" },
-  Otro: { fill: "#64748B", label: "Actividad" },
+  Partido: { fill: BRAND.green, text: "#FFFFFF", label: "Partido" },
+  Descanso: { fill: "#C7C5EA", text: "#111827", label: "Descanso" },
+  Viaje: { fill: "#C661D9", text: "#111827", label: "Viaje" },
+  Comida: { fill: "#EFFFBD", text: "#111827", label: "Comida" },
+  Video: { fill: "#EA580C", text: "#111827", label: "Video" },
+  Gimnasio: { fill: "#000000", text: "#FFFFFF", label: "Gimnasio" },
+  Cancha: { fill: "#56D934", text: "#111827", label: "Cancha" },
+  Entrenamiento: { fill: "#56D934", text: "#111827", label: "Entrenamiento" },
+  Reunión: { fill: BRAND.yellow, text: "#111827", label: "Reunión" },
+  Otro: { fill: "#F4F3EF", text: "#111827", label: "Actividad" },
 };
 
 function rgb(hex) {
@@ -23,8 +26,17 @@ function rgb(hex) {
 
 function setFill(doc, hex) { doc.setFillColor(...rgb(hex)); }
 function setText(doc, hex) { doc.setTextColor(...rgb(hex)); }
+function setStroke(doc, hex) { doc.setDrawColor(...rgb(hex)); }
 
 function styleFor(ev) {
+  const text = `${ev.event_type || ""} ${ev.type || ""} ${ev.title || ""} ${ev.location || ""}`.toLowerCase();
+  if (text.includes("partido") || text.includes(" vs ")) return TYPE_STYLES.Partido;
+  if (text.includes("descanso") || text.includes("libre")) return TYPE_STYLES.Descanso;
+  if (text.includes("viaje") || text.includes("salida") || text.includes("traslado")) return TYPE_STYLES.Viaje;
+  if (text.includes("desayuno") || text.includes("almuerzo") || text.includes("cena") || text.includes("comida")) return TYPE_STYLES.Comida;
+  if (text.includes("video") || text.includes("auditorio")) return TYPE_STYLES.Video;
+  if (text.includes("gimnasio") || text.includes("gym")) return TYPE_STYLES.Gimnasio;
+  if (text.includes("cancha")) return TYPE_STYLES.Cancha;
   return TYPE_STYLES[ev.event_type || ev.type] || TYPE_STYLES.Otro;
 }
 
@@ -47,36 +59,136 @@ async function drawClubMark(doc, x, y, size) {
     doc.circle(x, y, size / 2, "F");
     setFill(doc, BRAND.green);
     doc.circle(x, y, size / 2 - 1.5, "F");
-    setFill(doc, "#FFFFFF");
-    doc.circle(x, y, size / 2 - 4, "F");
-    setText(doc, BRAND.green);
+    setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
     doc.text(CLUB_BRAND.shortName, x, y + 1.8, { align: "center" });
   }
 }
 
-function eventSubtitle(ev) {
-  return [
-    ev.time || ev.start_time,
-    ev.end_time ? `a ${ev.end_time}` : "",
-    ev.location,
-    ev.rival ? `vs ${ev.rival}` : "",
-    ev.home_away,
-  ].filter(Boolean).join(" · ");
+function spanishDayTitle(day) {
+  return `${SPANISH_DAYS[day.day()]} ${day.date()}`;
 }
 
-function drawMetric(doc, x, y, value, label, color = BRAND.green) {
-  setFill(doc, "#FFFFFF");
-  doc.roundedRect(x, y, 35, 13, 2, 2, "F");
+function formatWeekRange(days) {
+  const first = days[0];
+  const last = days[days.length - 1];
+  const sameMonth = first.month() === last.month();
+  if (sameMonth) return `SEMANA ${SPANISH_DAYS[first.day()]} ${first.date()} AL ${SPANISH_DAYS[last.day()]} ${last.date()} DE ${SPANISH_MONTHS[first.month()]}`;
+  return `SEMANA ${SPANISH_DAYS[first.day()]} ${first.date()} DE ${SPANISH_MONTHS[first.month()]} AL ${SPANISH_DAYS[last.day()]} ${last.date()} DE ${SPANISH_MONTHS[last.month()]}`;
+}
+
+function timeToMinutes(time) {
+  const match = String(time || "").match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return 0;
+  return Number(match[1]) * 60 + Number(match[2]);
+}
+
+function eventTime(ev) {
+  return ev.time || ev.start_time || "";
+}
+
+function eventMainTitle(ev) {
+  const title = String(ev.title || ev.event_type || ev.type || "ACTIVIDAD").toUpperCase();
+  const location = String(ev.location || "").trim().toUpperCase();
+  if (location && title === "ENTRENAMIENTO") return location;
+  return title;
+}
+
+function eventSecondLine(ev) {
+  const parts = [];
+  const time = eventTime(ev);
+  if (time) parts.push(`${time} HS`);
+  if (ev.rival) parts.push(`VS ${String(ev.rival).toUpperCase()}`);
+  if (ev.home_away) parts.push(String(ev.home_away).toUpperCase());
+  if (ev.location && eventMainTitle(ev) !== String(ev.location).toUpperCase()) parts.push(String(ev.location).toUpperCase());
+  return parts.join(" · ");
+}
+
+function splitByMoment(events) {
+  const sorted = [...events].sort((a, b) => eventTime(a).localeCompare(eventTime(b)));
+  return {
+    morning: sorted.filter((ev) => !eventTime(ev) || timeToMinutes(eventTime(ev)) < 13 * 60),
+    afternoon: sorted.filter((ev) => eventTime(ev) && timeToMinutes(eventTime(ev)) >= 13 * 60),
+  };
+}
+
+function drawCenteredLabel(doc, text, x, y, w, h, color = "#111827") {
   setText(doc, color);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.text(String(value), x + 4, y + 7.5);
+  doc.setFontSize(8.8);
+  const lines = doc.splitTextToSize(text, w - 4).slice(0, 3);
+  const startY = y + h / 2 - ((lines.length - 1) * 4.2) / 2 + 1.5;
+  lines.forEach((line, idx) => doc.text(line, x + w / 2, startY + idx * 4.2, { align: "center" }));
+}
+
+function drawEvents(doc, events, x, y, w, h) {
+  if (!events.length) return;
+  const gap = 1.2;
+  const maxVisible = Math.max(1, Math.floor((h + gap) / 11));
+  const visible = events.slice(0, maxVisible);
+  const cardH = Math.min(18, Math.max(10, (h - gap * (visible.length - 1)) / visible.length));
+
+  visible.forEach((ev, idx) => {
+    const yy = y + idx * (cardH + gap);
+    const st = styleFor(ev);
+    setFill(doc, st.fill);
+    setStroke(doc, "#000000");
+    doc.roundedRect(x + 1.1, yy, w - 2.2, cardH, 0.8, 0.8, "FD");
+    drawCenteredLabel(doc, eventMainTitle(ev), x + 1.1, yy + 1.4, w - 2.2, Math.max(5.5, cardH * 0.5), st.text);
+    const second = eventSecondLine(ev);
+    if (second) {
+      setText(doc, st.text);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(cardH < 12 ? 6.2 : 7.2);
+      doc.text(doc.splitTextToSize(second, w - 5).slice(0, 2), x + w / 2, yy + cardH - (cardH < 12 ? 2.4 : 3.4), { align: "center" });
+    }
+  });
+
+  if (events.length > visible.length) {
+    setText(doc, BRAND.greenDark);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(6);
+    doc.text(`+${events.length - visible.length} ACTIVIDADES`, x + w / 2, y + h - 2, { align: "center" });
+  }
+}
+
+function drawLegend(doc, x, y) {
+  const items = ["Comida", "Video", "Gimnasio", "Cancha", "Viaje", "Partido", "Descanso"];
+  let cursor = x;
+  items.forEach((key) => {
+    const st = TYPE_STYLES[key];
+    setFill(doc, st.fill);
+    setStroke(doc, "#000000");
+    doc.roundedRect(cursor, y, 4, 4, 0.7, 0.7, "FD");
+    setText(doc, BRAND.ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.5);
+    doc.text(st.label.toUpperCase(), cursor + 5.2, y + 3.2);
+    cursor += 24;
+  });
+}
+
+function buildEventStats(events) {
+  return {
+    total: events.length,
+    trainings: events.filter((e) => ["Entrenamiento", "Cancha", "Gimnasio"].includes(e.event_type || e.type)).length,
+    matches: events.filter((e) => (e.event_type || e.type) === "Partido").length,
+    trips: events.filter((e) => (e.event_type || e.type) === "Viaje").length,
+  };
+}
+
+function drawStat(doc, x, y, value, label) {
+  setFill(doc, "#FFFFFF");
+  setStroke(doc, BRAND.yellow);
+  doc.roundedRect(x, y, 24, 11, 2, 2, "FD");
+  setText(doc, BRAND.greenDark);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(String(value), x + 4, y + 6.5);
   setText(doc, BRAND.muted);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(5.6);
-  doc.text(label.toUpperCase(), x + 4, y + 11);
+  doc.setFontSize(4.7);
+  doc.text(label.toUpperCase(), x + 4, y + 9.5);
 }
 
 export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabel, squadName, season }) {
@@ -85,129 +197,109 @@ export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, we
   const ph = doc.internal.pageSize.getHeight();
   const margin = 8;
   const allEvents = days.flatMap((d) => eventsForDate(d.format("YYYY-MM-DD")));
-  const matches = allEvents.filter((e) => (e.event_type || e.type) === "Partido").length;
-  const trainings = allEvents.filter((e) => ["Entrenamiento", "Cancha", "Gimnasio"].includes(e.event_type || e.type)).length;
-  const trips = allEvents.filter((e) => (e.event_type || e.type) === "Viaje").length;
+  const stats = buildEventStats(allEvents);
+  const rangeLabel = formatWeekRange(days) || weekLabel;
 
   setFill(doc, "#FFFFFF");
   doc.rect(0, 0, pw, ph, "F");
-  setFill(doc, BRAND.greenDark);
-  doc.rect(0, 0, pw, 31, "F");
-  setFill(doc, BRAND.green);
-  doc.rect(0, 0, pw, 24, "F");
-  setFill(doc, BRAND.yellow);
-  doc.rect(0, 24, pw, 2.2, "F");
-  await drawClubMark(doc, 18, 13, 18);
 
+  setFill(doc, BRAND.greenDark);
+  doc.roundedRect(margin, 6, pw - margin * 2, 28, 2, 2, "F");
+  setFill(doc, BRAND.green);
+  doc.roundedRect(margin + 1.5, 7.5, pw - margin * 2 - 3, 23, 2, 2, "F");
+  setFill(doc, BRAND.yellow);
+  doc.rect(margin + 1.5, 29.2, pw - margin * 2 - 3, 2.2, "F");
+
+  await drawClubMark(doc, margin + 15, 19, 21);
+  setText(doc, BRAND.yellow);
+  doc.setFont("helvetica", "bolditalic");
+  doc.setFontSize(17);
+  doc.text(`· ${CLUB_BRAND.shortName} SEMANA PLANTEL ${String(squadName || "").toUpperCase() || "EQUIPO"} ·`, pw / 2, 18.5, { align: "center" });
+
+  setFill(doc, "#92861D");
+  setStroke(doc, "#2B2608");
+  doc.roundedRect(pw - 83, 12, 64, 13, 2.5, 2.5, "FD");
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(17);
-  doc.text("CRONOGRAMA SEMANAL", 31, 11.5);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text(`${squadName || "Plantel"}${season ? ` · Temporada ${season}` : ""}`, 31, 17);
-  doc.text(weekLabel, 31, 21.5);
+  doc.setFontSize(7.4);
+  doc.text(rangeLabel.replace("SEMANA ", "Semana "), pw - 51, 20.3, { align: "center", maxWidth: 58 });
 
-  const metricX = pw - 158;
-  drawMetric(doc, metricX, 6, allEvents.length, "eventos", BRAND.green);
-  drawMetric(doc, metricX + 38, 6, trainings, "cargas", "#16A34A");
-  drawMetric(doc, metricX + 76, 6, matches, "partidos", "#D71920");
-  drawMetric(doc, metricX + 114, 6, trips, "viajes", "#6D28D9");
+  drawLegend(doc, margin + 28, 38);
+  drawStat(doc, pw - 109, 36, stats.total, "eventos");
+  drawStat(doc, pw - 82, 36, stats.trainings, "cargas");
+  drawStat(doc, pw - 55, 36, stats.matches, "partidos");
+  drawStat(doc, pw - 28, 36, stats.trips, "viajes");
 
-  const legend = ["Partido", "Entrenamiento", "Gimnasio", "Comida", "Descanso", "Viaje"];
-  let lx = 118;
-  legend.forEach((key) => {
-    const st = TYPE_STYLES[key] || TYPE_STYLES.Otro;
-    setFill(doc, st.fill);
-    doc.roundedRect(lx, 34.5, 4, 4, 1, 1, "F");
-    setText(doc, BRAND.muted);
+  const gridX = margin;
+  const gridY = 50;
+  const labelW = 18;
+  const gridW = pw - margin * 2;
+  const dayW = (gridW - labelW) / days.length;
+  const headerH = 15;
+  const bodyH = ph - gridY - 20;
+  const morningH = bodyH * 0.58;
+  const afternoonH = bodyH - morningH;
+
+  setStroke(doc, "#000000");
+  doc.setLineWidth(0.55);
+  doc.rect(gridX, gridY, gridW, headerH + bodyH, "S");
+
+  setFill(doc, BRAND.yellow);
+  doc.rect(gridX, gridY, labelW, headerH + bodyH, "F");
+  doc.rect(gridX, gridY + headerH + morningH, labelW, afternoonH, "F");
+  setStroke(doc, "#000000");
+  doc.rect(gridX, gridY, labelW, headerH + bodyH, "S");
+  doc.line(gridX, gridY + headerH + morningH, gridX + labelW, gridY + headerH + morningH);
+
+  setText(doc, "#000000");
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(9.2);
+  doc.text("MAÑANA", gridX + labelW / 2, gridY + headerH + morningH / 2, { align: "center", angle: 0 });
+  doc.text("TARDE", gridX + labelW / 2, gridY + headerH + morningH + afternoonH / 2, { align: "center", angle: 0 });
+
+  days.forEach((day, idx) => {
+    const x = gridX + labelW + idx * dayW;
+    const events = eventsForDate(day.format("YYYY-MM-DD"));
+    const groups = splitByMoment(events);
+
+    setFill(doc, BRAND.greenDark);
+    doc.rect(x, gridY, dayW, headerH, "F");
+    setStroke(doc, "#000000");
+    doc.rect(x, gridY, dayW, headerH + bodyH, "S");
+    doc.line(x, gridY + headerH, x + dayW, gridY + headerH);
+    doc.line(x, gridY + headerH + morningH, x + dayW, gridY + headerH + morningH);
+
+    setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(5.5);
-    doc.text(st.label.toUpperCase(), lx + 5.5, 37.8);
-    lx += 25;
-  });
+    doc.setFontSize(days.length > 7 ? 8.8 : 9.8);
+    doc.text(spanishDayTitle(day), x + dayW / 2, gridY + 9.5, { align: "center" });
 
-  setFill(doc, BRAND.panel);
-  doc.roundedRect(margin, 32, pw - margin * 2, ph - 43, 3, 3, "F");
-  doc.setDrawColor(...rgb(BRAND.line));
-  doc.roundedRect(margin, 32, pw - margin * 2, ph - 43, 3, 3, "S");
+    setFill(doc, "#F6F5F0");
+    doc.rect(x, gridY + headerH, dayW, morningH, "F");
+    doc.rect(x, gridY + headerH + morningH, dayW, afternoonH, "F");
+    setStroke(doc, "#000000");
+    doc.rect(x, gridY + headerH, dayW, morningH, "S");
+    doc.rect(x, gridY + headerH + morningH, dayW, afternoonH, "S");
 
-  const gridX = margin + 5;
-  const gridY = 43;
-  const gridW = pw - margin * 2 - 10;
-  const colGap = 2;
-  const colW = (gridW - colGap * 6) / 7;
-  const colH = ph - gridY - 17;
+    drawEvents(doc, groups.morning, x + 0.5, gridY + headerH + 2, dayW - 1, morningH - 4);
+    drawEvents(doc, groups.afternoon, x + 0.5, gridY + headerH + morningH + 2, dayW - 1, afternoonH - 4);
 
-  days.forEach((d, i) => {
-    const x = gridX + i * (colW + colGap);
-    const dateKey = d.format("YYYY-MM-DD");
-    const evs = eventsForDate(dateKey);
-    setFill(doc, "#FFFFFF");
-    doc.roundedRect(x, gridY, colW, colH, 2, 2, "F");
-    doc.setDrawColor(...rgb("#E5E7EB"));
-    doc.roundedRect(x, gridY, colW, colH, 2, 2, "S");
-
-    setFill(doc, i >= 5 ? "#EEF7F1" : "#F3F4F6");
-    doc.roundedRect(x + 1.2, gridY + 1.2, colW - 2.4, 13, 1.6, 1.6, "F");
-    setText(doc, BRAND.ink);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.2);
-    doc.text(d.format("dddd").toUpperCase(), x + colW / 2, gridY + 6, { align: "center" });
-    setText(doc, BRAND.muted);
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    doc.text(d.format("DD/MM/YYYY"), x + colW / 2, gridY + 10.5, { align: "center" });
-
-    const areaY = gridY + 17;
-    const available = colH - 20;
-    const maxVisible = Math.max(1, Math.min(evs.length, 6));
-    const cardH = evs.length > 4 ? 14 : 17;
-    const visible = evs.slice(0, Math.floor(available / cardH));
-
-    if (!visible.length) {
+    if (!events.length) {
       setText(doc, "#9CA3AF");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.5);
-      doc.text("SIN ACTIVIDADES", x + colW / 2, areaY + 12, { align: "center" });
-    }
-
-    visible.forEach((ev, idx) => {
-      const y = areaY + idx * cardH;
-      const st = styleFor(ev);
-      setFill(doc, st.fill);
-      doc.roundedRect(x + 1.8, y, colW - 3.6, cardH - 1.6, 2, 2, "F");
-      setText(doc, "#FFFFFF");
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(6.7);
-      const title = String(ev.title || st.label).toUpperCase();
-      doc.text(title, x + 4, y + 5.2, { maxWidth: colW - 8 });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(5.4);
-      const sub = eventSubtitle(ev);
-      if (sub) doc.text(sub, x + 4, y + 9.5, { maxWidth: colW - 8 });
-      if (ev.notes && cardH >= 16) {
-        doc.setFontSize(4.8);
-        doc.text(String(ev.notes), x + 4, y + 13, { maxWidth: colW - 8 });
-      }
-    });
-
-    if (evs.length > visible.length) {
-      setText(doc, BRAND.green);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(5.6);
-      doc.text(`+${evs.length - visible.length} actividades más`, x + colW / 2, gridY + colH - 3, { align: "center" });
+      doc.setFontSize(7);
+      doc.text("SIN ACTIVIDADES", x + dayW / 2, gridY + headerH + bodyH / 2, { align: "center" });
     }
   });
 
-  setFill(doc, BRAND.green);
+  setFill(doc, BRAND.greenDark);
   doc.rect(0, ph - 8, pw, 8, "F");
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(6.2);
-  doc.text(`PERFORMANCEPITCH · ${CLUB_BRAND.name.toUpperCase()}`, margin, ph - 3.2);
+  doc.text(`${CLUB_BRAND.name.toUpperCase()} · PERFORMANCEPITCH`, margin, ph - 3.2);
   doc.setFont("helvetica", "normal");
-  doc.text("Documento operativo — horarios sujetos a modificación", pw - margin, ph - 3.2, { align: "right" });
+  doc.text(`${season ? `Temporada ${season} · ` : ""}Documento operativo — horarios sujetos a modificación`, pw - margin, ph - 3.2, { align: "right" });
 
   return doc;
 }
