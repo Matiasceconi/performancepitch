@@ -53,6 +53,7 @@ export default function ExternalGpsDashboard() {
   }, []);
 
   const seasons = useMemo(() => [...new Set(squads.map((s) => s.season).filter(Boolean))].sort().reverse(), [squads]);
+  const selectedSquad = useMemo(() => squads.find((s) => s.id === selectedSquadId), [squads, selectedSquadId]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -67,7 +68,7 @@ export default function ExternalGpsDashboard() {
       setCompetitionProfiles(allCompetitionProfiles);
       setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
 
-      const squadSessions = allSessions.filter((s) => !selectedSquadId || s.squad_id === selectedSquadId);
+      const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId);
       setSessions(squadSessions);
 
       if (squadSessions.length > 0) {
@@ -247,7 +248,7 @@ export default function ExternalGpsDashboard() {
       </div>
 
       {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} />
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} />
       )}
 
       {activeTab === "sessions" && (
