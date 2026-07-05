@@ -1,61 +1,53 @@
 import React, { useState } from "react";
 import { Download } from "lucide-react";
-import { jsPDF } from "jspdf";
-import html2canvas from "html2canvas";
-import moment from "moment";
+import { base44 } from "@/api/base44Client";
+import { MICRO_METRICS } from "./gpsMicrocycleReportUtils";
+import { generateMicrocyclePdf } from "./gpsMicrocyclePdfRenderer";
 
-const CLUB_LOGO_URL = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/36f6c4008_defensa.png";
+const DEFAULT_OPTIONS = {
+  includeCharts: true,
+  includeRankings: true,
+  includeDailyTable: true,
+  includeComparison: true,
+  includeAi: false,
+  includeHighlightedPlayers: true,
+};
 
-async function imageToDataUrl(url) {
-  try {
-    const res = await fetch(url);
-    const blob = await res.blob();
-    return await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); });
-  } catch { return null; }
-}
+const OPTION_LABELS = [
+  ["includeCharts", "Incluir gráficos"],
+  ["includeRankings", "Incluir rankings"],
+  ["includeDailyTable", "Incluir tabla diaria"],
+  ["includeComparison", "Incluir comparación"],
+  ["includeAi", "Incluir análisis IA"],
+  ["includeHighlightedPlayers", "Incluir jugadores destacados"],
+];
 
-async function drawClubHeader(doc, logo, squadName, season, start, end) {
-  doc.setFillColor(3, 20, 11); doc.rect(0, 0, 297, 210, "F");
-  doc.setFillColor(0, 128, 62); doc.rect(0, 0, 297, 12, "F");
-  doc.setFillColor(255, 214, 0); doc.rect(0, 12, 297, 3, "F");
-  if (logo) doc.addImage(logo, "PNG", 14, 18, 20, 20);
-  doc.setTextColor(255, 255, 255); doc.setFontSize(15); doc.text("Informe de microciclo GPS", 42, 27);
-  doc.setTextColor(255, 214, 0); doc.setFontSize(9); doc.text(`${squadName || "Plantel"} · Temporada ${season || "—"}`, 42, 34);
-  doc.setTextColor(210, 210, 210); doc.setFontSize(8); doc.text(`${start ? moment(start).format("DD/MM") : ""} - ${end ? moment(end).format("DD/MM/YYYY") : ""}`, 240, 27);
-}
-
-export default function GpsMicrocyclePdfButton({ squadName, season, dailySummaries, captureRef }) {
+export default function GpsMicrocyclePdfButton({ squadName, season, dailySummaries, highlights, comparison, cycleDays }) {
+  const [open, setOpen] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [options, setOptions] = useState(DEFAULT_OPTIONS);
+
+  async function buildAiText() {
+    if (!options.includeAi) return "";
+    const res = await base44.integrations.Core.InvokeLLM({
+      prompt: `Redacta conclusiones profesionales, breves y accionables para un informe de rendimiento de fútbol. Usa español técnico y claro. Datos: ${JSON.stringify({ dailySummaries, highlights, comparison }).slice(0, 12000)}`,
+    });
+    return typeof res === "string" ? res : String(res || "");
+  }
+
   async function exportPdf() {
     setExporting(true);
     try {
-      const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-      const start = dailySummaries[0]?.date, end = dailySummaries[dailySummaries.length - 1]?.date;
-      const logo = await imageToDataUrl(CLUB_LOGO_URL);
-      await drawClubHeader(doc, logo, squadName, season, start, end);
-
-      if (captureRef?.current) {
-        const canvas = await html2canvas(captureRef.current, { scale: 2, backgroundColor: "#09090b", useCORS: true });
-        const pageW = 269;
-        const pageH = 156;
-        const sourcePageH = Math.floor((canvas.width * pageH) / pageW);
-        const pagesNeeded = Math.max(1, Math.ceil(canvas.height / sourcePageH));
-        for (let page = 0; page < pagesNeeded; page++) {
-          if (page > 0) { doc.addPage("a4", "landscape"); await drawClubHeader(doc, logo, squadName, season, start, end); }
-          const sliceY = page * sourcePageH;
-          const sliceH = Math.min(sourcePageH, canvas.height - sliceY);
-          if (sliceH <= 0) break;
-          const slice = document.createElement("canvas");
-          slice.width = canvas.width; slice.height = sliceH;
-          slice.getContext("2d").drawImage(canvas, 0, sliceY, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
-          const img = slice.toDataURL("image/png");
-          const imgH = Math.min(pageH, (sliceH * pageW) / canvas.width);
-          doc.addImage(img, "PNG", 14, 44, pageW, imgH);
-          doc.setTextColor(150, 150, 150); doc.setFontSize(7); doc.text(`Generado ${moment().format("DD/MM/YYYY HH:mm")} · Página ${page + 1}/${pagesNeeded}`, 14, 202);
-        }
-      }
-      doc.save(`informe-microciclo-${start || "gps"}.pdf`);
+      const aiText = await buildAiText();
+      await generateMicrocyclePdf({ squadName, season, dailySummaries, highlights, comparison, metrics: MICRO_METRICS, cycleDays, options, aiText });
+      setOpen(false);
     } finally { setExporting(false); }
   }
-  return <button onClick={exportPdf} disabled={exporting} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-colors"><Download size={16} /> {exporting ? "Generando..." : "Exportar informe"}</button>;
+
+  return (
+    <>
+      <button onClick={() => setOpen(true)} disabled={exporting} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-colors"><Download size={16} /> {exporting ? "Generando..." : "Exportar informe"}</button>
+      {open && <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-4"><div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-2xl p-5 shadow-2xl"><h3 className="text-white text-lg font-bold">Opciones de exportación</h3><p className="text-zinc-400 text-sm mt-1">Informe PDF profesional sin capturas de pantalla.</p><div className="space-y-3 mt-5">{OPTION_LABELS.map(([key, label]) => <label key={key} className="flex items-center gap-3 text-zinc-200 text-sm"><input type="checkbox" checked={options[key]} onChange={(e) => setOptions((p) => ({ ...p, [key]: e.target.checked }))} className="w-4 h-4 accent-emerald-600" />{label}</label>)}</div><div className="flex justify-end gap-2 mt-6"><button onClick={() => setOpen(false)} className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white text-sm">Cancelar</button><button onClick={exportPdf} disabled={exporting} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white text-sm font-bold">{exporting ? "Generando..." : "Generar PDF"}</button></div></div></div>}
+    </>
+  );
 }

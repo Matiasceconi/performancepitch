@@ -62,7 +62,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
           <h2 className="text-2xl font-bold text-white mt-1">Resumen del microciclo</h2>
           <p className="text-zinc-400 text-sm mt-1">{squadName || "Plantel activo"} · {weekStart ? moment(weekStart).format("DD/MM") : ""} - {weekEnd ? moment(weekEnd).format("DD/MM/YYYY") : ""}</p>
         </div>
-        <div className="flex gap-2 flex-wrap"><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={cycleDays} metrics={MICRO_METRICS} /><GpsMicrocycleAiAnalysis dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} captureRef={reportCaptureRef} /></div>
+        <div className="flex gap-2 flex-wrap"><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={cycleDays} metrics={MICRO_METRICS} /><GpsMicrocycleAiAnalysis dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} cycleDays={cycleDays} /></div>
       </div>
 
       <div ref={reportCaptureRef} className="space-y-5">
