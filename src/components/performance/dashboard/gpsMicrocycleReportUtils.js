@@ -10,7 +10,6 @@ export const MICRO_METRICS = [
   { key: "acc_3", label: "ACC +3", short: "ACC +3", unit: "", color: "#a855f7", mode: "avg" },
   { key: "dec_3", label: "DEC +3", short: "DEC +3", unit: "", color: "#14b8a6", mode: "avg" },
   { key: "player_load", label: "Player Load", short: "PL", unit: "u", color: "#3b82f6", mode: "avg" },
-  { key: "player_load_per_min", label: "Player Load/min", short: "PL/min", unit: "", color: "#84cc16", mode: "avg" },
   { key: "smax", label: "Smax", short: "Smax", unit: "km/h", color: "#eab308", mode: "max" },
 ];
 
@@ -23,7 +22,6 @@ export const HIGHLIGHT_METRICS = [
   { key: "acc_3", label: "ACC +3", unit: "", color: "#a855f7", mode: "sum" },
   { key: "dec_3", label: "DEC +3", unit: "", color: "#14b8a6", mode: "sum" },
   { key: "player_load", label: "Player Load", unit: "u", color: "#3b82f6", mode: "sum" },
-  { key: "player_load_per_min", label: "Player Load/min", unit: "", color: "#84cc16", mode: "avg" },
   { key: "smax", label: "Smax", unit: "km/h", color: "#eab308", mode: "max" },
 ];
 
