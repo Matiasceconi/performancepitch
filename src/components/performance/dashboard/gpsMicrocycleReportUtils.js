@@ -10,23 +10,27 @@ export const MICRO_METRICS = [
   { key: "acc_3", label: "ACC +3", short: "ACC +3", unit: "", color: "#a855f7", mode: "avg" },
   { key: "dec_3", label: "DEC +3", short: "DEC +3", unit: "", color: "#14b8a6", mode: "avg" },
   { key: "player_load", label: "Player Load", short: "PL", unit: "u", color: "#3b82f6", mode: "avg" },
-  { key: "smax", label: "Smax máxima", short: "Smax", unit: "km/h", color: "#eab308", mode: "max" },
+  { key: "player_load_per_min", label: "Player Load/min", short: "PL/min", unit: "", color: "#84cc16", mode: "avg" },
+  { key: "smax", label: "Smax", short: "Smax", unit: "km/h", color: "#eab308", mode: "max" },
 ];
 
 export const HIGHLIGHT_METRICS = [
-  { key: "total_distance", label: "Mayor distancia acumulada", unit: "m", color: "#22c55e", mode: "sum" },
-  { key: "player_load", label: "Mayor Player Load acumulado", unit: "u", color: "#3b82f6", mode: "sum" },
-  { key: "smax", label: "Mayor Smax", unit: "km/h", color: "#eab308", mode: "max" },
-  { key: "sprints", label: "Más sprints", unit: "", color: "#f59e0b", mode: "sum" },
-  { key: "acc_3", label: "Más ACC +3", unit: "", color: "#a855f7", mode: "sum" },
-  { key: "dec_3", label: "Más DEC +3", unit: "", color: "#14b8a6", mode: "sum" },
-  { key: "distance_25", label: "Mayor D >25", unit: "m", color: "#ef4444", mode: "sum" },
+  { key: "total_distance", label: "Distancia acumulada", unit: "m", color: "#22c55e", mode: "sum" },
+  { key: "m_min", label: "m/min", unit: "", color: "#60a5fa", mode: "avg" },
+  { key: "distance_19_8", label: "D >19.8", unit: "m", color: "#f97316", mode: "sum" },
+  { key: "distance_25", label: "D >25", unit: "m", color: "#ef4444", mode: "sum" },
+  { key: "sprints", label: "Sprints", unit: "", color: "#f59e0b", mode: "sum" },
+  { key: "acc_3", label: "ACC +3", unit: "", color: "#a855f7", mode: "sum" },
+  { key: "dec_3", label: "DEC +3", unit: "", color: "#14b8a6", mode: "sum" },
+  { key: "player_load", label: "Player Load", unit: "u", color: "#3b82f6", mode: "sum" },
+  { key: "player_load_per_min", label: "Player Load/min", unit: "", color: "#84cc16", mode: "avg" },
+  { key: "smax", label: "Smax", unit: "km/h", color: "#eab308", mode: "max" },
 ];
 
 export function fmt(value, unit = "") {
   if (value == null || Number.isNaN(Number(value))) return "—";
   const n = Number(value);
-  const shown = unit === "km/h" ? n.toFixed(1) : Math.round(n).toLocaleString("es-AR");
+  const shown = unit === "km/h" || n < 100 ? n.toFixed(1) : Math.round(n).toLocaleString("es-AR");
   return `${shown} ${unit}`.trim();
 }
 
@@ -39,16 +43,16 @@ function aggregate(rows, key, mode = "avg") {
 }
 
 export function getCycleDays(cycleDays) {
-  return cycleDays?.length ? cycleDays : Array.from({ length: 7 }, (_, i) => ({
-    date: moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD"),
-    md: "—",
-    objetivo: "—",
-  }));
+  return cycleDays?.length ? cycleDays : Array.from({ length: 7 }, (_, i) => ({ date: moment().startOf("isoWeek").add(i, "days").format("YYYY-MM-DD"), md: "—", objetivo: "—" }));
 }
 
 export function normalizeRows(rows, playerMap) {
   return rows
-    .map((r) => ({ ...r, player: playerMap[r.player_id], player_name: r.player_name || playerMap[r.player_id]?.full_name || "Jugador" }))
+    .map((r) => {
+      const player = playerMap[r.player_id];
+      const duration = r.m_min && r.total_distance ? r.total_distance / r.m_min : 0;
+      return { ...r, player, player_name: r.player_name || player?.full_name || "Jugador", player_load_per_min: r.player_load_per_min || (duration ? r.player_load / duration : 0) };
+    })
     .filter((r) => !isGoalkeeper(r.player));
 }
 
@@ -66,19 +70,7 @@ export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerM
     const rawRows = daySessions.flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_title: s.title })));
     const { main, excluded } = splitRows(rawRows, playerMap);
     const metrics = Object.fromEntries(MICRO_METRICS.map((m) => [m.key, aggregate(main, m.key, m.mode)]));
-    return {
-      date: day.date,
-      label: day.date ? moment(day.date).format("ddd DD/MM") : "—",
-      md: day.md || "—",
-      objetivo: day.objetivo || "—",
-      observations: day.observaciones || "",
-      sessions: daySessions,
-      mainRows: main,
-      excludedRows: excluded,
-      gpsPlayers: new Set(main.map((r) => r.player_id)).size,
-      excludedCount: new Set(excluded.map((r) => r.player_id)).size,
-      ...metrics,
-    };
+    return { date: day.date, label: day.date ? moment(day.date).format("ddd DD/MM") : "—", md: day.md || "—", objetivo: day.objetivo || "—", observations: day.observaciones || "", sessions: daySessions, mainRows: main, excludedRows: excluded, gpsPlayers: new Set(main.map((r) => r.player_id)).size, excludedCount: new Set(excluded.map((r) => r.player_id)).size, ...metrics };
   });
 }
 
@@ -96,12 +88,13 @@ export function buildHighlights(rows, playerMap) {
       const value = Number(row[metric.key]);
       if (!Number.isFinite(value) || value <= 0) return;
       const player = playerMap[row.player_id];
-      const current = byPlayer[row.player_id] || { player, name: row.player_name || player?.full_name || "Jugador", value: metric.mode === "max" ? 0 : 0 };
-      current.value = metric.mode === "max" ? Math.max(current.value, value) : current.value + value;
+      const current = byPlayer[row.player_id] || { player, name: row.player_name || player?.full_name || "Jugador", values: [], value: metric.mode === "max" ? 0 : 0 };
+      current.values.push(value);
+      current.value = metric.mode === "max" ? Math.max(current.value, value) : metric.mode === "avg" ? current.values.reduce((a, b) => a + b, 0) / current.values.length : current.value + value;
       byPlayer[row.player_id] = current;
     });
-    const best = Object.values(byPlayer).sort((a, b) => b.value - a.value)[0] || null;
-    return { metric, best };
+    const top = Object.values(byPlayer).sort((a, b) => b.value - a.value).slice(0, 3);
+    return { metric, top, best: top[0] || null };
   });
 }
 

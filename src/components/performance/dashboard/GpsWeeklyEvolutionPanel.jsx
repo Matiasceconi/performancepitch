@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef } from "react";
 import moment from "moment";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import GpsMicrocycleDailyTable from "./GpsMicrocycleDailyTable";
@@ -39,7 +39,7 @@ function MetricChart({ metric, data }) {
 }
 
 export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season }) {
-  const [analysis, setAnalysis] = useState("");
+  const reportCaptureRef = useRef(null);
   const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap }), [sessions, gpsBySession, cycleDays, playerMap]);
   const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap }), [sessions, gpsBySession, cycleDays, playerMap]);
   const highlights = useMemo(() => buildHighlights(cycleRows, playerMap), [cycleRows, playerMap]);
@@ -55,17 +55,18 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
           <h2 className="text-2xl font-bold text-white mt-1">Resumen del microciclo</h2>
           <p className="text-zinc-400 text-sm mt-1">{squadName || "Plantel activo"} · {weekStart ? moment(weekStart).format("DD/MM") : ""} - {weekEnd ? moment(weekEnd).format("DD/MM/YYYY") : ""}</p>
         </div>
-        <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} analysis={analysis} />
+        <div className="flex gap-2 flex-wrap"><GpsMicrocycleAiAnalysis dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} captureRef={reportCaptureRef} /></div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        {MICRO_METRICS.map((metric) => <MetricChart key={metric.key} metric={metric} data={dailySummaries} />)}
-      </div>
+      <div ref={reportCaptureRef} className="space-y-5">
+        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+          {MICRO_METRICS.map((metric) => <MetricChart key={metric.key} metric={metric} data={dailySummaries} />)}
+        </div>
 
-      <GpsMicrocycleDailyTable dailySummaries={dailySummaries} />
-      <GpsMicrocycleHighlights highlights={highlights} />
-      <GpsMicrocycleComparison comparison={comparison} />
-      <GpsMicrocycleAiAnalysis dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} onAnalysisReady={setAnalysis} />
+        <GpsMicrocycleDailyTable dailySummaries={dailySummaries} />
+        <GpsMicrocycleHighlights highlights={highlights} />
+        <GpsMicrocycleComparison comparison={comparison} />
+      </div>
     </div>
   );
 }

@@ -1,68 +1,80 @@
-import React from "react";
+import React, { useState } from "react";
 import { Download } from "lucide-react";
 import { jsPDF } from "jspdf";
+import html2canvas from "html2canvas";
 import moment from "moment";
 import { fmt, MICRO_METRICS } from "./gpsMicrocycleReportUtils";
 
-export default function GpsMicrocyclePdfButton({ squadName, season, dailySummaries, highlights, comparison, analysis }) {
-  function exportPdf() {
-    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-    const start = dailySummaries[0]?.date;
-    const end = dailySummaries[dailySummaries.length - 1]?.date;
-    doc.setFillColor(12, 18, 14); doc.rect(0, 0, 297, 24, "F");
-    doc.setFillColor(34, 197, 94); doc.circle(16, 12, 8, "F");
-    doc.setTextColor(255, 255, 255); doc.setFontSize(9); doc.text("DyJ", 11.5, 14);
-    doc.setFontSize(16); doc.text("Informe de microciclo GPS", 30, 11);
-    doc.setFontSize(9); doc.setTextColor(190, 190, 190);
-    doc.text(`${squadName || "Plantel"} · ${season || "Temporada"} · ${start ? moment(start).format("DD/MM") : ""} - ${end ? moment(end).format("DD/MM/YYYY") : ""}`, 30, 18);
+function drawHeader(doc, title) {
+  doc.setFillColor(7, 18, 12); doc.rect(0, 0, 297, 210, "F");
+  doc.setFillColor(252, 211, 77); doc.rect(0, 0, 297, 4, "F");
+  doc.setFillColor(34, 197, 94); doc.roundedRect(14, 12, 22, 26, 4, 4, "F");
+  doc.setTextColor(7, 18, 12); doc.setFontSize(12); doc.text("DyJ", 20, 28);
+  doc.setTextColor(255, 255, 255); doc.setFontSize(16); doc.text(title, 44, 24);
+  doc.setFontSize(9); doc.setTextColor(220, 220, 220); doc.text("PerformancePitch", 240, 24);
+}
 
-    let y = 34;
-    doc.setTextColor(20, 20, 20); doc.setFontSize(11); doc.text("Carga por día", 12, y); y += 6;
-    doc.setFontSize(7); doc.setTextColor(90, 90, 90);
-    const headers = ["Día", "MD", "Sesiones", ...MICRO_METRICS.map((m) => m.short), "GPS", "Excl."];
-    const widths = [18, 12, 42, 18, 14, 16, 14, 13, 13, 16, 14, 16, 12, 12];
-    let x = 12;
-    headers.forEach((h, i) => { doc.text(h, x, y); x += widths[i]; });
-    y += 4;
-    dailySummaries.forEach((d) => {
-      x = 12; doc.setTextColor(35, 35, 35);
-      const row = [d.label, d.md, d.sessions.map((s) => s.title).join(" / ").slice(0, 28), ...MICRO_METRICS.map((m) => fmt(d[m.key], m.unit)), String(d.gpsPlayers), String(d.excludedCount)];
-      row.forEach((value, i) => { doc.text(String(value || "—").slice(0, 18), x, y); x += widths[i]; });
-      y += 5;
-    });
+async function imageToDataUrl(url) {
+  if (!url) return null;
+  try {
+    const res = await fetch(url);
+    const blob = await res.blob();
+    return await new Promise((resolve) => { const reader = new FileReader(); reader.onloadend = () => resolve(reader.result); reader.readAsDataURL(blob); });
+  } catch { return null; }
+}
 
-    y += 5; doc.setFontSize(11); doc.setTextColor(20, 20, 20); doc.text("Destacados", 12, y); y += 6;
-    doc.setFontSize(8);
-    highlights.forEach((h, i) => {
-      const xPos = 12 + (i % 4) * 68;
-      if (i > 0 && i % 4 === 0) y += 14;
-      doc.setTextColor(90, 90, 90); doc.text(h.metric.label, xPos, y);
-      doc.setTextColor(35, 35, 35); doc.text(`${h.best?.name || "—"} · ${h.best ? fmt(h.best.value, h.metric.unit) : "—"}`, xPos, y + 5);
-    });
-
-    y += 22; doc.setFontSize(11); doc.setTextColor(20, 20, 20); doc.text("Comparación 4 semanas", 12, y); y += 6;
-    doc.setFontSize(8);
-    comparison.slice(0, 6).forEach((c, i) => {
-      const xPos = 12 + (i % 3) * 90;
-      if (i > 0 && i % 3 === 0) y += 11;
-      doc.setTextColor(90, 90, 90); doc.text(c.metric.label, xPos, y);
-      doc.setTextColor(35, 35, 35); doc.text(`${fmt(c.current, c.metric.unit)} vs ${fmt(c.previous, c.metric.unit)} (${c.diff == null ? "—" : c.diff.toFixed(0) + "%"})`, xPos, y + 5);
-    });
-
-    doc.addPage("a4", "landscape"); y = 18;
-    doc.setTextColor(20, 20, 20); doc.setFontSize(13); doc.text("Análisis IA", 12, y); y += 8;
-    doc.setTextColor(40, 40, 40); doc.setFontSize(9);
-    doc.splitTextToSize(analysis || "Sin análisis generado.", 270).forEach((line) => { doc.text(line, 12, y); y += 5; });
-    y += 8; doc.setTextColor(20, 20, 20); doc.setFontSize(13); doc.text("Observaciones del PF", 12, y); y += 8;
-    doc.setTextColor(80, 80, 80); doc.setFontSize(9);
-    const obs = dailySummaries.map((d) => d.observations).filter(Boolean).join("\n") || "Sin observaciones cargadas.";
-    doc.splitTextToSize(obs, 270).forEach((line) => { doc.text(line, 12, y); y += 5; });
-    doc.save(`informe-microciclo-${start || "gps"}.pdf`);
+async function addRankingPage(doc, highlights) {
+  doc.addPage("a4", "landscape"); drawHeader(doc, "Jugadores destacados");
+  let y = 50;
+  for (let i = 0; i < highlights.length; i++) {
+    const h = highlights[i];
+    const x = 14 + (i % 2) * 140;
+    if (i > 0 && i % 2 === 0) y += 39;
+    doc.setTextColor(252, 211, 77); doc.setFontSize(9); doc.text(h.metric.label.toUpperCase(), x, y);
+    for (let idx = 0; idx < (h.top || []).length; idx++) {
+      const p = h.top[idx];
+      const yy = y + 8 + idx * 10;
+      const img = await imageToDataUrl(p.player?.photo_url);
+      if (img) doc.addImage(img, String(img).includes("image/png") ? "PNG" : "JPEG", x, yy - 5, 7, 7);
+      else { doc.setFillColor(39, 39, 42); doc.circle(x + 3.5, yy - 1.5, 3.5, "F"); }
+      doc.setTextColor(255, 255, 255); doc.setFontSize(8); doc.text(`${idx + 1}. ${p.name}`, x + 10, yy);
+      doc.setTextColor(180, 180, 180); doc.text(`${p.player?.position || "—"} · ${fmt(p.value, h.metric.unit)}`, x + 70, yy);
+    }
   }
+}
 
-  return (
-    <button onClick={exportPdf} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold transition-colors">
-      <Download size={16} /> Exportar informe de microciclo
-    </button>
-  );
+export default function GpsMicrocyclePdfButton({ squadName, season, dailySummaries, highlights, comparison, captureRef }) {
+  const [exporting, setExporting] = useState(false);
+  async function exportPdf() {
+    setExporting(true);
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const start = dailySummaries[0]?.date, end = dailySummaries[dailySummaries.length - 1]?.date;
+    drawHeader(doc, "Informe profesional de microciclo GPS");
+    doc.setTextColor(255, 255, 255); doc.setFontSize(24); doc.text("Defensa y Justicia", 24, 72);
+    doc.setFontSize(14); doc.setTextColor(252, 211, 77); doc.text(squadName || "Plantel", 24, 86);
+    doc.setTextColor(220, 220, 220); doc.setFontSize(11); doc.text(`Temporada ${season || "—"} · Semana ${start ? moment(start).format("DD/MM") : ""} - ${end ? moment(end).format("DD/MM/YYYY") : ""}`, 24, 98);
+    doc.text(`Generado: ${moment().format("DD/MM/YYYY HH:mm")}`, 24, 110);
+
+    doc.addPage("a4", "landscape"); drawHeader(doc, "Resumen semanal");
+    if (captureRef?.current) {
+      const canvas = await html2canvas(captureRef.current, { scale: 2, backgroundColor: "#09090b", useCORS: true });
+      const img = canvas.toDataURL("image/png");
+      doc.addImage(img, "PNG", 12, 44, 273, Math.min(140, (canvas.height * 273) / canvas.width));
+    }
+    let y = 188; doc.setTextColor(255, 255, 255); doc.setFontSize(8);
+    comparison.slice(0, 5).forEach((c, i) => doc.text(`${c.metric.label}: ${fmt(c.current, c.metric.unit)} vs ${fmt(c.previous, c.metric.unit)} (${c.diff == null ? "—" : c.diff.toFixed(0) + "%"})`, 14 + i * 55, y));
+
+    await addRankingPage(doc, highlights);
+    doc.addPage("a4", "landscape"); drawHeader(doc, "Carga diaria"); y = 52;
+    dailySummaries.forEach((d) => { doc.setTextColor(255,255,255); doc.setFontSize(8); doc.text(`${d.label} · ${d.md} · GPS ${d.gpsPlayers}`, 14, y); doc.setTextColor(190,190,190); doc.text(MICRO_METRICS.map((m) => `${m.short}: ${fmt(d[m.key], m.unit)}`).join("  |  ").slice(0, 170), 64, y); y += 9; });
+
+    doc.addPage("a4", "landscape"); drawHeader(doc, "Resumen estadístico"); y = 52;
+    highlights.slice(0, 8).forEach((h) => { doc.setTextColor(252,211,77); doc.setFontSize(8); doc.text(h.metric.label, 14, y); doc.setTextColor(255,255,255); doc.text((h.top || []).map((p, i) => `${i + 1}) ${p.name} ${fmt(p.value, h.metric.unit)}`).join("   "), 70, y); y += 8; });
+
+    doc.addPage("a4", "landscape"); drawHeader(doc, "Observaciones del Preparador Físico");
+    doc.setDrawColor(80, 80, 80); for (let yy = 58; yy < 178; yy += 12) doc.line(20, yy, 277, yy);
+    doc.save(`informe-microciclo-${start || "gps"}.pdf`);
+    setExporting(false);
+  }
+  return <button onClick={exportPdf} disabled={exporting} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold transition-colors"><Download size={16} /> {exporting ? "Generando..." : "Exportar informe de microciclo"}</button>;
 }
