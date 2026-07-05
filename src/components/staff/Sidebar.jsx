@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Video, Users, LayoutDashboard, Menu, X, Map, TrendingUp, UsersRound,
   CalendarDays, Trophy, ClipboardList, Settings2, ShieldCheck, BookOpen,
-  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock, Repeat
+  Dumbbell, ChevronDown, ChevronRight, LogOut, User, Gauge, HeartPulse, Heart, Apple, Clock, Repeat, History
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { label: "Partidos",          path: "/matches",         icon: Trophy },
   { label: "Mapa táctico",      path: "/tactical",        icon: Map },
   { label: "Carga Externa",     path: "/performance/external-load", icon: Gauge },
+  { label: "Histórico Microciclos", path: "/performance/microcycle-history", icon: History },
   // "performance" group — shown if any child page is allowed
   { label: "Carga Interna",     path: "/performance/internal-load", icon: HeartPulse,group: "rendimiento" },
   { label: "Área Médica",       path: "/performance/medical",       icon: Heart,     group: "rendimiento" },
@@ -35,7 +36,7 @@ const NAV_ITEMS = [
 
 const SESSION_PATHS = ["/sessions", "/field-library", "/strength-library"];
 const PERFORMANCE_PATHS = ["/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes"];
-const BEFORE_PERFORMANCE_PATHS = ["/matches", "/tactical", "/performance/external-load"];
+const BEFORE_PERFORMANCE_PATHS = ["/matches", "/tactical", "/performance/external-load", "/performance/microcycle-history"];
 
 export default function Sidebar() {
   const location = useLocation();

@@ -23,6 +23,7 @@ export const PAGES = [
   { path: "/matches",                       label: "Partidos" },
   { path: "/tactical",                      label: "Mapa táctico" },
   { path: "/performance/external-load",     label: "Carga Externa (GPS)" },
+  { path: "/performance/microcycle-history", label: "Histórico de Microciclos" },
   { path: "/performance/internal-load",     label: "Carga Interna" },
   { path: "/performance/medical",           label: "Área Médica" },
   { path: "/performance/nutrition",         label: "Nutrición" },

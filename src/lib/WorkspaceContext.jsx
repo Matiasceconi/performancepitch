@@ -106,7 +106,7 @@ export function WorkspaceProvider({ children }) {
         AREAS.forEach(a => {
           allowedAreaIds.add(a.id);
           pagesMap[a.id] = new Set(["/", "/daily-squad", "/sessions", "/field-library", "/strength-library", "/matches", "/tactical",
-            "/performance/external-load", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes",
+            "/performance/external-load", "/performance/microcycle-history", "/performance/internal-load", "/performance/medical", "/performance/nutrition", "/performance/minutes",
             "/schedule", "/team", "/weekly-planner", "/squad-manager", "/admin"]);
         });
       }

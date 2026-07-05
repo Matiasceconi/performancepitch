@@ -23,6 +23,7 @@ import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
 import Tactical from '@/pages/Tactical';
 import PerformanceExternalLoad from '@/pages/PerformanceExternalLoad';
+import MicrocycleHistory from '@/pages/MicrocycleHistory';
 import PerformanceInternalLoad from '@/pages/PerformanceInternalLoad';
 import PerformanceMedical from '@/pages/PerformanceMedical';
 import PerformanceNutrition from '@/pages/PerformanceNutrition';
@@ -112,6 +113,7 @@ const AuthenticatedApp = () => {
           <Route path="/catapult" element={<Catapult />} />
           <Route path="/tactical" element={<Tactical />} />
           <Route path="/performance/external-load" element={<PerformanceExternalLoad />} />
+          <Route path="/performance/microcycle-history" element={<MicrocycleHistory />} />
           <Route path="/performance/internal-load" element={<PerformanceInternalLoad />} />
           <Route path="/performance/medical" element={<PerformanceMedical />} />
           <Route path="/performance/nutrition" element={<PerformanceNutrition />} />
