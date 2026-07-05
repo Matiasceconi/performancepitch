@@ -1,34 +1,30 @@
-import React, { useMemo } from "react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
+import React, { useState } from "react";
+import { PROFILE_METRICS } from "./gpsProfileMetrics";
+import GpsIndividualMicrocycleTable from "./GpsIndividualMicrocycleTable";
+import GpsRecalculateProfilesButton from "./GpsRecalculateProfilesButton";
 
-const METRICS = [
-  { key: "total_distance", label: "Distancia" },
-  { key: "player_load", label: "Player Load" },
-  { key: "sprints", label: "Sprints" },
-  { key: "m_min", label: "m/min" },
-];
-function avg(values) { const clean = values.filter(v => Number.isFinite(Number(v))); return clean.length ? Math.round(clean.reduce((a, b) => a + Number(b), 0) / clean.length) : 0; }
-
-export default function GpsIndividualProfilePanel({ rows, selectedPlayerId, onSelectPlayer }) {
-  const players = useMemo(() => [...new Map(rows.map(r => [r.player_id, r.player_name])).entries()], [rows]);
-  const data = useMemo(() => {
-    const playerRows = rows.filter(r => r.player_id === selectedPlayerId);
-    return METRICS.map(m => ({ metric: m.label, valor: avg(playerRows.map(r => r[m.key])) }));
-  }, [rows, selectedPlayerId]);
+export default function GpsIndividualProfilePanel({ players, competitionProfiles, microcycleProfiles, squadId, seasonId, onReload }) {
+  const [metricKey, setMetricKey] = useState("avg_total_distance");
+  const metric = PROFILE_METRICS.find((m) => m.key === metricKey) || PROFILE_METRICS[0];
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
-      <div className="flex items-center justify-between gap-3 flex-wrap">
-        <div><h2 className="text-xl font-bold text-white">Perfil individual</h2><p className="text-zinc-500 text-sm">Promedios del jugador seleccionado</p></div>
-        <select value={selectedPlayerId || ""} onChange={e => onSelectPlayer(e.target.value)} className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-xl px-3 py-2">
-          {players.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-5">
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h2 className="text-xl font-bold text-white">Perfil individual por microciclo</h2>
+          <p className="text-zinc-500 text-sm mt-1">Promedios por día MD comparados contra el perfil competitivo real de partido +80’.</p>
+        </div>
+        <GpsRecalculateProfilesButton squadId={squadId} seasonId={seasonId} onDone={onReload} />
+      </div>
+
+      <div className="flex items-center gap-3 flex-wrap">
+        <span className="text-sm text-zinc-400">Métrica</span>
+        <select value={metricKey} onChange={(e) => setMetricKey(e.target.value)} className="bg-zinc-800 border border-zinc-700 text-white text-sm rounded-xl px-3 py-2">
+          {PROFILE_METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}
         </select>
       </div>
-      <div className="h-80">
-        <ResponsiveContainer width="100%" height="100%">
-          <BarChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="metric" stroke="#71717a" fontSize={11} /><YAxis stroke="#71717a" fontSize={11} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} /><Bar dataKey="valor" fill="#22c55e" radius={[8, 8, 0, 0]}><LabelList dataKey="valor" position="top" fill="#e4e4e7" fontSize={11} fontWeight={700} /></Bar></BarChart>
-        </ResponsiveContainer>
-      </div>
+
+      <GpsIndividualMicrocycleTable players={players} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} metric={metric} />
     </div>
   );
 }

@@ -19,6 +19,10 @@
       "type": "string",
       "description": "Nombre del plantel (desnormalizado)"
     },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada del plantel"
+    },
     "session_type": {
       "type": "string",
       "enum": [
@@ -49,6 +53,19 @@
         "Otro"
       ],
       "description": "C\u00f3digo relativo al partido"
+    },
+    "microcycle_day": {
+      "type": "string",
+      "enum": [
+        "MD-4",
+        "MD-3",
+        "MD-2",
+        "MD-1",
+        "MD",
+        "MD+1",
+        "MD+2"
+      ],
+      "description": "D\u00eda usado para perfiles GPS de microciclo"
     },
     "session_objective": {
       "type": "string",
@@ -149,7 +166,7 @@
       "enum": [
         "excel_historico"
       ],
-      "description": "Origen de importaci\u00f3n masiva, usado para evitar duplicar sesiones al re-importar el mismo Excel"
+      "description": "Origen de importaci\u00f3n masiva"
     },
     "gps_report_observations": {
       "type": "string",

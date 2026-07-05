@@ -30,6 +30,8 @@ export default function ExternalGpsDashboard() {
   const [sessions, setSessions] = useState([]);
   const [gpsBySession, setGpsBySession] = useState({});
   const [competitionProfiles, setCompetitionProfiles] = useState([]);
+  const [microcycleProfiles, setMicrocycleProfiles] = useState([]);
+  const [memberships, setMemberships] = useState([]);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -58,14 +60,18 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles, allWeeklyPlans] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMemberships, allWeeklyPlans] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
+        base44.entities.PlayerMicrocycleGPSProfile.list("-updated_at", 2000),
+        base44.entities.SquadMembership.list("-created_date", 2000),
         base44.entities.WeeklyPlan.list("-week_start", 100),
       ]);
       setPlayers(allPlayers.filter((p) => p.active !== false));
-      setCompetitionProfiles(allCompetitionProfiles);
+      setCompetitionProfiles(allCompetitionProfiles.filter((p) => (!selectedSquadId || p.squad_id === selectedSquadId) && (!selectedSeason || p.season_id === selectedSeason)));
+      setMicrocycleProfiles(allMicrocycleProfiles.filter((p) => (!selectedSquadId || p.squad_id === selectedSquadId) && (!selectedSeason || p.season_id === selectedSeason)));
+      setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
       setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
 
       const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId);
@@ -91,7 +97,7 @@ export default function ExternalGpsDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [selectedSquadId]);
+  }, [selectedSquadId, selectedSeason]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -152,6 +158,9 @@ export default function ExternalGpsDashboard() {
   }, [weeklyPlans, today]);
 
   const cycleDays = currentCycle?.days_data || [];
+
+  const rosterPlayerIds = useMemo(() => new Set(memberships.map((m) => m.player_id)), [memberships]);
+  const rosterPlayers = useMemo(() => players.filter((p) => rosterPlayerIds.has(p.id)), [players, rosterPlayerIds]);
 
   const selectedSession = sessions.find((s) => s.id === selectedSessionId);
   const sessionRows = useMemo(() => {
@@ -217,7 +226,7 @@ export default function ExternalGpsDashboard() {
   const tabs = [
     { id: "microcycle", label: "Resumen del microciclo" },
     { id: "sessions", label: "Buscar sesiones" },
-    { id: "individual", label: "Perfil individual" },
+    { id: "individual", label: "Perfil competitivo individual" },
     { id: "team", label: "Perfil del equipo" },
   ];
 
@@ -226,7 +235,11 @@ export default function ExternalGpsDashboard() {
       <GpsDashboardHeader
         squads={squads}
         selectedSquadId={selectedSquadId}
-        onSquadChange={setSelectedSquadId}
+        onSquadChange={(id) => {
+          setSelectedSquadId(id);
+          const squad = squads.find((s) => s.id === id);
+          if (squad) setSelectedSeason(squad.season || "");
+        }}
         seasons={seasons}
         selectedSeason={selectedSeason}
         onSeasonChange={setSelectedSeason}
@@ -269,7 +282,16 @@ export default function ExternalGpsDashboard() {
         </div>
       )}
 
-      {activeTab === "individual" && <GpsIndividualProfilePanel rows={allEnrichedRows} selectedPlayerId={selectedPlayerId} onSelectPlayer={setSelectedPlayerId} />}
+      {activeTab === "individual" && (
+        <GpsIndividualProfilePanel
+          players={rosterPlayers}
+          competitionProfiles={competitionProfiles}
+          microcycleProfiles={microcycleProfiles}
+          squadId={selectedSquadId}
+          seasonId={selectedSeason || selectedSquad?.season || ""}
+          onReload={load}
+        />
+      )}
 
       {activeTab === "team" && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

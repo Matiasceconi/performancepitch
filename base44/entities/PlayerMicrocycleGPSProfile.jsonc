@@ -12,7 +12,7 @@
     },
     "season_id": {
       "type": "string",
-      "description": "Temporada (season del plantel)"
+      "description": "Temporada del plantel"
     },
     "microcycle_day": {
       "type": "string",
