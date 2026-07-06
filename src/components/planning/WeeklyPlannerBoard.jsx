@@ -6,6 +6,7 @@ import moment from "moment";
 import "moment/locale/es";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { CLUB_BRAND } from "@/lib/clubBrand";
 import { MICROCycle_TEMPLATES } from "@/components/planning/microcycleTemplates";
 import MicrocycleTopSummary from "@/components/planning/MicrocycleTopSummary";
 import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
@@ -104,9 +105,12 @@ function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, s
       <button onClick={() => window.print()} className="px-3 py-2 bg-zinc-900 text-white rounded-lg text-sm flex items-center gap-2"><Printer size={15} /> Imprimir / PDF</button>
       <button onClick={onExit} className="px-3 py-2 bg-zinc-200 rounded-lg text-sm">Volver</button>
     </div>
-    <div className="border-b-4 border-emerald-700 pb-4 mb-5 flex justify-between items-start">
-      <div><p className="text-xs font-bold text-emerald-700 uppercase">PerformancePitch</p><h1 className="text-3xl font-black">Planificación de Microciclo</h1><p className="text-sm text-zinc-600">Semana {meta.week_number} · {meta.range_label}</p></div>
-      <div className="text-right text-sm"><p className="font-black uppercase">{meta.week_type}</p><p>{meta.next_match}</p></div>
+    <div className="rounded-2xl border-b-4 pb-4 mb-5 p-4 flex justify-between items-start" style={{ borderColor: CLUB_BRAND.colors.green, background: `linear-gradient(135deg, ${CLUB_BRAND.colors.panel}, #ffffff 62%, ${CLUB_BRAND.colors.yellow}22)` }}>
+      <div className="flex items-center gap-4">
+        <img src={CLUB_BRAND.logoUrl} alt={CLUB_BRAND.name} className="w-16 h-16 object-contain" />
+        <div><p className="text-xs font-bold uppercase" style={{ color: CLUB_BRAND.colors.greenDark }}>{CLUB_BRAND.name}</p><h1 className="text-3xl font-black">Planificación de Microciclo</h1><p className="text-sm text-zinc-600">Semana {meta.week_number} · {meta.range_label}</p></div>
+      </div>
+      <div className="text-right text-sm"><p className="font-black uppercase" style={{ color: CLUB_BRAND.colors.greenDeep }}>{meta.week_type}</p><p>{meta.next_match}</p></div>
     </div>
     <div className="grid gap-2 mb-5" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
       {days.map((day, idx) => {
@@ -143,18 +147,18 @@ function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, s
         </div>;
       })}
     </div>
-    <div className="grid grid-cols-3 gap-3"><div className="border rounded-xl p-3"><p className="text-xs font-black text-emerald-700 uppercase">Resumen automático</p><p className="text-sm mt-2 whitespace-pre-wrap">{summary}</p></div><div className="border rounded-xl p-3 col-span-2"><LoadChart data={dayLoads} type="barras" clean /></div></div>
+    <div className="grid grid-cols-3 gap-3"><div className="border rounded-xl p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-xs font-black uppercase" style={{ color: CLUB_BRAND.colors.greenDark }}>Resumen automático</p><p className="text-sm mt-2 whitespace-pre-wrap">{summary}</p></div><div className="border rounded-xl p-3 col-span-2" style={{ borderColor: CLUB_BRAND.colors.line }}><LoadChart data={dayLoads} type="barras" clean /></div></div>
   </div>;
 }
 
 function LoadChart({ data, type, clean = false }) {
   const chartData = data.map(d => ({ day: d.day, Carga: Math.round(d.player_load || 0), Distancia: Math.round((d.total_distance || 0) / 100) }));
   const text = clean ? "#111827" : "#a1a1aa";
-  if (type === "radar") return <ResponsiveContainer width="100%" height={260}><RadarChart data={chartData}><PolarGrid stroke="#334155" /><PolarAngleAxis dataKey="day" tick={{ fill: text, fontSize: 10 }} /><Radar dataKey="Carga" stroke="#22c55e" fill="#22c55e" fillOpacity={0.35} /></RadarChart></ResponsiveContainer>;
+  if (type === "radar") return <ResponsiveContainer width="100%" height={260}><RadarChart data={chartData}><PolarGrid stroke={CLUB_BRAND.colors.line} /><PolarAngleAxis dataKey="day" tick={{ fill: text, fontSize: 10 }} /><Radar dataKey="Carga" stroke={CLUB_BRAND.colors.green} fill={CLUB_BRAND.colors.green} fillOpacity={0.35} /></RadarChart></ResponsiveContainer>;
   const common = <><CartesianGrid strokeDasharray="3 3" stroke={clean ? "#e5e7eb" : "#27272a"} /><XAxis dataKey="day" tick={{ fill: text, fontSize: 11 }} /><YAxis tick={{ fill: text, fontSize: 10 }} /><Tooltip /></>;
-  if (type === "linea") return <ResponsiveContainer width="100%" height={260}><LineChart data={chartData}>{common}<Line type="monotone" dataKey="Carga" stroke="#22c55e" strokeWidth={3} /></LineChart></ResponsiveContainer>;
-  if (type === "area") return <ResponsiveContainer width="100%" height={260}><AreaChart data={chartData}>{common}<Area type="monotone" dataKey="Carga" stroke="#22c55e" fill="#22c55e" fillOpacity={0.28} /></AreaChart></ResponsiveContainer>;
-  return <ResponsiveContainer width="100%" height={260}><BarChart data={chartData}>{common}<Bar dataKey="Carga" fill="#22c55e" radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer>;
+  if (type === "linea") return <ResponsiveContainer width="100%" height={260}><LineChart data={chartData}>{common}<Line type="monotone" dataKey="Carga" stroke={CLUB_BRAND.colors.green} strokeWidth={3} /></LineChart></ResponsiveContainer>;
+  if (type === "area") return <ResponsiveContainer width="100%" height={260}><AreaChart data={chartData}>{common}<Area type="monotone" dataKey="Carga" stroke={CLUB_BRAND.colors.green} fill={CLUB_BRAND.colors.green} fillOpacity={0.28} /></AreaChart></ResponsiveContainer>;
+  return <ResponsiveContainer width="100%" height={260}><BarChart data={chartData}>{common}<Bar dataKey="Carga" fill={CLUB_BRAND.colors.green} radius={[8, 8, 0, 0]} /></BarChart></ResponsiveContainer>;
 }
 
 export default function WeeklyPlannerBoard() {
@@ -441,10 +445,10 @@ export default function WeeklyPlannerBoard() {
   return <div className="min-h-screen bg-slate-200 text-zinc-950 -m-6 p-6 space-y-3">
     <input ref={aiInputRef} type="file" className="hidden" accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.png,.jpg,.jpeg" onChange={e => handleAiFile(e.target.files?.[0])} />
 
-    <header className="bg-white border border-zinc-200 rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+    <header className="border rounded-xl shadow-sm px-4 py-3 flex items-center justify-between gap-3 flex-wrap overflow-hidden" style={{ borderColor: CLUB_BRAND.colors.line, background: `linear-gradient(135deg, ${CLUB_BRAND.colors.white} 0%, ${CLUB_BRAND.colors.panel} 72%, ${CLUB_BRAND.colors.yellow}26 100%)` }}>
       <div className="flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-slate-950 text-white flex items-center justify-center font-black text-xs">PP</div>
-        <div><h1 className="text-lg font-black tracking-tight">PLANIFICADOR DE MICROCICLO</h1><p className="text-xs text-zinc-500">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"}</p></div>
+        <div className="w-12 h-12 rounded-xl bg-white border flex items-center justify-center shadow-sm p-1.5" style={{ borderColor: CLUB_BRAND.colors.green }}><img src={CLUB_BRAND.logoUrl} alt={CLUB_BRAND.name} className="w-full h-full object-contain" /></div>
+        <div><p className="text-[10px] font-black uppercase tracking-widest" style={{ color: CLUB_BRAND.colors.greenDark }}>{CLUB_BRAND.name}</p><h1 className="text-lg font-black tracking-tight">PLANIFICADOR DE MICROCICLO</h1><p className="text-xs text-zinc-500">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"}</p></div>
       </div>
       <div className="flex gap-2 flex-wrap items-center">
         <button onClick={() => shiftWeek(-1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronLeft size={16} /></button>
@@ -452,9 +456,9 @@ export default function WeeklyPlannerBoard() {
         <select value={days.length} onChange={e => setMicrocycleLength(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n} días</option>)}</select>
         <select value="" onChange={e => { if (e.target.value) applyTemplate(e.target.value); e.target.value = ""; }} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Plantillas de microciclo</option>{MICROCycle_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
         {savedPlans.length > 0 && <select value="" onChange={e => e.target.value && setStartDate(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Planes guardados</option>{savedPlans.map(plan => <option key={plan.id} value={plan.week_start}>{moment(plan.week_start).format("DD/MM/YYYY")}</option>)}</select>}
-        <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-black flex items-center gap-2"><Sparkles size={14} /> {aiLoading ? "Creando..." : "Crear con IA"}</button>
-        <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-black flex items-center gap-2"><Save size={14} /> {saving ? "Guardando..." : "Guardar"}</button>
-        <button onClick={() => setExportMode(true)} className="px-3 py-2 rounded-lg bg-blue-600 text-white text-xs font-black flex items-center gap-2"><Download size={14} /> Exportar / Compartir</button>
+        <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-lg text-white text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.green }}><Sparkles size={14} /> {aiLoading ? "Creando..." : "Crear con IA"}</button>
+        <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.yellow, color: CLUB_BRAND.colors.greenDeep }}><Save size={14} /> {saving ? "Guardando..." : "Guardar"}</button>
+        <button onClick={() => setExportMode(true)} className="px-3 py-2 rounded-lg text-white text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.greenDark }}><Download size={14} /> Exportar / Compartir</button>
       </div>
     </header>
 
