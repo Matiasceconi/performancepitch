@@ -155,7 +155,16 @@ export default function SessionExercises({ session, sessionPlayers }) {
     } else {
       payload.order = exercises.length + 1;
       const created = await base44.entities.SessionExercise.create(payload);
-      const libId = form.library_exercise_id || await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name);
+      let libId = form.library_exercise_id;
+      if (libId) {
+        let shouldUpdateLibrary = updateLibraryToo;
+        if (!shouldUpdateLibrary && fieldImportantChanged(originalExercise, form)) {
+          shouldUpdateLibrary = window.confirm("Este ejercicio está vinculado a la biblioteca. ¿Querés actualizar la plantilla original?");
+        }
+        if (shouldUpdateLibrary) await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name, { updateExistingId: libId, incrementUsage: false });
+      } else {
+        libId = await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name);
+      }
       if (libId && !created.library_exercise_id) {
         await base44.entities.SessionExercise.update(created.id, { library_exercise_id: libId });
         created.library_exercise_id = libId;
@@ -196,6 +205,8 @@ export default function SessionExercises({ session, sessionPlayers }) {
       library_exercise_id: ex.id,
     });
     setEditId(null);
+    setOriginalExercise(ex);
+    setUpdateLibraryToo(false);
     setShowAdvanced(!!ex.notes);
     setShowLibrary(false);
     setShowForm(true);
@@ -377,7 +388,7 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
         <form onSubmit={handleSubmit} className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-5 space-y-4">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <p className="text-sm font-semibold text-white">{editId ? "Editar ejercicio" : "Nuevo ejercicio"}</p>
-            {editId && form.library_exercise_id && (
+            {form.library_exercise_id && (
               <label className="flex items-center gap-2 text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1.5">
                 <input type="checkbox" checked={updateLibraryToo} onChange={e => setUpdateLibraryToo(e.target.checked)} />
                 Actualizar también en biblioteca

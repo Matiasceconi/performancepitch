@@ -74,10 +74,12 @@ export async function syncToFieldLibrary(form, sessionId, squadId, squadName, op
   const all = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
   const match = all.find((item) => sameFieldTemplate(item, form, squadId));
   if (match) {
-    await base44.entities.FieldExerciseLibrary.update(match.id, {
+    const matchUpdate = {
       times_used: (match.times_used || 1) + (options.incrementUsage === false ? 0 : 1),
       last_used_at: today,
-    });
+    };
+    if (!match.image_url && payload.image_url) matchUpdate.image_url = payload.image_url;
+    await base44.entities.FieldExerciseLibrary.update(match.id, matchUpdate);
     return match.id;
   }
   const created = await base44.entities.FieldExerciseLibrary.create({ ...payload, times_used: 1, first_created_at: today, last_used_at: today });
