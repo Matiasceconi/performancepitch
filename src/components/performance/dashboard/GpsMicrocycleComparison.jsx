@@ -9,28 +9,38 @@ function trendClass(trend) {
 }
 
 export default function GpsMicrocycleComparison({ comparison }) {
-  const weeks = comparison[0]?.weeksAvailable || 0;
+  const hasPrevious = (comparison[0]?.weeksAvailable || 0) > 0;
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
       <div className="mb-4">
-        <h3 className="text-white font-bold text-lg">Comparación con semanas anteriores</h3>
-        <p className="text-zinc-500 text-sm">{weeks >= 4 ? "Comparación contra promedio de últimas 4 semanas." : `Comparación basada en ${weeks} semana${weeks === 1 ? "" : "s"} disponible${weeks === 1 ? "" : "s"}.`}</p>
+        <h3 className="text-white font-bold text-lg">Comparación con microciclo anterior</h3>
+        <p className="text-zinc-500 text-sm">Semana actual vs microciclo anterior, respetando los filtros aplicados.</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-        {comparison.map((item) => (
-          <div key={item.metric.key} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3">
-            <p className="text-xs text-zinc-500 mb-1">{item.metric.label}</p>
-            <p className="text-white text-lg font-bold">{fmt(item.current, item.metric.unit)}</p>
-            <div className="flex items-center justify-between mt-2 text-xs">
-              <span className="text-zinc-500">Prom. 4 sem.</span>
-              <span className="text-zinc-300">{fmt(item.previous, item.metric.unit)}</span>
-            </div>
-            <div className="flex items-center justify-between mt-1 text-xs">
-              <span className="text-zinc-500">Diferencia</span>
-              <span className={trendClass(item.trend)}>{item.diff == null ? "—" : `${item.diff > 0 ? "+" : ""}${item.diff.toFixed(0)}% · ${item.trend}`}</span>
-            </div>
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-zinc-500 border-b border-zinc-800">
+              <th className="py-2 pr-3">Variable</th>
+              <th className="py-2 pr-3">Semana actual</th>
+              <th className="py-2 pr-3">Microciclo anterior</th>
+              <th className="py-2 pr-3">Dif. absoluta</th>
+              <th className="py-2 pr-3">Dif. %</th>
+              <th className="py-2 pr-3">Tendencia</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparison.map((item) => (
+              <tr key={item.metric.key} className="border-b border-zinc-800/60">
+                <td className="py-2 pr-3 text-white font-semibold">{item.metric.label}</td>
+                <td className="py-2 pr-3 text-zinc-200">{fmt(item.current, item.metric.unit)}</td>
+                <td className="py-2 pr-3 text-zinc-300">{hasPrevious ? fmt(item.previous, item.metric.unit) : "—"}</td>
+                <td className="py-2 pr-3 text-zinc-300">{item.diffAbs == null ? "—" : fmt(item.diffAbs, item.metric.unit)}</td>
+                <td className={`py-2 pr-3 ${trendClass(item.trend)}`}>{item.diff == null ? "—" : `${item.diff > 0 ? "+" : ""}${item.diff.toFixed(1)}%`}</td>
+                <td className={`py-2 pr-3 font-semibold ${trendClass(item.trend)}`}>{item.trend}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     </div>
   );

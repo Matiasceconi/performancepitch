@@ -1,8 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
 const METRICS = [
-  ['total_distance', 'Distancia total', 'avg'], ['player_load', 'Player Load', 'avg'], ['m_min', 'm/min', 'avg'],
-  ['sprints', 'Sprints', 'avg'], ['acc_3', 'ACC +3', 'avg'], ['dec_3', 'DEC +3', 'avg'], ['smax', 'Smax', 'max']
+  ['total_distance', 'Distancia total', 'avg'], ['m_min', 'm/min', 'avg'], ['distance_19_8', 'D >19.8', 'avg'],
+  ['distance_25', 'D >25', 'avg'], ['sprints', 'Sprints', 'avg'], ['acc_3', 'ACC +3', 'avg'],
+  ['dec_3', 'DEC +3', 'avg'], ['player_load', 'Player Load', 'avg'], ['smax', 'Smax', 'max']
 ];
 
 function isoDate(d) { return d.toISOString().slice(0, 10); }
@@ -76,12 +77,12 @@ Deno.serve(async (req) => {
       const snapshot = buildSnapshot({ plan, squad, sessions: weekSessions, matches: weekMatches, rows: weekRows, teamProfile, previousSummary });
       const data = {
         squad_id: plan.squad_id, squad_name: plan.squad_name || squad.name || '', season_id: squad.season || plan.season_id || '',
-        microcycle_name: plan.microcycle_name || `Microciclo ${start}`, fecha_inicio: start, fecha_fin: end,
-        rival: mainMatch.rival || '', resultado: mainMatch.our_score != null && mainMatch.rival_score != null ? `${mainMatch.our_score}-${mainMatch.rival_score}` : '',
-        cantidad_sesiones: weekSessions.length, cantidad_partidos: weekMatches.length, estado: force ? 'recalculado' : 'congelado',
-        entrenador: plan.coach || '', competencia: mainMatch.competition || '', created_at: existing?.created_at || new Date().toISOString(),
+        microcycle_name: plan.microcycle_name || `Microciclo ${start}`, nombre_microciclo: plan.microcycle_name || `Microciclo ${start}`, fecha_inicio: start, fecha_fin: end,
+        rival: mainMatch.rival || '', partido_asociado: mainMatch.rival || mainMatch.title || '', resultado: mainMatch.our_score != null && mainMatch.rival_score != null ? `${mainMatch.our_score}-${mainMatch.rival_score}` : '',
+        cantidad_sesiones: weekSessions.length, cantidad_partidos: weekMatches.length, estado: force ? 'recalculado' : 'cerrado',
+        entrenador: plan.coach || '', competencia: mainMatch.competition || '', created_at: existing?.created_at || new Date().toISOString(), updated_at: new Date().toISOString(),
         source_weekly_plan_id: plan.id, snapshot_locked: !force, snapshot, summary_snapshot: snapshot.resumen_semanal, charts_snapshot: snapshot.graficos,
-        rankings_snapshot: snapshot.rankings, gps_variables_snapshot: snapshot.variables_gps, team_profile_snapshot: snapshot.perfil_equipo,
+        rankings_snapshot: snapshot.rankings, gps_variables_snapshot: snapshot.variables_gps, promedios_snapshot: snapshot.variables_gps, highlighted_players_snapshot: snapshot.rankings, team_profile_snapshot: snapshot.perfil_equipo,
         weekly_comparison_snapshot: snapshot.comparacion_semanal, observations: snapshot.observations, conclusions: snapshot.conclusions, recalculated_at: force ? new Date().toISOString() : existing?.recalculated_at || ''
       };
       if (dryRun) { (existing ? updated : created).push(plan.id); continue; }

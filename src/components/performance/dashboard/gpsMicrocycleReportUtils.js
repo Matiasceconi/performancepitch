@@ -69,7 +69,23 @@ export function normalizeRows(rows, playerMap) {
   });
 }
 
+export function applyMicrocycleDayFilters(days, filters = {}) {
+  const selectedWeekdays = filters.selectedWeekdays || [];
+  const selectedDates = filters.selectedDates || [];
+  return days.filter((day) => {
+    if (filters.md && day.md !== filters.md) return false;
+    if (filters.date && day.date !== filters.date) return false;
+    if (filters.dateFrom && day.date < filters.dateFrom) return false;
+    if (filters.dateTo && day.date > filters.dateTo) return false;
+    if (selectedWeekdays.length && !selectedWeekdays.includes(String(moment(day.date).isoWeekday()))) return false;
+    if (selectedDates.length && !selectedDates.includes(day.date)) return false;
+    return true;
+  });
+}
+
 export function applyMicrocycleFilters(rows, filters = {}) {
+  const selectedWeekdays = filters.selectedWeekdays || [];
+  const selectedDates = filters.selectedDates || [];
   return rows.filter((row) => {
     if (filters.playerId && row.player_id !== filters.playerId) return false;
     if (filters.position && row.position !== filters.position) return false;
@@ -79,21 +95,26 @@ export function applyMicrocycleFilters(rows, filters = {}) {
     if (filters.md && row.md !== filters.md) return false;
     if (filters.sessionId && row.session_id !== filters.sessionId) return false;
     if (filters.date && row.session_date !== filters.date) return false;
+    if (filters.dateFrom && row.session_date < filters.dateFrom) return false;
+    if (filters.dateTo && row.session_date > filters.dateTo) return false;
+    if (selectedWeekdays.length && !selectedWeekdays.includes(String(moment(row.session_date).isoWeekday()))) return false;
+    if (selectedDates.length && !selectedDates.includes(row.session_date)) return false;
     return true;
   });
 }
 
 export function splitRows(rows, playerMap, filters = {}) {
-  const filtered = applyMicrocycleFilters(normalizeRows(rows, playerMap), filters);
-  if (filters.status) return { main: filtered, excluded: [] };
-  return {
-    main: filtered.filter((r) => r.row_status === "incluidos"),
-    excluded: filtered.filter((r) => r.row_status !== "incluidos"),
-  };
+  const status = filters.status || "";
+  const filtered = applyMicrocycleFilters(normalizeRows(rows, playerMap), { ...filters, status: "" });
+  const main = filtered.filter((r) => r.row_status === "incluidos");
+  const excluded = filtered.filter((r) => r.row_status !== "incluidos");
+  if (status === "incluidos") return { main, excluded: [] };
+  if (status) return { main: [], excluded: excluded.filter((r) => r.row_status === status) };
+  return { main, excluded };
 }
 
 export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, metrics = MICRO_METRICS }) {
-  return getCycleDays(cycleDays).filter((day) => !filters.md || day.md === filters.md).filter((day) => !filters.date || day.date === filters.date).map((day) => {
+  return applyMicrocycleDayFilters(getCycleDays(cycleDays), filters).map((day) => {
     const daySessions = sessions.filter((s) => s.date === day.date && (!filters.sessionId || s.id === filters.sessionId));
     const rawRows = daySessions.flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md: day.md || "—" })));
     const { main, excluded } = splitRows(rawRows, playerMap, filters);
@@ -103,7 +124,7 @@ export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerM
 }
 
 export function rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, includeExcluded = false }) {
-  const days = getCycleDays(cycleDays).filter((d) => !filters.md || d.md === filters.md).filter((d) => !filters.date || d.date === filters.date);
+  const days = applyMicrocycleDayFilters(getCycleDays(cycleDays), filters);
   const dayByDate = Object.fromEntries(days.map((d) => [d.date, d]));
   const rows = sessions
     .filter((s) => dayByDate[s.date] && (!filters.sessionId || s.id === filters.sessionId))
@@ -130,23 +151,17 @@ export function buildHighlights(rows, playerMap, metrics = HIGHLIGHT_METRICS) {
 }
 
 export function buildComparison({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, metrics = MICRO_METRICS }) {
-  const days = getCycleDays(cycleDays).filter((day) => !filters.md || day.md === filters.md).filter((day) => !filters.date || day.date === filters.date);
-  const start = moment(days[0]?.date).startOf("day");
-  const end = moment(days[days.length - 1]?.date).endOf("day");
+  const days = applyMicrocycleDayFilters(getCycleDays(cycleDays), filters);
   const currentRows = rowsForCycle({ sessions, gpsBySession, cycleDays: days, playerMap, filters });
-  const pastWeeks = [];
-  for (let i = 1; i <= 4; i++) {
-    const shiftedDays = days.map((d) => ({ ...d, date: moment(d.date).subtract(i * 7, "days").format("YYYY-MM-DD") }));
-    const rows = rowsForCycle({ sessions, gpsBySession, cycleDays: shiftedDays, playerMap, filters: { ...filters, sessionId: "", date: "" } });
-    if (rows.length) pastWeeks.push(rows);
-  }
-  const pastRows = pastWeeks.flat();
-  return metrics.slice(0, 8).map((metric) => {
+  const previousDays = days.map((d) => ({ ...d, date: moment(d.date).subtract(7, "days").format("YYYY-MM-DD") }));
+  const previousRows = rowsForCycle({ sessions, gpsBySession, cycleDays: previousDays, playerMap, filters: { ...filters, sessionId: "", date: "", dateFrom: "", dateTo: "", selectedDates: [] } });
+  return metrics.map((metric) => {
     const current = aggregate(currentRows, metric.key, metric.mode);
-    const previous = aggregate(pastRows, metric.key, metric.mode);
+    const previous = aggregate(previousRows, metric.key, metric.mode);
+    const diffAbs = current != null && previous != null ? current - previous : null;
     const diff = current != null && previous ? ((current - previous) / previous) * 100 : null;
     const trend = diff == null ? "Sin comparación" : diff > 8 ? "Sube" : diff < -8 ? "Baja" : "Estable";
-    return { metric, current, previous, diff, trend, weeksAvailable: pastWeeks.length };
+    return { metric, current, previous, diffAbs, diff, trend, weeksAvailable: previousRows.length ? 1 : 0 };
   });
 }
 

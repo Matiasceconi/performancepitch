@@ -16,7 +16,11 @@
     },
     "microcycle_name": {
       "type": "string",
-      "description": "Nombre del microciclo"
+      "description": "Nombre del microciclo (compatibilidad)"
+    },
+    "nombre_microciclo": {
+      "type": "string",
+      "description": "Nombre visible del microciclo"
     },
     "fecha_inicio": {
       "type": "string",
@@ -32,13 +36,17 @@
       "type": "string",
       "description": "Rival principal de la semana"
     },
+    "partido_asociado": {
+      "type": "string",
+      "description": "Partido asociado al microciclo"
+    },
     "resultado": {
       "type": "string",
       "description": "Resultado si existe"
     },
     "cantidad_sesiones": {
       "type": "number",
-      "description": "Cantidad de sesiones de entrenamiento"
+      "description": "Cantidad de sesiones con GPS v\u00e1lido"
     },
     "cantidad_partidos": {
       "type": "number",
@@ -47,12 +55,15 @@
     "estado": {
       "type": "string",
       "enum": [
+        "abierto",
+        "cerrado",
+        "archivado",
         "congelado",
         "recalculado",
         "borrador"
       ],
-      "default": "congelado",
-      "description": "Estado del snapshot"
+      "default": "abierto",
+      "description": "Estado del microciclo"
     },
     "entrenador": {
       "type": "string",
@@ -66,14 +77,18 @@
       "type": "string",
       "description": "Fecha/hora de creaci\u00f3n del snapshot"
     },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima actualizaci\u00f3n del snapshot"
+    },
     "source_weekly_plan_id": {
       "type": "string",
       "description": "Plan semanal origen"
     },
     "snapshot_locked": {
       "type": "boolean",
-      "default": true,
-      "description": "Si conserva el snapshot original"
+      "default": false,
+      "description": "Si conserva el snapshot original sin recalcular"
     },
     "pdf_url": {
       "type": "string",
@@ -103,13 +118,25 @@
       "type": "object",
       "description": "Variables GPS agregadas"
     },
+    "promedios_snapshot": {
+      "type": "object",
+      "description": "Promedios filtrados del microciclo"
+    },
+    "highlighted_players_snapshot": {
+      "type": "object",
+      "description": "Jugadores destacados del microciclo"
+    },
     "team_profile_snapshot": {
       "type": "object",
       "description": "Perfil del equipo al momento del cierre"
     },
     "weekly_comparison_snapshot": {
       "type": "object",
-      "description": "Comparaci\u00f3n semanal congelada"
+      "description": "Comparaci\u00f3n con microciclo anterior"
+    },
+    "filters_snapshot": {
+      "type": "object",
+      "description": "Filtros aplicados al guardar/cerrar"
     },
     "observations": {
       "type": "string",
@@ -126,7 +153,6 @@
   },
   "required": [
     "squad_id",
-    "microcycle_name",
     "fecha_inicio",
     "fecha_fin"
   ]
