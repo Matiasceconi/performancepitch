@@ -1,6 +1,6 @@
 import React from "react";
 import moment from "moment";
-import { CheckCircle2, Clock, Dumbbell, Home, Link2, MapPin, Moon, Pencil, Plane, RefreshCcw, Trophy, Wind } from "lucide-react";
+import { CheckCircle2, Clock, Dumbbell, Home, Link2, MapPin, Moon, Pencil, Plane, Plus, RefreshCcw, Trophy, Wind } from "lucide-react";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
 
 function upsertBlock(day, type, patch, updateDay, dayIdx) {
@@ -11,6 +11,15 @@ function upsertBlock(day, type, patch, updateDay, dayIdx) {
   } else {
     updateDay(dayIdx, { blocks: [...blocks, { id: `${type}-${dayIdx}`, type, title: type, content: "", session_id: "", auto_sync: true, ...patch }] });
   }
+}
+
+function updateBlockById(day, blockId, patch, updateDay, dayIdx) {
+  updateDay(dayIdx, { blocks: (day.blocks || []).map((block) => block.id === blockId ? { ...block, ...patch } : block) });
+}
+
+function addTypedBlock(day, type, updateDay, dayIdx) {
+  const config = WORK_BLOCKS.find((item) => item.type === type);
+  updateDay(dayIdx, { blocks: [...(day.blocks || []), { id: `${type}-${dayIdx}-${Date.now()}`, type, title: config?.label || type, content: "", session_id: "", auto_sync: false }] });
 }
 
 function normalizeText(value) {
@@ -159,9 +168,15 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
       </div>
       <div className="flex-1 p-3 space-y-3 bg-white">
         {WORK_BLOCKS.map((config) => {
-          const block = blocks.find((item) => item.type === config.type) || { type: config.type, title: config.label, content: "" };
-          const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
-          return <WorkCard key={config.type} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onChange={(patch) => upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
+          const typeBlocks = blocks.filter((item) => item.type === config.type);
+          const renderBlocks = typeBlocks.length ? typeBlocks : [{ type: config.type, title: config.label, content: "" }];
+          return <div key={config.type} className="space-y-2">
+            {renderBlocks.map((block, index) => {
+              const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
+              return <WorkCard key={block.id || `${config.type}-${index}`} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onChange={(patch) => block.id ? updateBlockById(day, block.id, patch, updateDay, dayIdx) : upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
+            })}
+            {config.type === "Campo" && <button type="button" onClick={() => addTypedBlock(day, "Campo", updateDay, dayIdx)} className="w-full rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black text-emerald-700 flex items-center justify-center gap-2"><Plus size={13} /> Agregar tarea de campo</button>}
+          </div>;
         })}
       </div>
     </div>
