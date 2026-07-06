@@ -25,18 +25,7 @@
     },
     "type": {
       "type": "string",
-      "enum": [
-        "Activaci\u00f3n",
-        "T\u00e9cnico",
-        "T\u00e1ctico",
-        "Reducido",
-        "Posesi\u00f3n",
-        "Finalizaci\u00f3n",
-        "Fuerza",
-        "Regenerativo",
-        "Otro"
-      ],
-      "description": "Tipo de ejercicio"
+      "description": "Tipo configurable del ejercicio"
     },
     "category": {
       "type": "string",

@@ -5,6 +5,7 @@ import { Star, Search, ChevronDown, ChevronUp, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import LibraryExerciseGPS from "@/components/sessions/LibraryExerciseGPS";
+import { DEFAULT_FIELD_EXERCISE_TYPES, loadFieldExerciseTypes } from "@/components/sessions/exerciseTypeOptions";
 
 const TYPE_COLORS = {
   "Activación": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
@@ -26,18 +27,23 @@ export default function FieldLibraryPanel() {
   const [filterType, setFilterType] = useState("");
   const [filterPlayers, setFilterPlayers] = useState("");
   const [sortBy, setSortBy] = useState("times_used");
+  const [typeOptions, setTypeOptions] = useState(DEFAULT_FIELD_EXERCISE_TYPES);
   const [expanded, setExpanded] = useState({});
   const [activeTab, setActiveTab] = useState({}); // per exercise: "info" | "gps"
   const { toast } = useToast();
 
   useEffect(() => {
-    base44.entities.FieldExerciseLibrary.list("-times_used", 500).then(data => {
+    Promise.all([
+      base44.entities.FieldExerciseLibrary.list("-times_used", 500),
+      loadFieldExerciseTypes(),
+    ]).then(([data, types]) => {
       // Mostrar únicamente: ejercicios globales o del plantel activo
       const visible = data.filter(e =>
         e.global === true ||
         e.squad_id === activeSquadId
       );
       setExercises(visible);
+      setTypeOptions(types);
       setLoading(false);
     });
   }, [activeSquadId]);
@@ -52,6 +58,7 @@ export default function FieldLibraryPanel() {
       const q = search.toLowerCase();
       const matchSearch = !search ||
         (e.name || "").toLowerCase().includes(q) ||
+        (e.type || "").toLowerCase().includes(q) ||
         (e.objective || "").toLowerCase().includes(q) ||
         (e.description || "").toLowerCase().includes(q);
       const matchType = !filterType || e.type === filterType;
@@ -70,7 +77,7 @@ export default function FieldLibraryPanel() {
       return 0;
     });
 
-  const allTypes = [...new Set(exercises.map(e => e.type).filter(Boolean))];
+  const allTypes = [...new Set([...typeOptions, ...exercises.map(e => e.type).filter(Boolean)])];
 
   if (loading) return <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 

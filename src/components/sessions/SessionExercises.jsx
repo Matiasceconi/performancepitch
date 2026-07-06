@@ -5,8 +5,8 @@ import ExerciseGPS from "@/components/sessions/ExerciseGPS";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import { fieldImportantChanged, syncToFieldLibrary } from "@/components/sessions/exerciseLibrarySync";
-
-const EXERCISE_TYPES = ["Activación", "Técnico", "Táctico", "Reducido", "Posesión", "Finalización", "Fuerza", "Regenerativo", "Otro"];
+import ExerciseTypeSelector from "@/components/sessions/ExerciseTypeSelector";
+import { DEFAULT_FIELD_EXERCISE_TYPES, addFieldExerciseType, deleteFieldExerciseType, loadFieldExerciseTypes, renameFieldExerciseType } from "@/components/sessions/exerciseTypeOptions";
 
 const TYPE_COLORS = {
   "Activación": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
@@ -71,6 +71,8 @@ export default function SessionExercises({ session, sessionPlayers }) {
   const [showLibrary, setShowLibrary] = useState(false);
   const [libraryExercises, setLibraryExercises] = useState([]);
   const [libSearch, setLibSearch] = useState("");
+  const [libTypeFilter, setLibTypeFilter] = useState("");
+  const [exerciseTypes, setExerciseTypes] = useState(DEFAULT_FIELD_EXERCISE_TYPES);
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [aiLoading, setAiLoading] = useState({ name: false, description: false, objective: false });
   const [updateLibraryToo, setUpdateLibraryToo] = useState(false);
@@ -91,7 +93,42 @@ export default function SessionExercises({ session, sessionPlayers }) {
     });
   }, [sessionId]);
 
+  useEffect(() => { refreshExerciseTypes(); }, []);
+
   function setF(k, v) { setForm(f => ({ ...f, [k]: v })); }
+
+  async function refreshExerciseTypes() {
+    const labels = await loadFieldExerciseTypes();
+    setExerciseTypes(labels);
+  }
+
+  async function handleAddType() {
+    const label = window.prompt("Nuevo tipo de ejercicio");
+    if (!label?.trim()) return;
+    await addFieldExerciseType(label);
+    await refreshExerciseTypes();
+    setF("type", label.trim());
+    toast({ title: "Tipo agregado" });
+  }
+
+  async function handleEditType(label) {
+    const next = window.prompt("Editar tipo de ejercicio", label || "");
+    if (!next?.trim() || next.trim() === label) return;
+    await renameFieldExerciseType(label, next);
+    await refreshExerciseTypes();
+    setF("type", next.trim());
+    setExercises(prev => prev.map(ex => ex.type === label ? { ...ex, type: next.trim() } : ex));
+    toast({ title: "Tipo actualizado" });
+  }
+
+  async function handleDeleteType(label) {
+    if (!label || !window.confirm(`¿Eliminar el tipo "${label}" de la lista?`)) return;
+    await deleteFieldExerciseType(label);
+    const labels = await loadFieldExerciseTypes();
+    setExerciseTypes(labels);
+    if (form.type === label) setF("type", labels[0] || "");
+    toast({ title: "Tipo eliminado" });
+  }
 
   function openNew() { setForm(EMPTY_FORM); setEditId(null); setShowAdvanced(false); setNameSuggestions([]); setUpdateLibraryToo(false); setOriginalExercise(null); setShowForm(true); }
 
@@ -190,6 +227,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
     const data = await base44.entities.FieldExerciseLibrary.list("-times_used", 300);
     const visible = data.filter(e => e.global === true || e.squad_id === session?.squad_id);
     setLibraryExercises(visible);
+    setLibTypeFilter("");
     setShowLibrary(true);
   }
 
@@ -421,13 +459,14 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
               )}
             </div>
 
-            <div>
-              <label className="text-[10px] text-zinc-400 mb-1 block">Tipo</label>
-              <select value={form.type} onChange={e => setF("type", e.target.value)}
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-2 py-2 text-xs text-white focus:outline-none">
-                {EXERCISE_TYPES.map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
+            <ExerciseTypeSelector
+              value={form.type}
+              options={exerciseTypes}
+              onChange={(value) => setF("type", value)}
+              onAdd={handleAddType}
+              onEdit={handleEditType}
+              onDelete={handleDeleteType}
+            />
             <div>
               <label className="text-[10px] text-zinc-400 mb-1 block">N° jugadores</label>
               <input type="number" value={form.players_count} onChange={e => setF("players_count", e.target.value)}
@@ -595,23 +634,36 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
               <p className="text-sm font-semibold text-white">Biblioteca de Ejercicios de Campo</p>
               <button onClick={() => setShowLibrary(false)} className="text-zinc-500 hover:text-white"><X size={16} /></button>
             </div>
-            <div className="p-3 border-b border-zinc-800">
-              <div className="relative">
+            <div className="p-3 border-b border-zinc-800 flex gap-2">
+              <div className="relative flex-1">
                 <Search size={12} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
                 <input value={libSearch} onChange={e => setLibSearch(e.target.value)} placeholder="Buscar ejercicio..."
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg pl-8 pr-3 py-2 text-xs text-white focus:outline-none" />
               </div>
+              <select value={libTypeFilter} onChange={e => setLibTypeFilter(e.target.value)}
+                className="bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-2 text-xs text-zinc-300 focus:outline-none">
+                <option value="">Todos los tipos</option>
+                {exerciseTypes.map(type => <option key={type} value={type}>{type}</option>)}
+              </select>
             </div>
             <div className="overflow-y-auto flex-1 p-3 space-y-2">
               {libraryExercises
-                .filter(e => !libSearch || (e.name || "").toLowerCase().includes(libSearch.toLowerCase()))
+                .filter(e => {
+                  const q = libSearch.toLowerCase();
+                  const matchSearch = !libSearch || (e.name || "").toLowerCase().includes(q) || (e.type || "").toLowerCase().includes(q);
+                  const matchType = !libTypeFilter || e.type === libTypeFilter;
+                  return matchSearch && matchType;
+                })
                 .map(ex => (
                 <div key={ex.id}
                   className="flex items-center gap-3 p-3 bg-zinc-800 border border-zinc-700 rounded-lg hover:border-zinc-500 cursor-pointer transition-colors"
                   onClick={() => addFromLibrary(ex)}>
                   {ex.image_url && <img src={ex.image_url} alt="" className="w-10 h-10 object-cover rounded shrink-0" />}
                   <div className="flex-1 min-w-0">
-                    <p className="text-xs font-semibold text-white truncate">{ex.name}</p>
+                    <div className="flex items-center gap-1.5 mb-0.5">
+                      {ex.type && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-zinc-700 text-zinc-300 border border-zinc-600">{ex.type}</span>}
+                      <p className="text-xs font-semibold text-white truncate">{ex.name}</p>
+                    </div>
                     {ex.objective && <p className="text-[10px] text-zinc-400 truncate">{ex.objective}</p>}
                     <p className="text-[10px] text-zinc-600">✓ {ex.times_used || 1} usos</p>
                   </div>
