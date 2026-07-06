@@ -1,12 +1,11 @@
 import React, { useState } from "react";
 import {
-  Lock, Users, Fingerprint, ShieldCheck, UserCog,
+  Lock, Fingerprint, ShieldCheck, UserCog,
   Settings, Wrench, ClipboardList, ChevronRight, Bug, KeyRound
 } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AdminAccessDebugPanel from "@/components/workspace/AdminAccessDebugPanel";
 import UsersAccess from "@/pages/UsersAccess";
-import PlayerAdmin from "@/pages/PlayerAdmin";
 import PlayerIdentity from "@/pages/PlayerIdentity";
 import SquadManager from "@/pages/SquadManager";
 import StaffManager from "@/pages/StaffManager";
@@ -33,15 +32,6 @@ const SECTIONS = [
     bg: "bg-red-500/10 border-red-500/20",
     description: "Crear roles, asignar áreas, páginas permitidas y permisos por acción",
     tags: ["Crear roles", "Áreas por rol", "Páginas por rol", "Permisos por acción"],
-  },
-  {
-    id: "players",
-    label: "Jugadores",
-    icon: Users,
-    color: "text-emerald-400",
-    bg: "bg-emerald-500/10 border-emerald-500/20",
-    description: "Base oficial de jugadores, altas, bajas e historial",
-    tags: ["Base oficial de Players", "Edición", "Altas", "Bajas", "Historial"],
   },
   {
     id: "identity",
@@ -148,7 +138,6 @@ export default function AdminHub() {
     switch (activeSection) {
       case "users":    return <UsersAccess />;
       case "roles":    return <RolesPermissions />;
-      case "players":  return <PlayerAdmin />;
       case "identity": return <PlayerIdentity />;
       case "squads":   return <SquadManager />;
       case "staff":    return <StaffManager />;

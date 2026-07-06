@@ -12,6 +12,8 @@ const EMPTY_PERMS = { can_view: false, can_create: false, can_edit: false, can_d
 const LEGACY_MODULE_PATHS = {
   dashboard: ["/"],
   daily_squad: ["/daily-squad"],
+  jugadores: ["/players", "/player-names"],
+  players: ["/players", "/player-names"],
   sessions: ["/sessions"],
   gps: ["/performance/external-load"],
   performance: ["/performance/external-load", "/performance/internal-load", "/performance/minutes", "/performance/microcycle-history"],

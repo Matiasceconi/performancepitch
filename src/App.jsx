@@ -36,6 +36,7 @@ import PlantilDiagnostic from '@/pages/PlantilDiagnostic';
 import WeeklyPlanner from '@/pages/WeeklyPlanner';
 import AdminHub from '@/pages/AdminHub';
 import DailySquad from '@/pages/DailySquad';
+import Players from '@/pages/Players';
 import SquadManager from '@/pages/SquadManager';
 import FieldLibrary from '@/pages/FieldLibrary';
 import StrengthLibrary from '@/pages/StrengthLibrary';
@@ -126,6 +127,7 @@ const AuthenticatedApp = () => {
           <Route path="/weekly-planner" element={<WeeklyPlanner />} />
           <Route path="/admin" element={<AdminHub />} />
           <Route path="/daily-squad" element={<DailySquad />} />
+          <Route path="/players" element={<Players />} />
           <Route path="/squad-manager" element={<SquadManager />} />
           <Route path="/field-library" element={<FieldLibrary />} />
           <Route path="/strength-library" element={<StrengthLibrary />} />

@@ -23,6 +23,7 @@ const NAV_ITEMS = [
   { label: "Calendario", path: "/schedule", icon: CalendarDays },
   { label: "Plan Semanal", path: "/weekly-planner", icon: ClipboardList },
   { label: "Estado del Plantel", path: "/daily-squad", icon: ShieldCheck },
+  { label: "Jugadores", path: "/players", icon: UsersRound },
   { label: "Biblioteca Campo", path: "/field-library", icon: BookOpen },
   { label: "Biblioteca Fuerza", path: "/strength-library", icon: Dumbbell },
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },

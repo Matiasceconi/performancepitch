@@ -34,6 +34,7 @@ export const MODULES = [
   { id: "calendario", label: "Calendario", path: "/schedule" },
   { id: "plan_semanal", label: "Plan Semanal", path: "/weekly-planner" },
   { id: "estado_plantel", label: "Estado del Plantel", path: "/daily-squad" },
+  { id: "jugadores", label: "Jugadores", path: "/players" },
   { id: "biblioteca_campo", label: "Biblioteca Campo", path: "/field-library" },
   { id: "biblioteca_fuerza", label: "Biblioteca Fuerza", path: "/strength-library" },
   { id: "cuerpo_tecnico", label: "Cuerpo Técnico", path: "/team" },
@@ -45,6 +46,6 @@ export const PAGES = [
   { path: "/performance/microcycle-history", label: "Histórico de Microciclos", module_id: "carga_externa" },
   { path: "/squad-manager", label: "Planteles", module_id: "configuracion" },
   { path: "/users-access", label: "Accesos de Usuarios", module_id: "configuracion" },
-  { path: "/player-names", label: "Gestión de Nombres", module_id: "configuracion" },
+  { path: "/player-names", label: "Gestión de Nombres", module_id: "jugadores" },
   { path: "/plantil-diagnostic", label: "Diagnóstico de Plantel", module_id: "configuracion" },
 ];
