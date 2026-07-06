@@ -26,6 +26,7 @@ const NAV_ITEMS = [
   { label: "Biblioteca Campo", path: "/field-library", icon: BookOpen },
   { label: "Biblioteca Fuerza", path: "/strength-library", icon: Dumbbell },
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
+  { label: "Planteles", path: "/squad-manager", icon: UsersRound },
   { label: "Configuración", path: "/admin", icon: Settings2 },
 ];
 

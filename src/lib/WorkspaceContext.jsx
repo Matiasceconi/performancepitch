@@ -88,9 +88,10 @@ export function WorkspaceProvider({ children }) {
       }), { ...EMPTY_PERMS });
       setPermissions(mergedPerms);
 
-      // Fallback: usuarios migrados que tenían can_admin=true directo en UserAccess (antes de AppRole)
+      // Fallback: usuarios migrados que tenían rol Administrador o can_admin=true directo en UserAccess
       // conservan su acceso de administrador aunque todavía no se les haya asignado un rol nuevo.
-      const resolvedAdmin = platformAdmin || mergedPerms.can_admin || !!access?.can_admin;
+      const legacyAdminRole = ["admin", "administrador"].includes(String(access?.role || "").toLowerCase());
+      const resolvedAdmin = platformAdmin || legacyAdminRole || mergedPerms.can_admin || !!access?.can_admin;
       if (resolvedAdmin) adminLockRef.current = true;
       setAdminAccess(adminLockRef.current);
 
