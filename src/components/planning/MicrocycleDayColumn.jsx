@@ -146,13 +146,13 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
 
   return (
     <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden min-w-0 flex flex-col min-h-[520px]">
-      <div className="px-3 pt-3 pb-2 text-center border-b border-zinc-200 bg-zinc-50">
-        <p className="text-[11px] font-black text-zinc-600 tracking-[0.22em]">{dayNameEs(day.date)}</p>
-        <input type="date" value={day.date} onChange={(e) => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-center text-[11px] font-semibold text-zinc-500 focus:outline-none mt-1" />
-        <select value={day.md || "MD-5"} onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : blocks })} className="mt-2 w-full bg-transparent text-center text-2xl font-black text-slate-950 focus:outline-none">
+      <div className="px-3 pt-3 pb-2 text-center border-b" style={{ backgroundColor: objStyle.bg, borderColor: objStyle.border }}>
+        <p className="text-[11px] font-black tracking-[0.22em]" style={{ color: objStyle.text }}>{dayNameEs(day.date)}</p>
+        <input type="date" value={day.date} onChange={(e) => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-center text-[11px] font-semibold focus:outline-none mt-1" style={{ color: objStyle.text }} />
+        <select value={day.md || "MD-5"} onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : blocks })} className="mt-2 w-full bg-transparent text-center text-2xl font-black focus:outline-none" style={{ color: objStyle.text }}>
           {MD_OPTIONS.map((item) => <option key={item}>{item}</option>)}
         </select>
-        <select value={objectiveOptions.includes(objective) ? objective : objectiveOptions[0]} onChange={(e) => updateDay(dayIdx, { physical_objective: e.target.value })} className="mt-2 w-full rounded-xl border px-2 py-2 text-[11px] font-black text-center focus:outline-none" style={{ backgroundColor: objStyle.bg, color: objStyle.text, borderColor: objStyle.border }}>
+        <select value={objectiveOptions.includes(objective) ? objective : objectiveOptions[0]} onChange={(e) => updateDay(dayIdx, { physical_objective: e.target.value })} className="mt-2 w-full rounded-xl border px-2 py-2 text-[11px] font-black text-center focus:outline-none" style={{ backgroundColor: "rgba(255,255,255,0.45)", color: objStyle.text, borderColor: objStyle.border }}>
           {objectiveOptions.map((item) => <option key={item}>{item}</option>)}
         </select>
       </div>
