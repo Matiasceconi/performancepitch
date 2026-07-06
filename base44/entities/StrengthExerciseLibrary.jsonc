@@ -6,6 +6,10 @@
       "type": "string",
       "description": "Nombre del ejercicio"
     },
+    "normalized_name": {
+      "type": "string",
+      "description": "Nombre normalizado para detectar duplicados"
+    },
     "squad_id": {
       "type": "string",
       "description": "Plantel propietario (vac\u00edo si global=true)"
@@ -47,6 +51,8 @@
         "Fuerza m\u00e1xima",
         "Hipertrofia",
         "Preventivo",
+        "Pliom\u00e9trico",
+        "Movilidad",
         "Otro"
       ],
       "description": "Tipo de trabajo"
@@ -67,9 +73,57 @@
       "type": "string",
       "description": "URL de video"
     },
+    "restore_exercise": {
+      "type": "string",
+      "description": "Ejercicio restaura"
+    },
+    "compensate_exercise": {
+      "type": "string",
+      "description": "Ejercicio compensa"
+    },
+    "sets": {
+      "type": "string",
+      "description": "Series"
+    },
+    "reps": {
+      "type": "string",
+      "description": "Repeticiones"
+    },
+    "time": {
+      "type": "string",
+      "description": "Tiempo"
+    },
+    "rest_time": {
+      "type": "string",
+      "description": "Pausa"
+    },
+    "rir": {
+      "type": "string",
+      "description": "RIR"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo"
+    },
+    "muscle_group": {
+      "type": "string",
+      "description": "Grupo muscular"
+    },
+    "vector_pattern": {
+      "type": "string",
+      "description": "Patr\u00f3n vectorial"
+    },
     "notes": {
       "type": "string",
       "description": "Observaciones"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas"
     },
     "favorite": {
       "type": "boolean",

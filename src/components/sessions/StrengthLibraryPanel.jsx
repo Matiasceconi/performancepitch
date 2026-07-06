@@ -148,6 +148,16 @@ export default function StrengthLibraryPanel() {
                 {isExp && (
                   <div className="mt-3 pt-3 border-t border-zinc-700 space-y-2">
                     {ex.description && <p className="text-xs text-zinc-400">{ex.description}</p>}
+                    <div className="grid grid-cols-2 gap-2 text-xs">
+                      {ex.sets && <div><span className="text-zinc-500">Series: </span><span className="text-zinc-300">{ex.sets}</span></div>}
+                      {ex.reps && <div><span className="text-zinc-500">Reps: </span><span className="text-zinc-300">{ex.reps}</span></div>}
+                      {ex.time && <div><span className="text-zinc-500">Tiempo: </span><span className="text-zinc-300">{ex.time}</span></div>}
+                      {ex.rest_time && <div><span className="text-zinc-500">Pausa: </span><span className="text-zinc-300">{ex.rest_time}</span></div>}
+                      {ex.rir && <div><span className="text-zinc-500">RIR: </span><span className="text-zinc-300">{ex.rir}</span></div>}
+                      {ex.objective && <div><span className="text-zinc-500">Objetivo: </span><span className="text-zinc-300">{ex.objective}</span></div>}
+                      {ex.muscle_group && <div><span className="text-zinc-500">Grupo: </span><span className="text-zinc-300">{ex.muscle_group}</span></div>}
+                      {ex.vector_pattern && <div><span className="text-zinc-500">Vector: </span><span className="text-zinc-300">{ex.vector_pattern}</span></div>}
+                    </div>
                     {ex.notes && <p className="text-xs text-zinc-500">{ex.notes}</p>}
                     {ex.last_used_at && <p className="text-[10px] text-zinc-600">Último uso: {moment(ex.last_used_at).format("DD/MM/YYYY")}</p>}
                     {ex.video_url && (

@@ -19,6 +19,10 @@
       "type": "string",
       "description": "Imagen del ejercicio (heredada de biblioteca)"
     },
+    "video_url": {
+      "type": "string",
+      "description": "URL de video"
+    },
     "method": {
       "type": "string",
       "description": "M\u00e9todo de trabajo (ej: Din\u00e1micos, Contrastes)"
@@ -35,11 +39,63 @@
       "type": "string",
       "description": "Volumen en formato libre (ej: 3x8, 3+3, 12+12)"
     },
+    "restore_exercise": {
+      "type": "string",
+      "description": "Ejercicio restaura"
+    },
+    "compensate_exercise": {
+      "type": "string",
+      "description": "Ejercicio compensa"
+    },
+    "sets": {
+      "type": "string",
+      "description": "Series"
+    },
+    "reps": {
+      "type": "string",
+      "description": "Repeticiones"
+    },
+    "time": {
+      "type": "string",
+      "description": "Tiempo"
+    },
+    "rest_time": {
+      "type": "string",
+      "description": "Pausa"
+    },
+    "rir": {
+      "type": "string",
+      "description": "RIR"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo"
+    },
+    "muscle_group": {
+      "type": "string",
+      "description": "Grupo muscular"
+    },
+    "vector_pattern": {
+      "type": "string",
+      "description": "Patr\u00f3n vectorial"
+    },
     "notes": {
       "type": "string",
       "description": "Observaciones"
     },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas"
+    },
     "library_exercise_id": {
+      "type": "string",
+      "description": "ID en StrengthExerciseLibrary si viene de biblioteca (legado)"
+    },
+    "library_strength_exercise_id": {
       "type": "string",
       "description": "ID en StrengthExerciseLibrary si viene de biblioteca"
     }

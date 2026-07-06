@@ -77,6 +77,15 @@ const TOOLS = [
     color: "text-red-400",
     bg: "bg-red-500/10 border-red-500/20",
   },
+  {
+    id: "syncExerciseLibraries",
+    label: "Sincronizar bibliotecas con sesiones",
+    description: "Vincula ejercicios, detecta duplicados, actualiza plantillas y recalcula carga externa histórica",
+    fn: "syncExerciseLibraries",
+    payload: {},
+    color: "text-emerald-400",
+    bg: "bg-emerald-500/10 border-emerald-500/20",
+  },
 ];
 
 export default function AdminTools() {

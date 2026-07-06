@@ -4,6 +4,7 @@ import { Activity, Filter, RefreshCw } from "lucide-react";
 import { fmtMetric, fmtSmax } from "@/utils";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
+import { updateFieldLibraryGpsSummary } from "@/components/sessions/exerciseLibrarySync";
 
 const METRICS = [
   { key: "total_distance", label: "Dist. (m)",   color: "#3b82f6" },
@@ -101,6 +102,7 @@ export default function LibraryExerciseGPS({ libraryExerciseId }) {
       // Eliminar campos que no pertenecen a LibraryExerciseGPSData
       const toCreate = allGpsData.map(({ id, created_date, updated_date, created_by_id, ...rest }) => rest);
       await base44.entities.LibraryExerciseGPSData.bulkCreate(toCreate);
+      await updateFieldLibraryGpsSummary(libraryExerciseId);
 
       toast({ title: `✓ Sincronizados ${toCreate.length} registros GPS a la biblioteca.` });
       await loadData();

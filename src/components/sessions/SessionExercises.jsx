@@ -4,61 +4,7 @@ import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen,
 import ExerciseGPS from "@/components/sessions/ExerciseGPS";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
-
-function normalize(s) {
-  return (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
-}
-
-// Returns the library exercise id (existing or newly created)
-async function syncToFieldLibrary(form, sessionId, squadId, squadName) {
-  const today = moment().format("YYYY-MM-DD");
-  const all = await base44.entities.FieldExerciseLibrary.list("-times_used", 500);
-  const match = all.find(e =>
-    normalize(e.name) === normalize(form.name) &&
-    e.length_m === (parseFloat(form.length_m) || undefined) &&
-    e.width_m === (parseFloat(form.width_m) || undefined) &&
-    (e.global === true || e.squad_id === squadId)
-  );
-  if (match) {
-    await base44.entities.FieldExerciseLibrary.update(match.id, {
-      times_used: (match.times_used || 1) + 1,
-      last_used_at: today,
-    });
-    return match.id;
-  } else {
-    const l = parseFloat(form.length_m) || 0;
-    const w = parseFloat(form.width_m) || 0;
-    const p = parseFloat(form.players_count) || 0;
-    const total_area = l && w ? parseFloat((l * w).toFixed(1)) : undefined;
-    const eii = total_area && p ? parseFloat((total_area / p).toFixed(2)) : undefined;
-    const created = await base44.entities.FieldExerciseLibrary.create({
-      name: form.name,
-      type: form.type || undefined,
-      objective: form.objective || undefined,
-      description: form.description || undefined,
-      length_m: parseFloat(form.length_m) || undefined,
-      width_m: parseFloat(form.width_m) || undefined,
-      total_area,
-      eii,
-      players_count: parseFloat(form.players_count) || undefined,
-      duration_min: parseFloat(form.duration_min) || undefined,
-      blocks: parseFloat(form.blocks) || undefined,
-      work_time: form.work_time || undefined,
-      rest_time: form.rest_time || undefined,
-      image_url: form.image_url || undefined,
-      video_url: form.video_url || undefined,
-      notes: form.notes || undefined,
-      squad_id: squadId || undefined,
-      squad_name: squadName || undefined,
-      global: false,
-      times_used: 1,
-      first_created_at: today,
-      last_used_at: today,
-      created_from_session_id: sessionId,
-    });
-    return created.id;
-  }
-}
+import { fieldImportantChanged, syncToFieldLibrary } from "@/components/sessions/exerciseLibrarySync";
 
 const EXERCISE_TYPES = ["Activación", "Técnico", "Táctico", "Reducido", "Posesión", "Finalización", "Fuerza", "Regenerativo", "Otro"];
 
@@ -77,7 +23,7 @@ const TYPE_COLORS = {
 const EMPTY_FORM = {
   name: "", type: "Técnico", duration_min: "", blocks: "", work_time: "", rest_time: "",
   length_m: "", width_m: "", players_count: "", objective: "", description: "",
-  image_url: "", video_url: "", notes: "",
+  image_url: "", video_url: "", notes: "", tags: "", library_exercise_id: "",
 };
 
 // Extrae el primer número de un texto tipo "4 min" o "4'"
@@ -127,6 +73,8 @@ export default function SessionExercises({ session, sessionPlayers }) {
   const [libSearch, setLibSearch] = useState("");
   const [nameSuggestions, setNameSuggestions] = useState([]);
   const [aiLoading, setAiLoading] = useState({ name: false, description: false, objective: false });
+  const [updateLibraryToo, setUpdateLibraryToo] = useState(false);
+  const [originalExercise, setOriginalExercise] = useState(null);
   const { toast } = useToast();
 
   async function handleImageUpload(file) {
@@ -145,7 +93,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
 
   function setF(k, v) { setForm(f => ({ ...f, [k]: v })); }
 
-  function openNew() { setForm(EMPTY_FORM); setEditId(null); setShowAdvanced(false); setNameSuggestions([]); setShowForm(true); }
+  function openNew() { setForm(EMPTY_FORM); setEditId(null); setShowAdvanced(false); setNameSuggestions([]); setUpdateLibraryToo(false); setOriginalExercise(null); setShowForm(true); }
 
   function openEdit(ex) {
     setForm({
@@ -155,9 +103,12 @@ export default function SessionExercises({ session, sessionPlayers }) {
       length_m: ex.length_m ?? "", width_m: ex.width_m ?? "",
       players_count: ex.players_count ?? "", objective: ex.objective || "",
       description: ex.description || "", image_url: ex.image_url || "",
-      video_url: ex.video_url || "", notes: ex.notes || "",
+      video_url: ex.video_url || "", notes: ex.notes || "", tags: (ex.tags || []).join(", "),
+      library_exercise_id: ex.library_exercise_id || "",
     });
     setEditId(ex.id);
+    setOriginalExercise(ex);
+    setUpdateLibraryToo(false);
     setShowAdvanced(!!ex.notes);
     setNameSuggestions([]);
     setShowForm(true);
@@ -185,18 +136,27 @@ export default function SessionExercises({ session, sessionPlayers }) {
       image_url: form.image_url || undefined,
       video_url: form.video_url || undefined,
       notes: form.notes || undefined,
+      tags: String(form.tags || "").split(",").map(t => t.trim()).filter(Boolean),
+      library_exercise_id: form.library_exercise_id || undefined,
     };
 
     if (editId) {
+      const linkedId = originalExercise?.library_exercise_id || form.library_exercise_id;
+      let shouldUpdateLibrary = updateLibraryToo;
+      if (linkedId && !shouldUpdateLibrary && fieldImportantChanged(originalExercise, form)) {
+        shouldUpdateLibrary = window.confirm("Este ejercicio está vinculado a la biblioteca. ¿Querés actualizar la plantilla original?");
+      }
+      if (linkedId && shouldUpdateLibrary) {
+        await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name, { updateExistingId: linkedId, incrementUsage: false });
+      }
       const updated = await base44.entities.SessionExercise.update(editId, payload);
       setExercises(prev => prev.map(e => e.id === editId ? { ...e, ...updated } : e));
-      toast({ title: "✓ Ejercicio actualizado" });
+      toast({ title: shouldUpdateLibrary ? "✓ Ejercicio y biblioteca actualizados" : "✓ Ejercicio actualizado" });
     } else {
       payload.order = exercises.length + 1;
       const created = await base44.entities.SessionExercise.create(payload);
-      // Sync automático a biblioteca de campo y guardar library_exercise_id
-      const libId = await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name);
-      if (libId) {
+      const libId = form.library_exercise_id || await syncToFieldLibrary(form, sessionId, session?.squad_id, session?.squad_name);
+      if (libId && !created.library_exercise_id) {
         await base44.entities.SessionExercise.update(created.id, { library_exercise_id: libId });
         created.library_exercise_id = libId;
       }
@@ -205,6 +165,8 @@ export default function SessionExercises({ session, sessionPlayers }) {
     }
     setShowForm(false);
     setEditId(null);
+    setOriginalExercise(null);
+    setUpdateLibraryToo(false);
     setForm(EMPTY_FORM);
     setSaving(false);
   }
@@ -230,7 +192,8 @@ export default function SessionExercises({ session, sessionPlayers }) {
       length_m: ex.length_m ?? "", width_m: ex.width_m ?? "",
       players_count: ex.players_count ?? "", objective: ex.objective || "",
       description: ex.description || "", image_url: ex.image_url || "",
-      video_url: ex.video_url || "", notes: ex.notes || "",
+      video_url: ex.video_url || "", notes: ex.notes || "", tags: (ex.tags || []).join(", "),
+      library_exercise_id: ex.id,
     });
     setEditId(null);
     setShowAdvanced(!!ex.notes);
@@ -412,7 +375,15 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
       {/* Form */}
       {showForm ? (
         <form onSubmit={handleSubmit} className="bg-zinc-800/50 border border-zinc-700 rounded-xl p-5 space-y-4">
-          <p className="text-sm font-semibold text-white">{editId ? "Editar ejercicio" : "Nuevo ejercicio"}</p>
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <p className="text-sm font-semibold text-white">{editId ? "Editar ejercicio" : "Nuevo ejercicio"}</p>
+            {editId && form.library_exercise_id && (
+              <label className="flex items-center gap-2 text-[10px] text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-2.5 py-1.5">
+                <input type="checkbox" checked={updateLibraryToo} onChange={e => setUpdateLibraryToo(e.target.checked)} />
+                Actualizar también en biblioteca
+              </label>
+            )}
+          </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
@@ -569,9 +540,14 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
                 Observaciones avanzadas {form.notes && !showAdvanced ? "(con contenido)" : ""}
               </button>
               {showAdvanced && (
-                <input value={form.notes} onChange={e => setF("notes", e.target.value)}
-                  placeholder="Observaciones adicionales (opcional)"
-                  className="mt-1.5 w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+                <div className="mt-1.5 grid gap-2">
+                  <input value={form.notes} onChange={e => setF("notes", e.target.value)}
+                    placeholder="Observaciones adicionales (opcional)"
+                    className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+                  <input value={form.tags} onChange={e => setF("tags", e.target.value)}
+                    placeholder="Etiquetas separadas por coma"
+                    className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
+                </div>
               )}
             </div>
           </div>

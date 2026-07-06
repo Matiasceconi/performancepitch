@@ -31,7 +31,8 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       session_id: session.id,
       order: stations.length + 1,
       station_number: stations.length + 1,
-      method: "", exercise_type: "", exercise_name: "", volume: "", notes: "",
+      method: "", exercise_type: "", exercise_name: "", volume: "", notes: "", video_url: "",
+      restore_exercise: "", compensate_exercise: "", sets: "", reps: "", time: "", rest_time: "", rir: "", objective: "", muscle_group: "", vector_pattern: "", tags: [],
       ...initial,
     };
     const created = await base44.entities.StrengthStation.create(payload);
@@ -43,15 +44,43 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   }
 
   async function onBlurField(station) {
-    await base44.entities.StrengthStation.update(station.id, {
+    const payload = {
       method: station.method || undefined,
       exercise_type: station.exercise_type || undefined,
       exercise_name: station.exercise_name || undefined,
       volume: station.volume || undefined,
+      image_url: station.image_url || undefined,
+      video_url: station.video_url || undefined,
+      restore_exercise: station.restore_exercise || undefined,
+      compensate_exercise: station.compensate_exercise || undefined,
+      sets: station.sets || undefined,
+      reps: station.reps || undefined,
+      time: station.time || undefined,
+      rest_time: station.rest_time || undefined,
+      rir: station.rir || undefined,
+      objective: station.objective || undefined,
+      muscle_group: station.muscle_group || undefined,
+      vector_pattern: station.vector_pattern || undefined,
+      tags: station.tags || [],
       notes: station.notes || undefined,
-    });
-    if (station.exercise_name && !station.library_exercise_id) {
-      await syncToLibrary(station, session.id, session?.squad_id, session?.squad_name);
+      library_exercise_id: station.library_exercise_id || station.library_strength_exercise_id || undefined,
+      library_strength_exercise_id: station.library_strength_exercise_id || station.library_exercise_id || undefined,
+    };
+    await base44.entities.StrengthStation.update(station.id, payload);
+    const linkedId = station.library_strength_exercise_id || station.library_exercise_id;
+    if (station.exercise_name && !linkedId) {
+      const libId = await syncToLibrary(station, session.id, session?.squad_id, session?.squad_name);
+      if (libId) {
+        await base44.entities.StrengthStation.update(station.id, { library_exercise_id: libId, library_strength_exercise_id: libId });
+        setStations(prev => prev.map(s => s.id === station.id ? { ...s, library_exercise_id: libId, library_strength_exercise_id: libId } : s));
+      }
+    } else if (linkedId) {
+      const shouldUpdate = station.sync_library_edits || window.confirm("Este ejercicio está vinculado a la biblioteca. ¿Querés actualizar la plantilla original?");
+      if (shouldUpdate) {
+        await syncToLibrary(station, session.id, session?.squad_id, session?.squad_name, { updateExistingId: linkedId, incrementUsage: false });
+        setStations(prev => prev.map(s => s.id === station.id ? { ...s, sync_library_edits: true } : s));
+        toast({ title: "✓ Biblioteca de fuerza actualizada" });
+      }
     }
   }
 
@@ -62,7 +91,21 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       exercise_name: ex.name || "",
       volume: ex.volume || "",
       image_url: ex.image_url || "",
+      video_url: ex.video_url || "",
+      restore_exercise: ex.restore_exercise || "",
+      compensate_exercise: ex.compensate_exercise || "",
+      sets: ex.sets || "",
+      reps: ex.reps || "",
+      time: ex.time || "",
+      rest_time: ex.rest_time || "",
+      rir: ex.rir || "",
+      objective: ex.objective || "",
+      muscle_group: ex.muscle_group || "",
+      vector_pattern: ex.vector_pattern || "",
+      tags: ex.tags || [],
+      notes: ex.notes || "",
       library_exercise_id: ex.id,
+      library_strength_exercise_id: ex.id,
     };
     setStations(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
     await base44.entities.StrengthStation.update(id, updated);
@@ -83,11 +126,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
 
   async function onDelete(id) {
     if (!window.confirm("¿Eliminar ejercicio?")) return;
-    const station = stations.find(s => s.id === id);
     await base44.entities.StrengthStation.delete(id);
-    if (station?.library_exercise_id) {
-      await base44.entities.StrengthExerciseLibrary.delete(station.library_exercise_id).catch(() => {});
-    }
     setStations(prev => prev.filter(s => s.id !== id));
   }
 
@@ -195,6 +234,14 @@ Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen e
                   <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tipo</th>
                   <th className="text-left py-2 px-2 text-zinc-500 font-medium">Ejercicio</th>
                   <th className="text-left py-2 px-2 text-zinc-500 font-medium">Volumen</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Series</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Reps</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tiempo</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Pausa</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">RIR</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Objetivo</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Grupo</th>
+                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Vector</th>
                   <th className="text-left py-2 px-2 text-zinc-500 font-medium">Observaciones</th>
                   <th className="py-2 px-2"></th>
                 </tr>

@@ -25,6 +25,21 @@
       ],
       "description": "Categor\u00eda del ejercicio"
     },
+    "type": {
+      "type": "string",
+      "enum": [
+        "Activaci\u00f3n",
+        "T\u00e9cnico",
+        "T\u00e1ctico",
+        "Reducido",
+        "Posesi\u00f3n",
+        "Finalizaci\u00f3n",
+        "Fuerza",
+        "Regenerativo",
+        "Otro"
+      ],
+      "description": "Tipo de ejercicio"
+    },
     "description": {
       "type": "string",
       "description": "Descripci\u00f3n del ejercicio"
@@ -36,6 +51,18 @@
     "duration_minutes": {
       "type": "number",
       "description": "Duraci\u00f3n de cada bloque en minutos"
+    },
+    "duration_min": {
+      "type": "number",
+      "description": "Duraci\u00f3n total del ejercicio en minutos"
+    },
+    "work_time": {
+      "type": "string",
+      "description": "Tiempo de trabajo"
+    },
+    "rest_time": {
+      "type": "string",
+      "description": "Pausa entre bloques"
     },
     "space": {
       "type": "string",
@@ -53,7 +80,19 @@
       "type": "number",
       "description": "Largo del espacio en metros"
     },
+    "total_area": {
+      "type": "number",
+      "description": "Superficie total"
+    },
+    "eii": {
+      "type": "number",
+      "description": "Espacio de interacci\u00f3n individual"
+    },
     "num_players": {
+      "type": "number",
+      "description": "N\u00famero de jugadores en el ejercicio"
+    },
+    "players_count": {
       "type": "number",
       "description": "N\u00famero de jugadores en el ejercicio"
     },
@@ -65,6 +104,10 @@
       "type": "string",
       "description": "URL de la imagen del ejercicio"
     },
+    "video_url": {
+      "type": "string",
+      "description": "URL del video del ejercicio"
+    },
     "external_csv_url": {
       "type": "string",
       "description": "URL del CSV con carga externa del ejercicio"
@@ -72,6 +115,26 @@
     "external_csv_label": {
       "type": "string",
       "description": "Nombre o descripci\u00f3n del archivo CSV cargado"
+    },
+    "external_load_summary": {
+      "type": "object",
+      "description": "Resumen de carga externa"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones"
+    },
+    "library_exercise_id": {
+      "type": "string",
+      "description": "ID del ejercicio en FieldExerciseLibrary si est\u00e1 vinculado"
     }
   },
   "required": [

@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Upload, AlertCircle, X, Eye, Link } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { fmtMetric, fmtSmax } from "@/utils";
+import { updateFieldLibraryGpsSummary } from "@/components/sessions/exerciseLibrarySync";
 
 // ── helpers ────────────────────────────────────────────────────────────────
 function normalize(s) {
@@ -203,6 +204,7 @@ export default function ExerciseGPS({ session, exercise, sessionPlayers }) {
         exercise_name: exercise?.name || "",
       }));
       await base44.entities.LibraryExerciseGPSData.bulkCreate(libRecords);
+      await updateFieldLibraryGpsSummary(libId);
     }
 
     setRows(Array.isArray(saved) ? saved : toCreate);
@@ -235,6 +237,7 @@ export default function ExerciseGPS({ session, exercise, sessionPlayers }) {
           session_date: session?.date || "",
           exercise_name: exercise?.name || "",
         });
+        await updateFieldLibraryGpsSummary(libraryExerciseId);
       }
       setRows(prev => [...prev, created]);
       setUnmatched(prev => prev.filter(u => u.rawName !== rawName));

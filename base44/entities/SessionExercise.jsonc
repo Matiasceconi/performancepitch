@@ -82,9 +82,21 @@
       "type": "string",
       "description": "Link al video del ejercicio"
     },
+    "external_load_summary": {
+      "type": "object",
+      "description": "Resumen de carga externa del ejercicio de sesi\u00f3n"
+    },
     "notes": {
       "type": "string",
       "description": "Observaciones"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas"
     },
     "library_exercise_id": {
       "type": "string",
