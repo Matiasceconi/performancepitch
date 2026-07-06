@@ -1,6 +1,6 @@
 import React from "react";
 import moment from "moment";
-import { CheckCircle2, Clock, Home, Link2, Moon, Pencil, Plane, Trophy } from "lucide-react";
+import { CheckCircle2, Clock, Dumbbell, Home, Link2, MapPin, Moon, Pencil, Plane, RefreshCcw, Trophy, Wind } from "lucide-react";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
 
 function upsertBlock(day, type, patch, updateDay, dayIdx) {
@@ -35,6 +35,13 @@ function eventCompetition(ev) {
   return ev?.competition || ev?.competencia || notes.match(/competencia\s*:?\s*([^\n·|]+)/i)?.[1] || "Competencia sin definir";
 }
 
+function blockIcon(type) {
+  if (type === "Gimnasio") return Dumbbell;
+  if (type === "Campo") return MapPin;
+  if (type === "Compensatorio") return RefreshCcw;
+  return Wind;
+}
+
 function EventFocusCard({ event, type }) {
   const isMatch = type === "match";
   return (
@@ -54,7 +61,7 @@ function EventFocusCard({ event, type }) {
   );
 }
 
-function WorkCard({ config, block, sessionLibrary, session, details, onChange }) {
+function WorkCard({ config, block, sessionLibrary, session, details, onChange, cooldownOptions = [] }) {
   const selectedSessionId = block?.auto_sync === false ? "" : block?.session_id || session?.id || "";
   const autoContent = getBlockAutoContent({ ...block, content: "" }, session, details);
   const fullContent = getBlockAutoContent(block, session, details);
@@ -62,36 +69,44 @@ function WorkCard({ config, block, sessionLibrary, session, details, onChange })
   const hasSync = Boolean(session && autoContent);
   const source = hasManual ? "Editado" : hasSync ? "Sincronizado" : "Sin datos";
   const SourceIcon = hasManual ? Pencil : CheckCircle2;
+  const Icon = blockIcon(config.type);
+
+  function addCooldown(value) {
+    if (!value) return;
+    const current = String(block?.content || "").trim();
+    onChange({ content: current ? `${current}\n${value}` : value, manual_edited: true });
+  }
 
   return (
-    <div className="rounded-xl border border-zinc-200 bg-white p-2.5 shadow-sm">
+    <div className="rounded-2xl border border-zinc-100 bg-slate-50/80 p-3 shadow-sm border-l-4" style={{ borderLeftColor: config.color }}>
       <div className="flex items-center justify-between gap-2 mb-2">
         <div className="flex items-center gap-2 min-w-0">
-          <span className="w-1.5 h-7 rounded-full shrink-0" style={{ backgroundColor: config.color }} />
-          <p className="text-[10px] font-black uppercase tracking-wide text-zinc-800 truncate">{config.label}</p>
+          <span className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${config.color}18`, color: config.color }}><Icon size={14} /></span>
+          <p className="text-[10px] font-black uppercase tracking-wide text-zinc-700 truncate">{config.label}</p>
         </div>
-        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${hasManual ? "bg-amber-50 text-amber-700" : hasSync ? "bg-blue-50 text-blue-700" : "bg-zinc-100 text-zinc-400"}`}>
+        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${hasManual ? "bg-amber-50 text-amber-700" : hasSync ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}>
           <SourceIcon size={10} /> {source}
         </span>
       </div>
-      <select value={selectedSessionId} onChange={(e) => onChange({ session_id: e.target.value, auto_sync: true })} className="w-full rounded-lg border border-zinc-200 bg-zinc-50 px-2 py-1.5 text-[10px] font-semibold text-zinc-700 focus:outline-none focus:ring-1 focus:ring-blue-200">
+      <select value={selectedSessionId} onChange={(e) => onChange({ session_id: e.target.value, auto_sync: true })} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-100">
         <option value="">Completar desde sesión...</option>
         {sessionLibrary.map((item) => <option key={item.id} value={item.id}>{item.date ? `${moment(item.date).format("DD/MM")} · ` : ""}{item.title}</option>)}
       </select>
-      {hasSync && <div className="mt-2 rounded-lg bg-blue-50 border border-blue-100 px-2 py-2 text-[10px] leading-relaxed text-blue-900 whitespace-pre-wrap"><Link2 size={11} className="inline mr-1" />{autoContent}</div>}
-      {hasSync && <button type="button" onClick={() => onChange({ session_id: "", auto_sync: false })} className="mt-1 text-[10px] font-black text-zinc-500 hover:text-blue-700">Usar solo edición manual</button>}
+      {config.type === "Vuelta a la calma" && <select value="" onChange={(e) => addCooldown(e.target.value)} className="mt-2 w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-100"><option value="">Agregar desde lista...</option>{cooldownOptions.map((item) => <option key={item.id} value={item.label}>{item.label}</option>)}</select>}
+      {hasSync && <div className="mt-2 rounded-xl bg-white border border-emerald-100 px-2 py-2 text-[10px] leading-relaxed text-zinc-700 whitespace-pre-wrap"><Link2 size={11} className="inline mr-1 text-emerald-600" />{autoContent}</div>}
+      {hasSync && <button type="button" onClick={() => onChange({ session_id: "", auto_sync: false })} className="mt-1 text-[10px] font-black text-zinc-500 hover:text-emerald-700">Usar solo edición manual</button>}
       <textarea
         value={block?.content || ""}
         onChange={(e) => onChange({ content: e.target.value, manual_edited: Boolean(e.target.value.trim()) })}
         placeholder="Escribir manualmente o complementar la sesión..."
-        className="mt-2 w-full min-h-[54px] rounded-lg border border-zinc-200 bg-white px-2 py-2 text-[10px] leading-relaxed text-zinc-700 focus:outline-none focus:ring-1 focus:ring-blue-200 resize-none"
+        className="mt-2 w-full min-h-[58px] rounded-xl border border-zinc-200 bg-white px-2 py-2 text-[10px] leading-relaxed text-zinc-700 focus:outline-none focus:ring-1 focus:ring-emerald-100 resize-none"
       />
       {!fullContent && <p className="mt-1 text-[10px] text-zinc-400">Sin tareas vinculadas</p>}
     </div>
   );
 }
 
-export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessionDetails, blockSession, sessionsById, updateDay, physicalObjectives = [], calendarEvents = [] }) {
+export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessionDetails, blockSession, sessionsById, updateDay, physicalObjectives = [], calendarEvents = [], cooldownOptions = [] }) {
   const matchEvent = calendarEvents.find(isMatchEvent);
   const travelEvent = calendarEvents.find(isTravelEvent);
   const specialEvent = matchEvent || travelEvent;
@@ -130,7 +145,7 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
   }
 
   return (
-    <div className="bg-white border-2 border-zinc-200 rounded-2xl shadow-md overflow-hidden min-w-0 flex flex-col min-h-[520px]">
+    <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden min-w-0 flex flex-col min-h-[520px]">
       <div className="px-3 pt-3 pb-2 text-center border-b border-zinc-200 bg-zinc-50">
         <p className="text-[11px] font-black text-zinc-600 tracking-[0.22em]">{dayNameEs(day.date)}</p>
         <input type="date" value={day.date} onChange={(e) => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-center text-[11px] font-semibold text-zinc-500 focus:outline-none mt-1" />
@@ -141,11 +156,11 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
           {objectiveOptions.map((item) => <option key={item}>{item}</option>)}
         </select>
       </div>
-      <div className="flex-1 p-2.5 space-y-2 bg-slate-100">
+      <div className="flex-1 p-3 space-y-3 bg-white">
         {WORK_BLOCKS.map((config) => {
           const block = blocks.find((item) => item.type === config.type) || { type: config.type, title: config.label, content: "" };
           const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
-          return <WorkCard key={config.type} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} onChange={(patch) => upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
+          return <WorkCard key={config.type} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onChange={(patch) => upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
         })}
       </div>
     </div>

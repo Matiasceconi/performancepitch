@@ -25,10 +25,10 @@ export const OBJECTIVE_COLORS = {
 };
 
 export const WORK_BLOCKS = [
-  { type: "Gimnasio", label: "Tarea de gimnasio", color: "#2563eb" },
-  { type: "Campo", label: "Tarea de campo", color: "#16a34a" },
-  { type: "Compensatorio", label: "Compensación", color: "#0891b2" },
-  { type: "Vuelta a la calma", label: "Vuelta a la calma", color: "#64748b" },
+  { type: "Gimnasio", label: "Tarea de gimnasio", color: "#5B8DEF" },
+  { type: "Campo", label: "Tarea de campo", color: "#4FA66A" },
+  { type: "Compensatorio", label: "Compensación", color: "#5CA8A6" },
+  { type: "Vuelta a la calma", label: "Vuelta a la calma", color: "#8A93A3" },
 ];
 
 export function dayNameEs(date) {

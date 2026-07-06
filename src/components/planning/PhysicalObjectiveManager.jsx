@@ -12,8 +12,8 @@ function textForColor(hex) {
   return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#0f172a" : "#ffffff";
 }
 
-export default function PhysicalObjectiveManager({ objectives = [], onRefresh }) {
-  const [open, setOpen] = useState(false);
+export default function PhysicalObjectiveManager({ objectives = [], onRefresh, defaultOpen = false }) {
+  const [open, setOpen] = useState(defaultOpen);
   const [drafts, setDrafts] = useState([]);
   const sorted = [...drafts].sort((a, b) => (a.order || 0) - (b.order || 0));
 
@@ -54,13 +54,13 @@ export default function PhysicalObjectiveManager({ objectives = [], onRefresh })
   }
 
   return (
-    <div className="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
+    <div className="bg-white border border-zinc-200 rounded-2xl shadow-sm overflow-hidden">
       <button onClick={() => setOpen(!open)} className="w-full px-4 py-3 flex items-center justify-between text-left hover:bg-zinc-50">
         <div>
           <p className="text-xs font-black uppercase tracking-wide text-zinc-500">Administrar objetivos físicos</p>
           <p className="text-sm font-bold text-zinc-900">Crear, editar colores, ordenar y ocultar objetivos</p>
         </div>
-        <span className="text-xs font-black text-blue-700">{open ? "Cerrar" : "Abrir"}</span>
+        <span className="text-xs font-black text-emerald-700">{open ? "Cerrar" : "Abrir"}</span>
       </button>
       {open && (
         <div className="border-t border-zinc-100 p-3 space-y-2">
@@ -91,7 +91,7 @@ export default function PhysicalObjectiveManager({ objectives = [], onRefresh })
               <button onClick={() => remove(item)} className="px-2 py-2 rounded-lg bg-red-50 border border-red-100 text-red-600 text-xs font-black flex items-center justify-center gap-1"><Trash2 size={13} /> Borrar</button>
             </div>
           ))}
-          <button onClick={createObjective} className="w-full rounded-xl border border-dashed border-blue-200 bg-blue-50 px-3 py-2 text-xs font-black text-blue-700 flex items-center justify-center gap-2"><Plus size={14} /> Crear objetivo físico</button>
+          <button onClick={createObjective} className="w-full rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-black text-emerald-700 flex items-center justify-center gap-2"><Plus size={14} /> Crear objetivo físico</button>
         </div>
       )}
     </div>
