@@ -115,7 +115,8 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
   const objStyle = objectiveStyle(objective, physicalObjectives);
   const blocks = day.blocks || [];
   const visibleObjectives = physicalObjectives.filter((item) => item.active !== false && !item.hidden).sort((a, b) => (a.order || 0) - (b.order || 0));
-  const objectiveOptions = visibleObjectives.length ? visibleObjectives.map((item) => item.name) : ["Recuperación", "Readaptación", "Velocidad", "Duración metabólica", "Mixto", "Activación pre competencia"];
+  const baseObjectiveOptions = visibleObjectives.length ? visibleObjectives.map((item) => item.name) : ["Recuperación", "Readaptación", "Velocidad", "Duración metabólica", "Mixto", "Activación pre competencia"];
+  const objectiveOptions = baseObjectiveOptions.includes(objective) ? baseObjectiveOptions : [objective, ...baseObjectiveOptions].filter(Boolean);
 
   if (specialEvent) {
     return (
@@ -152,7 +153,7 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
         <select value={day.md || "MD-5"} onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : blocks })} className="mt-2 w-full bg-transparent text-center text-2xl font-black focus:outline-none" style={{ color: objStyle.text }}>
           {MD_OPTIONS.map((item) => <option key={item}>{item}</option>)}
         </select>
-        <select value={objectiveOptions.includes(objective) ? objective : objectiveOptions[0]} onChange={(e) => updateDay(dayIdx, { physical_objective: e.target.value })} className="mt-2 w-full rounded-xl border px-2 py-2 text-[11px] font-black text-center focus:outline-none" style={{ backgroundColor: "rgba(255,255,255,0.45)", color: objStyle.text, borderColor: objStyle.border }}>
+        <select value={objective || objectiveOptions[0]} onChange={(e) => updateDay(dayIdx, { physical_objective: e.target.value })} className="mt-2 w-full rounded-xl border px-2 py-2 text-[11px] font-black text-center focus:outline-none" style={{ backgroundColor: "rgba(255,255,255,0.45)", color: objStyle.text, borderColor: objStyle.border }}>
           {objectiveOptions.map((item) => <option key={item}>{item}</option>)}
         </select>
       </div>
