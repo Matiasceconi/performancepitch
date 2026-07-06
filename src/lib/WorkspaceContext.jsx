@@ -9,6 +9,25 @@ const WorkspaceContext = createContext(null);
 
 const EMPTY_PERMS = { can_view: false, can_create: false, can_edit: false, can_delete: false, can_export: false, can_admin: false };
 
+const LEGACY_MODULE_PATHS = {
+  dashboard: ["/"],
+  daily_squad: ["/daily-squad"],
+  sessions: ["/sessions"],
+  gps: ["/performance/external-load"],
+  performance: ["/performance/external-load", "/performance/internal-load", "/performance/minutes", "/performance/microcycle-history"],
+  medical: ["/performance/medical"],
+  nutrition: ["/performance/nutrition"],
+  field_library: ["/field-library"],
+  strength_library: ["/strength-library"],
+  matches: ["/matches"],
+  tactical: ["/tactical"],
+  schedule: ["/schedule"],
+  weekly_planner: ["/weekly-planner"],
+  team: ["/team"],
+  admin: ["/admin"],
+  squad_manager: ["/squad-manager"],
+};
+
 export function WorkspaceProvider({ children }) {
   const { user, isAuthenticated } = useAuth();
   const [squads, setSquads] = useState([]);
@@ -90,7 +109,8 @@ export function WorkspaceProvider({ children }) {
 
       // Fallback: usuarios migrados que tenían rol Administrador o can_admin=true directo en UserAccess
       // conservan su acceso de administrador aunque todavía no se les haya asignado un rol nuevo.
-      const legacyAdminRole = ["admin", "administrador"].includes(String(access?.role || "").toLowerCase());
+      const normalizedAccessRole = String(access?.role || "").toLowerCase();
+      const legacyAdminRole = normalizedAccessRole.includes("admin") || normalizedAccessRole.includes("administrador");
       const resolvedAdmin = platformAdmin || legacyAdminRole || mergedPerms.can_admin || !!access?.can_admin;
       if (resolvedAdmin) adminLockRef.current = true;
       setAdminAccess(adminLockRef.current);
@@ -109,6 +129,8 @@ export function WorkspaceProvider({ children }) {
           MODULE_ACTIONS.forEach(action => { mergedModulePermissions[moduleId][action.key] = !!mergedModulePermissions[moduleId][action.key] || !!perms?.[action.key]; });
         });
       });
+      (access?.allowed_pages || []).forEach(p => allowedPageSet.add(p));
+      (access?.allowed_modules || []).forEach(moduleId => (LEGACY_MODULE_PATHS[moduleId] || []).forEach(path => allowedPageSet.add(path)));
       PAGES.forEach(page => { if (mergedModulePermissions[page.module_id]?.can_view) allowedPageSet.add(page.path); });
       if (adminLockRef.current) {
         AREAS.forEach(a => allowedAreaIds.add(a.id));
@@ -221,8 +243,10 @@ export function WorkspaceProvider({ children }) {
     ? squads
     : squads.filter(s => (userAccess?.squad_ids || []).includes(s.id));
 
+  const effectiveAdminAccess = adminAccess || user?.role === "admin" || !!userAccess?.can_admin || String(userAccess?.role || "").toLowerCase().includes("admin") || String(userAccess?.role || "").toLowerCase().includes("administrador");
+
   function can(action, path = null) {
-    if (adminAccess) return true;
+    if (effectiveAdminAccess) return true;
     const key = `can_${action}`;
     if (path) {
       const page = PAGES.find(p => p.path === path);
@@ -254,7 +278,7 @@ export function WorkspaceProvider({ children }) {
   // Seguridad: valida si una página puede verse por módulo independiente.
   // Administradores tienen acceso total; ya no depende del área activa ni de un módulo padre.
   function canSeePath(path) {
-    if (adminAccess) return true;
+    if (effectiveAdminAccess) return true;
     return allowedPages.includes(path);
   }
 
@@ -320,7 +344,7 @@ export function WorkspaceProvider({ children }) {
   }
 
   // ── No modules/areas assigned ───────────────────────────────────────────
-  if (!adminAccess && myAreas.length === 0 && allowedPages.length === 0) {
+  if (!effectiveAdminAccess && myAreas.length === 0 && allowedPages.length === 0) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
         <div className="w-full max-w-sm text-center space-y-4">
@@ -342,7 +366,7 @@ export function WorkspaceProvider({ children }) {
   }
 
   // ── No squads assigned ──────────────────────────────────────────────────
-  if (!adminAccess && mySquads.length === 0) {
+  if (!effectiveAdminAccess && mySquads.length === 0) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-6">
         <div className="w-full max-w-sm text-center space-y-4">
@@ -409,8 +433,8 @@ export function WorkspaceProvider({ children }) {
       activeSquadName: activeSquad?.name || "",
       activeSeasonId: activeSquad?.season || null,
       // Global, sticky para la sesión — nunca depende del plantel ni del área activa.
-      isAdmin: adminAccess,
-      canManageUsers: adminAccess,
+      isAdmin: effectiveAdminAccess,
+      canManageUsers: effectiveAdminAccess,
       roleNames,
       permissions,
       debugInfo: {

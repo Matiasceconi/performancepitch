@@ -56,7 +56,7 @@ export default function Sidebar() {
           {myAreas.length > 1 && <button onClick={requestAreaChange} className="w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-lg bg-zinc-900 border border-zinc-800 hover:border-zinc-600 transition-colors text-left"><span className="text-xs text-zinc-300 truncate">{activeAreaName || "Área"}</span><Repeat size={12} className="text-zinc-500 shrink-0" /></button>}
           <SquadSelector />
         </div>
-        <nav className="p-3 space-y-0.5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 148px)" }}>
+        <nav className="p-3 space-y-0.5 overflow-y-auto" style={{ maxHeight: "calc(100vh - 218px)" }}>
           {visibleItems.map((item) => <NavLink key={item.path} item={item} />)}
         </nav>
         <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-zinc-800 bg-zinc-950">
