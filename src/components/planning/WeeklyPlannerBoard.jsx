@@ -136,7 +136,9 @@ function MicrocycleExportView({ days, meta, dayLoads, summary, sessionDetails, s
             {travel && <p className="text-[10px] font-bold text-zinc-600 mt-2">{eventTime(travel)}</p>}
           </div> : free ? <div className="min-h-[260px] flex flex-col items-center justify-center text-blue-700"><p className="text-3xl">☾</p><p className="text-lg font-black mt-2">DÍA LIBRE</p></div> : <div className="p-2 space-y-2 min-h-[260px]">
             {WORK_BLOCKS.map((config) => {
-              const block = (day.blocks || []).find((item) => item.type === config.type) || { type: config.type };
+              const existing = (day.blocks || []).find((item) => item.type === config.type);
+              if (config.type === "Compensatorio" && !existing) return null;
+              const block = existing || { type: config.type };
               const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
               const content = getBlockAutoContent(block, session, sessionDetails[block.session_id || session?.id]);
               return <div key={config.type} className="rounded-lg bg-zinc-50 border border-zinc-100 p-2">
@@ -281,7 +283,9 @@ export default function WeeklyPlannerBoard() {
     if (isFreeDay(day) || dayEvents.some(isMatchEvent) || dayEvents.some(isTravelEvent)) return [];
     const explicit = (day.blocks || []).map(block => block.session_id).filter(Boolean);
     const inferred = WORK_BLOCKS.map((config) => {
-      const block = (day.blocks || []).find((item) => item.type === config.type) || { type: config.type };
+      const existing = (day.blocks || []).find((item) => item.type === config.type);
+      if (config.type === "Compensatorio" && !existing) return null;
+      const block = existing || { type: config.type };
       return block.auto_sync === false ? null : inferSessionForBlock(day, config.type, sessionLibrary)?.id;
     }).filter(Boolean);
     return [...explicit, ...inferred];
@@ -354,7 +358,9 @@ export default function WeeklyPlannerBoard() {
     const dayEvents = calendarEvents.filter((ev) => ev.date === day.date);
     if (isFreeDay(day) || dayEvents.some(isMatchEvent) || dayEvents.some(isTravelEvent)) return { day: dayName(day.date).slice(0, 3), date: day.date };
     const load = WORK_BLOCKS.reduce((acc, config) => {
-      const block = (day.blocks || []).find((item) => item.type === config.type) || { type: config.type };
+      const existing = (day.blocks || []).find((item) => item.type === config.type);
+      if (config.type === "Compensatorio" && !existing) return acc;
+      const block = existing || { type: config.type };
       const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
       return session ? addLoads(acc, sessionLoad(session, historicalAverages)) : acc;
     }, {});

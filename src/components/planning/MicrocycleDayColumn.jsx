@@ -1,6 +1,6 @@
 import React from "react";
 import moment from "moment";
-import { CheckCircle2, Clock, Dumbbell, Home, Link2, MapPin, Moon, Pencil, Plane, Plus, RefreshCcw, Trophy, Wind } from "lucide-react";
+import { CheckCircle2, Clock, Dumbbell, Home, Link2, MapPin, Moon, Pencil, Plane, Plus, RefreshCcw, Trash2, Trophy, Wind } from "lucide-react";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
 
 function upsertBlock(day, type, patch, updateDay, dayIdx) {
@@ -15,6 +15,10 @@ function upsertBlock(day, type, patch, updateDay, dayIdx) {
 
 function updateBlockById(day, blockId, patch, updateDay, dayIdx) {
   updateDay(dayIdx, { blocks: (day.blocks || []).map((block) => block.id === blockId ? { ...block, ...patch } : block) });
+}
+
+function removeBlockById(day, blockId, updateDay, dayIdx) {
+  updateDay(dayIdx, { blocks: (day.blocks || []).filter((block) => block.id !== blockId) });
 }
 
 function addTypedBlock(day, type, updateDay, dayIdx) {
@@ -70,7 +74,7 @@ function EventFocusCard({ event, type }) {
   );
 }
 
-function WorkCard({ config, block, sessionLibrary, session, details, onChange, onSelectSession, cooldownOptions = [] }) {
+function WorkCard({ config, block, sessionLibrary, session, details, onChange, onDelete, onSelectSession, cooldownOptions = [] }) {
   const selectedSessionId = block?.auto_sync === false ? "" : block?.session_id || session?.id || "";
   const autoContent = getBlockAutoContent({ ...block, content: "" }, session, details);
   const fullContent = getBlockAutoContent(block, session, details);
@@ -93,9 +97,12 @@ function WorkCard({ config, block, sessionLibrary, session, details, onChange, o
           <span className="w-7 h-7 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${config.color}18`, color: config.color }}><Icon size={14} /></span>
           <p className="text-[10px] font-black uppercase tracking-wide text-zinc-700 truncate">{config.label}</p>
         </div>
-        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${hasManual ? "bg-amber-50 text-amber-700" : hasSync ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}>
-          <SourceIcon size={10} /> {source}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-[9px] font-black ${hasManual ? "bg-amber-50 text-amber-700" : hasSync ? "bg-emerald-50 text-emerald-700" : "bg-zinc-100 text-zinc-400"}`}>
+            <SourceIcon size={10} /> {source}
+          </span>
+          {config.type === "Compensatorio" && block?.id && <button type="button" onClick={onDelete} className="rounded-full p-1 text-zinc-400 hover:bg-red-50 hover:text-red-600" title="Eliminar compensación"><Trash2 size={11} /></button>}
+        </div>
       </div>
       <select value={selectedSessionId} onChange={(e) => { onChange({ session_id: e.target.value, auto_sync: true }); onSelectSession?.(e.target.value); }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-100">
         <option value="">Completar desde sesión...</option>
@@ -169,11 +176,14 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
       <div className="flex-1 p-3 space-y-3 bg-white">
         {WORK_BLOCKS.map((config) => {
           const typeBlocks = blocks.filter((item) => item.type === config.type);
+          if (config.type === "Compensatorio" && !typeBlocks.length) {
+            return <button key={config.type} type="button" onClick={() => addTypedBlock(day, "Compensatorio", updateDay, dayIdx)} className="w-full rounded-xl border border-dashed border-teal-200 bg-teal-50/60 px-3 py-2 text-[10px] font-black text-teal-700 flex items-center justify-center gap-2"><Plus size={13} /> Agregar compensación</button>;
+          }
           const renderBlocks = typeBlocks.length ? typeBlocks : [{ type: config.type, title: config.label, content: "" }];
           return <div key={config.type} className="space-y-2">
             {renderBlocks.map((block, index) => {
               const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
-              return <WorkCard key={block.id || `${config.type}-${index}`} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onSelectSession={(sessionId) => onSelectSession?.(dayIdx, sessionId)} onChange={(patch) => block.id ? updateBlockById(day, block.id, patch, updateDay, dayIdx) : upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
+              return <WorkCard key={block.id || `${config.type}-${index}`} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onDelete={() => block.id && removeBlockById(day, block.id, updateDay, dayIdx)} onSelectSession={(sessionId) => onSelectSession?.(dayIdx, sessionId)} onChange={(patch) => block.id ? updateBlockById(day, block.id, patch, updateDay, dayIdx) : upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
             })}
             {config.type === "Campo" && <button type="button" onClick={() => addTypedBlock(day, "Campo", updateDay, dayIdx)} className="w-full rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black text-emerald-700 flex items-center justify-center gap-2"><Plus size={13} /> Agregar tarea de campo</button>}
           </div>;

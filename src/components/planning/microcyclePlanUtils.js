@@ -80,8 +80,7 @@ export function getBlockAutoContent(block, session, details = {}) {
 
   if (session) {
     if (block.type === "Gimnasio") {
-      const rows = (details.strength || []).slice().sort((a, b) => (a.order || a.station_number || 0) - (b.order || b.station_number || 0));
-      if (rows.length) automatic = rows.map(formatStrength).join("\n");
+      automatic = [session.title || "Sesión de fuerza", session.session_type, session.duration_minutes ? `${session.duration_minutes} min` : ""].filter(Boolean).join(" · ");
     }
 
     if (block.type === "Campo") {
