@@ -80,7 +80,15 @@ export function getBlockAutoContent(block, session, details = {}) {
 
   if (session) {
     if (block.type === "Gimnasio") {
-      automatic = [session.title || "Sesión de fuerza", session.session_type, session.duration_minutes ? `${session.duration_minutes} min` : ""].filter(Boolean).join(" · ");
+      const workBlocks = (details.strengthBlocks || []).filter((item) => item.hidden !== true).sort((a, b) => (a.order || 0) - (b.order || 0));
+      if (workBlocks.length) {
+        automatic = workBlocks.map((item) => item.name).filter(Boolean).join("\n");
+      } else if ((details.strength || []).length) {
+        const names = [...new Set((details.strength || []).map((row) => row.strength_group).filter(Boolean))];
+        automatic = names.length ? names.join("\n") : [session.title || "Sesión de fuerza", session.session_type, session.duration_minutes ? `${session.duration_minutes} min` : ""].filter(Boolean).join(" · ");
+      } else {
+        automatic = [session.title || "Sesión de fuerza", session.session_type, session.duration_minutes ? `${session.duration_minutes} min` : ""].filter(Boolean).join(" · ");
+      }
     }
 
     if (block.type === "Campo") {

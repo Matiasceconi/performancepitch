@@ -342,12 +342,13 @@ export default function WeeklyPlannerBoard() {
   useEffect(() => {
     async function loadDetails() {
       const entries = await Promise.all(linkedSessionIds.map(async id => {
-        const [strength, exercises, field] = await Promise.all([
+        const [strength, strengthBlocks, exercises, field] = await Promise.all([
           base44.entities.StrengthStation.filter({ session_id: id }, "order"),
+          base44.entities.StrengthWorkBlock.filter({ session_id: id }, "order"),
           base44.entities.SessionExercise.filter({ session_id: id }, "order"),
           base44.entities.FieldExercise.filter({ session_id: id }, "order"),
         ]);
-        return [id, { strength, exercises, field }];
+        return [id, { strength, strengthBlocks, exercises, field }];
       }));
       setSessionDetails(Object.fromEntries(entries));
     }

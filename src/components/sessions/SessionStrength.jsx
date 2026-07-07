@@ -3,7 +3,6 @@ import { base44 } from "@/api/base44Client";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { Activity, Dumbbell, ImagePlus, Plus, RotateCcw, Shield, Sparkles, Target, Users, Zap } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
-import StrengthHeader from "@/components/sessions/strength/StrengthHeader";
 import StrengthGroupTable from "@/components/sessions/strength/StrengthGroupTable";
 import StrengthPDFExport from "@/components/sessions/strength/StrengthPDFExport";
 import StrengthImageImportModal from "@/components/sessions/strength/StrengthImageImportModal";
@@ -281,8 +280,6 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     <div className="space-y-4">
       <datalist id="strength-method-options">{METHOD_OPTIONS.map(m => <option key={m} value={m} />)}</datalist>
       <datalist id="strength-type-options">{TYPE_OPTIONS.map(t => <option key={t} value={t} />)}</datalist>
-
-      <StrengthHeader session={session} onSessionUpdate={onSessionUpdate} />
 
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
