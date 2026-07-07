@@ -56,25 +56,27 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   useEffect(() => { loadData(); }, [session.id]);
 
   async function loadData() {
-    const [rows, rawBlocks] = await Promise.all([
-      base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 300),
-      base44.entities.StrengthWorkBlock.filter({ session_id: session.id }, "order", 100),
-    ]);
+    const rows = await base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 300);
+    const rawBlocks = await base44.entities.StrengthWorkBlock.filter({ session_id: session.id }, "order", 100);
 
     let nextBlocks = rawBlocks.sort((a, b) => (a.order || 0) - (b.order || 0));
     let nextRows = rows.sort((a, b) => (a.order || 0) - (b.order || 0));
 
     if (!nextBlocks.length && nextRows.length) {
       const names = [...new Set(nextRows.map(r => normalizeGroupName(r.strength_group || "Restaura")))];
-      nextBlocks = await Promise.all(names.map((name, index) => {
+      nextBlocks = [];
+      for (let index = 0; index < names.length; index += 1) {
+        const name = names[index];
         const template = BLOCK_TEMPLATES.find(t => uidName(t.name) === uidName(name)) || BLOCK_TEMPLATES[index % BLOCK_TEMPLATES.length];
-        return base44.entities.StrengthWorkBlock.create({ session_id: session.id, name, color: template.color, icon: template.icon, order: index + 1, hidden: false });
-      }));
+        nextBlocks.push(await base44.entities.StrengthWorkBlock.create({ session_id: session.id, name, color: template.color, icon: template.icon, order: index + 1, hidden: false }));
+      }
       const byName = Object.fromEntries(nextBlocks.map(b => [uidName(b.name), b]));
-      nextRows = await Promise.all(nextRows.map((row) => {
+      const migratedRows = [];
+      for (const row of nextRows) {
         const block = byName[uidName(row.strength_group || "Restaura")] || nextBlocks[0];
-        return base44.entities.StrengthStation.update(row.id, { work_block_id: block.id, strength_group: block.name });
-      }));
+        migratedRows.push(await base44.entities.StrengthStation.update(row.id, { work_block_id: block.id, strength_group: block.name }));
+      }
+      nextRows = migratedRows;
     }
 
     setBlocks(nextBlocks);
@@ -115,16 +117,20 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     [next[index], next[target]] = [next[target], next[index]];
     const updated = next.map((block, i) => ({ ...block, order: i + 1 }));
     setBlocks(updated);
-    await Promise.all(updated.map(block => base44.entities.StrengthWorkBlock.update(block.id, { order: block.order })));
+    for (const block of updated) {
+      await base44.entities.StrengthWorkBlock.update(block.id, { order: block.order });
+    }
   }
 
   async function duplicateBlock(block) {
     const created = await createBlock({ name: `${block.name} copia`, description: block.description, color: block.color, icon: block.icon });
     const sourceRows = stationsByBlock[block.id] || [];
-    const createdRows = await Promise.all(sourceRows.map((row, index) => {
+    const createdRows = [];
+    for (let index = 0; index < sourceRows.length; index += 1) {
+      const row = sourceRows[index];
       const { id, created_date, updated_date, created_by_id, ...rest } = row;
-      return base44.entities.StrengthStation.create({ ...rest, work_block_id: created.id, strength_group: created.name, order: index + 1, station_number: index + 1 });
-    }));
+      createdRows.push(await base44.entities.StrengthStation.create({ ...rest, work_block_id: created.id, strength_group: created.name, order: index + 1, station_number: index + 1 }));
+    }
     setStations(prev => [...prev, ...createdRows]);
     toast({ title: "✓ Cuadro duplicado" });
   }
@@ -132,7 +138,9 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   async function deleteBlock(block) {
     if (!window.confirm(`¿Eliminar el cuadro ${block.name} y sus ejercicios?`)) return;
     const rows = stationsByBlock[block.id] || [];
-    await Promise.all(rows.map(row => base44.entities.StrengthStation.delete(row.id)));
+    for (const row of rows) {
+      await base44.entities.StrengthStation.delete(row.id);
+    }
     await base44.entities.StrengthWorkBlock.delete(block.id);
     setBlocks(prev => prev.filter(item => item.id !== block.id));
     setStations(prev => prev.filter(row => row.work_block_id !== block.id));
@@ -236,7 +244,9 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     const block = blocks.find(item => item.id === blockId);
     const updated = list.map((row, index) => ({ ...row, work_block_id: blockId, strength_group: block?.name || row.strength_group || "", order: index + 1, station_number: index + 1 }));
     setStations(prev => prev.filter(row => row.work_block_id !== blockId).concat(updated));
-    await Promise.all(updated.map(row => base44.entities.StrengthStation.update(row.id, { work_block_id: row.work_block_id, strength_group: row.strength_group, order: row.order, station_number: row.station_number })));
+    for (const row of updated) {
+      await base44.entities.StrengthStation.update(row.id, { work_block_id: row.work_block_id, strength_group: row.strength_group, order: row.order, station_number: row.station_number });
+    }
   }
 
   function onMoveInBlock(blockId, index, direction) {

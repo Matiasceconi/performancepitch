@@ -74,8 +74,14 @@ export default function StrengthImageImportModal({ session, hasExisting, onClose
     setSaving(true);
     try {
       if (replaceMode === "replace") {
-        const [existingRows, existingBlocks] = await Promise.all([base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 300), base44.entities.StrengthWorkBlock.filter({ session_id: session.id }, "order", 100)]);
-        await Promise.all([...existingRows.map(s => base44.entities.StrengthStation.delete(s.id)), ...existingBlocks.map(b => base44.entities.StrengthWorkBlock.delete(b.id))]);
+        const existingRows = await base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 300);
+        const existingBlocks = await base44.entities.StrengthWorkBlock.filter({ session_id: session.id }, "order", 100);
+        for (const row of existingRows) {
+          await base44.entities.StrengthStation.delete(row.id);
+        }
+        for (const block of existingBlocks) {
+          await base44.entities.StrengthWorkBlock.delete(block.id);
+        }
       }
       const existingCount = replaceMode === "replace" ? 0 : (await base44.entities.StrengthWorkBlock.filter({ session_id: session.id }, "order", 100)).length;
       const createdBlocks = [];
