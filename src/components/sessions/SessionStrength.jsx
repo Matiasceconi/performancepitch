@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { DragDropContext, Droppable } from "@hello-pangea/dnd";
+import { DragDropContext } from "@hello-pangea/dnd";
 import { Plus, Sparkles, ImagePlus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import StrengthHeader from "@/components/sessions/strength/StrengthHeader";
-import StrengthStationRow from "@/components/sessions/strength/StrengthStationRow";
+import StrengthGroupTable from "@/components/sessions/strength/StrengthGroupTable";
 import StrengthPDFExport from "@/components/sessions/strength/StrengthPDFExport";
 import StrengthImageImportModal from "@/components/sessions/strength/StrengthImageImportModal";
 import { METHOD_OPTIONS, TYPE_OPTIONS, syncToLibrary } from "@/components/sessions/strength/strengthOptions";
@@ -23,14 +23,17 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   async function persistOrder(list) {
     const updated = list.map((s, i) => ({ ...s, order: i + 1, station_number: i + 1 }));
     setStations(updated);
-    await Promise.all(updated.map(s => base44.entities.StrengthStation.update(s.id, { order: s.order, station_number: s.station_number })));
+    await Promise.all(updated.map(s => base44.entities.StrengthStation.update(s.id, { order: s.order, station_number: s.station_number, strength_group: s.strength_group || "restaura" })));
   }
 
   async function addRow(initial = {}) {
+    const group = initial.strength_group || "restaura";
+    const groupCount = stations.filter(s => (s.strength_group || "restaura") === group).length;
     const payload = {
       session_id: session.id,
       order: stations.length + 1,
-      station_number: stations.length + 1,
+      station_number: groupCount + 1,
+      strength_group: group,
       method: "", exercise_type: "", exercise_name: "", volume: "", notes: "", video_url: "",
       restore_exercise: "", compensate_exercise: "", sets: "", reps: "", time: "", rest_time: "", rir: "", objective: "", muscle_group: "", vector_pattern: "", tags: [],
       ...initial,
@@ -45,6 +48,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
 
   async function onBlurField(station) {
     const payload = {
+      strength_group: station.strength_group || "restaura",
       method: station.method || undefined,
       exercise_type: station.exercise_type || undefined,
       exercise_name: station.exercise_name || undefined,
@@ -86,6 +90,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
 
   async function onPickLibrary(id, ex) {
     const updated = {
+      strength_group: stations.find(s => s.id === id)?.strength_group || "restaura",
       method: ex.method || "",
       exercise_type: ex.exercise_type || "",
       exercise_name: ex.name || "",
@@ -117,8 +122,10 @@ export default function SessionStrength({ session, onSessionUpdate }) {
 
   async function onDuplicate(station) {
     const { id, created_date, updated_date, ...rest } = station;
+    const group = rest.strength_group || "restaura";
     rest.order = stations.length + 1;
-    rest.station_number = stations.length + 1;
+    rest.station_number = stations.filter(s => (s.strength_group || "restaura") === group).length + 1;
+    rest.strength_group = group;
     const created = await base44.entities.StrengthStation.create(rest);
     setStations(prev => [...prev, created]);
     toast({ title: "✓ Ejercicio duplicado" });
@@ -130,26 +137,30 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     setStations(prev => prev.filter(s => s.id !== id));
   }
 
-  function onMoveUp(idx) {
-    if (idx === 0) return;
-    const list = [...stations];
-    [list[idx - 1], list[idx]] = [list[idx], list[idx - 1]];
-    persistOrder(list);
-  }
-
-  function onMoveDown(idx) {
-    if (idx === stations.length - 1) return;
-    const list = [...stations];
-    [list[idx], list[idx + 1]] = [list[idx + 1], list[idx]];
-    persistOrder(list);
+  function onMoveInGroup(group, idx, direction) {
+    const grouped = stations.filter(s => (s.strength_group || "restaura") === group);
+    const nextIndex = idx + direction;
+    if (nextIndex < 0 || nextIndex >= grouped.length) return;
+    [grouped[idx], grouped[nextIndex]] = [grouped[nextIndex], grouped[idx]];
+    const updated = stations.filter(s => (s.strength_group || "restaura") !== group).concat(grouped);
+    persistOrder(updated);
   }
 
   function onDragEnd(result) {
     if (!result.destination) return;
-    const list = [...stations];
-    const [moved] = list.splice(result.source.index, 1);
-    list.splice(result.destination.index, 0, moved);
-    persistOrder(list);
+    const sourceGroup = result.source.droppableId;
+    const destGroup = result.destination.droppableId;
+    const sourceItems = stations.filter(s => (s.strength_group || "restaura") === sourceGroup);
+    const destItems = sourceGroup === destGroup ? sourceItems : stations.filter(s => (s.strength_group || "restaura") === destGroup);
+    const [moved] = sourceItems.splice(result.source.index, 1);
+    const movedWithGroup = { ...moved, strength_group: destGroup };
+    if (sourceGroup === destGroup) {
+      sourceItems.splice(result.destination.index, 0, movedWithGroup);
+    } else {
+      destItems.splice(result.destination.index, 0, movedWithGroup);
+    }
+    const others = stations.filter(s => ![sourceGroup, destGroup].includes(s.strength_group || "restaura"));
+    persistOrder([...others, ...sourceItems, ...(sourceGroup === destGroup ? [] : destItems)]);
   }
 
   async function suggestRow() {
@@ -191,8 +202,11 @@ Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen e
       <StrengthHeader session={session} onSessionUpdate={onSessionUpdate} />
 
       <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => addRow()} className="flex items-center gap-1.5 px-3 py-2 bg-white text-zinc-900 font-semibold rounded-lg text-xs hover:bg-zinc-200 transition-colors">
-          <Plus size={13} /> Nuevo ejercicio
+        <button onClick={() => addRow({ strength_group: "restaura" })} className="flex items-center gap-1.5 px-3 py-2 bg-red-500/15 border border-red-500/30 text-red-300 font-semibold rounded-lg text-xs hover:bg-red-500/25 transition-colors">
+          <Plus size={13} /> Nuevo en Restaura
+        </button>
+        <button onClick={() => addRow({ strength_group: "compensa" })} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold rounded-lg text-xs hover:bg-emerald-500/25 transition-colors">
+          <Plus size={13} /> Nuevo en Compensa
         </button>
         <button onClick={suggestRow} disabled={suggesting}
           className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-lg text-xs hover:bg-purple-500/25 transition-colors disabled:opacity-50">
@@ -224,54 +238,19 @@ Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen e
       )}
 
       {stations.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-x-auto">
-          <DragDropContext onDragEnd={onDragEnd}>
-            <table className="w-full text-xs border-collapse">
-              <thead>
-                <tr className="border-b border-zinc-800 bg-zinc-900/80">
-                  <th className="text-center py-2 px-2 text-zinc-500 font-medium w-12">N°</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Método</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tipo</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Ejercicio</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Volumen</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Series</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Reps</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tiempo</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Pausa</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">RIR</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Objetivo</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Grupo</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Vector</th>
-                  <th className="text-left py-2 px-2 text-zinc-500 font-medium">Observaciones</th>
-                  <th className="py-2 px-2"></th>
-                </tr>
-              </thead>
-              <Droppable droppableId="strength-stations">
-                {(provided) => (
-                  <tbody ref={provided.innerRef} {...provided.droppableProps}>
-                    {stations.map((st, i) => (
-                      <StrengthStationRow
-                        key={st.id}
-                        station={st}
-                        index={i}
-                        squadId={session?.squad_id}
-                        onChange={onChange}
-                        onBlurField={onBlurField}
-                        onPickLibrary={onPickLibrary}
-                        onDuplicate={onDuplicate}
-                        onDelete={onDelete}
-                        onMoveUp={onMoveUp}
-                        onMoveDown={onMoveDown}
-                        isLast={i === stations.length - 1}
-                      />
-                    ))}
-                    {provided.placeholder}
-                  </tbody>
-                )}
-              </Droppable>
-            </table>
-          </DragDropContext>
-        </div>
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
+            {(["restaura", "compensa"]).map(group => (
+              <StrengthGroupTable
+                key={group}
+                group={group}
+                stations={stations.filter(s => (s.strength_group || "restaura") === group).sort((a, b) => (a.order || 0) - (b.order || 0))}
+                squadId={session?.squad_id}
+                handlers={{ onChange, onBlurField, onPickLibrary, onDuplicate, onDelete, onMoveInGroup }}
+              />
+            ))}
+          </div>
+        </DragDropContext>
       )}
     </div>
   );

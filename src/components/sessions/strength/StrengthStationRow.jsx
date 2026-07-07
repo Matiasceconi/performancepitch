@@ -1,9 +1,41 @@
 import React from "react";
 import { Draggable } from "@hello-pangea/dnd";
-import { Trash2, Copy, ChevronUp, ChevronDown, GripVertical } from "lucide-react";
+import { Trash2, Copy, ChevronUp, ChevronDown, GripVertical, Play } from "lucide-react";
 import StrengthExercisePicker from "./StrengthExercisePicker";
 
-export default function StrengthStationRow({ station, index, squadId, onChange, onBlurField, onPickLibrary, onDuplicate, onDelete, onMoveUp, onMoveDown, isLast }) {
+function getYouTubeId(url = "") {
+  const match = String(url).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/);
+  return match?.[1] || null;
+}
+
+function ExercisePreview({ station }) {
+  const youtubeId = getYouTubeId(station.video_url);
+  const previewUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : station.image_url;
+  const content = previewUrl ? (
+    <img src={previewUrl} alt="" className="w-10 h-10 object-cover rounded border border-zinc-700" />
+  ) : (
+    <div className="w-10 h-10 rounded border border-zinc-700 bg-zinc-800 flex items-center justify-center text-zinc-600">
+      <Play size={14} />
+    </div>
+  );
+
+  if (station.video_url) {
+    return (
+      <a href={station.video_url} target="_blank" rel="noreferrer" className="relative shrink-0 group" title="Abrir video">
+        {content}
+        <span className="absolute inset-0 flex items-center justify-center bg-black/35 rounded opacity-90 group-hover:bg-black/15 transition-colors">
+          <Play size={13} className="text-white fill-white" />
+        </span>
+      </a>
+    );
+  }
+
+  return <div className="shrink-0">{content}</div>;
+}
+
+export default function StrengthStationRow({ station, index, squadId, onChange, onBlurField, onPickLibrary, onDuplicate, onDelete, onMoveUp, onMoveDown, isLast, compact = false }) {
+  const middleFields = ["sets", "reps", "time", "rest_time", "rir", "objective", "muscle_group", "vector_pattern"];
+
   return (
     <Draggable draggableId={station.id} index={index}>
       {(provided, snapshot) => (
@@ -15,28 +47,37 @@ export default function StrengthStationRow({ station, index, squadId, onChange, 
               <span className="text-xs font-bold text-white w-4">{index + 1}</span>
             </div>
           </td>
+          {!compact && (
+            <>
+              <td className="py-1.5 px-2 align-middle">
+                <input list="strength-method-options" value={station.method || ""}
+                  onChange={e => onChange(station.id, "method", e.target.value)}
+                  onBlur={() => onBlurField(station)}
+                  placeholder="Método..."
+                  className="w-32 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
+              </td>
+              <td className="py-1.5 px-2 align-middle">
+                <input list="strength-type-options" value={station.exercise_type || ""}
+                  onChange={e => onChange(station.id, "exercise_type", e.target.value)}
+                  onBlur={() => onBlurField(station)}
+                  placeholder="Tipo..."
+                  className="w-36 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
+              </td>
+            </>
+          )}
           <td className="py-1.5 px-2 align-middle">
-            <input list="strength-method-options" value={station.method || ""}
-              onChange={e => onChange(station.id, "method", e.target.value)}
-              onBlur={() => onBlurField(station)}
-              placeholder="Método..."
-              className="w-32 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
-          </td>
-          <td className="py-1.5 px-2 align-middle">
-            <input list="strength-type-options" value={station.exercise_type || ""}
-              onChange={e => onChange(station.id, "exercise_type", e.target.value)}
-              onBlur={() => onBlurField(station)}
-              placeholder="Tipo..."
-              className="w-36 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
-          </td>
-          <td className="py-1.5 px-2 align-middle">
-            <div className="flex items-center gap-1">
+            <div className="flex items-start gap-2">
+              <ExercisePreview station={station} />
               <StrengthExercisePicker squadId={squadId} onPick={ex => onPickLibrary(station.id, ex)} />
               <div className="space-y-1">
                 <input value={station.exercise_name || ""} onChange={e => onChange(station.id, "exercise_name", e.target.value)}
                   onBlur={() => onBlurField(station)}
                   placeholder="Ejercicio..."
                   className="w-44 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
+                <input value={station.video_url || ""} onChange={e => onChange(station.id, "video_url", e.target.value)}
+                  onBlur={() => onBlurField(station)}
+                  placeholder="URL YouTube/video..."
+                  className="w-44 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[10px] text-zinc-400 focus:outline-none focus:border-zinc-500" />
                 {(station.library_strength_exercise_id || station.library_exercise_id) && (
                   <label className="flex items-center gap-1 text-[9px] text-emerald-300">
                     <input type="checkbox" checked={!!station.sync_library_edits} onChange={e => onChange(station.id, "sync_library_edits", e.target.checked)} />
@@ -44,7 +85,7 @@ export default function StrengthStationRow({ station, index, squadId, onChange, 
                   </label>
                 )}
               </div>
-              </div>
+            </div>
           </td>
           <td className="py-1.5 px-2 align-middle">
             <input value={station.volume || ""} onChange={e => onChange(station.id, "volume", e.target.value)}
@@ -52,7 +93,7 @@ export default function StrengthStationRow({ station, index, squadId, onChange, 
               placeholder="3x8, 3+3..."
               className="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-amber-300 font-semibold focus:outline-none focus:border-zinc-500" />
           </td>
-          {["sets", "reps", "time", "rest_time", "rir", "objective", "muscle_group", "vector_pattern"].map((field) => (
+          {middleFields.map((field) => (
             <td key={field} className="py-1.5 px-2 align-middle">
               <input value={station[field] || ""} onChange={e => onChange(station.id, field, e.target.value)}
                 onBlur={() => onBlurField(station)}
@@ -60,6 +101,24 @@ export default function StrengthStationRow({ station, index, squadId, onChange, 
                 className="w-24 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500" />
             </td>
           ))}
+          {compact && (
+            <>
+              <td className="py-1.5 px-2 align-middle">
+                <input list="strength-method-options" value={station.method || ""}
+                  onChange={e => onChange(station.id, "method", e.target.value)}
+                  onBlur={() => onBlurField(station)}
+                  placeholder="Método..."
+                  className="w-28 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
+              </td>
+              <td className="py-1.5 px-2 align-middle">
+                <input list="strength-type-options" value={station.exercise_type || ""}
+                  onChange={e => onChange(station.id, "exercise_type", e.target.value)}
+                  onBlur={() => onBlurField(station)}
+                  placeholder="Tipo..."
+                  className="w-32 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-zinc-500" />
+              </td>
+            </>
+          )}
           <td className="py-1.5 px-2 align-middle">
             <input value={station.notes || ""} onChange={e => onChange(station.id, "notes", e.target.value)}
               onBlur={() => onBlurField(station)}

@@ -15,6 +15,15 @@
       "default": 0,
       "description": "Orden en la sesi\u00f3n"
     },
+    "strength_group": {
+      "type": "string",
+      "enum": [
+        "restaura",
+        "compensa"
+      ],
+      "default": "restaura",
+      "description": "Cuadro o grupo de fuerza dentro de la sesi\u00f3n"
+    },
     "image_url": {
       "type": "string",
       "description": "Imagen del ejercicio (heredada de biblioteca)"

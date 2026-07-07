@@ -27,7 +27,8 @@ Extraé la siguiente información:
 - Propósito mecánico de la sesión (si figura)
 - Tipo de sesión de fuerza (si figura)
 - Patrón vectorial (si figura)
-- La lista de ejercicios de la planificación, en orden, con: método de trabajo, tipo de trabajo, nombre del ejercicio, volumen (formato libre ej: 3x8, 3+3, 12+12) y observaciones si existen.
+- La lista de ejercicios de la planificación, en orden, con: grupo, método de trabajo, tipo de trabajo, nombre del ejercicio, volumen (formato libre ej: 3x8, 3+3, 12+12) y observaciones si existen.
+- Si la imagen tiene dos cuadros/columnas, clasificá cada ejercicio según el cuadro donde aparece: "restaura" para Grupo Restaura/restauración/recuperación y "compensa" para Grupo Compensa/compensación/rendimiento.
 
 Para "método" intentá mapear a una de estas opciones si es posible: ${METHOD_OPTIONS.join(", ")}. Si no coincide con ninguna, dejá el texto tal cual aparece en la imagen.
 Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTIONS.join(", ")}. Si no coincide con ninguna, dejá el texto tal cual aparece en la imagen.`,
@@ -43,6 +44,7 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
               items: {
                 type: "object",
                 properties: {
+                  strength_group: { type: "string", enum: ["restaura", "compensa"] },
                   method: { type: "string" },
                   exercise_type: { type: "string" },
                   exercise_name: { type: "string" },
@@ -63,6 +65,7 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
       });
       setRows((result.exercises || []).map((r, i) => ({
         tempId: `import-${i}`,
+        strength_group: normalizeGroup(r.strength_group),
         method: r.method || "",
         exercise_type: r.exercise_type || "",
         exercise_name: r.exercise_name || "",
@@ -79,6 +82,12 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
 
   function updateRow(tempId, field, value) {
     setRows(prev => prev.map(r => r.tempId === tempId ? { ...r, [field]: value } : r));
+  }
+
+  function normalizeGroup(value) {
+    const text = String(value || "").toLowerCase();
+    if (text.includes("compensa")) return "compensa";
+    return "restaura";
   }
 
   function deleteRow(tempId) {
@@ -102,7 +111,8 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
         const payload = {
           session_id: session.id,
           order: startOrder + i + 1,
-          station_number: startOrder + i + 1,
+          station_number: rows.filter((item, idx) => idx <= i && normalizeGroup(item.strength_group) === normalizeGroup(r.strength_group)).length,
+          strength_group: normalizeGroup(r.strength_group),
           method: r.method || "",
           exercise_type: r.exercise_type || "",
           exercise_name: r.exercise_name || "",
@@ -212,6 +222,7 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
                   <thead>
                     <tr className="border-b border-zinc-800 bg-zinc-900/80">
                       <th className="text-center py-2 px-2 text-zinc-500 font-medium w-8">N°</th>
+                      <th className="text-left py-2 px-2 text-zinc-500 font-medium">Grupo</th>
                       <th className="text-left py-2 px-2 text-zinc-500 font-medium">Método</th>
                       <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tipo</th>
                       <th className="text-left py-2 px-2 text-zinc-500 font-medium">Ejercicio</th>
@@ -224,6 +235,13 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
                     {rows.map((r, i) => (
                       <tr key={r.tempId} className="border-b border-zinc-800/60">
                         <td className="py-1.5 px-2 text-center text-white font-bold">{i + 1}</td>
+                        <td className="py-1.5 px-2">
+                          <select value={normalizeGroup(r.strength_group)} onChange={e => updateRow(r.tempId, "strength_group", e.target.value)}
+                            className="w-28 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none">
+                            <option value="restaura">Restaura</option>
+                            <option value="compensa">Compensa</option>
+                          </select>
+                        </td>
                         <td className="py-1.5 px-2">
                           <input value={r.method} onChange={e => updateRow(r.tempId, "method", e.target.value)}
                             className="w-28 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white focus:outline-none" />
@@ -250,7 +268,7 @@ Para "tipo" intentá mapear a una de estas opciones si es posible: ${TYPE_OPTION
                       </tr>
                     ))}
                     {rows.length === 0 && (
-                      <tr><td colSpan={7} className="text-center text-zinc-600 py-4">Sin ejercicios detectados</td></tr>
+                      <tr><td colSpan={8} className="text-center text-zinc-600 py-4">Sin ejercicios detectados</td></tr>
                     )}
                   </tbody>
                 </table>
