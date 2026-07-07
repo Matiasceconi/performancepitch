@@ -7,10 +7,11 @@ import SessionList from "@/components/sessions/SessionList";
 import SessionForm from "@/components/sessions/SessionForm";
 import SessionDetail from "@/components/sessions/SessionDetail";
 import SessionFilters, { DEFAULT_FILTERS } from "@/components/sessions/SessionFilters";
+import { effectiveSessionMeta, findPlanDay } from "@/components/planning/microcycleSync";
 import moment from "moment";
 
 export default function Sessions() {
-  const { activeSquadId, activeSquad } = useWorkspace();
+  const { activeSquadId, activeSquad, activeSeasonId } = useWorkspace();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("list"); // "list" | "new" | "detail"
@@ -18,6 +19,7 @@ export default function Sessions() {
   const [filters, setFilters] = useState(DEFAULT_FILTERS);
   const [exerciseCounts, setExerciseCounts] = useState({});
   const [videoLinksBySession, setVideoLinksBySession] = useState({});
+  const [weeklyPlans, setWeeklyPlans] = useState([]);
   const [selectedTab, setSelectedTab] = useState("players");
   const [autoOpenPDF, setAutoOpenPDF] = useState(false);
   const { toast } = useToast();
@@ -30,11 +32,13 @@ export default function Sessions() {
       base44.entities.TrainingSession.list("-date", 200),
       base44.entities.SessionExercise.list("-order", 3000),
       base44.entities.SessionVideoLink.list("-created_date", 1000),
-    ]).then(([all, allExercises, allVideoLinks]) => {
+      base44.entities.WeeklyPlan.list("-week_start", 100),
+    ]).then(([all, allExercises, allVideoLinks, allPlans]) => {
       const filtered = activeSquadId
         ? all.filter(s => s.squad_id === activeSquadId)
         : all;
       setSessions(filtered);
+      setWeeklyPlans(activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans);
       const counts = {};
       allExercises.forEach(ex => { counts[ex.session_id] = (counts[ex.session_id] || 0) + 1; });
       setExerciseCounts(counts);
@@ -53,7 +57,7 @@ export default function Sessions() {
         if (found) { setSelectedSession(found); setView("detail"); }
       }
     });
-  }, [activeSquadId]);
+  }, [activeSquadId, activeSeasonId]);
 
   function handleCreated(session) {
     setSessions(prev => [session, ...prev]);
@@ -94,9 +98,10 @@ export default function Sessions() {
     if (f.search.trim()) {
       const q = f.search.trim().toLowerCase();
       list = list.filter(s => {
+        const meta = effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id }));
         const haystack = [
           s.title, moment(s.date).format("DD/MM/YYYY"), s.date, s.session_type,
-          s.match_day_code, s.squad_name, s.objective,
+          meta.match_day_code, meta.session_objective, s.squad_name, s.objective,
         ].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(q);
       });
@@ -104,7 +109,7 @@ export default function Sessions() {
     if (f.dateFrom) list = list.filter(s => s.date >= f.dateFrom);
     if (f.dateTo) list = list.filter(s => s.date <= f.dateTo);
     if (f.type) list = list.filter(s => s.session_type === f.type);
-    if (f.md) list = list.filter(s => s.match_day_code === f.md);
+    if (f.md) list = list.filter(s => effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id })).match_day_code === f.md);
     if (f.minPlayers) list = list.filter(s => (s.players_selected || 0) >= parseInt(f.minPlayers));
     if (f.gps === "con") list = list.filter(s => !!s.csv_label);
     if (f.gps === "sin") list = list.filter(s => !s.csv_label);
@@ -119,7 +124,7 @@ export default function Sessions() {
     else list.sort((a, b) => b.date.localeCompare(a.date));
 
     return list;
-  }, [sessions, filters]);
+  }, [sessions, filters, weeklyPlans]);
 
   const hasActiveFilters = Object.entries(filters).some(([k, v]) => k !== "sort" && v !== "" && v !== "todos");
 
@@ -163,7 +168,7 @@ export default function Sessions() {
         ) : (
           <>
             <SessionFilters filters={filters} onChange={setFilters} />
-            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} videoLinksBySession={videoLinksBySession} />
+            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} videoLinksBySession={videoLinksBySession} weeklyPlans={weeklyPlans} />
           </>
         )
       )}

@@ -70,7 +70,7 @@ function EventFocusCard({ event, type }) {
   );
 }
 
-function WorkCard({ config, block, sessionLibrary, session, details, onChange, cooldownOptions = [] }) {
+function WorkCard({ config, block, sessionLibrary, session, details, onChange, onSelectSession, cooldownOptions = [] }) {
   const selectedSessionId = block?.auto_sync === false ? "" : block?.session_id || session?.id || "";
   const autoContent = getBlockAutoContent({ ...block, content: "" }, session, details);
   const fullContent = getBlockAutoContent(block, session, details);
@@ -97,7 +97,7 @@ function WorkCard({ config, block, sessionLibrary, session, details, onChange, c
           <SourceIcon size={10} /> {source}
         </span>
       </div>
-      <select value={selectedSessionId} onChange={(e) => onChange({ session_id: e.target.value, auto_sync: true })} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-100">
+      <select value={selectedSessionId} onChange={(e) => { onChange({ session_id: e.target.value, auto_sync: true }); onSelectSession?.(e.target.value); }} className="w-full rounded-xl border border-zinc-200 bg-white px-2 py-1.5 text-[10px] font-semibold text-zinc-600 focus:outline-none focus:ring-1 focus:ring-emerald-100">
         <option value="">Completar desde sesión...</option>
         {sessionLibrary.map((item) => <option key={item.id} value={item.id}>{item.date ? `${moment(item.date).format("DD/MM")} · ` : ""}{item.title}</option>)}
       </select>
@@ -115,7 +115,7 @@ function WorkCard({ config, block, sessionLibrary, session, details, onChange, c
   );
 }
 
-export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessionDetails, blockSession, sessionsById, updateDay, physicalObjectives = [], calendarEvents = [], cooldownOptions = [] }) {
+export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessionDetails, blockSession, sessionsById, updateDay, onSelectSession, physicalObjectives = [], calendarEvents = [], cooldownOptions = [] }) {
   const matchEvent = calendarEvents.find(isMatchEvent);
   const travelEvent = calendarEvents.find(isTravelEvent);
   const specialEvent = matchEvent || travelEvent;
@@ -173,7 +173,7 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
           return <div key={config.type} className="space-y-2">
             {renderBlocks.map((block, index) => {
               const session = block.auto_sync === false ? null : block.session_id ? blockSession(block, sessionsById) : inferSessionForBlock(day, config.type, sessionLibrary);
-              return <WorkCard key={block.id || `${config.type}-${index}`} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onChange={(patch) => block.id ? updateBlockById(day, block.id, patch, updateDay, dayIdx) : upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
+              return <WorkCard key={block.id || `${config.type}-${index}`} config={config} block={block} sessionLibrary={sessionLibrary} session={session} details={sessionDetails[block.session_id || session?.id]} cooldownOptions={cooldownOptions} onSelectSession={(sessionId) => onSelectSession?.(dayIdx, sessionId)} onChange={(patch) => block.id ? updateBlockById(day, block.id, patch, updateDay, dayIdx) : upsertBlock(day, config.type, patch, updateDay, dayIdx)} />;
             })}
             {config.type === "Campo" && <button type="button" onClick={() => addTypedBlock(day, "Campo", updateDay, dayIdx)} className="w-full rounded-xl border border-dashed border-emerald-200 bg-emerald-50 px-3 py-2 text-[10px] font-black text-emerald-700 flex items-center justify-center gap-2"><Plus size={13} /> Agregar tarea de campo</button>}
           </div>;

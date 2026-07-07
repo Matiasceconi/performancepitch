@@ -13,6 +13,7 @@ import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
 import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
 import PlannerSettingsModal from "@/components/planning/PlannerSettingsModal";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
+import { syncSessionsWithWeeklyPlan } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -398,8 +399,28 @@ export default function WeeklyPlannerBoard() {
     next[to].blocks.splice(result.destination.index, 0, moved);
     setDays(next);
   }
+  function syncSessionFromDay(dayIdx, sessionId) {
+    const session = sessionsById[sessionId];
+    const day = days[dayIdx];
+    if (session && day) {
+      const patch = {};
+      if (!session.md_manual_override && day.md && session.match_day_code !== day.md) {
+        patch.match_day_code = day.md;
+        patch.microcycle_day = day.md;
+      }
+      if (!session.physical_objective_manual_override && day.physical_objective && session.session_objective !== day.physical_objective) {
+        patch.session_objective = day.physical_objective;
+      }
+      if (Object.keys(patch).length) {
+        base44.entities.TrainingSession.update(session.id, patch).then((updated) => {
+          setSessionLibrary(prev => prev.map(item => item.id === updated.id ? updated : item));
+        });
+      }
+    }
+  }
   function selectSession(dayIdx, blockId, sessionId) {
     const session = sessionsById[sessionId];
+    syncSessionFromDay(dayIdx, sessionId);
     updateBlock(dayIdx, blockId, { session_id: sessionId, session_snapshot: session ? { title: session.title, duration_minutes: session.duration_minutes, objective: session.objective, session_type: session.session_type } : null });
   }
   function addDay() { setDays(prev => [...prev, emptyDay(moment(prev[prev.length - 1]?.date || startDate).add(1, "days").format("YYYY-MM-DD"), prev.length)]); }
@@ -426,9 +447,11 @@ export default function WeeklyPlannerBoard() {
   async function save() {
     setSaving(true);
     const payload = { week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", microcycle_meta: meta, graph_type: graphType, template_type: meta.week_type, days_data: days, notes: autoText };
-    if (recordId) await base44.entities.WeeklyPlan.update(recordId, payload); else { const rec = await base44.entities.WeeklyPlan.create(payload); setRecordId(rec.id); }
+    const savedPlan = recordId ? await base44.entities.WeeklyPlan.update(recordId, payload) : await base44.entities.WeeklyPlan.create(payload);
+    if (!recordId) setRecordId(savedPlan.id);
+    const syncedCount = await syncSessionsWithWeeklyPlan({ ...payload, id: savedPlan.id });
     setSaving(false);
-    toast({ title: "Microciclo guardado correctamente" });
+    toast({ title: syncedCount ? `Microciclo guardado · ${syncedCount} sesiones sincronizadas` : "Microciclo guardado correctamente" });
   }
   async function handleAiFile(file) {
     if (!file) return;
@@ -481,7 +504,7 @@ export default function WeeklyPlannerBoard() {
     <section className="grid grid-cols-1 xl:grid-cols-[190px_1fr] gap-4 items-start">
       <MicrocycleAreaLegend objectives={physicalObjectives} />
       <div className="grid gap-3 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(185px, 1fr))` }}>
-        {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
+        {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={syncSessionFromDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
       </div>
 
     </section>

@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Calendar, Users, Clock, ChevronRight, Trash2, Dumbbell, Zap, Video, FileText, Eye } from "lucide-react";
 import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
 import moment from "moment";
+import { effectiveSessionMeta, findPlanDay } from "@/components/planning/microcycleSync";
 
 const TYPE_COLORS = {
   Campo: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
@@ -15,7 +16,7 @@ const TYPE_COLORS = {
 
 const actionBtn = "flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-colors whitespace-nowrap";
 
-export default function SessionList({ sessions, onSelect, onDelete, hasFilters = false, exerciseCounts = {}, videoLinksBySession = {} }) {
+export default function SessionList({ sessions, onSelect, onDelete, hasFilters = false, exerciseCounts = {}, videoLinksBySession = {}, weeklyPlans = [] }) {
   const [preview, setPreview] = useState(null);
 
   if (sessions.length === 0) {
@@ -36,6 +37,7 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
         const sessionVideoLinks = videoLinksBySession[session.id] || [];
         const hasVideo = !!session.video_url || sessionVideoLinks.length > 0;
         const hasPDF = !!session.pdf_exported;
+        const effectiveMeta = effectiveSessionMeta(session, findPlanDay(weeklyPlans, { date: session.date, squadId: session.squad_id, seasonId: session.season_id }));
 
         return (
           <div key={session.id}
@@ -47,9 +49,14 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${typeClass}`}>
                     {session.session_type}
                   </span>
-                  {session.match_day_code && (
+                  {effectiveMeta.match_day_code && (
                     <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400">
-                      {session.match_day_code}
+                      {effectiveMeta.match_day_code}
+                    </span>
+                  )}
+                  {effectiveMeta.session_objective && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300">
+                      {effectiveMeta.session_objective}
                     </span>
                   )}
                   {session.squad_name && (

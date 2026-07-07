@@ -1,8 +1,9 @@
 import React from "react";
 import { Search, X } from "lucide-react";
+import { SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
 const TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
-const MD_CODES = ["MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2"];
+const MD_CODES = SESSION_MD_CODES;
 
 export const DEFAULT_FILTERS = {
   search: "", dateFrom: "", dateTo: "", type: "", md: "",

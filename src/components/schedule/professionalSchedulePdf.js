@@ -236,7 +236,7 @@ function yFor(mins, slots, y, h) {
   return y + ((mins - start) / Math.max(60, end - start)) * h;
 }
 
-function drawScheduleGrid(doc, days, eventsForDate, imageCache) {
+function drawScheduleGrid(doc, days, eventsForDate, imageCache, planMetaByDate = {}) {
   const margin = 5;
   const top = 40;
   const axisW = 13;
@@ -286,6 +286,13 @@ function drawScheduleGrid(doc, days, eventsForDate, imageCache) {
     doc.setFont("helvetica", "normal");
     doc.setFontSize(4.4);
     doc.text(shortMonth(day), x + dayW / 2, top + 15.2, { align: "center" });
+    const planMeta = planMetaByDate[day.format("YYYY-MM-DD")];
+    if (planMeta?.match_day_code || planMeta?.session_objective) {
+      setText(doc, "#FFFFFF");
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(4.2);
+      doc.text([planMeta.match_day_code, planMeta.session_objective].filter(Boolean).join(" · ").toUpperCase(), x + dayW / 2, top + 16.6, { align: "center", maxWidth: dayW - 2 });
+    }
 
     const events = [...eventsForDate(day.format("YYYY-MM-DD"))].sort((a, b) => eventStart(a) - eventStart(b));
     let lastBottom = bodyY + 1.5;
@@ -491,7 +498,7 @@ async function buildImageCache(events) {
   return Object.fromEntries(entries.filter(([, value]) => value));
 }
 
-export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabel, squadName, season }) {
+export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, weekLabel, squadName, season, planMetaByDate = {} }) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
   const allEvents = days.flatMap((d) => eventsForDate(d.format("YYYY-MM-DD")));
   const imageCache = await buildImageCache(allEvents);
@@ -500,7 +507,7 @@ export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, we
   doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), "F");
   drawHeader(doc, days, squadName, season || "");
   await drawLogo(doc, 15, 15.5, 22);
-  drawScheduleGrid(doc, days, eventsForDate, imageCache);
+  drawScheduleGrid(doc, days, eventsForDate, imageCache, planMetaByDate);
   drawLegend(doc, 19, 151.5, 221);
   drawBottomPanels(doc, days, allEvents, imageCache);
   drawFooter(doc);

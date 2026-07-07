@@ -7,6 +7,7 @@ import { jsPDF } from "jspdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
 import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professionalSchedulePdf";
+import { findPlanDay } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -537,10 +538,15 @@ export default function Schedule() {
   const [showAiImport, setShowAiImport] = useState(false);
   const [copyingEvent, setCopyingEvent] = useState(null); // event being copied
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
+  const [weeklyPlans, setWeeklyPlans] = useState([]);
 
   async function loadEvents() {
     setLoading(true);
-    const all = await base44.entities.DayEvent.list("-date", 500);
+    const [all, allPlans] = await Promise.all([
+      base44.entities.DayEvent.list("-date", 500),
+      base44.entities.WeeklyPlan.list("-week_start", 100),
+    ]);
+    setWeeklyPlans(activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans);
     // Mostrar únicamente eventos del plantel activo
     const filtered = activeSquadId
       ? all.filter(e => e.squad_id === activeSquadId && (!e.season_id || e.season_id === activeSeasonId))
@@ -660,6 +666,11 @@ export default function Schedule() {
       weekLabel,
       squadName: activeSquad?.name || "Plantel",
       season: activeSeasonId || activeSquad?.season || "",
+      planMetaByDate: Object.fromEntries(days.map((day) => {
+        const date = day.format("YYYY-MM-DD");
+        const match = findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season });
+        return [date, match?.values || null];
+      })),
     });
     doc.save(`cronograma-semana-${days[0].format("YYYY-MM-DD")}.pdf`);
   }
@@ -694,6 +705,7 @@ export default function Schedule() {
             const dateStr = d.format("YYYY-MM-DD");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
+            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values;
 
             return (
               <div key={dateStr} style={{ minWidth: "200px", scrollSnapAlign: "start" }} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
@@ -701,6 +713,7 @@ export default function Schedule() {
                   <div>
                     <p className="text-xs text-zinc-500 uppercase font-medium">{DAY_NAMES_FULL[d.day()]}</p>
                     <p className={`text-lg font-bold ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()}</p>
+                    {planMeta && <p className="text-[10px] font-bold text-emerald-300 mt-0.5">{planMeta.match_day_code} · {planMeta.session_objective}</p>}
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => downloadDayPDF(d)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-600 hover:text-zinc-300 transition-colors" title="Descargar PDF del día">
@@ -758,10 +771,14 @@ export default function Schedule() {
             const isCurrentMonth = d.isSame(currentMonth, "month");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
+            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values;
             return (
               <div key={dateStr} className={`bg-zinc-900 min-h-[90px] p-1.5 ${!isCurrentMonth ? "opacity-25" : ""}`}>
                 <div className="flex items-center justify-between mb-1">
-                  <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-white text-zinc-900" : "text-zinc-400"}`}>{d.date()}</div>
+                  <div>
+                    <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-white text-zinc-900" : "text-zinc-400"}`}>{d.date()}</div>
+                    {planMeta && <p className="text-[9px] text-emerald-300 font-bold leading-none mt-0.5">{planMeta.match_day_code}</p>}
+                  </div>
                   {isCurrentMonth && (
                     <button onClick={() => openNew(dateStr)} className="p-0.5 rounded hover:bg-zinc-700 text-zinc-700 hover:text-zinc-400 transition-colors">
                       <Plus size={10} />

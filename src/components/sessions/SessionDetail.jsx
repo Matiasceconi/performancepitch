@@ -13,9 +13,10 @@ import SessionVideoObs from "@/components/sessions/SessionVideoObs";
 import SessionVideoLinks from "@/components/sessions/SessionVideoLinks";
 import { useToast } from "@/components/ui/use-toast";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
+import { effectiveSessionMeta, getMicrocycleDefaults, SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
 const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
-const MD_CODES = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4", "Otro"];
+const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
 const OBJECTIVE_COLORS = {
   "Tensión": "bg-red-500/15 text-red-300 border-red-500/30",
@@ -54,6 +55,8 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
   const [editing, setEditing] = useState(false);
   const [editForm, setEditForm] = useState(session);
   const [saving, setSaving] = useState(false);
+  const [planDefaults, setPlanDefaults] = useState(null);
+  const [editManualMeta, setEditManualMeta] = useState({ md: false, objective: false });
 
   useEffect(() => {
     setCurrentSession(session);
@@ -68,11 +71,27 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
       .then(sp => { setSessionPlayers(sp); setLoading(false); });
   }, [session.id]);
 
+  useEffect(() => {
+    let cancelled = false;
+    async function loadDefaults() {
+      const match = await getMicrocycleDefaults({ date: currentSession.date, squadId: currentSession.squad_id, seasonId: currentSession.season_id });
+      if (cancelled) return;
+      setPlanDefaults(match?.values || null);
+    }
+    if (currentSession?.date) loadDefaults();
+    return () => { cancelled = true; };
+  }, [currentSession.id, currentSession.date, currentSession.squad_id, currentSession.season_id]);
+
   async function handleSaveEdit() {
     setSaving(true);
+    const mdOverride = planDefaults?.match_day_code ? editForm.match_day_code !== planDefaults.match_day_code : editManualMeta.md;
+    const objectiveOverride = planDefaults?.session_objective ? editForm.session_objective !== planDefaults.session_objective : editManualMeta.objective;
     const updated = await base44.entities.TrainingSession.update(currentSession.id, {
       title: editForm.title, date: editForm.date, session_type: editForm.session_type,
-      match_day_code: editForm.match_day_code, session_objective: editForm.session_objective,
+      match_day_code: editForm.match_day_code, microcycle_day: editForm.match_day_code,
+      session_objective: editForm.session_objective,
+      md_manual_override: mdOverride,
+      physical_objective_manual_override: objectiveOverride,
       duration_minutes: editForm.duration_minutes, location: editForm.location,
       objective: editForm.objective, notes: editForm.notes,
     });
@@ -90,6 +109,9 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
   const presentesField = presentRows.filter(sp => !isGoalkeeper({ position: sp.position })).length;
   const presentesGK = presentRows.filter(sp => isGoalkeeper({ position: sp.position })).length;
   const typeClass = TYPE_COLORS[currentSession.session_type] || TYPE_COLORS["Otro"];
+  const effectiveMeta = effectiveSessionMeta(currentSession, planDefaults ? { values: planDefaults } : null);
+  const sessionForDisplay = { ...currentSession, ...effectiveMeta };
+  const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, planDefaults?.session_objective, editForm.session_objective].filter(Boolean))];
 
   return (
     <div className="space-y-5">
@@ -105,7 +127,7 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
           <div className="w-full flex justify-end gap-2 mb-1">
             {!editing && (
               <button
-                onClick={() => { setEditForm(currentSession); setEditing(true); }}
+                onClick={() => { setEditForm({ ...currentSession, match_day_code: effectiveMeta.match_day_code, session_objective: effectiveMeta.session_objective }); setEditManualMeta({ md: false, objective: false }); setEditing(true); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-zinc-800 border border-zinc-700 text-zinc-300 hover:bg-zinc-700 rounded-lg transition-colors"
               >
                 <Edit2 size={12} /> Editar sesión
@@ -153,14 +175,14 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${typeClass}`}>
                   {currentSession.session_type}
                 </span>
-                {currentSession.match_day_code && (
+                {effectiveMeta.match_day_code && (
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300">
-                    {currentSession.match_day_code}
+                    {effectiveMeta.match_day_code}
                   </span>
                 )}
-                {currentSession.session_objective && (
-                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${OBJECTIVE_COLORS[currentSession.session_objective] || OBJECTIVE_COLORS["Otro"]}`}>
-                    {currentSession.session_objective}
+                {effectiveMeta.session_objective && (
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${OBJECTIVE_COLORS[effectiveMeta.session_objective] || OBJECTIVE_COLORS["Otro"]}`}>
+                    {effectiveMeta.session_objective}
                   </span>
                 )}
               </div>
@@ -188,16 +210,16 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">MD</label>
-                  <select value={editForm.match_day_code || ""} onChange={e => setEditForm(f => ({ ...f, match_day_code: e.target.value }))}
+                  <select value={editForm.match_day_code || ""} onChange={e => { setEditManualMeta(prev => ({ ...prev, md: true })); setEditForm(f => ({ ...f, match_day_code: e.target.value, microcycle_day: e.target.value })); }}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
                     {MD_CODES.map(m => <option key={m}>{m}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Objetivo físico</label>
-                  <select value={editForm.session_objective || ""} onChange={e => setEditForm(f => ({ ...f, session_objective: e.target.value }))}
+                  <select value={editForm.session_objective || ""} onChange={e => { setEditManualMeta(prev => ({ ...prev, objective: true })); setEditForm(f => ({ ...f, session_objective: e.target.value })); }}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
-                    {OBJECTIVE_OPTS.map(o => <option key={o}>{o}</option>)}
+                    {objectiveOptions.map(o => <option key={o}>{o}</option>)}
                   </select>
                 </div>
                 <div>
@@ -305,10 +327,10 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
 
       {/* Modals */}
       {showVideoPanel && (
-        <SessionVideoPanel session={currentSession} onClose={() => setShowVideoPanel(false)} />
+        <SessionVideoPanel session={sessionForDisplay} onClose={() => setShowVideoPanel(false)} />
       )}
       {showPDFExport && (
-        <SessionPDFExport session={currentSession} sessionPlayers={sessionPlayers} onClose={() => setShowPDFExport(false)} />
+        <SessionPDFExport session={sessionForDisplay} sessionPlayers={sessionPlayers} onClose={() => setShowPDFExport(false)} />
       )}
 
       {/* Tab content */}
@@ -320,12 +342,12 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
         ) : (
           <>
             {tab === "players"   && <SessionPlayerTable sessionPlayers={sessionPlayers} sessionId={currentSession.id} onPlayersUpdate={setSessionPlayers} />}
-            {tab === "exercises" && <SessionExercises session={currentSession} sessionPlayers={sessionPlayers} />}
-            {tab === "strength"  && <SessionStrength session={currentSession} onSessionUpdate={setCurrentSession} />}
-            {tab === "gps"       && <SessionGPS session={currentSession} sessionPlayers={sessionPlayers} />}
+            {tab === "exercises" && <SessionExercises session={sessionForDisplay} sessionPlayers={sessionPlayers} />}
+            {tab === "strength"  && <SessionStrength session={sessionForDisplay} onSessionUpdate={setCurrentSession} />}
+            {tab === "gps"       && <SessionGPS session={sessionForDisplay} sessionPlayers={sessionPlayers} />}
             {tab === "video"     && (
               <div className="space-y-6">
-                <SessionVideoObs session={currentSession} onUpdate={setCurrentSession} />
+                <SessionVideoObs session={sessionForDisplay} onUpdate={setCurrentSession} />
                 <div className="border-t border-zinc-800 pt-5">
                   <SessionVideoLinks session={currentSession} />
                 </div>

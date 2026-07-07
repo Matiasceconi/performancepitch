@@ -4,9 +4,10 @@ import { Users, CheckSquare, Square, Search, X, Sparkles, Loader2 } from "lucide
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { getMicrocycleDefaults, SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
 const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
-const MD_CODES = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "MD+3", "MD+4", "Otro"];
+const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
 
 const AVAILABLE_STATUSES = ["disponible", "subió", "convocado"];
@@ -21,7 +22,7 @@ const STATUS_LABELS = {
 };
 
 export default function SessionForm({ onCreated, onCancel }) {
-  const { activeSquadId, mySquads } = useWorkspace();
+  const { activeSquadId, activeSeasonId } = useWorkspace();
   const [squads, setSquads] = useState([]);
   const [form, setForm] = useState({
     title: "", date: moment().format("YYYY-MM-DD"),
@@ -35,6 +36,8 @@ export default function SessionForm({ onCreated, onCancel }) {
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiLoadingTitle, setAiLoadingTitle] = useState(false);
+  const [planDefaults, setPlanDefaults] = useState(null);
+  const [manualMeta, setManualMeta] = useState({ md: false, objective: false });
 
   useEffect(() => {
     base44.entities.Squad.list("name", 100).then(sq => {
@@ -51,6 +54,28 @@ export default function SessionForm({ onCreated, onCancel }) {
     if (!form.squad_id || !form.date) return;
     loadSquadPlayers(form.squad_id, form.date);
   }, [form.squad_id, form.date]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMicrocycleDefaults() {
+      if (!form.squad_id || !form.date) return;
+      const squad = squads.find(s => s.id === form.squad_id);
+      const match = await getMicrocycleDefaults({ date: form.date, squadId: form.squad_id, seasonId: activeSeasonId || squad?.season });
+      if (cancelled) return;
+      const defaults = match?.values || null;
+      setPlanDefaults(defaults);
+      if (defaults) {
+        setForm(prev => ({
+          ...prev,
+          match_day_code: manualMeta.md ? prev.match_day_code : (defaults.match_day_code || prev.match_day_code),
+          microcycle_day: manualMeta.md ? prev.microcycle_day : (defaults.microcycle_day || defaults.match_day_code || prev.microcycle_day),
+          session_objective: manualMeta.objective ? prev.session_objective : (defaults.session_objective || prev.session_objective),
+        }));
+      }
+    }
+    loadMicrocycleDefaults();
+    return () => { cancelled = true; };
+  }, [form.squad_id, form.date, squads.length, activeSeasonId, manualMeta.md, manualMeta.objective]);
 
   async function loadSquadPlayers(squadId, date) {
     setLoadingPlayers(true);
@@ -171,7 +196,11 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
 
     const session = await base44.entities.TrainingSession.create({
       ...form,
+      microcycle_day: form.match_day_code,
+      md_manual_override: manualMeta.md,
+      physical_objective_manual_override: manualMeta.objective,
       squad_name: squad?.name || "",
+      season_id: activeSeasonId || squad?.season || "",
       players_available: available.length,
       players_selected: selectedIds.size,
       players_absent: unavailable.filter(({ ds }) => ds?.status === "ausente").length,
@@ -230,7 +259,21 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
     return p && isGoalkeeper(p);
   }).length;
 
+  const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, planDefaults?.session_objective].filter(Boolean))];
+
   function setF(key, val) { setForm(f => ({ ...f, [key]: val })); }
+  function setDateOrSquad(key, val) {
+    setManualMeta({ md: false, objective: false });
+    setF(key, val);
+  }
+  function setManualMd(value) {
+    setManualMeta(prev => ({ ...prev, md: true }));
+    setForm(f => ({ ...f, match_day_code: value, microcycle_day: value }));
+  }
+  function setManualObjective(value) {
+    setManualMeta(prev => ({ ...prev, objective: true }));
+    setF("session_objective", value);
+  }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -253,12 +296,12 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
-            <input required type="date" value={form.date} onChange={e => setF("date", e.target.value)}
+            <input required type="date" value={form.date} onChange={e => setDateOrSquad("date", e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Plantel *</label>
-            <select required value={form.squad_id} onChange={e => setF("squad_id", e.target.value)}
+            <select required value={form.squad_id} onChange={e => setDateOrSquad("squad_id", e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
               {squads.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
@@ -272,10 +315,11 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">MD</label>
-            <select value={form.match_day_code} onChange={e => setF("match_day_code", e.target.value)}
+            <select value={form.match_day_code} onChange={e => setManualMd(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
               {MD_CODES.map(m => <option key={m}>{m}</option>)}
             </select>
+            <p className="mt-1 text-[10px] text-zinc-500">{planDefaults?.match_day_code && !manualMeta.md ? "Desde Plan Semanal" : "Excepción manual"}</p>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
@@ -284,10 +328,11 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Objetivo físico</label>
-            <select value={form.session_objective} onChange={e => setF("session_objective", e.target.value)}
+            <select value={form.session_objective} onChange={e => setManualObjective(e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
-              {OBJECTIVE_OPTS.map(i => <option key={i}>{i}</option>)}
+              {objectiveOptions.map(i => <option key={i}>{i}</option>)}
             </select>
+            <p className="mt-1 text-[10px] text-zinc-500">{planDefaults?.session_objective && !manualMeta.objective ? "Desde Plan Semanal" : "Excepción manual"}</p>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Lugar</label>

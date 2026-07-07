@@ -38,46 +38,25 @@
     },
     "match_day_code": {
       "type": "string",
-      "enum": [
-        "MD-6",
-        "MD-5",
-        "MD-4",
-        "MD-3",
-        "MD-2",
-        "MD-1",
-        "MD",
-        "MD+1",
-        "MD+2",
-        "MD+3",
-        "MD+4",
-        "Otro"
-      ],
-      "description": "C\u00f3digo relativo al partido"
+      "description": "C\u00f3digo del d\u00eda del microciclo heredado del Plan Semanal, editable como excepci\u00f3n"
+    },
+    "md_manual_override": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si true, el MD fue modificado manualmente en la sesi\u00f3n y no se pisa desde el Plan Semanal"
     },
     "microcycle_day": {
       "type": "string",
-      "enum": [
-        "MD-4",
-        "MD-3",
-        "MD-2",
-        "MD-1",
-        "MD",
-        "MD+1",
-        "MD+2"
-      ],
-      "description": "D\u00eda usado para perfiles GPS de microciclo"
+      "description": "D\u00eda usado para perfiles GPS de microciclo, sincronizado con match_day_code"
     },
     "session_objective": {
       "type": "string",
-      "enum": [
-        "Tensi\u00f3n",
-        "Volumen",
-        "Activaci\u00f3n",
-        "Velocidad",
-        "Recuperaci\u00f3n",
-        "Otro"
-      ],
-      "description": "Objetivo f\u00edsico de la sesi\u00f3n"
+      "description": "Objetivo f\u00edsico heredado del Plan Semanal, editable como excepci\u00f3n"
+    },
+    "physical_objective_manual_override": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si true, el objetivo f\u00edsico fue modificado manualmente en la sesi\u00f3n y no se pisa desde el Plan Semanal"
     },
     "duration_minutes": {
       "type": "number",
