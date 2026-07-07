@@ -92,7 +92,7 @@ export default function GpsIndividualAutoSummary({ stats, competitionProfile, re
           y <span className="font-semibold text-emerald-400">ACC +3</span>.
         </p>
         <p className="text-sm text-zinc-300 mt-3">
-          Las mayores diferencias aparecen en <span className="font-semibold text-yellow-400">Sprints y D >25</span>.
+          Las mayores diferencias aparecen en <span className="font-semibold text-yellow-400">Sprints y D {">"}25</span>.
         </p>
       </div>
 

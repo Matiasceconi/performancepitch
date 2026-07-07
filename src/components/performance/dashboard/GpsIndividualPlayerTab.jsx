@@ -3,10 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { avg } from "../externalGpsLoadUtils";
 import GpsIndividualPlayerSelector from "./GpsIndividualPlayerSelector";
-import GpsIndividualPlayerHeader from "./GpsIndividualPlayerHeader";
-import GpsIndividualPlayerStats from "./GpsIndividualPlayerStats";
-import GpsIndividualPlayerCharts from "./GpsIndividualPlayerCharts";
-import GpsIndividualSessionDetails from "./GpsIndividualSessionDetails";
+import GpsIndividualPlayerReport from "./GpsIndividualPlayerReport";
 
 export default function GpsIndividualPlayerTab({
   players,
@@ -95,14 +92,23 @@ export default function GpsIndividualPlayerTab({
 
     return {
       sessionsCount: enrichedRecords.length,
+      total_distance: avg(enrichedRecords.map((r) => r.total_distance)),
+      m_min: avg(enrichedRecords.map((r) => r.m_min)),
+      distance_19_8: avg(enrichedRecords.map((r) => r.distance_19_8)),
+      distance_25: avg(enrichedRecords.map((r) => r.distance_25)),
+      sprints: avg(enrichedRecords.map((r) => r.sprints)),
+      acc_3: avg(enrichedRecords.map((r) => r.acc_3)),
+      dec_3: avg(enrichedRecords.map((r) => r.dec_3)),
+      player_load: avg(enrichedRecords.map((r) => r.player_load)),
+      smax: avg(enrichedRecords.map((r) => r.smax)),
       avgDistance: avg(enrichedRecords.map((r) => r.total_distance)),
       maxDistance: Math.max(...enrichedRecords.map((r) => r.total_distance || 0)),
       avgSprints: avg(enrichedRecords.map((r) => r.sprints)),
       maxSprints: Math.max(...enrichedRecords.map((r) => r.sprints || 0)),
       avgPlayerLoad: avg(enrichedRecords.map((r) => r.player_load)),
       maxPlayerLoad: Math.max(...enrichedRecords.map((r) => r.player_load || 0)),
-      avgSpeed: avg(enrichedRecords.map((r) => r.max_speed)),
-      maxSpeed: Math.max(...enrichedRecords.map((r) => r.max_speed || 0)),
+      avgSpeed: avg(enrichedRecords.map((r) => r.smax)),
+      maxSpeed: Math.max(...enrichedRecords.map((r) => r.smax || 0)),
     };
   }, [enrichedRecords]);
 
@@ -128,22 +134,12 @@ export default function GpsIndividualPlayerTab({
         </div>
       ) : playerData ? (
         <>
-          {/* Player Header with Photo */}
-          <GpsIndividualPlayerHeader player={playerData} />
-
-          {/* Stats Cards */}
-          <GpsIndividualPlayerStats
+          <GpsIndividualPlayerReport
+            player={playerData}
+            records={enrichedRecords}
             stats={stats}
             competitionProfile={competitionProfile}
           />
-
-          {/* Charts */}
-          <GpsIndividualPlayerCharts records={enrichedRecords} stats={stats} />
-
-          {/* Session Details */}
-          {enrichedRecords.length > 0 && (
-            <GpsIndividualSessionDetails records={enrichedRecords} />
-          )}
         </>
       ) : (
         <div className="text-center py-12">
