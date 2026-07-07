@@ -237,69 +237,78 @@ function yFor(mins, slots, y, h) {
 }
 
 function drawScheduleGrid(doc, days, eventsForDate, imageCache) {
-  const margin = 5;
+  const margin = 7;
   const top = 39;
-  const gridW = 287;
-  const gridH = 136;
-  const gap = 2;
-  const dayW = (gridW - gap * (days.length - 1)) / days.length;
-  const headerH = 19;
-  const bodyY = top + headerH;
-  const bodyH = gridH - headerH;
+  const gridW = 283;
+  const gap = 3;
+  const rowGap = 4;
+  const rowH = 66;
+  const headerH = 17;
+  const topDays = days.slice(0, 4);
+  const bottomDays = days.slice(4);
 
-  days.forEach((day, idx) => {
+  function drawDay(day, idx, row, total) {
+    const dayW = (gridW - gap * (total - 1)) / total;
     const x = margin + idx * (dayW + gap);
+    const y0 = top + row * (rowH + rowGap);
     const isWeekend = [0, 6].includes(day.day());
     const events = [...eventsForDate(day.format("YYYY-MM-DD"))].sort((a, b) => eventStart(a) - eventStart(b));
+    const bodyY = y0 + headerH;
+    const bodyH = rowH - headerH;
 
     setFill(doc, "#FFFFFF");
     setStroke(doc, "#D7E2CF");
-    doc.roundedRect(x, top, dayW, gridH, 3.3, 3.3, "FD");
+    doc.setLineWidth(0.45);
+    doc.roundedRect(x, y0, dayW, rowH, 3.2, 3.2, "FD");
 
     setFill(doc, isWeekend ? BRAND.greenDark : BRAND.green);
-    doc.roundedRect(x, top, dayW, headerH, 3.3, 3.3, "F");
+    doc.roundedRect(x, y0, dayW, headerH, 3.2, 3.2, "F");
     setFill(doc, BRAND.yellow);
-    doc.rect(x, top + headerH - 2.1, dayW, 2.1, "F");
+    doc.rect(x, y0 + headerH - 1.8, dayW, 1.8, "F");
 
     setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.2);
-    doc.text(dayName(day), x + dayW / 2, top + 5.7, { align: "center" });
+    doc.setFontSize(6.5);
+    doc.text(dayName(day), x + 5, y0 + 6);
     setText(doc, BRAND.yellow);
-    doc.setFontSize(12.3);
-    doc.text(String(day.date()), x + dayW / 2, top + 13.2, { align: "center" });
+    doc.setFontSize(13.8);
+    doc.text(String(day.date()), x + dayW - 7, y0 + 9.5, { align: "right" });
     setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.6);
-    doc.text(shortMonth(day), x + dayW / 2, top + 17.1, { align: "center" });
+    doc.setFontSize(4.8);
+    doc.text(shortMonth(day), x + dayW - 7, y0 + 14, { align: "right" });
 
     if (!events.length) {
-      setFill(doc, "#F5F7F2");
-      doc.roundedRect(x + 2.5, bodyY + 4, dayW - 5, 31, 2.2, 2.2, "F");
-      drawIcon(doc, "Descanso", x + dayW / 2, bodyY + 16, "#8D7AD9");
-      setText(doc, "#69758B");
+      setFill(doc, "#F4F7F1");
+      doc.roundedRect(x + 3, bodyY + 5, dayW - 6, 31, 2.3, 2.3, "F");
+      drawIcon(doc, "Descanso", x + dayW / 2, bodyY + 17, "#8D7AD9");
+      setText(doc, "#6B7280");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(5.6);
-      doc.text("SIN ACTIVIDADES", x + dayW / 2, bodyY + 27, { align: "center" });
+      doc.setFontSize(6);
+      doc.text("SIN ACTIVIDADES", x + dayW / 2, bodyY + 28, { align: "center" });
       return;
     }
 
-    const cardGap = 2;
-    const visible = events.slice(0, 8);
-    const cardH = Math.max(10.2, Math.min(14.8, (bodyH - 7 - cardGap * (visible.length - 1)) / visible.length));
+    const visibleLimit = total === 4 ? 4 : 5;
+    const visible = events.slice(0, visibleLimit);
+    const cardGap = 1.8;
+    const cardH = Math.max(8.8, Math.min(11.2, (bodyH - 5 - cardGap * (visible.length - 1)) / visible.length));
     visible.forEach((ev, j) => {
-      const y = bodyY + 3.5 + j * (cardH + cardGap);
-      drawActivityCard(doc, ev, x + 2.3, y, dayW - 4.6, cardH, imageCache);
+      const cardY = bodyY + 3 + j * (cardH + cardGap);
+      drawActivityCard(doc, ev, x + 3, cardY, dayW - 6, cardH, imageCache);
     });
     if (events.length > visible.length) {
       setFill(doc, "#EEF2F7");
-      doc.roundedRect(x + 2.3, bodyY + bodyH - 7.2, dayW - 4.6, 5.5, 1.4, 1.4, "F");
+      doc.roundedRect(x + 3, y0 + rowH - 6.4, dayW - 6, 4.8, 1.3, 1.3, "F");
       setText(doc, BRAND.muted);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(4.8);
-      doc.text(`+${events.length - visible.length} más`, x + dayW / 2, bodyY + bodyH - 3.4, { align: "center" });
+      doc.setFontSize(4.7);
+      doc.text(`+${events.length - visible.length} actividades más`, x + dayW / 2, y0 + rowH - 3, { align: "center" });
     }
-  });
+  }
+
+  topDays.forEach((day, idx) => drawDay(day, idx, 0, topDays.length));
+  bottomDays.forEach((day, idx) => drawDay(day, idx, 1, bottomDays.length));
 }
 
 function drawActivityCard(doc, ev, x, y, w, h, imageCache) {
