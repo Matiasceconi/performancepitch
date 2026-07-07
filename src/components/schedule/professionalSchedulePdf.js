@@ -196,7 +196,7 @@ function drawHeader(doc, days, squadName, season) {
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15.5);
-  doc.text("AGENDA DEPORTIVA SEMANAL", 29, 12);
+  doc.text("CRONOGRAMA SEMANAL", 29, 12);
   setText(doc, BRAND.yellow);
   doc.setFontSize(8.5);
   doc.text(`${String(squadName || "Plantel").toUpperCase()} · TEMPORADA ${season || "—"}`, 29, 18.5);
@@ -204,9 +204,9 @@ function drawHeader(doc, days, squadName, season) {
   setText(doc, "#FFFFFF");
   doc.setFont("helvetica", "normal");
   doc.setFontSize(6.4);
-  doc.text("SEMANA", 29, 24.1);
+  doc.text("PLANIFICACIÓN OPERATIVA · SEMANA", 29, 24.1);
   doc.setFont("helvetica", "bold");
-  doc.text(rangeLabel(days), 43, 24.1);
+  doc.text(rangeLabel(days), 76, 24.1);
 
   setStroke(doc, "#FFFFFF");
   doc.setLineWidth(0.2);
@@ -238,82 +238,81 @@ function yFor(mins, slots, y, h) {
 
 function drawScheduleGrid(doc, days, eventsForDate, imageCache, planMetaByDate = {}) {
   const margin = 5;
-  const top = 40;
-  const axisW = 13;
+  const top = 39;
   const gridW = 287;
-  const gridH = 108;
-  const dayW = (gridW - axisW) / days.length;
-  const allEvents = days.flatMap((d) => eventsForDate(d.format("YYYY-MM-DD")));
-  const slots = timeSlots(allEvents);
-  const bodyY = top + 17;
-  const bodyH = gridH - 17;
-
-  setFill(doc, "#FFFFFF");
-  setStroke(doc, "#D8E1D1");
-  doc.roundedRect(margin, top, gridW, gridH, 3, 3, "FD");
-
-  setFill(doc, "#F7FAF4");
-  doc.rect(margin, bodyY, axisW, bodyH, "F");
-  setText(doc, BRAND.ink);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(5.7);
-  slots.forEach((slot) => {
-    const yy = yFor(slot, slots, bodyY, bodyH);
-    const label = `${String(Math.floor(slot / 60)).padStart(2, "0")}:00`;
-    setStroke(doc, "#E7ECE2");
-    doc.line(margin + axisW, yy, margin + gridW, yy);
-    setText(doc, BRAND.ink);
-    doc.text(label, margin + 2.2, yy + 1.8);
-  });
+  const gridH = 109;
+  const gap = 2;
+  const dayW = (gridW - gap * (days.length - 1)) / days.length;
+  const headerH = 25;
+  const bodyY = top + headerH;
+  const bodyH = gridH - headerH;
 
   days.forEach((day, idx) => {
-    const x = margin + axisW + idx * dayW;
+    const x = margin + idx * (dayW + gap);
     const isWeekend = [0, 6].includes(day.day());
+    const planMeta = planMetaByDate[day.format("YYYY-MM-DD")];
+    const events = [...eventsForDate(day.format("YYYY-MM-DD"))].sort((a, b) => eventStart(a) - eventStart(b));
+
+    setFill(doc, events.length ? "#FFFFFF" : "#F3F7FF");
+    setStroke(doc, events.length ? "#D8E1D1" : "#BFD7FF");
+    doc.roundedRect(x, top, dayW, gridH, 3, 3, "FD");
+
     setFill(doc, isWeekend ? BRAND.greenDark : BRAND.green);
-    doc.rect(x, top, dayW, 17, "F");
-    if (idx > 0) {
-      setStroke(doc, "#D8E1D1");
-      doc.line(x, top, x, top + gridH);
-    }
+    doc.roundedRect(x, top, dayW, headerH, 3, 3, "F");
+    setFill(doc, BRAND.yellow);
+    doc.rect(x, top + headerH - 2.2, dayW, 2.2, "F");
+
     setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(6.3);
-    doc.text(dayName(day), x + dayW / 2, top + 5.2, { align: "center" });
+    doc.setFontSize(6.2);
+    doc.text(dayName(day), x + dayW / 2, top + 5.4, { align: "center" });
     setText(doc, BRAND.yellow);
-    doc.setFontSize(10.5);
-    doc.text(String(day.date()), x + dayW / 2, top + 11.3, { align: "center" });
+    doc.setFontSize(11.5);
+    doc.text(String(day.date()), x + dayW / 2, top + 12.7, { align: "center" });
     setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.4);
-    doc.text(shortMonth(day), x + dayW / 2, top + 15.2, { align: "center" });
-    const planMeta = planMetaByDate[day.format("YYYY-MM-DD")];
+    doc.setFontSize(4.8);
+    doc.text(shortMonth(day), x + dayW / 2, top + 17, { align: "center" });
+
     if (planMeta?.match_day_code || planMeta?.session_objective) {
-      setText(doc, "#FFFFFF");
+      const md = planMeta.match_day_code || "MD";
+      const objective = planMeta.session_objective || "Objetivo físico";
+      setFill(doc, "#FFFFFF");
+      doc.roundedRect(x + 2.2, top + 19, dayW - 4.4, 4.7, 1.5, 1.5, "F");
+      setText(doc, BRAND.greenDeep);
       doc.setFont("helvetica", "bold");
       doc.setFontSize(4.2);
-      doc.text([planMeta.match_day_code, planMeta.session_objective].filter(Boolean).join(" · ").toUpperCase(), x + dayW / 2, top + 16.6, { align: "center", maxWidth: dayW - 2 });
+      doc.text(`${md} · ${objective}`.toUpperCase(), x + dayW / 2, top + 22.2, { align: "center", maxWidth: dayW - 6 });
     }
 
-    const events = [...eventsForDate(day.format("YYYY-MM-DD"))].sort((a, b) => eventStart(a) - eventStart(b));
-    let lastBottom = bodyY + 1.5;
-    events.forEach((ev) => {
-      const key = typeKey(ev);
-      const start = eventStart(ev);
-      let cardY = yFor(start, slots, bodyY, bodyH) + 1;
-      const cardH = key === "Partido" ? 31 : Math.max(9.5, Math.min(16, (eventDuration(ev) / 60) * (bodyH / Math.max(1, slots.length - 1))));
-      if (cardY < lastBottom) cardY = lastBottom;
-      if (cardY + cardH > bodyY + bodyH - 1) cardY = bodyY + bodyH - cardH - 1;
-      drawActivityCard(doc, ev, x + 1.2, cardY, dayW - 2.4, cardH, imageCache);
-      lastBottom = cardY + cardH + 1.2;
-    });
-
     if (!events.length) {
-      setText(doc, "#B8B1D9");
+      setText(doc, "#5C7FC4");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(15);
-      drawIcon(doc, "Descanso", x + dayW / 2, bodyY + bodyH / 2 - 7, "#8D7AD9");
-      doc.setFontSize(5.8);
-      doc.text("SIN ACTIVIDADES", x + dayW / 2, bodyY + bodyH / 2 + 7, { align: "center" });
+      doc.setFontSize(14);
+      drawIcon(doc, "Descanso", x + dayW / 2, bodyY + bodyH / 2 - 8, "#6E8FE0");
+      doc.setFontSize(6.5);
+      doc.text("DÍA LIBRE", x + dayW / 2, bodyY + bodyH / 2 + 7, { align: "center" });
+      setText(doc, "#7486A8");
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(4.7);
+      doc.text("Sin actividades cargadas", x + dayW / 2, bodyY + bodyH / 2 + 12, { align: "center" });
+      return;
+    }
+
+    const cardGap = 1.8;
+    const visible = events.slice(0, 6);
+    const cardH = Math.max(9.2, Math.min(14.2, (bodyH - 5 - cardGap * (visible.length - 1)) / visible.length));
+    visible.forEach((ev, j) => {
+      const y = bodyY + 3 + j * (cardH + cardGap);
+      drawActivityCard(doc, ev, x + 2.1, y, dayW - 4.2, cardH, imageCache);
+    });
+    if (events.length > visible.length) {
+      setFill(doc, "#EEF2F7");
+      doc.roundedRect(x + 2.1, bodyY + bodyH - 7, dayW - 4.2, 5.2, 1.3, 1.3, "F");
+      setText(doc, BRAND.muted);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(4.9);
+      doc.text(`+${events.length - visible.length} actividades más`, x + dayW / 2, bodyY + bodyH - 3.3, { align: "center" });
     }
   });
 }
@@ -508,7 +507,7 @@ export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, we
   drawHeader(doc, days, squadName, season || "");
   await drawLogo(doc, 15, 15.5, 22);
   drawScheduleGrid(doc, days, eventsForDate, imageCache, planMetaByDate);
-  drawLegend(doc, 19, 151.5, 221);
+  drawLegend(doc, 5, 151.5, 235);
   drawBottomPanels(doc, days, allEvents, imageCache);
   drawFooter(doc);
 
