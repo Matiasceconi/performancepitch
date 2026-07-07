@@ -2,21 +2,39 @@ import { avg } from "@/components/performance/externalGpsLoadUtils";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 
 export const REPORT_METRICS = [
-  { key: "total_distance", label: "Distancia Total", unit: "m" },
-  { key: "m_min", label: "m/min", unit: "" },
-  { key: "distance_19_8", label: "D >19.8", unit: "m" },
-  { key: "distance_25", label: "D >25", unit: "m" },
-  { key: "sprints", label: "Sprints", unit: "" },
-  { key: "acc_3", label: "ACC +3", unit: "" },
-  { key: "dec_3", label: "DEC +3", unit: "" },
-  { key: "player_load", label: "Player Load", unit: "" },
-  { key: "smax", label: "Smax", unit: "km/h" },
+  { key: "total_distance", label: "Distancia Total", unit: "m", color: "#3b82f6" },
+  { key: "m_min", label: "m/min", unit: "", color: "#22c55e" },
+  { key: "distance_19_8", label: "D >19.8", unit: "m", color: "#10b981" },
+  { key: "distance_25", label: "D >25", unit: "m", color: "#f97316" },
+  { key: "sprints", label: "Sprints", unit: "", color: "#06b6d4" },
+  { key: "acc_3", label: "ACC +3", unit: "", color: "#f59e0b" },
+  { key: "dec_3", label: "DEC +3", unit: "", color: "#ec4899" },
+  { key: "player_load", label: "Player Load", unit: "", color: "#a855f7" },
+  { key: "smax", label: "Smax", unit: "km/h", color: "#ef4444" },
 ];
 
 export function fmtMetricVal(key, v) {
   if (v == null || isNaN(v)) return "—";
   if (key === "smax") return Number(v).toFixed(1);
   return Math.round(v).toLocaleString("es-AR");
+}
+
+function surnameFromName(name = "") {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  return parts.length > 1 ? parts[parts.length - 1] : (parts[0] || "—");
+}
+
+function firstInitial(name = "") {
+  return (String(name || "").trim().split(/\s+/)[0] || "").charAt(0).toUpperCase();
+}
+
+export function withPlayerDisplayNames(rows = []) {
+  const bases = rows.map((row) => surnameFromName(row.player_name || row.player_name_original));
+  const counts = bases.reduce((acc, base) => ({ ...acc, [base]: (acc[base] || 0) + 1 }), {});
+  return rows.map((row, index) => ({
+    ...row,
+    display_name: counts[bases[index]] > 1 ? `${bases[index]} ${firstInitial(row.player_name || row.player_name_original)}.` : bases[index],
+  }));
 }
 
 const COMPETITION_KEY_MAP = {
@@ -50,7 +68,7 @@ export function buildReportData({ session, sessionPlayers, gpsRows, players, wee
     .map((r) => ({ ...r, _player: playerMap[r.player_id] }))
     .filter((r) => !isGoalkeeper(r._player || { position: r.player_name_original }));
 
-  const allRows = enrich(gpsRows);
+  const allRows = withPlayerDisplayNames(enrich(gpsRows));
   const principal = allRows.filter((r) => r.include_in_session_average !== false);
   const excluded = allRows.filter((r) => r.include_in_session_average === false);
   const weekPrincipal = enrich(weekGpsRows).filter((r) => r.include_in_session_average !== false);
@@ -83,7 +101,7 @@ export function buildReportData({ session, sessionPlayers, gpsRows, players, wee
     return {
       key: h.key,
       label: h.label,
-      player_name: top.player_name,
+      player_name: top.display_name || top.player_name,
       photo_url: top._player?.photo_url,
       position: top._player?.position,
       value: fmtMetricVal(h.key, top[h.key]),
@@ -101,37 +119,37 @@ export function buildReportData({ session, sessionPlayers, gpsRows, players, wee
       const pct = (sessionVal != null && compVal) ? (sessionVal / compVal) * 100 : null;
       return { key: m.key, label: m.label, sessionVal, compVal, pct };
     });
-    return { player_id: r.player_id, player_name: r.player_name, photo_url: r._player?.photo_url, position: r._player?.position, metrics };
+    return { player_id: r.player_id, player_name: r.player_name, display_name: r.display_name, photo_url: r._player?.photo_url, position: r._player?.position, metrics };
   }).filter(Boolean);
 
   const alerts = [];
   presentRows.forEach((sp) => {
     if (isGoalkeeper({ position: sp.position })) return;
     const hasGps = allRows.some((r) => r.player_id === sp.player_id);
-    if (!hasGps) alerts.push({ type: "sin_gps", text: `${sp.player_name}: presente sin registro GPS` });
+    if (!hasGps) alerts.push({ type: "sin_gps", text: `${surnameFromName(sp.player_name)}: presente sin registro GPS` });
   });
   principal.forEach((r) => {
     const missing = ["total_distance", "player_load"].some((k) => r[k] == null);
-    if (missing) alerts.push({ type: "incompleto", text: `${r.player_name}: GPS incompleto` });
+    if (missing) alerts.push({ type: "incompleto", text: `${r.display_name || r.player_name}: GPS incompleto` });
   });
   if (teamAverages.total_distance) {
     principal.forEach((r) => {
       if (r.total_distance > teamAverages.total_distance * 1.3) {
-        alerts.push({ type: "carga_alta", text: `${r.player_name}: carga muy alta (${fmtMetricVal("total_distance", r.total_distance)} m)` });
+        alerts.push({ type: "carga_alta", text: `${r.display_name || r.player_name}: carga muy alta (${fmtMetricVal("total_distance", r.total_distance)} m)` });
       }
     });
   }
   const maxSmax = Math.max(0, ...principal.map((r) => r.smax || 0));
   if (maxSmax > 0) {
     principal.filter((r) => r.smax >= maxSmax - 0.3).forEach((r) =>
-      alerts.push({ type: "smax", text: `${r.player_name}: velocidad máxima destacada (${fmtMetricVal("smax", r.smax)} km/h)` }));
+      alerts.push({ type: "smax", text: `${r.display_name || r.player_name}: velocidad máxima destacada (${fmtMetricVal("smax", r.smax)} km/h)` }));
   }
   const accDecAvg = avg(principal.map((r) => (r.acc_3 || 0) + (r.dec_3 || 0)));
   if (accDecAvg) {
     principal.filter((r) => ((r.acc_3 || 0) + (r.dec_3 || 0)) > accDecAvg * 1.4).forEach((r) =>
-      alerts.push({ type: "accdec", text: `${r.player_name}: muchas ACC/DEC (ACC ${fmtMetricVal("acc_3", r.acc_3)} / DEC ${fmtMetricVal("dec_3", r.dec_3)})` }));
+      alerts.push({ type: "accdec", text: `${r.display_name || r.player_name}: muchas ACC/DEC (ACC ${fmtMetricVal("acc_3", r.acc_3)} / DEC ${fmtMetricVal("dec_3", r.dec_3)})` }));
   }
-  excluded.forEach((r) => alerts.push({ type: "excluido", text: `${r.player_name}: excluido del promedio` }));
+  excluded.forEach((r) => alerts.push({ type: "excluido", text: `${r.display_name || r.player_name}: excluido del promedio` }));
 
   const insights = [];
   if (teamAverages.total_distance != null && weekAverages.total_distance) {

@@ -7,9 +7,10 @@ import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { fmtMetric, fmtSmax } from "@/utils";
 import { classifyGpsInclusion, EXCLUSION_REASON_LABELS } from "@/components/performance/externalGpsLoadUtils";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, LabelList, ReferenceLine } from "recharts";
 import { parseCSV, parseNum, normalize, detectColumns } from "@/components/sessions/gps/gpsCsvUtils";
 import { MAIN_FIELDS, loadTemplates } from "@/components/sessions/gps/gpsColumnsConfig";
+import { withPlayerDisplayNames } from "@/components/sessions/gpsReport/sessionGpsReportData";
 import GpsImportPreview from "@/components/sessions/gps/GpsImportPreview";
 import GpsDataTable from "@/components/sessions/gps/GpsDataTable";
 
@@ -246,7 +247,6 @@ export default function SessionGPS({ session, sessionPlayers }) {
   }
 
   const [activeMetric, setActiveMetric] = useState("total_distance");
-  const [playerTypeFilter, setPlayerTypeFilter] = useState("todos");
 
   const gkRows = gpsRows.filter(r => {
     const p = allPlayers.find(x => x.id === r.player_id);
@@ -256,14 +256,11 @@ export default function SessionGPS({ session, sessionPlayers }) {
     const p = allPlayers.find(x => x.id === r.player_id);
     return !isGoalkeeper(p || { position: r.player_name });
   });
-  const filteredRows = playerTypeFilter === "arqueros" ? gkRows
-    : playerTypeFilter === "campo" ? fieldRows
-    : gpsRows;
+  const displayFieldRows = withPlayerDisplayNames(fieldRows);
+  const filteredRows = displayFieldRows;
 
   const principalRows = filteredRows.filter(r => r.include_in_session_average !== false);
   const excludedRows = filteredRows.filter(r => r.include_in_session_average === false);
-  const principalField = fieldRows.filter(r => r.include_in_session_average !== false);
-  const principalGK = gkRows.filter(r => r.include_in_session_average !== false);
 
   function avg(key, rows = principalRows) {
     const vals = rows.map(r => r[key] || 0).filter(v => v > 0);
@@ -273,9 +270,19 @@ export default function SessionGPS({ session, sessionPlayers }) {
   const chartData = [...principalRows]
     .sort((a, b) => (b[activeMetric] || 0) - (a[activeMetric] || 0))
     .map(r => ({
-      name: (r.player_name || "").split(" ")[0],
+      name: r.display_name || r.player_name,
       value: r[activeMetric] || 0,
     }));
+
+  function metricLabel(key, value) {
+    if (key === "smax") return fmtSmax(value);
+    const formatted = fmtMetric(value);
+    if (key === "total_distance" || key === "distance_19_8" || key === "distance_25") return `${formatted} m`;
+    if (key === "sprints") return `${formatted} sprints`;
+    if (key === "acc_3") return `${formatted} ACC`;
+    if (key === "dec_3") return `${formatted} DEC`;
+    return formatted;
+  }
 
   return (
     <div className="space-y-6">
@@ -328,22 +335,10 @@ export default function SessionGPS({ session, sessionPlayers }) {
       )}
 
       {gpsRows.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-500">
           <Filter size={12} className="text-zinc-500" />
-          {[
-            { key: "todos", label: `Todos (${gpsRows.length})` },
-            { key: "campo", label: `Campo (${fieldRows.length})` },
-            { key: "arqueros", label: `Arqueros (${gkRows.length})` },
-          ].map(opt => (
-            <button key={opt.key} onClick={() => setPlayerTypeFilter(opt.key)}
-              className={`px-3 py-1 rounded-full text-xs font-medium border transition-colors ${
-                playerTypeFilter === opt.key
-                  ? "bg-white text-zinc-900 border-transparent"
-                  : "bg-transparent border-zinc-700 text-zinc-400 hover:text-white"
-              }`}>
-              {opt.label}
-            </button>
-          ))}
+          <span className="px-3 py-1 rounded-full border border-zinc-700 text-zinc-300">Jugadores de campo ({fieldRows.length})</span>
+          {gkRows.length > 0 && <span className="px-3 py-1 rounded-full border border-zinc-800 text-zinc-500">Arqueros excluidos automáticamente ({gkRows.length})</span>}
         </div>
       )}
 
@@ -361,16 +356,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
                 <div key={m.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-4 text-center">
                   <p className="text-[10px] text-zinc-500 mb-1">{m.label}</p>
                   <p className="text-xl font-bold" style={{ color: m.color }}>{display}</p>
-                  {playerTypeFilter === "todos" && principalField.length > 0 && principalGK.length > 0 && (
-                    <div className="flex justify-center gap-2 mt-1">
-                      <span className="text-[8px] text-zinc-500">
-                        C: {m.key === "smax" ? fmtSmax(avg(m.key, principalField) || 0) : fmtMetric(avg(m.key, principalField) || 0)}
-                      </span>
-                      <span className="text-[8px] text-yellow-600">
-                        A: {m.key === "smax" ? fmtSmax(avg(m.key, principalGK) || 0) : fmtMetric(avg(m.key, principalGK) || 0)}
-                      </span>
-                    </div>
-                  )}
+
                 </div>
               );
             })}
@@ -400,7 +386,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
               <tbody>
                 {excludedRows.map((r, i) => (
                   <tr key={r.player_id || i} className="border-b border-zinc-800/40 hover:bg-zinc-800/30 transition-colors">
-                    <td className="py-2.5 px-4 text-white font-semibold whitespace-nowrap">{r.player_name}</td>
+                    <td className="py-2.5 px-4 text-white font-semibold whitespace-nowrap">{r.display_name || r.player_name}</td>
                     <td className="py-2.5 px-3 text-amber-300 whitespace-nowrap">{EXCLUSION_REASON_LABELS[r.exclusion_reason] || r.exclusion_reason || "—"}</td>
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#3b82f6" }}>{fmtMetric(r.total_distance)}</td>
                     <td className="py-2.5 px-3 text-right font-bold" style={{ color: "#a855f7" }}>{fmtMetric(r.player_load)}</td>
@@ -434,17 +420,19 @@ export default function SessionGPS({ session, sessionPlayers }) {
 
           <div>
             <p className="text-xs text-zinc-400 mb-3 font-medium">{activeMeta.label} — por jugador</p>
-            <ResponsiveContainer width="100%" height={chartData.length * 32 + 20}>
-              <BarChart data={chartData} layout="vertical" margin={{ left: 60, right: 40, top: 0, bottom: 0 }}>
+            <ResponsiveContainer width="100%" height={Math.max(220, chartData.length * 32 + 30)}>
+              <BarChart data={chartData} layout="vertical" margin={{ left: 70, right: 90, top: 0, bottom: 0 }}>
                 <XAxis type="number" hide />
                 <YAxis type="category" dataKey="name" tick={{ fill: "#a1a1aa", fontSize: 11 }} width={60} />
                 <Tooltip
                   contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, fontSize: 11 }}
                   labelStyle={{ color: "#fff" }}
                   itemStyle={{ color: activeMeta.color }}
-                  formatter={v => [activeMetric === "smax" ? fmtSmax(v) : fmtMetric(v), activeMeta.label]}
+                  formatter={v => [metricLabel(activeMetric, v), activeMeta.label]}
                 />
+                {avg(activeMetric, principalRows) != null && <ReferenceLine x={avg(activeMetric, principalRows)} stroke="#facc15" strokeDasharray="4 4" label={{ value: "Prom.", fill: "#facc15", fontSize: 10 }} />}
                 <Bar dataKey="value" radius={[0, 4, 4, 0]}>
+                  <LabelList dataKey="value" position="right" fill="#e4e4e7" fontSize={10} formatter={(v) => metricLabel(activeMetric, v)} />
                   {chartData.map((_, idx) => (
                     <Cell key={idx} fill={activeMeta.color} fillOpacity={0.85} />
                   ))}
