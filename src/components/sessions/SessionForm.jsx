@@ -37,6 +37,7 @@ export default function SessionForm({ onCreated, onCancel }) {
   const [saving, setSaving] = useState(false);
   const [aiLoadingTitle, setAiLoadingTitle] = useState(false);
   const [planDefaults, setPlanDefaults] = useState(null);
+  const [physicalObjectives, setPhysicalObjectives] = useState([]);
   const [manualMeta, setManualMeta] = useState({ md: false, objective: false });
 
   useEffect(() => {
@@ -48,6 +49,12 @@ export default function SessionForm({ onCreated, onCancel }) {
       setForm(f => ({ ...f, squad_id: defaultId }));
     });
   }, [activeSquadId]);
+
+  useEffect(() => {
+    base44.entities.PhysicalObjective.list("order", 100).then(rows => {
+      setPhysicalObjectives(rows.filter(o => o.active !== false && o.hidden !== true).map(o => o.name).filter(Boolean));
+    });
+  }, []);
 
   // Load players whenever date or squad changes
   useEffect(() => {
@@ -259,7 +266,7 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
     return p && isGoalkeeper(p);
   }).length;
 
-  const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, planDefaults?.session_objective].filter(Boolean))];
+  const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, ...physicalObjectives, planDefaults?.session_objective, form.session_objective].filter(Boolean))];
 
   function setF(key, val) { setForm(f => ({ ...f, [key]: val })); }
   function setDateOrSquad(key, val) {

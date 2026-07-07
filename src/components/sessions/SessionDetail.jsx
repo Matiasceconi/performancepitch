@@ -56,6 +56,7 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
   const [editForm, setEditForm] = useState(session);
   const [saving, setSaving] = useState(false);
   const [planDefaults, setPlanDefaults] = useState(null);
+  const [physicalObjectives, setPhysicalObjectives] = useState([]);
   const [editManualMeta, setEditManualMeta] = useState({ md: false, objective: false });
 
   useEffect(() => {
@@ -70,6 +71,12 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
     base44.entities.SessionPlayer.filter({ session_id: session.id }, "player_name", 200)
       .then(sp => { setSessionPlayers(sp); setLoading(false); });
   }, [session.id]);
+
+  useEffect(() => {
+    base44.entities.PhysicalObjective.list("order", 100).then(rows => {
+      setPhysicalObjectives(rows.filter(o => o.active !== false && o.hidden !== true).map(o => o.name).filter(Boolean));
+    });
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -111,7 +118,7 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
   const typeClass = TYPE_COLORS[currentSession.session_type] || TYPE_COLORS["Otro"];
   const effectiveMeta = effectiveSessionMeta(currentSession, planDefaults ? { values: planDefaults } : null);
   const sessionForDisplay = { ...currentSession, ...effectiveMeta };
-  const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, planDefaults?.session_objective, editForm.session_objective].filter(Boolean))];
+  const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, ...physicalObjectives, planDefaults?.session_objective, editForm.session_objective].filter(Boolean))];
 
   return (
     <div className="space-y-5">
