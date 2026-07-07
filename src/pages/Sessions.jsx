@@ -76,9 +76,11 @@ export default function Sessions() {
   async function handleDelete(id) {
     if (!window.confirm("¿Eliminar esta sesión?")) return;
     const strengthStations = await base44.entities.StrengthStation.filter({ session_id: id }, "order", 200);
+    const strengthBlocks = await base44.entities.StrengthWorkBlock.filter({ session_id: id }, "order", 100);
     const libraryFromSession = await base44.entities.StrengthExerciseLibrary.filter({ created_from_session_id: id }, "-created_date", 200);
     await Promise.all([
       ...strengthStations.map(s => base44.entities.StrengthStation.delete(s.id)),
+      ...strengthBlocks.map(b => base44.entities.StrengthWorkBlock.delete(b.id)),
       ...libraryFromSession.map(ex => base44.entities.StrengthExerciseLibrary.delete(ex.id)),
     ]);
     await base44.entities.TrainingSession.delete(id);

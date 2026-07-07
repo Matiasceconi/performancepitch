@@ -6,23 +6,23 @@
       "type": "string",
       "description": "ID de la TrainingSession"
     },
+    "work_block_id": {
+      "type": "string",
+      "description": "ID del cuadro de trabajo de fuerza al que pertenece el ejercicio"
+    },
     "station_number": {
       "type": "number",
-      "description": "N\u00famero de fila"
+      "description": "N\u00famero de fila dentro del cuadro"
     },
     "order": {
       "type": "number",
       "default": 0,
-      "description": "Orden en la sesi\u00f3n"
+      "description": "Orden dentro del cuadro o sesi\u00f3n"
     },
     "strength_group": {
       "type": "string",
-      "enum": [
-        "restaura",
-        "compensa"
-      ],
-      "default": "restaura",
-      "description": "Cuadro o grupo de fuerza dentro de la sesi\u00f3n"
+      "default": "",
+      "description": "Nombre del cuadro o grupo de fuerza dentro de la sesi\u00f3n (compatibilidad)"
     },
     "image_url": {
       "type": "string",

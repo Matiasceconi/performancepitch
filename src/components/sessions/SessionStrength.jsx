@@ -1,39 +1,156 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { DragDropContext } from "@hello-pangea/dnd";
-import { Plus, Sparkles, ImagePlus } from "lucide-react";
+import { Activity, Dumbbell, ImagePlus, Plus, RotateCcw, Shield, Sparkles, Target, Users, Zap } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import StrengthHeader from "@/components/sessions/strength/StrengthHeader";
 import StrengthGroupTable from "@/components/sessions/strength/StrengthGroupTable";
 import StrengthPDFExport from "@/components/sessions/strength/StrengthPDFExport";
 import StrengthImageImportModal from "@/components/sessions/strength/StrengthImageImportModal";
-import { METHOD_OPTIONS, TYPE_OPTIONS, syncToLibrary } from "@/components/sessions/strength/strengthOptions";
+import { METHOD_OPTIONS, TYPE_OPTIONS } from "@/components/sessions/strength/strengthOptions";
+
+const BLOCK_TEMPLATES = [
+  { name: "Restaura", color: "#ef4444", icon: "rotate" },
+  { name: "Compensa", color: "#22c55e", icon: "activity" },
+  { name: "Potencia", color: "#38bdf8", icon: "zap" },
+  { name: "Preventivo", color: "#f59e0b", icon: "shield" },
+  { name: "Circuito", color: "#a855f7", icon: "target" },
+  { name: "Readaptación", color: "#14b8a6", icon: "activity" },
+  { name: "Arqueros", color: "#60a5fa", icon: "users" },
+];
+
+function normalizeGroupName(value = "") {
+  const text = String(value || "").trim();
+  if (!text) return "Cuadro";
+  if (text.toLowerCase() === "restaura") return "Restaura";
+  if (text.toLowerCase() === "compensa") return "Compensa";
+  return text;
+}
+
+function uidName(name) {
+  return normalizeGroupName(name).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "cuadro";
+}
+
+function parseLeadingNumber(value) {
+  const match = String(value || "").match(/\d+(?:[.,]\d+)?/);
+  return match ? Number(match[0].replace(",", ".")) : 0;
+}
+
+function summarize(stations) {
+  return {
+    exercises: stations.length,
+    minutes: stations.reduce((sum, row) => sum + parseLeadingNumber(row.time), 0),
+    volume: stations.reduce((sum, row) => sum + parseLeadingNumber(row.volume), 0),
+    sets: stations.reduce((sum, row) => sum + parseLeadingNumber(row.sets || row.volume), 0),
+  };
+}
+
+export const STRENGTH_BLOCK_ICONS = { dumbbell: Dumbbell, activity: Activity, zap: Zap, shield: Shield, target: Target, users: Users, rotate: RotateCcw };
 
 export default function SessionStrength({ session, onSessionUpdate }) {
   const [stations, setStations] = useState([]);
+  const [blocks, setBlocks] = useState([]);
   const [suggesting, setSuggesting] = useState(false);
   const [showImageImport, setShowImageImport] = useState(false);
   const { toast } = useToast();
 
-  useEffect(() => {
-    base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 200)
-      .then(rows => setStations(rows.sort((a, b) => (a.order || 0) - (b.order || 0))));
-  }, [session.id]);
+  useEffect(() => { loadData(); }, [session.id]);
 
-  async function persistOrder(list) {
-    const updated = list.map((s, i) => ({ ...s, order: i + 1, station_number: i + 1 }));
-    setStations(updated);
-    await Promise.all(updated.map(s => base44.entities.StrengthStation.update(s.id, { order: s.order, station_number: s.station_number, strength_group: s.strength_group || "restaura" })));
+  async function loadData() {
+    const [rows, rawBlocks] = await Promise.all([
+      base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 300),
+      base44.entities.StrengthWorkBlock.filter({ session_id: session.id }, "order", 100),
+    ]);
+
+    let nextBlocks = rawBlocks.sort((a, b) => (a.order || 0) - (b.order || 0));
+    let nextRows = rows.sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    if (!nextBlocks.length && nextRows.length) {
+      const names = [...new Set(nextRows.map(r => normalizeGroupName(r.strength_group || "Restaura")))];
+      nextBlocks = await Promise.all(names.map((name, index) => {
+        const template = BLOCK_TEMPLATES.find(t => uidName(t.name) === uidName(name)) || BLOCK_TEMPLATES[index % BLOCK_TEMPLATES.length];
+        return base44.entities.StrengthWorkBlock.create({ session_id: session.id, name, color: template.color, icon: template.icon, order: index + 1, hidden: false });
+      }));
+      const byName = Object.fromEntries(nextBlocks.map(b => [uidName(b.name), b]));
+      nextRows = await Promise.all(nextRows.map((row) => {
+        const block = byName[uidName(row.strength_group || "Restaura")] || nextBlocks[0];
+        return base44.entities.StrengthStation.update(row.id, { work_block_id: block.id, strength_group: block.name });
+      }));
+    }
+
+    setBlocks(nextBlocks);
+    setStations(nextRows);
   }
 
-  async function addRow(initial = {}) {
-    const group = initial.strength_group || "restaura";
-    const groupCount = stations.filter(s => (s.strength_group || "restaura") === group).length;
+  const visibleBlocks = useMemo(() => blocks.slice().sort((a, b) => (a.order || 0) - (b.order || 0)), [blocks]);
+  const stationsByBlock = useMemo(() => Object.fromEntries(visibleBlocks.map(block => [block.id, stations.filter(s => s.work_block_id === block.id || (!s.work_block_id && uidName(s.strength_group) === uidName(block.name))).sort((a, b) => (a.order || 0) - (b.order || 0))])), [visibleBlocks, stations]);
+
+  async function createBlock(initial = {}) {
+    const template = BLOCK_TEMPLATES.find(t => uidName(t.name) === uidName(initial.name)) || BLOCK_TEMPLATES[blocks.length % BLOCK_TEMPLATES.length];
+    const created = await base44.entities.StrengthWorkBlock.create({
+      session_id: session.id,
+      name: initial.name || `Cuadro ${blocks.length + 1}`,
+      description: initial.description || "",
+      color: initial.color || template.color,
+      icon: initial.icon || template.icon,
+      order: blocks.length + 1,
+      hidden: false,
+      template_key: initial.template_key || "",
+    });
+    setBlocks(prev => [...prev, created]);
+    return created;
+  }
+
+  async function updateBlock(id, patch) {
+    setBlocks(prev => prev.map(block => block.id === id ? { ...block, ...patch } : block));
+    await base44.entities.StrengthWorkBlock.update(id, patch);
+    if (patch.name) {
+      const affected = stations.filter(row => row.work_block_id === id);
+      await Promise.all(affected.map(row => base44.entities.StrengthStation.update(row.id, { strength_group: patch.name })));
+      setStations(prev => prev.map(row => row.work_block_id === id ? { ...row, strength_group: patch.name } : row));
+    }
+  }
+
+  async function moveBlock(index, direction) {
+    const next = [...visibleBlocks];
+    const target = index + direction;
+    if (target < 0 || target >= next.length) return;
+    [next[index], next[target]] = [next[target], next[index]];
+    const updated = next.map((block, i) => ({ ...block, order: i + 1 }));
+    setBlocks(updated);
+    await Promise.all(updated.map(block => base44.entities.StrengthWorkBlock.update(block.id, { order: block.order })));
+  }
+
+  async function duplicateBlock(block) {
+    const created = await createBlock({ name: `${block.name} copia`, description: block.description, color: block.color, icon: block.icon });
+    const sourceRows = stationsByBlock[block.id] || [];
+    const createdRows = await Promise.all(sourceRows.map((row, index) => {
+      const { id, created_date, updated_date, created_by_id, ...rest } = row;
+      return base44.entities.StrengthStation.create({ ...rest, work_block_id: created.id, strength_group: created.name, order: index + 1, station_number: index + 1 });
+    }));
+    setStations(prev => [...prev, ...createdRows]);
+    toast({ title: "✓ Cuadro duplicado" });
+  }
+
+  async function deleteBlock(block) {
+    if (!window.confirm(`¿Eliminar el cuadro ${block.name} y sus ejercicios?`)) return;
+    const rows = stationsByBlock[block.id] || [];
+    await Promise.all(rows.map(row => base44.entities.StrengthStation.delete(row.id)));
+    await base44.entities.StrengthWorkBlock.delete(block.id);
+    setBlocks(prev => prev.filter(item => item.id !== block.id));
+    setStations(prev => prev.filter(row => row.work_block_id !== block.id));
+  }
+
+  async function addRow(blockId, initial = {}) {
+    let block = blocks.find(item => item.id === blockId);
+    if (!block) block = await createBlock({ name: "Cuadro 1" });
+    const groupRows = stations.filter(row => row.work_block_id === block.id);
     const payload = {
       session_id: session.id,
-      order: stations.length + 1,
-      station_number: groupCount + 1,
-      strength_group: group,
+      work_block_id: block.id,
+      strength_group: block.name,
+      order: groupRows.length + 1,
+      station_number: groupRows.length + 1,
       method: "", exercise_type: "", exercise_name: "", volume: "", notes: "", video_url: "",
       restore_exercise: "", compensate_exercise: "", sets: "", reps: "", time: "", rest_time: "", rir: "", objective: "", muscle_group: "", vector_pattern: "", tags: [],
       ...initial,
@@ -43,12 +160,13 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   }
 
   function onChange(id, field, value) {
-    setStations(prev => prev.map(s => s.id === id ? { ...s, [field]: value } : s));
+    setStations(prev => prev.map(row => row.id === id ? { ...row, [field]: value } : row));
   }
 
   async function onBlurField(station) {
-    const payload = {
-      strength_group: station.strength_group || "restaura",
+    await base44.entities.StrengthStation.update(station.id, {
+      work_block_id: station.work_block_id,
+      strength_group: station.strength_group || blocks.find(b => b.id === station.work_block_id)?.name || "",
       method: station.method || undefined,
       exercise_type: station.exercise_type || undefined,
       exercise_name: station.exercise_name || undefined,
@@ -69,28 +187,14 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       notes: station.notes || undefined,
       library_exercise_id: station.library_exercise_id || station.library_strength_exercise_id || undefined,
       library_strength_exercise_id: station.library_strength_exercise_id || station.library_exercise_id || undefined,
-    };
-    await base44.entities.StrengthStation.update(station.id, payload);
-    const linkedId = station.library_strength_exercise_id || station.library_exercise_id;
-    if (station.exercise_name && !linkedId) {
-      const libId = await syncToLibrary(station, session.id, session?.squad_id, session?.squad_name);
-      if (libId) {
-        await base44.entities.StrengthStation.update(station.id, { library_exercise_id: libId, library_strength_exercise_id: libId });
-        setStations(prev => prev.map(s => s.id === station.id ? { ...s, library_exercise_id: libId, library_strength_exercise_id: libId } : s));
-      }
-    } else if (linkedId) {
-      const shouldUpdate = station.sync_library_edits || window.confirm("Este ejercicio está vinculado a la biblioteca. ¿Querés actualizar la plantilla original?");
-      if (shouldUpdate) {
-        await syncToLibrary(station, session.id, session?.squad_id, session?.squad_name, { updateExistingId: linkedId, incrementUsage: false });
-        setStations(prev => prev.map(s => s.id === station.id ? { ...s, sync_library_edits: true } : s));
-        toast({ title: "✓ Biblioteca de fuerza actualizada" });
-      }
-    }
+    });
   }
 
   async function onPickLibrary(id, ex) {
+    const current = stations.find(s => s.id === id);
     const updated = {
-      strength_group: stations.find(s => s.id === id)?.strength_group || "restaura",
+      work_block_id: current?.work_block_id || "",
+      strength_group: current?.strength_group || "",
       method: ex.method || "",
       exercise_type: ex.exercise_type || "",
       exercise_name: ex.name || "",
@@ -114,19 +218,13 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     };
     setStations(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
     await base44.entities.StrengthStation.update(id, updated);
-    base44.entities.StrengthExerciseLibrary.update(ex.id, {
-      times_used: (ex.times_used || 1) + 1,
-      last_used_at: new Date().toISOString().slice(0, 10),
-    });
+    base44.entities.StrengthExerciseLibrary.update(ex.id, { times_used: (ex.times_used || 1) + 1, last_used_at: new Date().toISOString().slice(0, 10) });
   }
 
   async function onDuplicate(station) {
-    const { id, created_date, updated_date, ...rest } = station;
-    const group = rest.strength_group || "restaura";
-    rest.order = stations.length + 1;
-    rest.station_number = stations.filter(s => (s.strength_group || "restaura") === group).length + 1;
-    rest.strength_group = group;
-    const created = await base44.entities.StrengthStation.create(rest);
+    const { id, created_date, updated_date, created_by_id, ...rest } = station;
+    const blockRows = stations.filter(s => s.work_block_id === rest.work_block_id);
+    const created = await base44.entities.StrengthStation.create({ ...rest, order: blockRows.length + 1, station_number: blockRows.length + 1 });
     setStations(prev => [...prev, created]);
     toast({ title: "✓ Ejercicio duplicado" });
   }
@@ -137,57 +235,42 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     setStations(prev => prev.filter(s => s.id !== id));
   }
 
-  function onMoveInGroup(group, idx, direction) {
-    const grouped = stations.filter(s => (s.strength_group || "restaura") === group);
-    const nextIndex = idx + direction;
-    if (nextIndex < 0 || nextIndex >= grouped.length) return;
-    [grouped[idx], grouped[nextIndex]] = [grouped[nextIndex], grouped[idx]];
-    const updated = stations.filter(s => (s.strength_group || "restaura") !== group).concat(grouped);
-    persistOrder(updated);
+  async function persistBlockRows(blockId, list) {
+    const block = blocks.find(item => item.id === blockId);
+    const updated = list.map((row, index) => ({ ...row, work_block_id: blockId, strength_group: block?.name || row.strength_group || "", order: index + 1, station_number: index + 1 }));
+    setStations(prev => prev.filter(row => row.work_block_id !== blockId).concat(updated));
+    await Promise.all(updated.map(row => base44.entities.StrengthStation.update(row.id, { work_block_id: row.work_block_id, strength_group: row.strength_group, order: row.order, station_number: row.station_number })));
   }
 
-  function onDragEnd(result) {
+  function onMoveInBlock(blockId, index, direction) {
+    const list = [...(stationsByBlock[blockId] || [])];
+    const target = index + direction;
+    if (target < 0 || target >= list.length) return;
+    [list[index], list[target]] = [list[target], list[index]];
+    persistBlockRows(blockId, list);
+  }
+
+  async function onDragEnd(result) {
     if (!result.destination) return;
-    const sourceGroup = result.source.droppableId;
-    const destGroup = result.destination.droppableId;
-    const sourceItems = stations.filter(s => (s.strength_group || "restaura") === sourceGroup);
-    const destItems = sourceGroup === destGroup ? sourceItems : stations.filter(s => (s.strength_group || "restaura") === destGroup);
-    const [moved] = sourceItems.splice(result.source.index, 1);
-    const movedWithGroup = { ...moved, strength_group: destGroup };
-    if (sourceGroup === destGroup) {
-      sourceItems.splice(result.destination.index, 0, movedWithGroup);
-    } else {
-      destItems.splice(result.destination.index, 0, movedWithGroup);
-    }
-    const others = stations.filter(s => ![sourceGroup, destGroup].includes(s.strength_group || "restaura"));
-    persistOrder([...others, ...sourceItems, ...(sourceGroup === destGroup ? [] : destItems)]);
+    const sourceBlockId = result.source.droppableId;
+    const destBlockId = result.destination.droppableId;
+    const source = [...(stationsByBlock[sourceBlockId] || [])];
+    const dest = sourceBlockId === destBlockId ? source : [...(stationsByBlock[destBlockId] || [])];
+    const [moved] = source.splice(result.source.index, 1);
+    dest.splice(result.destination.index, 0, { ...moved, work_block_id: destBlockId, strength_group: blocks.find(b => b.id === destBlockId)?.name || moved.strength_group });
+    await persistBlockRows(sourceBlockId, source);
+    if (sourceBlockId !== destBlockId) await persistBlockRows(destBlockId, dest);
   }
 
   async function suggestRow() {
+    const targetBlock = visibleBlocks.find(block => !block.hidden) || visibleBlocks[0] || await createBlock({ name: "Potencia", color: "#38bdf8", icon: "zap" });
     setSuggesting(true);
     try {
       const result = await base44.integrations.Core.InvokeLLM({
-        prompt: `Sos un preparador físico de fútbol profesional. Sugerí UN ejercicio de fuerza para una sesión con estos datos:
-- MD (microciclo): ${session.match_day_code || "no especificado"}
-- Propósito mecánico: ${session.strength_purpose || "no especificado"}
-- Patrón vectorial: ${session.strength_vector_pattern || "no especificado"}
-- Tipo de sesión de fuerza: ${session.strength_session_type || "no especificado"}
-
-Elegí el método más adecuado de esta lista exacta: ${METHOD_OPTIONS.join(", ")}.
-Elegí el tipo más adecuado de esta lista exacta: ${TYPE_OPTIONS.join(", ")}.
-Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen en formato libre (ej: 3x8, 3+3, 12+12).`,
-        response_json_schema: {
-          type: "object",
-          properties: {
-            method: { type: "string", enum: METHOD_OPTIONS },
-            exercise_type: { type: "string", enum: TYPE_OPTIONS },
-            exercise_name: { type: "string" },
-            volume: { type: "string" },
-          },
-          required: ["method", "exercise_type", "exercise_name", "volume"],
-        },
+        prompt: `Sos un preparador físico de fútbol profesional. Sugerí UN ejercicio de fuerza para el cuadro "${targetBlock.name}". MD: ${session.match_day_code || "no especificado"}. Propósito: ${session.strength_purpose || "no especificado"}. Método posible: ${METHOD_OPTIONS.join(", ")}. Tipo posible: ${TYPE_OPTIONS.join(", ")}.`,
+        response_json_schema: { type: "object", properties: { method: { type: "string" }, exercise_type: { type: "string" }, exercise_name: { type: "string" }, volume: { type: "string" } }, required: ["exercise_name"] },
       });
-      await addRow(result);
+      await addRow(targetBlock.id, result);
       toast({ title: "✓ Ejercicio sugerido por IA" });
     } finally {
       setSuggesting(false);
@@ -201,57 +284,31 @@ Proponé un ejercicio concreto y realista de fuerza para fútbol, y un volumen e
 
       <StrengthHeader session={session} onSessionUpdate={onSessionUpdate} />
 
-      <div className="flex items-center gap-2 flex-wrap">
-        <button onClick={() => addRow({ strength_group: "restaura" })} className="flex items-center gap-1.5 px-3 py-2 bg-red-500/15 border border-red-500/30 text-red-300 font-semibold rounded-lg text-xs hover:bg-red-500/25 transition-colors">
-          <Plus size={13} /> Nuevo en Restaura
-        </button>
-        <button onClick={() => addRow({ strength_group: "compensa" })} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 font-semibold rounded-lg text-xs hover:bg-emerald-500/25 transition-colors">
-          <Plus size={13} /> Nuevo en Compensa
-        </button>
-        <button onClick={suggestRow} disabled={suggesting}
-          className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-lg text-xs hover:bg-purple-500/25 transition-colors disabled:opacity-50">
-          <Sparkles size={13} /> {suggesting ? "Pensando..." : "Sugerir ejercicio"}
-        </button>
-        <button onClick={() => setShowImageImport(true)}
-          className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs hover:bg-emerald-500/25 transition-colors">
-          <ImagePlus size={13} /> Importar fuerza desde imagen
-        </button>
-        <StrengthPDFExport session={session} stations={stations} />
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <div>
+          <h3 className="text-white font-semibold text-sm">Constructor de fuerza</h3>
+          <p className="text-xs text-zinc-500">Creá cuadros libres, asigná ejercicios de biblioteca y ordená la estructura.</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button onClick={() => createBlock()} className="flex items-center gap-1.5 px-3 py-2 bg-white text-zinc-950 font-semibold rounded-lg text-xs hover:bg-zinc-200 transition-colors"><Plus size={13} /> Nuevo cuadro</button>
+          <button onClick={suggestRow} disabled={suggesting} className="flex items-center gap-1.5 px-3 py-2 bg-purple-500/15 border border-purple-500/30 text-purple-300 rounded-lg text-xs hover:bg-purple-500/25 transition-colors disabled:opacity-50"><Sparkles size={13} /> {suggesting ? "Pensando..." : "Sugerir ejercicio"}</button>
+          <button onClick={() => setShowImageImport(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 rounded-lg text-xs hover:bg-emerald-500/25 transition-colors"><ImagePlus size={13} /> Importar desde imagen</button>
+          <StrengthPDFExport session={session} blocks={visibleBlocks} stations={stations} />
+        </div>
       </div>
 
-      {showImageImport && (
-        <StrengthImageImportModal
-          session={session}
-          hasExisting={stations.length > 0}
-          onClose={() => setShowImageImport(false)}
-          onImported={(updatedSession) => {
-            setShowImageImport(false);
-            if (onSessionUpdate) onSessionUpdate(updatedSession);
-            base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 200)
-              .then(rows => setStations(rows.sort((a, b) => (a.order || 0) - (b.order || 0))));
-          }}
-        />
-      )}
+      <div className="flex gap-1.5 flex-wrap">
+        {BLOCK_TEMPLATES.map(template => <button key={template.name} onClick={() => createBlock({ ...template, template_key: uidName(template.name) })} className="px-2.5 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 text-[10px] hover:border-zinc-500 transition-colors">{template.name}</button>)}
+      </div>
 
-      {stations.length === 0 && (
-        <p className="text-zinc-600 text-sm text-center py-6">Sin ejercicios cargados</p>
-      )}
+      {showImageImport && <StrengthImageImportModal session={session} hasExisting={stations.length > 0 || blocks.length > 0} onClose={() => setShowImageImport(false)} onImported={(updatedSession) => { setShowImageImport(false); if (onSessionUpdate) onSessionUpdate(updatedSession); loadData(); }} />}
 
-      {stations.length > 0 && (
-        <DragDropContext onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-            {(["restaura", "compensa"]).map(group => (
-              <StrengthGroupTable
-                key={group}
-                group={group}
-                stations={stations.filter(s => (s.strength_group || "restaura") === group).sort((a, b) => (a.order || 0) - (b.order || 0))}
-                squadId={session?.squad_id}
-                handlers={{ onChange, onBlurField, onPickLibrary, onDuplicate, onDelete, onMoveInGroup }}
-              />
-            ))}
-          </div>
-        </DragDropContext>
-      )}
+      {!blocks.length && <div className="border border-dashed border-zinc-700 rounded-2xl p-8 text-center"><p className="text-zinc-500 text-sm">Todavía no hay cuadros de trabajo.</p><button onClick={() => createBlock({ name: "Restaura" })} className="mt-3 px-4 py-2 rounded-lg bg-white text-zinc-950 text-xs font-bold">Crear primer cuadro</button></div>}
+
+      {!!blocks.length && <DragDropContext onDragEnd={onDragEnd}><div className="grid grid-cols-1 xl:grid-cols-2 gap-4">{visibleBlocks.map((block, index) => {
+        const blockStations = stationsByBlock[block.id] || [];
+        return <StrengthGroupTable key={block.id} block={block} index={index} totalBlocks={visibleBlocks.length} stations={blockStations} summary={summarize(blockStations)} icons={STRENGTH_BLOCK_ICONS} squadId={session?.squad_id} handlers={{ addRow, updateBlock, moveBlock, duplicateBlock, deleteBlock, onChange, onBlurField, onPickLibrary, onDuplicate, onDelete, onMoveInBlock }} />;
+      })}</div></DragDropContext>}
     </div>
   );
 }

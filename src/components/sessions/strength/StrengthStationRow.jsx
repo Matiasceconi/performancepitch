@@ -79,10 +79,7 @@ export default function StrengthStationRow({ station, index, squadId, onChange, 
                   placeholder="URL YouTube/video..."
                   className="w-44 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-[10px] text-zinc-400 focus:outline-none focus:border-zinc-500" />
                 {(station.library_strength_exercise_id || station.library_exercise_id) && (
-                  <label className="flex items-center gap-1 text-[9px] text-emerald-300">
-                    <input type="checkbox" checked={!!station.sync_library_edits} onChange={e => onChange(station.id, "sync_library_edits", e.target.checked)} />
-                    Actualizar también en biblioteca
-                  </label>
+                  <p className="text-[9px] text-emerald-300">Vinculado a biblioteca</p>
                 )}
               </div>
             </div>
