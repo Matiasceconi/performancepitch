@@ -32,7 +32,7 @@ export function fmt(value, unit = "") {
   return `${shown} ${unit}`.trim();
 }
 
-function aggregate(rows, key, mode = "avg") {
+export function aggregateMetric(rows, key, mode = "avg") {
   const values = rows.map((r) => Number(r[key])).filter((v) => Number.isFinite(v));
   if (!values.length) return null;
   if (mode === "sum") return values.reduce((a, b) => a + b, 0);
@@ -93,6 +93,11 @@ export function applyMicrocycleFilters(rows, filters = {}) {
     if (filters.playerType && row.player_type !== filters.playerType) return false;
     if (filters.status && row.row_status !== filters.status) return false;
     if (filters.md && row.md !== filters.md) return false;
+    if (filters.objective && row.objective !== filters.objective) return false;
+    if (filters.sessionType && row.session_type !== filters.sessionType) return false;
+    if (filters.squadId && row.squad_id !== filters.squadId) return false;
+    if (filters.rival && !String(row.rival || "").toLowerCase().includes(String(filters.rival).toLowerCase())) return false;
+    if (filters.season && row.season_id !== filters.season) return false;
     if (filters.sessionId && row.session_id !== filters.sessionId) return false;
     if (filters.date && row.session_date !== filters.date) return false;
     if (filters.dateFrom && row.session_date < filters.dateFrom) return false;
@@ -115,10 +120,26 @@ export function splitRows(rows, playerMap, filters = {}) {
 
 export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, metrics = MICRO_METRICS }) {
   return applyMicrocycleDayFilters(getCycleDays(cycleDays), filters).map((day) => {
-    const daySessions = sessions.filter((s) => s.date === day.date && (!filters.sessionId || s.id === filters.sessionId));
-    const rawRows = daySessions.flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md: day.md || "—" })));
+    const daySessions = sessions.filter((s) => {
+      if (s.date !== day.date) return false;
+      if (filters.sessionId && s.id !== filters.sessionId) return false;
+      if (filters.sessionType && s.session_type !== filters.sessionType) return false;
+      if (filters.squadId && s.squad_id !== filters.squadId) return false;
+      if (filters.season && s.season_id !== filters.season) return false;
+      const objective = s.session_objective || day.physical_objective || day.objetivo_fisico || day.objetivo || "—";
+      const rival = s.rival || day.rival || "";
+      if (filters.objective && objective !== filters.objective) return false;
+      if (filters.rival && !String(rival).toLowerCase().includes(String(filters.rival).toLowerCase())) return false;
+      return true;
+    });
+    const rawRows = daySessions.flatMap((s) => {
+      const objective = s.session_objective || day.physical_objective || day.objetivo_fisico || day.objetivo || "—";
+      const md = s.match_day_code || s.microcycle_day || day.md || "—";
+      const rival = s.rival || day.rival || "";
+      return (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md, objective, rival, session_type: s.session_type || "", squad_id: s.squad_id || "", squad_name: s.squad_name || "", season_id: s.season_id || "" }));
+    });
     const { main, excluded } = splitRows(rawRows, playerMap, filters);
-    const metricValues = Object.fromEntries(metrics.map((m) => [m.key, aggregate(main, m.key, m.mode)]));
+    const metricValues = Object.fromEntries(metrics.map((m) => [m.key, aggregateMetric(main, m.key, m.mode)]));
     return { date: day.date, label: day.date ? moment(day.date).format("ddd DD/MM") : "—", md: day.md || "—", objetivo: day.objetivo || "—", observations: day.observaciones || "", sessions: daySessions, mainRows: main, excludedRows: excluded, gpsPlayers: new Set(main.map((r) => r.player_id)).size, excludedCount: new Set(excluded.map((r) => r.player_id)).size, ...metricValues };
   });
 }
@@ -127,8 +148,14 @@ export function rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap, fil
   const days = applyMicrocycleDayFilters(getCycleDays(cycleDays), filters);
   const dayByDate = Object.fromEntries(days.map((d) => [d.date, d]));
   const rows = sessions
-    .filter((s) => dayByDate[s.date] && (!filters.sessionId || s.id === filters.sessionId))
-    .flatMap((s) => (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md: dayByDate[s.date]?.md || "—" })));
+    .filter((s) => dayByDate[s.date] && (!filters.sessionId || s.id === filters.sessionId) && (!filters.sessionType || s.session_type === filters.sessionType) && (!filters.squadId || s.squad_id === filters.squadId) && (!filters.season || s.season_id === filters.season))
+    .flatMap((s) => {
+      const day = dayByDate[s.date] || {};
+      const objective = s.session_objective || day.physical_objective || day.objetivo_fisico || day.objetivo || "—";
+      const md = s.match_day_code || s.microcycle_day || day.md || "—";
+      const rival = s.rival || day.rival || "";
+      return (gpsBySession[s.id] || []).map((r) => ({ ...r, session_id: s.id, session_date: s.date, session_title: s.title, md, objective, rival, session_type: s.session_type || "", squad_id: s.squad_id || "", squad_name: s.squad_name || "", season_id: s.season_id || "" }));
+    });
   const split = splitRows(rows, playerMap, filters);
   return includeExcluded ? [...split.main, ...split.excluded] : split.main;
 }
@@ -156,8 +183,8 @@ export function buildComparison({ sessions, gpsBySession, cycleDays, playerMap, 
   const previousDays = days.map((d) => ({ ...d, date: moment(d.date).subtract(7, "days").format("YYYY-MM-DD") }));
   const previousRows = rowsForCycle({ sessions, gpsBySession, cycleDays: previousDays, playerMap, filters: { ...filters, sessionId: "", date: "", dateFrom: "", dateTo: "", selectedDates: [] } });
   return metrics.map((metric) => {
-    const current = aggregate(currentRows, metric.key, metric.mode);
-    const previous = aggregate(previousRows, metric.key, metric.mode);
+    const current = aggregateMetric(currentRows, metric.key, metric.mode);
+    const previous = aggregateMetric(previousRows, metric.key, metric.mode);
     const diffAbs = current != null && previous != null ? current - previous : null;
     const diff = current != null && previous ? ((current - previous) / previous) * 100 : null;
     const trend = diff == null ? "Sin comparación" : diff > 8 ? "Sube" : diff < -8 ? "Baja" : "Estable";
@@ -173,4 +200,77 @@ export function loadColorClass(value, average) {
   if (pct >= 1.05) return "bg-yellow-500/15 text-yellow-300 border-yellow-500/30";
   if (pct < 0.75) return "bg-blue-500/15 text-blue-300 border-blue-500/30";
   return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+}
+
+function findPlanDay(session, weeklyPlans = []) {
+  const plan = weeklyPlans.find((p) => (!session.squad_id || !p.squad_id || p.squad_id === session.squad_id) && (!session.season_id || !p.season_id || p.season_id === session.season_id) && (p.days_data || []).some((d) => d.date === session.date));
+  const day = (plan?.days_data || []).find((d) => d.date === session.date) || {};
+  const meta = plan?.microcycle_meta || {};
+  return { plan, day, meta };
+}
+
+export function sessionMeta(session, weeklyPlans = []) {
+  const { day, meta } = findPlanDay(session, weeklyPlans);
+  return {
+    md: session.match_day_code || session.microcycle_day || day.md || "—",
+    objective: session.session_objective || day.physical_objective || day.objetivo_fisico || day.objetivo || "—",
+    rival: session.rival || day.rival || meta.rival || meta.proximo_rival || meta.proximo_partido || "",
+    season_id: session.season_id || "",
+    squad_id: session.squad_id || "",
+    squad_name: session.squad_name || "",
+    session_type: session.session_type || "",
+  };
+}
+
+export function buildSessionAverages({ sessions, gpsBySession, playerMap, weeklyPlans = [], filters = {}, metrics = MICRO_METRICS }) {
+  return sessions.map((session) => {
+    const meta = sessionMeta(session, weeklyPlans);
+    const rawRows = (gpsBySession[session.id] || []).map((r) => ({ ...r, session_id: session.id, session_date: session.date, session_title: session.title, md: meta.md, objective: meta.objective, rival: meta.rival, season_id: meta.season_id, squad_id: meta.squad_id, squad_name: meta.squad_name, session_type: meta.session_type }));
+    const { main } = splitRows(rawRows, playerMap, filters);
+    const values = Object.fromEntries(metrics.map((m) => [m.key, aggregateMetric(main, m.key, m.mode)]));
+    return { id: session.id, session, title: session.title || "Sesión", date: session.date, ...meta, rowCount: main.length, ...values };
+  }).filter((s) => s.date && s.rowCount > 0).filter((s) => {
+    if (filters.objective && s.objective !== filters.objective) return false;
+    if (filters.sessionType && s.session_type !== filters.sessionType) return false;
+    if (filters.squadId && s.squad_id !== filters.squadId) return false;
+    if (filters.rival && !String(s.rival || "").toLowerCase().includes(String(filters.rival).toLowerCase())) return false;
+    if (filters.season && s.season_id !== filters.season) return false;
+    if (filters.md && s.md !== filters.md) return false;
+    if (filters.date && s.date !== filters.date) return false;
+    if (filters.dateFrom && s.date < filters.dateFrom) return false;
+    if (filters.dateTo && s.date > filters.dateTo) return false;
+    return true;
+  }).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+}
+
+export function compareGroups(groupA, groupB, metrics = MICRO_METRICS) {
+  return metrics.map((metric) => {
+    const a = aggregateMetric(groupA, metric.key, metric.mode);
+    const b = aggregateMetric(groupB, metric.key, metric.mode);
+    const diffAbs = b != null && a != null ? b - a : null;
+    const diff = diffAbs != null && a ? (diffAbs / a) * 100 : null;
+    const abs = Math.abs(diff || 0);
+    const light = diff == null ? "Sin datos" : abs <= 5 ? "Verde" : abs <= 12 ? "Amarillo" : "Rojo";
+    return { metric, a, b, diffAbs, diff, light };
+  });
+}
+
+export function buildObjectiveBlocks(sessionAverages, objective, season) {
+  const objectiveSessions = sessionAverages.filter((s) => s.objective === objective).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const current = objectiveSessions.slice(0, 1);
+  const previous = objectiveSessions.slice(1);
+  return {
+    current,
+    last4: previous.slice(0, 4),
+    last8: previous.slice(0, 8),
+    historical: previous,
+    season: objectiveSessions.filter((s) => !season || s.season_id === season),
+  };
+}
+
+export function buildMdBlocks(sessionAverages, md, season) {
+  const mdSessions = sessionAverages.filter((s) => s.md === md).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+  const current = mdSessions.slice(0, 1);
+  const previous = mdSessions.slice(1);
+  return { current, last4: previous.slice(0, 4), last8: previous.slice(0, 8), historical: previous, season: mdSessions.filter((s) => !season || s.season_id === season) };
 }

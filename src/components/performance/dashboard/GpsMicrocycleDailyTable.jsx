@@ -29,7 +29,7 @@ export default function GpsMicrocycleDailyTable({ dailySummaries, metrics = MICR
             <tr key={day.date} className="border-b border-zinc-800/70 align-top">
               <td className="py-3 pr-3 text-white font-semibold">{day.label}</td>
               <td className="py-3 pr-3 text-zinc-300">{day.md}</td>
-              <td className="py-3 pr-3 text-zinc-400 max-w-[180px]">{day.sessions.map((s) => s.title).join(" · ") || "Sin sesión"}</td>
+              <td className="py-3 pr-3 text-zinc-400 max-w-[180px]">{(day.sessions || []).map((s) => s.title).join(" · ") || "Sin sesión"}</td>
               {metrics.map((m) => (
                 <td key={m.key} className="py-3 pr-3">
                   <span className={`inline-flex px-2 py-1 rounded-lg border text-xs font-semibold ${loadColorClass(day[m.key], averages[m.key])}`}>{fmt(day[m.key], m.unit)}</span>
@@ -39,8 +39,8 @@ export default function GpsMicrocycleDailyTable({ dailySummaries, metrics = MICR
               <td className="py-3 pr-3 text-zinc-400">
                 {day.excludedCount ? (
                   <div className="space-y-1">
-                    {day.excludedRows.slice(0, 4).map((r) => <p key={`${day.date}-${r.player_id}-${r.session_id}`} className="text-xs">{r.player_name} · {r.gps_group || r.exclusion_reason || "excluido"}</p>)}
-                    {day.excludedRows.length > 4 && <p className="text-xs text-zinc-500">+{day.excludedRows.length - 4} más</p>}
+                    {(day.excludedRows || []).slice(0, 4).map((r) => <p key={`${day.date}-${r.player_id}-${r.session_id}`} className="text-xs">{r.player_name} · {r.gps_group || r.exclusion_reason || "excluido"}</p>)}
+                    {(day.excludedRows || []).length > 4 && <p className="text-xs text-zinc-500">+{(day.excludedRows || []).length - 4} más</p>}
                   </div>
                 ) : "—"}
               </td>
