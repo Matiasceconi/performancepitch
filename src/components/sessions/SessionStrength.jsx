@@ -244,9 +244,16 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     const block = blocks.find(item => item.id === blockId);
     const updated = list.map((row, index) => ({ ...row, work_block_id: blockId, strength_group: block?.name || row.strength_group || "", order: index + 1, station_number: index + 1 }));
     setStations(prev => prev.filter(row => row.work_block_id !== blockId).concat(updated));
+    const missingIds = [];
     for (const row of updated) {
-      await base44.entities.StrengthStation.update(row.id, { work_block_id: row.work_block_id, strength_group: row.strength_group, order: row.order, station_number: row.station_number });
+      try {
+        await base44.entities.StrengthStation.update(row.id, { work_block_id: row.work_block_id, strength_group: row.strength_group, order: row.order, station_number: row.station_number });
+      } catch (error) {
+        if (String(error?.message || error).includes("not found")) missingIds.push(row.id);
+        else throw error;
+      }
     }
+    if (missingIds.length) setStations(prev => prev.filter(row => !missingIds.includes(row.id)));
   }
 
   function onMoveInBlock(blockId, index, direction) {
