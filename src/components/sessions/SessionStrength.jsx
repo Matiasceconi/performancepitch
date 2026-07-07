@@ -35,12 +35,29 @@ function parseLeadingNumber(value) {
   return match ? Number(match[0].replace(",", ".")) : 0;
 }
 
+function parseNumbers(value) {
+  return String(value || "").match(/\d+(?:[.,]\d+)?/g)?.map(item => Number(item.replace(",", "."))) || [];
+}
+
+function totalReps(row) {
+  const sets = parseLeadingNumber(row.sets);
+  const reps = parseLeadingNumber(row.reps);
+  if (sets && reps) return sets * reps;
+  const volumeNumbers = parseNumbers(row.volume);
+  if (/x/i.test(String(row.volume || "")) && volumeNumbers.length >= 2) return volumeNumbers[0] * volumeNumbers[1];
+  if (String(row.volume || "").includes("+") && volumeNumbers.length) return volumeNumbers.reduce((sum, value) => sum + value, 0);
+  return reps || parseLeadingNumber(row.volume);
+}
+
+function totalSets(row) {
+  return parseLeadingNumber(row.sets) || (/x/i.test(String(row.volume || "")) ? parseLeadingNumber(row.volume) : 0);
+}
+
 function summarize(stations) {
   return {
     exercises: stations.length,
-    minutes: stations.reduce((sum, row) => sum + parseLeadingNumber(row.time), 0),
-    volume: stations.reduce((sum, row) => sum + parseLeadingNumber(row.volume), 0),
-    sets: stations.reduce((sum, row) => sum + parseLeadingNumber(row.sets || row.volume), 0),
+    volume: stations.reduce((sum, row) => sum + totalReps(row), 0),
+    sets: stations.reduce((sum, row) => sum + totalSets(row), 0),
   };
 }
 
@@ -92,6 +109,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       session_id: session.id,
       name: initial.name || `Cuadro ${blocks.length + 1}`,
       description: initial.description || "",
+      estimated_time: initial.estimated_time || "",
       color: initial.color || template.color,
       icon: initial.icon || template.icon,
       order: blocks.length + 1,
@@ -123,7 +141,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   }
 
   async function duplicateBlock(block) {
-    const created = await createBlock({ name: `${block.name} copia`, description: block.description, color: block.color, icon: block.icon });
+    const created = await createBlock({ name: `${block.name} copia`, description: block.description, estimated_time: block.estimated_time, color: block.color, icon: block.icon });
     const sourceRows = stationsByBlock[block.id] || [];
     const createdRows = [];
     for (let index = 0; index < sourceRows.length; index += 1) {

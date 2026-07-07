@@ -1,8 +1,48 @@
 import React, { useMemo, useState } from "react";
 import { FileText, Loader, X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { CLUB_BRAND } from "@/lib/clubBrand";
 import moment from "moment";
 import jsPDF from "jspdf";
+
+function hexToRgb(hex, fallback = [0, 0, 0]) {
+  const clean = String(hex || "").replace("#", "");
+  if (clean.length !== 6) return fallback;
+  return [parseInt(clean.slice(0, 2), 16), parseInt(clean.slice(2, 4), 16), parseInt(clean.slice(4, 6), 16)];
+}
+
+function parseLeadingNumber(value) {
+  const match = String(value || "").match(/\d+(?:[.,]\d+)?/);
+  return match ? Number(match[0].replace(",", ".")) : 0;
+}
+
+function parseNumbers(value) {
+  return String(value || "").match(/\d+(?:[.,]\d+)?/g)?.map(item => Number(item.replace(",", "."))) || [];
+}
+
+function totalReps(row) {
+  const sets = parseLeadingNumber(row.sets);
+  const reps = parseLeadingNumber(row.reps);
+  if (sets && reps) return sets * reps;
+  const volumeNumbers = parseNumbers(row.volume);
+  if (/x/i.test(String(row.volume || "")) && volumeNumbers.length >= 2) return volumeNumbers[0] * volumeNumbers[1];
+  if (String(row.volume || "").includes("+") && volumeNumbers.length) return volumeNumbers.reduce((sum, value) => sum + value, 0);
+  return reps || parseLeadingNumber(row.volume);
+}
+
+function totalSets(row) {
+  return parseLeadingNumber(row.sets) || (/x/i.test(String(row.volume || "")) ? parseLeadingNumber(row.volume) : 0);
+}
+
+async function loadImageDataUrl(url) {
+  const response = await fetch(url);
+  const blob = await response.blob();
+  return await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result);
+    reader.readAsDataURL(blob);
+  });
+}
 
 export default function StrengthPDFExport({ session, stations, blocks = [] }) {
   const [generating, setGenerating] = useState(false);
@@ -30,101 +70,188 @@ export default function StrengthPDFExport({ session, stations, blocks = [] }) {
       const doc = new jsPDF({ unit: "mm", format: "a4" });
       const pageW = 210;
       const pageH = 297;
-      const margin = 14;
+      const margin = 12;
       const contentW = pageW - margin * 2;
       let y = margin;
-      const DARK = [20, 20, 20];
-      const GRAY = [100, 100, 100];
-      const YELLOW = [240, 200, 0];
-      const WHITE = [255, 255, 255];
+      let logo = null;
+      try { logo = await loadImageDataUrl(CLUB_BRAND.logoUrl); } catch { logo = null; }
 
-      function addPageIfNeeded(needed = 10) {
-        if (y + needed > pageH - 12) { doc.addPage(); y = margin; drawDocHeader(false); }
-      }
+      const green = hexToRgb(CLUB_BRAND.colors.green, [0, 132, 61]);
+      const greenDark = hexToRgb(CLUB_BRAND.colors.greenDark, [0, 90, 52]);
+      const greenDeep = hexToRgb(CLUB_BRAND.colors.greenDeep, [0, 61, 37]);
+      const yellow = hexToRgb(CLUB_BRAND.colors.yellow, [255, 212, 0]);
+      const panel = hexToRgb(CLUB_BRAND.colors.panel, [246, 247, 243]);
+      const line = hexToRgb(CLUB_BRAND.colors.line, [216, 222, 210]);
+      const ink = hexToRgb(CLUB_BRAND.colors.ink, [17, 24, 39]);
+      const muted = hexToRgb(CLUB_BRAND.colors.muted, [107, 114, 128]);
 
-      function drawDocHeader(first = true) {
-        doc.setFillColor(...YELLOW);
-        doc.rect(0, 0, pageW, 6, "F");
-        doc.setFontSize(13);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...DARK);
-        doc.text("Planilla de Fuerza", margin, y + 6);
-        y += 12;
-        if (first) {
-          const infoLine = [`Sesión: ${session.title || "—"}`, `Fecha: ${moment(session.date).format("DD/MM/YYYY")}`, session.squad_name && `Plantel: ${session.squad_name}`, session.match_day_code && `MD: ${session.match_day_code}`].filter(Boolean).join("   ·   ");
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...GRAY);
-          doc.text(infoLine, margin, y + 4, { maxWidth: contentW });
-          y += 8;
+      function addPageIfNeeded(needed = 12) {
+        if (y + needed > pageH - 16) {
+          doc.addPage();
+          y = margin;
+          drawPageHeader(false);
         }
       }
 
-      function drawBlock(block) {
-        const blockRows = stations.filter(row => row.work_block_id === block.id).sort((a, b) => (a.order || 0) - (b.order || 0));
-        addPageIfNeeded(22);
-        doc.setFillColor(245, 245, 245);
-        doc.rect(margin, y, contentW, 12, "F");
+      function metricCard(x, label, value, color = greenDark) {
+        doc.setFillColor(...panel);
+        doc.setDrawColor(...line);
+        doc.roundedRect(x, y, 43, 16, 3, 3, "FD");
         doc.setFont("helvetica", "bold");
+        doc.setFontSize(5.4);
+        doc.setTextColor(...muted);
+        doc.text(doc.splitTextToSize(label.toUpperCase(), 37).slice(0, 2), x + 3, y + 4.2);
         doc.setFontSize(10);
-        doc.setTextColor(...DARK);
-        doc.text(block.name || "Cuadro", margin + 3, y + 7);
+        doc.setTextColor(...color);
+        doc.text(String(value || "—"), x + 3, y + 13);
+      }
+
+      function drawPageHeader(first = true) {
+        doc.setFillColor(...greenDeep);
+        doc.rect(0, 0, pageW, 20, "F");
+        doc.setFillColor(...yellow);
+        doc.rect(0, 20, pageW, 2.2, "F");
+        if (logo) doc.addImage(logo, "PNG", margin, 4, 14, 14);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(12);
+        doc.setTextColor(255, 255, 255);
+        doc.text("PLANILLA DE FUERZA", logo ? margin + 18 : margin, 10);
         doc.setFont("helvetica", "normal");
         doc.setFontSize(7);
-        doc.setTextColor(...GRAY);
-        doc.text(`${blockRows.length} ejercicios`, pageW - margin - 3, y + 7, { align: "right" });
-        y += 15;
-        if (block.description) {
-          doc.setFontSize(7);
-          doc.text(doc.splitTextToSize(block.description, contentW), margin, y);
-          y += 7;
-        }
-        const cols = [{ label: "N°", w: 10 }, { label: "Ejercicio", w: 50 }, { label: "Volumen", w: 22 }, { label: "Series", w: 18 }, { label: "Reps", w: 18 }, { label: "Tiempo", w: 20 }, { label: "Método/Tipo", w: 34 }, { label: "Obs.", w: contentW - 172 }];
-        doc.setFillColor(...DARK);
-        doc.rect(margin, y, contentW, 6, "F");
-        doc.setFontSize(7);
+        doc.setTextColor(225, 238, 228);
+        doc.text(CLUB_BRAND.name, logo ? margin + 18 : margin, 15);
         doc.setFont("helvetica", "bold");
-        doc.setTextColor(...WHITE);
-        let hx = margin;
-        cols.forEach(c => { doc.text(c.label, hx + 2, y + 4, { maxWidth: c.w - 3 }); hx += c.w; });
-        y += 6;
-        if (!blockRows.length) {
-          doc.setTextColor(...GRAY);
-          doc.text("Sin ejercicios cargados", margin, y + 5);
-          y += 10;
-          return;
-        }
-        blockRows.forEach((row, idx) => {
-          const values = [String(idx + 1), row.exercise_name || "—", row.volume || "—", row.sets || "—", row.reps || "—", row.time || "—", [row.method, row.exercise_type].filter(Boolean).join(" / ") || "—", row.notes || "—"];
-          const lineSets = values.map((value, i) => doc.splitTextToSize(value, cols[i].w - 3));
-          const rowH = Math.max(6, Math.max(...lineSets.map(lines => lines.length)) * 4 + 2);
-          addPageIfNeeded(rowH + 2);
-          if (idx % 2 === 0) { doc.setFillColor(248, 248, 248); doc.rect(margin, y, contentW, rowH, "F"); }
-          doc.setFontSize(7);
+        doc.setTextColor(...yellow);
+        doc.text(moment(session.date).isValid() ? moment(session.date).format("DD/MM/YYYY") : "Fecha sin definir", pageW - margin, 10, { align: "right" });
+        y = 28;
+
+        if (first) {
+          doc.setFillColor(255, 255, 255);
+          doc.setDrawColor(...line);
+          doc.roundedRect(margin, y, contentW, 24, 4, 4, "FD");
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(13);
+          doc.setTextColor(...ink);
+          doc.text(session.title || "Sesión de fuerza", margin + 4, y + 8, { maxWidth: contentW - 8 });
           doc.setFont("helvetica", "normal");
-          doc.setTextColor(...DARK);
-          let rx = margin;
-          lineSets.forEach((lines, i) => { doc.text(lines, rx + 2, y + 4, { maxWidth: cols[i].w - 3 }); rx += cols[i].w; });
-          y += rowH;
-        });
-        y += 6;
+          doc.setFontSize(7.5);
+          doc.setTextColor(...muted);
+          const info = [session.squad_name && `Plantel: ${session.squad_name}`, session.match_day_code && `MD: ${session.match_day_code}`, session.strength_purpose && `Propósito: ${session.strength_purpose}`, session.strength_session_type && `Tipo: ${session.strength_session_type}`].filter(Boolean).join("  ·  ");
+          doc.text(info || "Información de sesión", margin + 4, y + 16, { maxWidth: contentW - 8 });
+          y += 31;
+        }
       }
 
-      drawDocHeader(true);
+      function drawBlock(block, blockIndex) {
+        const blockRows = stations.filter(row => row.work_block_id === block.id).sort((a, b) => (a.order || 0) - (b.order || 0));
+        const repsTotal = blockRows.reduce((sum, row) => sum + totalReps(row), 0);
+        const setsTotal = blockRows.reduce((sum, row) => sum + totalSets(row), 0);
+        const blockColor = hexToRgb(block.color, green);
+        addPageIfNeeded(44);
+
+        doc.setFillColor(...blockColor);
+        doc.roundedRect(margin, y, contentW, 13, 3, 3, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10);
+        doc.setTextColor(255, 255, 255);
+        doc.text(`${String(blockIndex + 1).padStart(2, "0")} · ${block.name || "Cuadro de trabajo"}`, margin + 4, y + 8.5, { maxWidth: contentW - 8 });
+        y += 17;
+
+        metricCard(margin, "Ejercicios", blockRows.length, greenDark);
+        metricCard(margin + 47, "Tiempo estimado", block.estimated_time || "—", greenDark);
+        metricCard(margin + 94, "Cantidad de repeticiones totales", repsTotal || "—", greenDark);
+        metricCard(margin + 141, "Cantidad de series totales", setsTotal || "—", greenDark);
+        y += 19;
+
+        if (block.description) {
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.setTextColor(...muted);
+          const description = doc.splitTextToSize(block.description, contentW);
+          doc.text(description, margin, y);
+          y += Math.max(6, description.length * 4) + 2;
+        }
+
+        const cols = [
+          { label: "N°", w: 9 },
+          { label: "Ejercicio", w: 43 },
+          { label: "Volumen", w: 20 },
+          { label: "Series", w: 16 },
+          { label: "Reps", w: 16 },
+          { label: "Tiempo", w: 18 },
+          { label: "Método / Tipo", w: 34 },
+          { label: "Objetivo / Obs.", w: contentW - 156 },
+        ];
+        doc.setFillColor(...greenDeep);
+        doc.roundedRect(margin, y, contentW, 7, 2, 2, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(6.5);
+        doc.setTextColor(255, 255, 255);
+        let x = margin;
+        cols.forEach(col => { doc.text(col.label, x + 1.5, y + 4.6, { maxWidth: col.w - 2 }); x += col.w; });
+        y += 7;
+
+        if (!blockRows.length) {
+          doc.setFillColor(...panel);
+          doc.roundedRect(margin, y, contentW, 10, 2, 2, "F");
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(7.5);
+          doc.setTextColor(...muted);
+          doc.text("Sin ejercicios cargados", margin + 3, y + 6);
+          y += 14;
+          return;
+        }
+
+        blockRows.forEach((row, idx) => {
+          const values = [
+            String(idx + 1),
+            row.exercise_name || "—",
+            row.volume || "—",
+            row.sets || "—",
+            row.reps || "—",
+            row.time || "—",
+            [row.method, row.exercise_type].filter(Boolean).join(" / ") || "—",
+            [row.objective, row.notes].filter(Boolean).join(" · ") || "—",
+          ];
+          const lineSets = values.map((value, i) => doc.splitTextToSize(String(value), cols[i].w - 2));
+          const rowH = Math.max(8, Math.max(...lineSets.map(lines => lines.length)) * 3.6 + 3);
+          addPageIfNeeded(rowH + 3);
+          doc.setFillColor(idx % 2 === 0 ? 252 : 246, idx % 2 === 0 ? 252 : 247, idx % 2 === 0 ? 250 : 243);
+          doc.rect(margin, y, contentW, rowH, "F");
+          doc.setDrawColor(...line);
+          doc.line(margin, y + rowH, margin + contentW, y + rowH);
+          doc.setFont("helvetica", idx === 0 ? "bold" : "normal");
+          doc.setFontSize(6.8);
+          doc.setTextColor(...ink);
+          let rx = margin;
+          lineSets.forEach((lines, i) => { doc.text(lines, rx + 1.5, y + 4.7, { maxWidth: cols[i].w - 2 }); rx += cols[i].w; });
+          y += rowH;
+        });
+        y += 8;
+      }
+
+      drawPageHeader(true);
       blocksToExport.forEach((block, idx) => {
-        if (mode === "separate" && idx > 0) { doc.addPage(); y = margin; drawDocHeader(false); }
-        drawBlock(block);
+        if (mode === "separate" && idx > 0) {
+          doc.addPage();
+          y = margin;
+          drawPageHeader(false);
+        }
+        drawBlock(block, idx);
       });
 
       const totalPages = doc.internal.getNumberOfPages();
-      for (let p = 1; p <= totalPages; p++) {
+      for (let p = 1; p <= totalPages; p += 1) {
         doc.setPage(p);
-        doc.setFillColor(...YELLOW);
-        doc.rect(0, pageH - 4, pageW, 4, "F");
-        doc.setFontSize(6);
-        doc.setTextColor(...GRAY);
-        doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 6, { align: "right" });
+        doc.setFillColor(...yellow);
+        doc.rect(0, pageH - 7, pageW, 2, "F");
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(6.5);
+        doc.setTextColor(...muted);
+        doc.text(`${CLUB_BRAND.shortName} · Área de Preparación Física`, margin, pageH - 3);
+        doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 3, { align: "right" });
       }
+
       doc.save(`fuerza_${moment(session.date).format("YYYY-MM-DD")}_${(session.title || "sesion").replace(/\s+/g, "_")}.pdf`);
       toast({ title: "✓ PDF de fuerza exportado" });
       setOpen(false);
