@@ -122,12 +122,12 @@ export default function StrengthStationRow({ station, index, squadId, onChange, 
               placeholder="Observaciones..."
               className="w-48 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-300 focus:outline-none focus:border-zinc-500" />
           </td>
-          <td className="py-1.5 px-2 align-middle">
-            <div className="flex items-center gap-0.5 justify-end">
-              <button onClick={() => onMoveUp(index)} disabled={index === 0} className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors"><ChevronUp size={12} /></button>
-              <button onClick={() => onMoveDown(index)} disabled={isLast} className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors"><ChevronDown size={12} /></button>
-              <button onClick={() => onDuplicate(station)} className="p-1 text-zinc-600 hover:text-blue-400 transition-colors"><Copy size={12} /></button>
-              <button onClick={() => onDelete(station.id)} className="p-1 text-zinc-600 hover:text-red-400 transition-colors"><Trash2 size={12} /></button>
+          <td className="py-1.5 px-2 align-middle sticky right-0 bg-zinc-900 border-l border-zinc-800">
+            <div className="flex items-center gap-1 justify-end">
+              <button onClick={() => onMoveUp(index)} disabled={index === 0} title="Subir fila" className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors"><ChevronUp size={12} /></button>
+              <button onClick={() => onMoveDown(index)} disabled={isLast} title="Bajar fila" className="p-1 text-zinc-600 hover:text-white disabled:opacity-30 transition-colors"><ChevronDown size={12} /></button>
+              <button onClick={() => onDuplicate(station)} title="Duplicar fila" className="p-1 text-zinc-600 hover:text-blue-400 transition-colors"><Copy size={12} /></button>
+              <button onClick={() => onDelete(station.id)} title="Eliminar fila" className="flex items-center gap-1 px-2 py-1 rounded-md bg-red-500/10 border border-red-500/30 text-red-300 hover:bg-red-500/20 transition-colors"><Trash2 size={12} /><span className="text-[10px] font-semibold">Eliminar</span></button>
             </div>
           </td>
         </tr>

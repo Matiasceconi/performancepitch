@@ -84,7 +84,7 @@ export default function StrengthGroupTable({ block, index, totalBlocks, stations
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Método</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tipo</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Obs.</th>
-                <th className="py-2 px-2"></th>
+                <th className="py-2 px-2 text-right text-zinc-500 font-medium sticky right-0 bg-zinc-900 border-l border-zinc-800">Acciones</th>
               </tr>
             </thead>
             <Droppable droppableId={block.id}>
