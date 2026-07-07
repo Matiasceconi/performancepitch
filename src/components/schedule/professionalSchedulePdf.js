@@ -236,83 +236,68 @@ function yFor(mins, slots, y, h) {
   return y + ((mins - start) / Math.max(60, end - start)) * h;
 }
 
-function drawScheduleGrid(doc, days, eventsForDate, imageCache, planMetaByDate = {}) {
+function drawScheduleGrid(doc, days, eventsForDate, imageCache) {
   const margin = 5;
   const top = 39;
   const gridW = 287;
-  const gridH = 109;
+  const gridH = 136;
   const gap = 2;
   const dayW = (gridW - gap * (days.length - 1)) / days.length;
-  const headerH = 25;
+  const headerH = 19;
   const bodyY = top + headerH;
   const bodyH = gridH - headerH;
 
   days.forEach((day, idx) => {
     const x = margin + idx * (dayW + gap);
     const isWeekend = [0, 6].includes(day.day());
-    const planMeta = planMetaByDate[day.format("YYYY-MM-DD")];
     const events = [...eventsForDate(day.format("YYYY-MM-DD"))].sort((a, b) => eventStart(a) - eventStart(b));
 
-    setFill(doc, events.length ? "#FFFFFF" : "#F3F7FF");
-    setStroke(doc, events.length ? "#D8E1D1" : "#BFD7FF");
-    doc.roundedRect(x, top, dayW, gridH, 3, 3, "FD");
+    setFill(doc, "#FFFFFF");
+    setStroke(doc, "#D7E2CF");
+    doc.roundedRect(x, top, dayW, gridH, 3.3, 3.3, "FD");
 
     setFill(doc, isWeekend ? BRAND.greenDark : BRAND.green);
-    doc.roundedRect(x, top, dayW, headerH, 3, 3, "F");
+    doc.roundedRect(x, top, dayW, headerH, 3.3, 3.3, "F");
     setFill(doc, BRAND.yellow);
-    doc.rect(x, top + headerH - 2.2, dayW, 2.2, "F");
+    doc.rect(x, top + headerH - 2.1, dayW, 2.1, "F");
 
     setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "bold");
     doc.setFontSize(6.2);
-    doc.text(dayName(day), x + dayW / 2, top + 5.4, { align: "center" });
+    doc.text(dayName(day), x + dayW / 2, top + 5.7, { align: "center" });
     setText(doc, BRAND.yellow);
-    doc.setFontSize(11.5);
-    doc.text(String(day.date()), x + dayW / 2, top + 12.7, { align: "center" });
+    doc.setFontSize(12.3);
+    doc.text(String(day.date()), x + dayW / 2, top + 13.2, { align: "center" });
     setText(doc, "#FFFFFF");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(4.8);
-    doc.text(shortMonth(day), x + dayW / 2, top + 17, { align: "center" });
-
-    if (planMeta?.match_day_code || planMeta?.session_objective) {
-      const md = planMeta.match_day_code || "MD";
-      const objective = planMeta.session_objective || "Objetivo físico";
-      setFill(doc, "#FFFFFF");
-      doc.roundedRect(x + 2.2, top + 19, dayW - 4.4, 4.7, 1.5, 1.5, "F");
-      setText(doc, BRAND.greenDeep);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize(4.2);
-      doc.text(`${md} · ${objective}`.toUpperCase(), x + dayW / 2, top + 22.2, { align: "center", maxWidth: dayW - 6 });
-    }
+    doc.setFontSize(4.6);
+    doc.text(shortMonth(day), x + dayW / 2, top + 17.1, { align: "center" });
 
     if (!events.length) {
-      setText(doc, "#5C7FC4");
+      setFill(doc, "#F5F7F2");
+      doc.roundedRect(x + 2.5, bodyY + 4, dayW - 5, 31, 2.2, 2.2, "F");
+      drawIcon(doc, "Descanso", x + dayW / 2, bodyY + 16, "#8D7AD9");
+      setText(doc, "#69758B");
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(14);
-      drawIcon(doc, "Descanso", x + dayW / 2, bodyY + bodyH / 2 - 8, "#6E8FE0");
-      doc.setFontSize(6.5);
-      doc.text("DÍA LIBRE", x + dayW / 2, bodyY + bodyH / 2 + 7, { align: "center" });
-      setText(doc, "#7486A8");
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(4.7);
-      doc.text("Sin actividades cargadas", x + dayW / 2, bodyY + bodyH / 2 + 12, { align: "center" });
+      doc.setFontSize(5.6);
+      doc.text("SIN ACTIVIDADES", x + dayW / 2, bodyY + 27, { align: "center" });
       return;
     }
 
-    const cardGap = 1.8;
-    const visible = events.slice(0, 6);
-    const cardH = Math.max(9.2, Math.min(14.2, (bodyH - 5 - cardGap * (visible.length - 1)) / visible.length));
+    const cardGap = 2;
+    const visible = events.slice(0, 8);
+    const cardH = Math.max(10.2, Math.min(14.8, (bodyH - 7 - cardGap * (visible.length - 1)) / visible.length));
     visible.forEach((ev, j) => {
-      const y = bodyY + 3 + j * (cardH + cardGap);
-      drawActivityCard(doc, ev, x + 2.1, y, dayW - 4.2, cardH, imageCache);
+      const y = bodyY + 3.5 + j * (cardH + cardGap);
+      drawActivityCard(doc, ev, x + 2.3, y, dayW - 4.6, cardH, imageCache);
     });
     if (events.length > visible.length) {
       setFill(doc, "#EEF2F7");
-      doc.roundedRect(x + 2.1, bodyY + bodyH - 7, dayW - 4.2, 5.2, 1.3, 1.3, "F");
+      doc.roundedRect(x + 2.3, bodyY + bodyH - 7.2, dayW - 4.6, 5.5, 1.4, 1.4, "F");
       setText(doc, BRAND.muted);
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(4.9);
-      doc.text(`+${events.length - visible.length} actividades más`, x + dayW / 2, bodyY + bodyH - 3.3, { align: "center" });
+      doc.setFontSize(4.8);
+      doc.text(`+${events.length - visible.length} más`, x + dayW / 2, bodyY + bodyH - 3.4, { align: "center" });
     }
   });
 }
@@ -377,7 +362,7 @@ function drawLegend(doc, x, y, w) {
   setFill(doc, "#FFFFFF");
   setStroke(doc, "#D8E1D1");
   doc.roundedRect(x, y, w, 10, 3, 3, "FD");
-  const keys = ["Comida", "Video", "Gimnasio", "Cancha", "Viaje", "Partido", "Descanso"];
+  const keys = ["Comida", "Gimnasio", "Cancha", "Viaje", "Partido", "Descanso"];
   const gap = w / keys.length;
   keys.forEach((key, idx) => {
     const st = TYPE_STYLES[key];
@@ -502,13 +487,12 @@ export async function buildProfessionalWeekSchedulePDF({ days, eventsForDate, we
   const allEvents = days.flatMap((d) => eventsForDate(d.format("YYYY-MM-DD")));
   const imageCache = await buildImageCache(allEvents);
 
-  setFill(doc, "#F7FAF4");
+  setFill(doc, "#F6F8F2");
   doc.rect(0, 0, doc.internal.pageSize.getWidth(), doc.internal.pageSize.getHeight(), "F");
   drawHeader(doc, days, squadName, season || "");
   await drawLogo(doc, 15, 15.5, 22);
-  drawScheduleGrid(doc, days, eventsForDate, imageCache, planMetaByDate);
-  drawLegend(doc, 5, 151.5, 235);
-  drawBottomPanels(doc, days, allEvents, imageCache);
+  drawScheduleGrid(doc, days, eventsForDate, imageCache);
+  drawLegend(doc, 22, 180, 253);
   drawFooter(doc);
 
   return doc;
