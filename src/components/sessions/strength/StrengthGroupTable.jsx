@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Droppable } from "@hello-pangea/dnd";
 import { ChevronDown, ChevronUp, Copy, Eye, EyeOff, Plus, Trash2 } from "lucide-react";
 import StrengthStationRow from "@/components/sessions/strength/StrengthStationRow";
@@ -14,24 +14,34 @@ const ICON_OPTIONS = [
 ];
 
 export default function StrengthGroupTable({ block, index, totalBlocks, stations, summary, icons, squadId, handlers }) {
-  const Icon = icons[block.icon] || icons.dumbbell;
+  const [draft, setDraft] = useState({ name: block.name || "", color: block.color || "#22c55e", icon: block.icon || "dumbbell", description: block.description || "" });
+  const Icon = icons[draft.icon] || icons.dumbbell;
   const hidden = !!block.hidden;
 
+  useEffect(() => {
+    setDraft({ name: block.name || "", color: block.color || "#22c55e", icon: block.icon || "dumbbell", description: block.description || "" });
+  }, [block.id, block.name, block.color, block.icon, block.description]);
+
+  function commitDraft(patch) {
+    const changed = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== (block[key] || (key === "color" ? "#22c55e" : key === "icon" ? "dumbbell" : ""))));
+    if (Object.keys(changed).length) handlers.updateBlock(block.id, changed);
+  }
+
   return (
-    <div className={`bg-zinc-900 border rounded-xl overflow-hidden min-w-0 ${hidden ? "border-zinc-800 opacity-60" : "border-zinc-700"}`} style={{ borderColor: hidden ? undefined : `${block.color || "#22c55e"}80` }}>
-      <div className="px-4 py-3 border-b border-zinc-800" style={{ background: hidden ? "rgba(39,39,42,.55)" : `${block.color || "#22c55e"}18` }}>
+    <div className={`bg-zinc-900 border rounded-xl overflow-hidden min-w-0 ${hidden ? "border-zinc-800 opacity-60" : "border-zinc-700"}`} style={{ borderColor: hidden ? undefined : `${draft.color || "#22c55e"}80` }}>
+      <div className="px-4 py-3 border-b border-zinc-800" style={{ background: hidden ? "rgba(39,39,42,.55)" : `${draft.color || "#22c55e"}18` }}>
         <div className="flex items-start justify-between gap-3">
           <div className="flex items-start gap-3 min-w-0 flex-1">
-            <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${block.color || "#22c55e"}22`, color: block.color || "#22c55e" }}><Icon size={19} /></span>
+            <span className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${draft.color || "#22c55e"}22`, color: draft.color || "#22c55e" }}><Icon size={19} /></span>
             <div className="min-w-0 flex-1 space-y-2">
               <div className="flex items-center gap-2 flex-wrap">
-                <input value={block.name || ""} onChange={e => handlers.updateBlock(block.id, { name: e.target.value })} className="min-w-[150px] flex-1 bg-zinc-950/40 border border-zinc-700 rounded-lg px-2 py-1 text-sm font-bold text-white focus:outline-none focus:border-zinc-500" />
-                <input type="color" value={block.color || "#22c55e"} onChange={e => handlers.updateBlock(block.id, { color: e.target.value })} className="w-8 h-8 bg-transparent border border-zinc-700 rounded-lg overflow-hidden" />
-                <select value={block.icon || "dumbbell"} onChange={e => handlers.updateBlock(block.id, { icon: e.target.value })} className="bg-zinc-950/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none">
+                <input value={draft.name} onChange={e => setDraft(prev => ({ ...prev, name: e.target.value }))} onBlur={() => commitDraft({ name: draft.name })} className="min-w-[150px] flex-1 bg-zinc-950/40 border border-zinc-700 rounded-lg px-2 py-1 text-sm font-bold text-white focus:outline-none focus:border-zinc-500" />
+                <input type="color" value={draft.color} onChange={e => setDraft(prev => ({ ...prev, color: e.target.value }))} onBlur={() => commitDraft({ color: draft.color })} className="w-8 h-8 bg-transparent border border-zinc-700 rounded-lg overflow-hidden" />
+                <select value={draft.icon} onChange={e => { setDraft(prev => ({ ...prev, icon: e.target.value })); commitDraft({ icon: e.target.value }); }} className="bg-zinc-950/40 border border-zinc-700 rounded-lg px-2 py-1.5 text-xs text-zinc-200 focus:outline-none">
                   {ICON_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </div>
-              <input value={block.description || ""} onChange={e => handlers.updateBlock(block.id, { description: e.target.value })} placeholder="Descripción del cuadro..." className="w-full bg-zinc-950/30 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-600" />
+              <input value={draft.description} onChange={e => setDraft(prev => ({ ...prev, description: e.target.value }))} onBlur={() => commitDraft({ description: draft.description })} placeholder="Descripción del cuadro..." className="w-full bg-zinc-950/30 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-600" />
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">

@@ -104,8 +104,6 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     setBlocks(prev => prev.map(block => block.id === id ? { ...block, ...patch } : block));
     await base44.entities.StrengthWorkBlock.update(id, patch);
     if (patch.name) {
-      const affected = stations.filter(row => row.work_block_id === id);
-      await Promise.all(affected.map(row => base44.entities.StrengthStation.update(row.id, { strength_group: patch.name })));
       setStations(prev => prev.map(row => row.work_block_id === id ? { ...row, strength_group: patch.name } : row));
     }
   }
