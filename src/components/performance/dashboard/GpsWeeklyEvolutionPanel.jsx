@@ -165,8 +165,8 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       rankings_snapshot: rankings,
       gps_variables_snapshot: gpsVariables,
       promedios_snapshot: gpsVariables,
-      highlighted_players_snapshot: highlights,
-      weekly_comparison_snapshot: comparison,
+      highlighted_players_snapshot: { items: highlights },
+      weekly_comparison_snapshot: { items: comparison },
       filters_snapshot: filters,
       snapshot: { dailySummaries, highlights, comparison, filters, metrics: visibleMetrics },
     };
