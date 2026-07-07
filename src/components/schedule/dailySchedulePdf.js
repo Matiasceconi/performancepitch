@@ -39,7 +39,8 @@ function normalize(text) {
 }
 function eventKey(event) {
   const text = normalize(`${event.event_type || ""} ${event.type || ""} ${event.title || ""} ${event.location || ""}`);
-  if (text.includes("desayuno") || text.includes("almuerzo") || text.includes("cena") || text.includes("comida") || text.includes("comedor")) return "food";
+  if (text.includes("desayuno") || text.includes("cafe") || text.includes("café")) return "coffee";
+  if (text.includes("almuerzo") || text.includes("cena") || text.includes("comida") || text.includes("comedor")) return "plate";
   if (text.includes("gimnasio") || text.includes("fuerza") || text.includes("gym")) return "gym";
   if (text.includes("campo") || text.includes("cancha") || text.includes("entrenamiento")) return "field";
   if (text.includes("formulario") || text.includes("wellness") || text.includes("percepcion") || text.includes("rpe")) return "phone";
@@ -61,14 +62,24 @@ function drawPhone(doc, x, y) {
   doc.circle(x, y + 5.6, 0.7, "F");
   doc.line(x - 2.3, y - 5.6, x + 2.3, y - 5.6);
 }
-function drawFood(doc, x, y) {
+function drawCoffee(doc, x, y) {
+  setStroke(doc, BRAND.greenDeep); doc.setLineWidth(1.2);
+  doc.roundedRect(x - 7, y - 1, 11, 8, 1.3, 1.3, "S");
+  doc.circle(x + 6, y + 3, 3, "S");
+  doc.line(x - 8, y + 8, x + 6, y + 8);
+  doc.line(x - 4, y - 8, x - 4, y - 4);
+  doc.line(x, y - 8, x, y - 4);
+  doc.line(x + 4, y - 8, x + 4, y - 4);
+}
+function drawPlate(doc, x, y) {
   setStroke(doc, BRAND.greenDeep); setFill(doc, BRAND.greenDeep); doc.setLineWidth(0.9);
   doc.circle(x, y, 8.2, "S");
-  doc.line(x - 4.2, y - 4.7, x - 4.2, y + 5.2);
-  doc.line(x - 5.7, y - 4.7, x - 5.7, y - 1.2);
-  doc.line(x - 2.7, y - 4.7, x - 2.7, y - 1.2);
-  doc.line(x + 3.9, y - 4.7, x + 3.9, y + 5.2);
-  doc.line(x + 2.2, y - 4.7, x + 5.3, y - 0.8);
+  doc.circle(x, y, 4.4, "S");
+  doc.line(x - 12, y - 6, x - 12, y + 6);
+  doc.line(x - 13.8, y - 6, x - 13.8, y - 2.3);
+  doc.line(x - 10.2, y - 6, x - 10.2, y - 2.3);
+  doc.line(x + 12, y - 6, x + 12, y + 6);
+  doc.line(x + 10.4, y - 6, x + 13.5, y - 1.3);
 }
 function drawGym(doc, x, y) {
   setStroke(doc, BRAND.greenDeep); setFill(doc, BRAND.greenDeep); doc.setLineWidth(1.3);
@@ -87,7 +98,8 @@ function drawField(doc, x, y) {
   doc.rect(x + 7.8, y - 3.5, 3.2, 7, "S");
 }
 function drawActivityIcon(doc, key, x, y) {
-  if (key === "food") return drawFood(doc, x, y);
+  if (key === "coffee") return drawCoffee(doc, x, y);
+  if (key === "plate") return drawPlate(doc, x, y);
   if (key === "gym") return drawGym(doc, x, y);
   if (key === "field") return drawField(doc, x, y);
   return drawPhone(doc, x, y);
@@ -125,7 +137,7 @@ function drawHeader(doc, day, squadName, logo) {
 }
 
 function drawTable(doc, events) {
-  const x = 7; const y = 66; const w = 196; const rows = Math.max(events.length, 6); const rowH = Math.max(18, Math.min(29, 170 / rows)); const h = 12 + rowH * rows;
+  const x = 7; const y = 66; const w = 196; const rows = Math.max(events.length, 1); const rowH = events.length ? Math.max(18, Math.min(32, 170 / rows)) : 26; const h = 12 + rowH * rows;
   const cols = [26, 73, 36, 61];
   setFill(doc, "#FFFFFF"); setStroke(doc, "#DCDCDC"); doc.roundedRect(x, y, w, h, 2.2, 2.2, "FD");
   setFill(doc, BRAND.greenDeep); doc.roundedRect(x, y, w, 12, 2.2, 2.2, "F");
