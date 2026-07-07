@@ -7,6 +7,7 @@ import { jsPDF } from "jspdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
 import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professionalSchedulePdf";
+import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
 import { findPlanDay } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
@@ -675,9 +676,9 @@ export default function Schedule() {
     doc.save(`cronograma-semana-${days[0].format("YYYY-MM-DD")}.pdf`);
   }
 
-  function downloadDayPDF(day) {
+  async function downloadDayPDF(day) {
     const evs = getEventsForDate(day.format("YYYY-MM-DD"));
-    const doc = buildDayPDF(day, evs);
+    const doc = await buildDailySchedulePDF({ day, events: evs, squadName: activeSquad?.name || "Plantel" });
     doc.save(`cronograma-${day.format("YYYY-MM-DD")}.pdf`);
   }
 
