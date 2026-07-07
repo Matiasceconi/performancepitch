@@ -20,7 +20,7 @@ const avg = (values) => {
 };
 const fmt = (value, decimals = 0) => Number(value || 0).toLocaleString("es-AR", { maximumFractionDigits: decimals, minimumFractionDigits: decimals });
 const pct = (value, base) => base ? Math.round((Number(value || 0) / Number(base)) * 100) : null;
-const statusColor = (percentage) => percentage == null ? "#52525b" : percentage >= 90 ? "#22c55e" : percentage >= 70 ? "#eab308" : "#ef4444";
+const statusColor = (percentage) => percentage == null ? "#52525b" : percentage > 80 ? "#ef4444" : percentage >= 50 ? "#eab308" : "#22c55e";
 const shortDate = (date) => date ? new Date(`${date}T00:00:00`).toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : "—";
 const calcAge = (birthDate) => {
   if (!birthDate) return "—";
@@ -79,7 +79,7 @@ function BestRecords({ data }) {
   return <Panel title="Mejores registros de la temporada" action={<Trophy size={15} className="text-yellow-400" />}><div className="grid grid-cols-2 gap-3">{bests.map((b) => <div key={b.key} className="border-r border-zinc-800 last:border-r-0 pr-2"><p className="text-[10px] text-zinc-500">{b.label}</p><p className="text-xl font-black text-white">{fmt(b.row?.[b.key], b.unit === "km/h" ? 1 : 0)}<span className="text-xs text-zinc-500 ml-1">{b.unit}</span></p><p className="text-[10px] text-zinc-500">{shortDate(b.row?.date)}</p></div>)}</div></Panel>;
 }
 
-function Legend() { return <div className="flex flex-wrap gap-4 mt-3 text-[10px] text-zinc-500"><span><b className="inline-block w-3 h-2 rounded-sm bg-emerald-500 mr-1" /> &gt;90% del perfil</span><span><b className="inline-block w-3 h-2 rounded-sm bg-yellow-500 mr-1" /> 70-90% del perfil</span><span><b className="inline-block w-3 h-2 rounded-sm bg-red-500 mr-1" /> &lt;70% del perfil</span></div>; }
+function Legend() { return <div className="flex flex-wrap gap-4 mt-3 text-[10px] text-zinc-500"><span><b className="inline-block w-3 h-2 rounded-sm bg-red-500 mr-1" /> &gt;80% del perfil</span><span><b className="inline-block w-3 h-2 rounded-sm bg-yellow-500 mr-1" /> 50-80% del perfil</span><span><b className="inline-block w-3 h-2 rounded-sm bg-emerald-500 mr-1" /> &lt;50% del perfil</span></div>; }
 
 export default function GpsIndividualPlayerReport({ player, records, stats, competitionProfile }) {
   const [metricKey, setMetricKey] = useState("total_distance");
