@@ -14,6 +14,7 @@ import GpsPositionRadar from "./GpsPositionRadar";
 import GpsExportButtons from "./GpsExportButtons";
 import GpsWeeklyEvolutionPanel from "./GpsWeeklyEvolutionPanel";
 import GpsIndividualProfilePanel from "./GpsIndividualProfilePanel";
+import GpsIndividualPlayerTab from "./GpsIndividualPlayerTab";
 import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
@@ -226,6 +227,7 @@ export default function ExternalGpsDashboard() {
   const tabs = [
     { id: "microcycle", label: "Resumen del microciclo" },
     { id: "sessions", label: "Buscar sesiones" },
+    { id: "individual-player", label: "Individual" },
     { id: "individual", label: "Perfil competitivo individual" },
     { id: "team", label: "Perfil del equipo" },
   ];
@@ -261,7 +263,7 @@ export default function ExternalGpsDashboard() {
       </div>
 
       {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} />
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} onReload={load} />
       )}
 
       {activeTab === "sessions" && (
@@ -280,6 +282,16 @@ export default function ExternalGpsDashboard() {
           <GpsPlayerTable rows={sessionRows} />
           <GpsExportButtons session={selectedSession} rows={sessionRows} dashboardRef={dashboardRef} />
         </div>
+      )}
+
+      {activeTab === "individual-player" && (
+        <GpsIndividualPlayerTab
+          players={rosterPlayers}
+          gpsBySession={gpsBySession}
+          sessions={sessions}
+          playerMap={playerMap}
+          competitionProfiles={competitionProfiles}
+        />
       )}
 
       {activeTab === "individual" && (
