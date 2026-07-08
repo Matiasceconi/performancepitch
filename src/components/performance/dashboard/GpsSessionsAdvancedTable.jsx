@@ -1,10 +1,12 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import {
   ChevronDown,
   ChevronRight,
   Search,
   FileText,
   FileSpreadsheet,
+  Loader2,
+  X,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -44,7 +46,7 @@ const mdBadgeClass = (md) => {
   if (md === "MD") return "bg-red-500/20 text-red-300 border-red-500/30";
   if (md === "MD+1" || md === "MD+2") return "bg-orange-500/20 text-orange-300 border-orange-500/30";
   if (md === "MD-1") return "bg-amber-500/20 text-amber-300 border-amber-500/30";
-  return "bg-zinc-800 text-zinc-300 border-zinc-700";
+  return "bg-zinc-800 text-zinc-200 border-zinc-700";
 };
 
 // ─── column definitions ──────────────────────────────────────────────────────
@@ -55,16 +57,16 @@ const SESSION_COLS = [
   { key: "title", label: "Nombre", sortable: true, align: "left" },
   { key: "type", label: "Tipo", sortable: true, align: "center" },
   { key: "objective", label: "Objetivo", sortable: false, align: "left" },
-  { key: "duration", label: "Min.", sortable: true, align: "center" },
-  { key: "playerCount", label: "Jugadores", sortable: true, align: "center" },
-  { key: "avgDistance", label: "Dist.Prom (m)", sortable: true, align: "right" },
-  { key: "avgD198", label: "D>19.8", sortable: true, align: "right" },
-  { key: "avgD25", label: "D>25", sortable: true, align: "right" },
-  { key: "avgSprints", label: "Sprints", sortable: true, align: "right" },
-  { key: "avgAcc", label: "ACC", sortable: true, align: "right" },
-  { key: "avgDec", label: "DEC", sortable: true, align: "right" },
-  { key: "avgPlayerLoad", label: "P.Load", sortable: true, align: "right" },
-  { key: "maxSmax", label: "S.Máx", sortable: true, align: "right" },
+  { key: "duration", label: "Min", headerTitle: "Minutos", sortable: true, align: "center" },
+  { key: "playerCount", label: "Jug", headerTitle: "Jugadores", sortable: true, align: "center" },
+  { key: "avgDistance", label: "Dist.P", headerTitle: "Distancia promedio (m)", sortable: true, align: "right" },
+  { key: "avgD198", label: "D>19.8", headerTitle: "Distancia > 19.8 km/h", sortable: true, align: "right" },
+  { key: "avgD25", label: "D>25", headerTitle: "Distancia > 25 km/h", sortable: true, align: "right" },
+  { key: "avgSprints", label: "Spr", headerTitle: "Sprints", sortable: true, align: "right" },
+  { key: "avgAcc", label: "ACC", headerTitle: "Aceleraciones", sortable: true, align: "right" },
+  { key: "avgDec", label: "DEC", headerTitle: "Deceleraciones", sortable: true, align: "right" },
+  { key: "avgPlayerLoad", label: "P.Load", headerTitle: "Player Load", sortable: true, align: "right" },
+  { key: "maxSmax", label: "S.Máx", headerTitle: "Velocidad máxima (km/h)", sortable: true, align: "right" },
 ];
 
 const NUMERIC_METRIC_KEYS = [
@@ -161,7 +163,7 @@ function PlayerSubTable({ rows }) {
             <td
               key={key}
               className={`px-2 py-1.5 text-right whitespace-nowrap ${
-                isMax ? "text-emerald-400 font-bold" : "text-zinc-300"
+                isMax ? "text-emerald-300 font-bold bg-emerald-500/20" : "text-zinc-200"
               }`}
             >
               {fmt(val)}
@@ -240,11 +242,26 @@ export default function GpsSessionsAdvancedTable({
   loading,
 }) {
   const [expandedId, setExpandedId] = useState(null);
+  const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState("date");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [showDetails, setShowDetails] = useState(true);
+  const [exporting, setExporting] = useState(null);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearch(searchInput);
+      setPage(1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
+
+  useEffect(() => {
+    if (!showDetails) setExpandedId(null);
+  }, [showDetails]);
 
   // ── compute per-session row data ──────────────────────────────────────────
   const tableData = useMemo(() => {
@@ -305,18 +322,6 @@ export default function GpsSessionsAdvancedTable({
     });
   }, [sessions, gpsBySession, playerMap, sessionFilters]);
 
-  // ── max value per numeric column (for highlighting) ───────────────────────
-  const maxByCol = useMemo(() => {
-    const map = {};
-    NUMERIC_METRIC_KEYS.forEach((key) => {
-      const vals = tableData
-        .map((r) => r[key])
-        .filter((v) => v != null && !isNaN(v));
-      map[key] = vals.length ? Math.max(...vals) : null;
-    });
-    return map;
-  }, [tableData]);
-
   // ── KPI summary ───────────────────────────────────────────────────────────
   const kpis = useMemo(
     () => ({
@@ -370,6 +375,18 @@ export default function GpsSessionsAdvancedTable({
   const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const paginated = sorted.slice((page - 1) * pageSize, page * pageSize);
 
+  // ── max value per numeric column only in visible page ─────────────────────
+  const maxByCol = useMemo(() => {
+    const map = {};
+    NUMERIC_METRIC_KEYS.forEach((key) => {
+      const vals = paginated
+        .map((r) => r[key])
+        .filter((v) => v != null && !isNaN(v));
+      map[key] = vals.length ? Math.max(...vals) : null;
+    });
+    return map;
+  }, [paginated]);
+
   function handleSort(key) {
     if (sortKey === key) {
       setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -380,15 +397,26 @@ export default function GpsSessionsAdvancedTable({
     setPage(1);
   }
 
-  function handleSearch(e) {
-    setSearch(e.target.value);
+  const handleSearch = useCallback((e) => {
+    setSearchInput(e.target.value);
+  }, []);
+
+  const handleResetSearch = useCallback(() => {
+    setSearchInput("");
+    setSearch("");
     setPage(1);
-  }
+  }, []);
 
   function handlePageSize(e) {
     setPageSize(Number(e.target.value));
     setPage(1);
   }
+
+  const handleRowClick = useCallback((e) => {
+    const rowId = e.currentTarget.dataset.rowId;
+    if (!rowId) return;
+    setExpandedId((current) => (current === rowId ? null : rowId));
+  }, []);
 
   // ── export helpers ────────────────────────────────────────────────────────
   const csvHeaders = [
@@ -409,6 +437,23 @@ export default function GpsSessionsAdvancedTable({
     "S.Máx",
   ];
 
+  const appliedFiltersComment = useMemo(() => {
+    const filters = [];
+    if (sessionFilters?.squadId && sessionFilters.squadId !== "all") filters.push(`Plantel: ${sessionFilters.squadId}`);
+    if (sessionFilters?.season) filters.push(`Temporada: ${sessionFilters.season}`);
+    if (sessionFilters?.dateFrom) filters.push(`Desde: ${moment(sessionFilters.dateFrom).format("DD/MM/YYYY")}`);
+    if (sessionFilters?.dateTo) filters.push(`Hasta: ${moment(sessionFilters.dateTo).format("DD/MM/YYYY")}`);
+    if (sessionFilters?.playerIds?.length) filters.push(`Jugadores: ${sessionFilters.playerIds.length}`);
+    if (sessionFilters?.position && sessionFilters.position !== "Todos") filters.push(`Posición: ${sessionFilters.position}`);
+    if (sessionFilters?.event && sessionFilters.event !== "Todos") filters.push(`Evento: ${sessionFilters.event}`);
+    if (sessionFilters?.objective && sessionFilters.objective !== "Todos") filters.push(`Objetivo: ${sessionFilters.objective}`);
+    if (sessionFilters?.md && sessionFilters.md !== "Todos") filters.push(`MD: ${sessionFilters.md}`);
+    if (sessionFilters?.minMinutes != null || sessionFilters?.maxMinutes != null) {
+      filters.push(`Minutos: ${sessionFilters.minMinutes ?? 0}-${sessionFilters.maxMinutes ?? "∞"}`);
+    }
+    return filters.length ? `Filtros aplicados: ${filters.join(" | ")}` : "Filtros aplicados: Sin filtros adicionales";
+  }, [sessionFilters]);
+
   function buildExportRows() {
     return sorted.map((r) => [
       r.date ? moment(r.date).format("DD/MM/YYYY") : "",
@@ -416,22 +461,29 @@ export default function GpsSessionsAdvancedTable({
       r.title,
       r.type,
       r.objective,
-      r.duration || "",
-      r.playerCount,
-      r.avgDistance != null ? Math.round(r.avgDistance) : "",
-      r.avgD198 != null ? Math.round(r.avgD198) : "",
-      r.avgD25 != null ? Math.round(r.avgD25) : "",
-      r.avgSprints != null ? Math.round(r.avgSprints) : "",
-      r.avgAcc != null ? Math.round(r.avgAcc) : "",
-      r.avgDec != null ? Math.round(r.avgDec) : "",
-      r.avgPlayerLoad != null ? Math.round(r.avgPlayerLoad) : "",
-      r.maxSmax != null ? Number(r.maxSmax.toFixed(1)) : "",
+      typeof r.duration === "number" ? r.duration : null,
+      typeof r.playerCount === "number" ? r.playerCount : null,
+      r.avgDistance != null ? Math.round(r.avgDistance) : null,
+      r.avgD198 != null ? Math.round(r.avgD198) : null,
+      r.avgD25 != null ? Math.round(r.avgD25) : null,
+      r.avgSprints != null ? Math.round(r.avgSprints) : null,
+      r.avgAcc != null ? Math.round(r.avgAcc) : null,
+      r.avgDec != null ? Math.round(r.avgDec) : null,
+      r.avgPlayerLoad != null ? Math.round(r.avgPlayerLoad) : null,
+      r.maxSmax != null ? Number(r.maxSmax.toFixed(1)) : null,
     ]);
   }
 
-  function exportCSV() {
+  async function exportCSV() {
+    setExporting("csv");
+    try {
     const rows = buildExportRows();
-    const csv = [csvHeaders, ...rows]
+    const csv = [
+      [`# ${appliedFiltersComment}`],
+      [],
+      csvHeaders,
+      ...rows,
+    ]
       .map((row) => row.map((v) => `"${v ?? ""}"`).join(","))
       .join("\n");
     const blob = new Blob(["\ufeff" + csv], {
@@ -443,20 +495,39 @@ export default function GpsSessionsAdvancedTable({
     a.download = `sesiones_gps_${moment().format("YYYYMMDD")}.csv`;
     a.click();
     URL.revokeObjectURL(url);
+    } finally {
+    setExporting(null);
+    }
   }
 
-  function exportExcel() {
+  async function exportExcel() {
+    setExporting("excel");
+    try {
     const rows = buildExportRows();
-    const ws = XLSX.utils.aoa_to_sheet([csvHeaders, ...rows]);
+    const ws = XLSX.utils.aoa_to_sheet([[appliedFiltersComment], [], csvHeaders, ...rows]);
+    const numericColIndexes = [5, 6, 7, 8, 9, 10, 11, 12, 13, 14];
+    rows.forEach((row, rowIndex) => {
+      const sheetRow = 3 + rowIndex;
+      numericColIndexes.forEach((colIndex) => {
+        const val = row[colIndex];
+        if (typeof val === "number" && !Number.isNaN(val)) {
+          const cellRef = XLSX.utils.encode_cell({ r: sheetRow, c: colIndex });
+          if (ws[cellRef]) ws[cellRef].t = "n";
+        }
+      });
+    });
     // Column widths
     ws["!cols"] = [
-      { wch: 12 }, { wch: 8 }, { wch: 30 }, { wch: 14 }, { wch: 22 },
+      { wch: 26 }, { wch: 8 }, { wch: 30 }, { wch: 14 }, { wch: 22 },
       { wch: 8 }, { wch: 10 }, { wch: 14 }, { wch: 10 }, { wch: 10 },
       { wch: 10 }, { wch: 8 }, { wch: 8 }, { wch: 10 }, { wch: 10 },
     ];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Sesiones GPS");
     XLSX.writeFile(wb, `sesiones_gps_${moment().format("YYYYMMDD")}.xlsx`);
+    } finally {
+    setExporting(null);
+    }
   }
 
   // ── skeleton loading ──────────────────────────────────────────────────────
@@ -532,17 +603,28 @@ export default function GpsSessionsAdvancedTable({
                 className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500"
               />
               <input
-                value={search}
+                value={searchInput}
                 onChange={handleSearch}
                 placeholder="Buscar sesión o jugador..."
-                className="bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/60 w-52"
+                aria-label="Buscar sesión o jugador"
+                className="bg-zinc-900 border border-zinc-800 rounded-xl pl-8 pr-9 py-1.5 text-xs text-white focus:outline-none focus:border-emerald-500/60 w-52"
               />
+              {searchInput.trim() && (
+                <button
+                  onClick={handleResetSearch}
+                  aria-label="Resetear búsqueda"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-200 transition-colors"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
             <div className="flex items-center gap-2 text-xs text-zinc-500">
               <span>Filas:</span>
               <select
                 value={pageSize}
                 onChange={handlePageSize}
+                aria-label="Filas por página"
                 className="bg-zinc-900 border border-zinc-800 rounded-lg px-2 py-1 text-xs text-white focus:outline-none"
               >
                 {PAGE_SIZES.map((n) => (
@@ -552,6 +634,16 @@ export default function GpsSessionsAdvancedTable({
                 ))}
               </select>
             </div>
+            <label className="inline-flex items-center gap-2 text-xs text-zinc-300">
+              <input
+                type="checkbox"
+                checked={showDetails}
+                onChange={(e) => setShowDetails(e.target.checked)}
+                aria-label="Ver detalles de jugadores"
+                className="rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/30"
+              />
+              Ver detalles
+            </label>
           </div>
 
           <div className="flex items-center gap-2">
@@ -560,46 +652,69 @@ export default function GpsSessionsAdvancedTable({
             </span>
             <button
               onClick={exportCSV}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors"
+              disabled={exporting != null}
+              aria-label="Exportar datos a CSV"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               title="Exportar CSV"
             >
-              <FileText size={13} /> CSV
+              {exporting === "csv" ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+              CSV
             </button>
             <button
               onClick={exportExcel}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-400 hover:text-white hover:border-zinc-700 transition-colors"
+              disabled={exporting != null}
+              aria-label="Exportar datos a Excel"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs text-zinc-300 hover:text-white hover:border-zinc-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
               title="Exportar Excel"
             >
-              <FileSpreadsheet size={13} /> Excel
+              {exporting === "excel" ? <Loader2 size={13} className="animate-spin" /> : <FileSpreadsheet size={13} />}
+              Excel
             </button>
           </div>
         </div>
 
         {/* Table */}
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
+          <table className="w-full text-xs" aria-label="Tabla avanzada de sesiones GPS">
             <thead>
-              <tr className="text-[10px] text-zinc-500 uppercase bg-zinc-900/80">
+              <tr className="text-[10px] text-zinc-400 uppercase bg-zinc-900/80">
                 {/* expand toggle column */}
-                <th className="w-8 px-2" />
+                {showDetails && <th className="w-12 px-2" scope="col" aria-label="Expandir detalles" />}
                 {SESSION_COLS.map((col) => (
                   <th
                     key={col.key}
+                    scope="col"
+                    title={col.headerTitle || col.label}
+                    aria-sort={
+                      col.sortable
+                        ? sortKey === col.key
+                          ? sortDir === "asc"
+                            ? "ascending"
+                            : "descending"
+                          : "none"
+                        : undefined
+                    }
                     className={`px-3 py-2.5 font-semibold whitespace-nowrap
                       ${col.align === "right" ? "text-right" : col.align === "center" ? "text-center" : "text-left"}
-                      ${col.sortable ? "cursor-pointer hover:text-zinc-300 select-none" : ""}`}
-                    onClick={() => col.sortable && handleSort(col.key)}
+                      ${col.sortable ? "hover:text-zinc-200" : ""}`}
                   >
-                    <span className="inline-flex items-center gap-0.5">
-                      {col.label}
-                      {col.sortable && (
+                    {col.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(col.key)}
+                        aria-label={`Ordenar por ${col.headerTitle || col.label}`}
+                        className="inline-flex items-center gap-0.5 select-none"
+                      >
+                        <span className="tabular-nums">{col.label}</span>
                         <SortIcon
                           colKey={col.key}
                           sortKey={sortKey}
                           sortDir={sortDir}
                         />
-                      )}
-                    </span>
+                      </button>
+                    ) : (
+                      <span className="inline-flex items-center gap-0.5 tabular-nums">{col.label}</span>
+                    )}
                   </th>
                 ))}
               </tr>
@@ -609,37 +724,56 @@ export default function GpsSessionsAdvancedTable({
               {paginated.length === 0 && (
                 <tr>
                   <td
-                    colSpan={SESSION_COLS.length + 1}
-                    className="text-center text-zinc-600 py-12 text-sm"
+                    colSpan={SESSION_COLS.length + (showDetails ? 1 : 0)}
+                    className="text-center text-zinc-400 py-12 text-sm"
                   >
-                    Sin sesiones GPS para los filtros seleccionados
+                    No encontramos sesiones GPS con estos filtros. Probá limpiar la búsqueda, ampliar fechas o revisar los filtros de jugadores/posición.
                   </td>
                 </tr>
               )}
 
-              {paginated.map((row) => {
-                const isExpanded = expandedId === row.id;
+              {paginated.map((row, idx) => {
+                const rowId = String(row.id);
+                const isExpanded = expandedId === rowId;
+                const withSeparator = idx > 0 && idx % 5 === 0;
                 return (
                   <React.Fragment key={row.id}>
                     <tr
-                      className={`border-t border-zinc-800/70 hover:bg-zinc-800/30 cursor-pointer transition-colors ${
+                      className={`border-t border-zinc-800/70 hover:bg-zinc-800/50 transition-colors duration-200 ${
+                        withSeparator ? "border-t-2 border-zinc-700/80" : ""
+                      } ${
                         isExpanded ? "bg-zinc-800/40" : ""
+                      } ${
+                        showDetails ? "cursor-pointer" : ""
                       }`}
-                      onClick={() =>
-                        setExpandedId(isExpanded ? null : row.id)
-                      }
+                      data-row-id={rowId}
+                      onClick={showDetails ? handleRowClick : undefined}
                     >
                       {/* expand icon */}
-                      <td className="px-2 py-2.5 text-zinc-500 w-8">
-                        {isExpanded ? (
-                          <ChevronDown size={14} />
-                        ) : (
-                          <ChevronRight size={14} />
-                        )}
-                      </td>
+                      {showDetails && (
+                        <td className="px-2 py-2.5 text-zinc-300 w-12">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRowClick(e);
+                            }}
+                            data-row-id={rowId}
+                            aria-label={isExpanded ? `Ocultar detalles de ${row.title || "sesión"}` : `Ver detalles de ${row.title || "sesión"}`}
+                            aria-expanded={isExpanded}
+                            className="h-9 w-9 rounded-lg inline-flex items-center justify-center hover:bg-zinc-700/60 transition-colors"
+                          >
+                            {isExpanded ? (
+                              <ChevronDown size={16} />
+                            ) : (
+                              <ChevronRight size={16} />
+                            )}
+                          </button>
+                        </td>
+                      )}
 
                       {/* Fecha */}
-                      <td className="px-3 py-2.5 text-zinc-300 whitespace-nowrap">
+                      <td className="px-3 py-2.5 text-zinc-200 whitespace-nowrap">
                         {row.date
                           ? moment(row.date).format("DD/MM/YY")
                           : "—"}
@@ -683,19 +817,19 @@ export default function GpsSessionsAdvancedTable({
 
                       {/* Objetivo */}
                       <td
-                        className="px-3 py-2.5 text-zinc-400 max-w-[130px] truncate"
+                        className="px-3 py-2.5 text-zinc-300 max-w-[130px] truncate"
                         title={row.objective}
                       >
                         {row.objective || "—"}
                       </td>
 
                       {/* Min. */}
-                      <td className="px-3 py-2.5 text-center text-zinc-300">
+                      <td className="px-3 py-2.5 text-center text-zinc-200 tabular-nums">
                         {row.duration || "—"}
                       </td>
 
                       {/* Jugadores */}
-                      <td className="px-3 py-2.5 text-center text-zinc-300">
+                      <td className="px-3 py-2.5 text-center text-zinc-200 tabular-nums">
                         {row.playerCount || "—"}
                       </td>
 
@@ -721,10 +855,10 @@ export default function GpsSessionsAdvancedTable({
                         return (
                           <td
                             key={key}
-                            className={`px-3 py-2.5 text-right whitespace-nowrap ${
+                            className={`px-3 py-2.5 text-right whitespace-nowrap tabular-nums ${
                               isMax
-                                ? "text-emerald-400 font-bold"
-                                : "text-zinc-300"
+                                ? "text-emerald-300 font-bold bg-emerald-500/20"
+                                : "text-zinc-200"
                             }`}
                           >
                             {fmt(val)}
@@ -734,8 +868,8 @@ export default function GpsSessionsAdvancedTable({
                     </tr>
 
                     {/* Expandable player detail */}
-                    {isExpanded && (
-                      <tr className="border-t border-zinc-800/30">
+                    {showDetails && isExpanded && (
+                      <tr className="border-t border-zinc-800/30 transition-all duration-200">
                         <td
                           colSpan={SESSION_COLS.length + 1}
                           className="px-4 py-3 bg-zinc-900/50"
@@ -768,6 +902,7 @@ export default function GpsSessionsAdvancedTable({
             <button
               disabled={page === 1}
               onClick={() => setPage((p) => Math.max(1, p - 1))}
+              aria-label="Página anterior"
               className="px-2 py-1 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               ← Anterior
@@ -782,6 +917,7 @@ export default function GpsSessionsAdvancedTable({
                 <button
                   key={p}
                   onClick={() => setPage(p)}
+                  aria-label={`Ir a página ${p}`}
                   className={`w-7 h-7 rounded-lg text-xs transition-colors ${
                     page === p
                       ? "bg-emerald-600 text-white"
@@ -795,6 +931,7 @@ export default function GpsSessionsAdvancedTable({
             <button
               disabled={page === totalPages}
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              aria-label="Página siguiente"
               className="px-2 py-1 rounded-lg text-xs text-zinc-400 hover:text-white hover:bg-zinc-800 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
             >
               Siguiente →
