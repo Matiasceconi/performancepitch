@@ -9,6 +9,7 @@ import GpsMicrocyclePdfButton from "./GpsMicrocyclePdfButton";
 import GpsMicrocycleFiltersPanel, { getMicrocycleFilterLabels } from "./GpsMicrocycleFiltersPanel";
 import GpsMicrocycleHistoryPanel from "./GpsMicrocycleHistoryPanel";
 import GpsPositionRadar from "./GpsPositionRadar";
+import GpsExcludedPlayersLoadChart from "./GpsExcludedPlayersLoadChart";
 import {
   MICRO_METRICS,
   buildDailySummaries,
@@ -347,6 +348,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
           {visibleMetrics.map((metric) => <MetricChart key={metric.key} metric={metric} data={shownDailySummaries} />)}
         </div>
         <GpsPositionRadar rows={cycleRows} />
+        <GpsExcludedPlayersLoadChart rows={allCycleRows} />
         <GpsMicrocycleHighlights highlights={shownHighlights} />
         <ObjectiveComparisonTable rows={objectiveTableRows} />
       </div>
