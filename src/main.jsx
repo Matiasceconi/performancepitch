@@ -23,6 +23,22 @@ for (const key of JSON_STORAGE_KEYS) {
   }
 }
 
+function isEmptyJsonParseError(error) {
+  return error instanceof SyntaxError && error.message === 'Unexpected end of input'
+}
+
+window.addEventListener('unhandledrejection', (event) => {
+  if (isEmptyJsonParseError(event.reason)) {
+    event.preventDefault()
+  }
+})
+
+window.addEventListener('error', (event) => {
+  if (isEmptyJsonParseError(event.error)) {
+    event.preventDefault()
+  }
+})
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <App />
 )
