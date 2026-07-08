@@ -1,51 +1,166 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
-import { Download, Copy, Search, GitCompare, Archive } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { Archive, CheckCircle2, Copy, Download, FileText, GitCompare, Search, Tag, X } from "lucide-react";
 import { jsPDF } from "jspdf";
+import { MICRO_METRICS, fmt } from "@/components/performance/dashboard/gpsMicrocycleReportUtils";
 
-const METRICS = [
-  ["total_distance", "Distancia"], ["player_load", "Player Load"], ["m_min", "m/min"], ["sprints", "Sprints"], ["acc_3", "ACC"], ["dec_3", "DEC"], ["smax", "Smax"]
-];
+const STATUS_STYLE = {
+  borrador: "bg-zinc-500/10 text-zinc-300 border-zinc-500/30",
+  en_curso: "bg-blue-500/10 text-blue-300 border-blue-500/30",
+  finalizado: "bg-emerald-500/10 text-emerald-300 border-emerald-500/30",
+  archivado: "bg-amber-500/10 text-amber-300 border-amber-500/30",
+};
+const SUGGESTED_TAGS = ["Pretemporada", "Playoffs", "Final", "Semana corta", "Semana larga", "Viaje", "Triple competencia"];
+const COMPARE_KEYS = ["total_distance", "player_load", "acc_3", "dec_3", "sprints", "distance_19_8", "distance_25", "smax"];
 
-function metricValue(summary, key) { return Number(summary.gps_variables_snapshot?.[key]?.value || summary.snapshot?.variables_gps?.[key]?.value || 0); }
-function fmt(n) { return Number(n || 0).toLocaleString("es-AR", { maximumFractionDigits: 1 }); }
+function metricValue(summary, key) {
+  return Number(summary.gps_variables_snapshot?.[key]?.value ?? summary.load_summary_snapshot?.[key]?.value ?? summary.snapshot?.loadSummary?.[key]?.value ?? 0);
+}
+function displayName(summary) {
+  return summary.nombre_microciclo || summary.microcycle_name || `Microciclo ${summary.microcycle_number || "—"}`;
+}
+function dateRange(summary) {
+  return `${summary.fecha_inicio || "—"} - ${summary.fecha_fin || "—"}`;
+}
+function stateLabel(state) {
+  if (state === "en_curso") return "En curso";
+  if (state === "finalizado" || state === "cerrado" || state === "congelado") return "Guardado";
+  if (state === "archivado") return "Archivado";
+  return "Borrador";
+}
 
 function Filters({ filters, setFilters, squads, seasons }) {
-  const update = (k, v) => setFilters((p) => ({ ...p, [k]: v }));
-  return <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 grid grid-cols-1 md:grid-cols-4 gap-3"><div className="md:col-span-4 flex items-center gap-2 text-white font-bold"><Search size={16} />Buscador histórico</div><select value={filters.season || ""} onChange={(e) => update("season", e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="">Temporada</option>{seasons.map((s) => <option key={s} value={s}>{s}</option>)}</select><select value={filters.squad || ""} onChange={(e) => update("squad", e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="">Plantel</option>{squads.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select><input value={filters.rival || ""} onChange={(e) => update("rival", e.target.value)} placeholder="Rival" className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" /><input value={filters.resultado || ""} onChange={(e) => update("resultado", e.target.value)} placeholder="Resultado" className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" /><input type="date" value={filters.fecha || ""} onChange={(e) => update("fecha", e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" /><input value={filters.entrenador || ""} onChange={(e) => update("entrenador", e.target.value)} placeholder="Entrenador" className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" /><input value={filters.competencia || ""} onChange={(e) => update("competencia", e.target.value)} placeholder="Competencia" className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" /><button onClick={() => setFilters({})} className="bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl px-3 py-2 text-sm font-bold">Limpiar</button></div>;
+  const update = (key, value) => setFilters((prev) => ({ ...prev, [key]: value }));
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3">
+      <div className="flex items-center gap-2 text-white font-bold"><Search size={16} />Buscador</div>
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-6 gap-3">
+        <input value={filters.query || ""} onChange={(e) => update("query", e.target.value)} placeholder="Rival, número, competencia..." className="xl:col-span-2 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" />
+        <input type="date" value={filters.fecha || ""} onChange={(e) => update("fecha", e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" />
+        <select value={filters.season || ""} onChange={(e) => update("season", e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="">Temporada</option>{seasons.map((s) => <option key={s} value={s}>{s}</option>)}</select>
+        <select value={filters.squad || ""} onChange={(e) => update("squad", e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="">Plantel</option>{squads.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+        <input value={filters.tag || ""} onChange={(e) => update("tag", e.target.value)} placeholder="Etiqueta" className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" />
+      </div>
+      <button onClick={() => setFilters({})} className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg text-xs font-bold">Limpiar filtros</button>
+    </div>
+  );
 }
 
-function Evolution({ summaries }) {
-  const data = summaries.map((s) => ({ name: s.microcycle_name || s.fecha_inicio, ...Object.fromEntries(METRICS.map(([k]) => [k, metricValue(s, k)])) }));
-  return <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5"><h3 className="text-white font-bold mb-4">Evolución de temporada</h3><div className="h-80"><ResponsiveContainer width="100%" height="100%"><LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="name" stroke="#71717a" fontSize={10} /><YAxis stroke="#71717a" fontSize={10} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", color: "#fff" }} /><Legend />{METRICS.map(([key, label], i) => <Line key={key} type="monotone" dataKey={key} name={label} stroke={["#22c55e", "#3b82f6", "#60a5fa", "#f59e0b", "#a855f7", "#14b8a6", "#eab308"][i]} dot={false} />)}</LineChart></ResponsiveContainer></div></div>;
+function MicrocycleCard({ summary, selected, onOpen, onDuplicate, onExport }) {
+  const objective = summary.physical_objectives_snapshot?.[0]?.objective || summary.summary_snapshot?.daily?.[0]?.objetivo || "Volumen";
+  const style = STATUS_STYLE[summary.estado] || STATUS_STYLE.borrador;
+  return (
+    <button onClick={() => onOpen(summary)} className="text-left bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 rounded-2xl p-4 space-y-3 transition-colors">
+      <div className="flex items-start justify-between gap-3">
+        <div><p className="text-emerald-400 text-xs font-bold uppercase">Microciclo {summary.microcycle_number || "—"}</p><h3 className="text-white font-bold text-lg">{displayName(summary)}</h3></div>
+        <span className={`px-2 py-1 rounded-full border text-xs font-bold ${style}`}>{stateLabel(summary.estado)}</span>
+      </div>
+      <div className="text-sm text-zinc-400 space-y-1"><p>{dateRange(summary)}</p><p>vs {summary.rival || summary.partido_asociado || "—"}</p><p>{summary.squad_name || "Plantel"} · {objective}</p><p className="text-emerald-300 font-bold">{summary.cantidad_sesiones || 0} sesiones</p></div>
+      <div className="flex flex-wrap gap-1">{(summary.tags || []).slice(0, 4).map((tag) => <span key={tag} className="px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 text-[10px] border border-zinc-700">{tag}</span>)}</div>
+      <div className="flex gap-2 pt-1" onClick={(e) => e.stopPropagation()}>
+        <button onClick={() => onOpen(summary)} className={`flex-1 px-3 py-1.5 rounded-lg text-xs font-bold ${selected ? "bg-emerald-600 text-white" : "bg-zinc-800 hover:bg-zinc-700 text-white"}`}>Abrir</button>
+        <button onClick={() => onDuplicate(summary)} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white"><Copy size={13} /></button>
+        <button onClick={() => onExport(summary)} className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white"><Download size={13} /></button>
+      </div>
+    </button>
+  );
 }
 
-function Comparison({ summaries }) {
-  const [a, setA] = useState(""); const [b, setB] = useState(""); const [md, setMd] = useState("MD-3");
-  const one = summaries.find((s) => s.id === a), two = summaries.find((s) => s.id === b);
-  const mdRows = summaries.flatMap((s) => (s.summary_snapshot?.daily || []).filter((d) => d.md === md));
-  return <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4"><div className="flex items-center gap-2 text-white font-bold"><GitCompare size={16} />Comparaciones</div><div className="grid grid-cols-1 md:grid-cols-3 gap-3"><select value={a} onChange={(e) => setA(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-sm"><option value="">Microciclo A</option>{summaries.map((s) => <option key={s.id} value={s.id}>{s.microcycle_name}</option>)}</select><select value={b} onChange={(e) => setB(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-sm"><option value="">Microciclo B</option>{summaries.map((s) => <option key={s.id} value={s.id}>{s.microcycle_name}</option>)}</select><select value={md} onChange={(e) => setMd(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-sm">{["MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1"].map((x) => <option key={x}>{x}</option>)}</select></div>{one && two && <div className="grid grid-cols-1 md:grid-cols-7 gap-2">{METRICS.map(([key, label]) => <div key={key} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><p className="text-zinc-500 text-xs">{label}</p><p className="text-white font-bold">{fmt(metricValue(one, key))}</p><p className="text-emerald-300 text-xs">vs {fmt(metricValue(two, key))}</p></div>)}</div>}<p className="text-zinc-400 text-sm">Promedio histórico {md}: {mdRows.length ? METRICS.map(([key, label]) => `${label}: ${fmt(mdRows.reduce((a, d) => a + Number(d.metrics?.[key]?.value || 0), 0) / mdRows.length)}`).join(" · ") : "sin datos"}</p></div>;
+function ComparisonPanel({ summaries }) {
+  const [a, setA] = useState("");
+  const [b, setB] = useState("");
+  const one = summaries.find((s) => s.id === a);
+  const two = summaries.find((s) => s.id === b);
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 space-y-4">
+      <div className="flex items-center gap-2 text-white font-bold"><GitCompare size={16} />Comparar microciclos</div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <select value={a} onChange={(e) => setA(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-sm"><option value="">Microciclo A</option>{summaries.map((s) => <option key={s.id} value={s.id}>{displayName(s)}</option>)}</select>
+        <select value={b} onChange={(e) => setB(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-white text-sm"><option value="">Microciclo B</option>{summaries.map((s) => <option key={s.id} value={s.id}>{displayName(s)}</option>)}</select>
+      </div>
+      {one && two && <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">{COMPARE_KEYS.map((key) => {
+        const metric = MICRO_METRICS.find((m) => m.key === key);
+        const first = metricValue(one, key), second = metricValue(two, key);
+        const abs = second - first, pct = first ? (abs / first) * 100 : null;
+        return <div key={key} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3"><p className="text-zinc-500 text-xs font-bold">{metric?.label || key}</p><p className="text-white text-sm mt-1">{fmt(first, metric?.unit)} → {fmt(second, metric?.unit)}</p><p className={abs >= 0 ? "text-emerald-300 text-xs font-bold" : "text-red-300 text-xs font-bold"}>{abs >= 0 ? "+" : ""}{fmt(abs, metric?.unit)} {pct != null ? `(${pct.toFixed(1)}%)` : ""}</p></div>;
+      })}</div>}
+    </div>
+  );
 }
 
-function Detail({ summary, onClose, onRecalculate, onKeep, onExport }) {
+function DetailPanel({ summary, tagDraft, setTagDraft, onClose, onTag, onStatus, onExport }) {
   if (!summary) return null;
-  return <div className="fixed inset-0 bg-black/70 z-50 flex justify-end"><div className="w-full max-w-3xl h-full bg-zinc-950 border-l border-zinc-800 overflow-y-auto p-6 space-y-4"><div className="flex items-start justify-between"><div><p className="text-emerald-400 text-xs font-bold uppercase">Snapshot congelado</p><h2 className="text-white text-2xl font-bold">{summary.microcycle_name}</h2><p className="text-zinc-400">{summary.fecha_inicio} - {summary.fecha_fin} · {summary.rival || "Sin rival"}</p></div><button onClick={onClose} className="text-zinc-400 hover:text-white">Cerrar</button></div><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{METRICS.map(([key, label]) => <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3"><p className="text-zinc-500 text-xs">{label}</p><p className="text-white font-bold text-lg">{fmt(metricValue(summary, key))}</p></div>)}</div><div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4"><h3 className="text-white font-bold mb-3">Rankings Top 3</h3><div className="grid grid-cols-1 md:grid-cols-2 gap-3">{METRICS.map(([key, label]) => <div key={key} className="bg-zinc-950 rounded-xl p-3"><p className="text-zinc-400 text-sm font-bold mb-2">{label}</p>{(summary.rankings_snapshot?.[key]?.top3 || []).map((p, i) => <p key={p.player_id || i} className="text-zinc-300 text-sm">{i + 1}. {p.name} · {fmt(p.value)}</p>)}</div>)}</div></div><div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4"><h3 className="text-white font-bold mb-2">Observaciones y conclusiones</h3><p className="text-zinc-300 text-sm whitespace-pre-line">{summary.observations || "Sin observaciones"}</p><p className="text-zinc-500 text-sm mt-2 whitespace-pre-line">{summary.conclusions || "Sin conclusiones"}</p></div><div className="flex flex-wrap gap-2"><button onClick={() => onExport(summary)} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold">Exportar</button><button onClick={() => onRecalculate(summary)} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-sm font-bold">Recalcular microciclo</button><button onClick={() => onKeep(summary)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold">Mantener snapshot original</button></div></div></div>;
+  return <div className="fixed inset-0 bg-black/70 z-50 flex justify-end"><div className="w-full max-w-4xl h-full bg-zinc-950 border-l border-zinc-800 overflow-y-auto p-6 space-y-5"><div className="flex items-start justify-between"><div><p className="text-emerald-400 text-xs font-bold uppercase">Snapshot congelado</p><h2 className="text-white text-2xl font-bold">{displayName(summary)}</h2><p className="text-zinc-400">{dateRange(summary)} · {summary.rival || "Sin rival"}</p></div><button onClick={onClose} className="p-2 text-zinc-400 hover:text-white"><X size={18} /></button></div><div className="grid grid-cols-2 md:grid-cols-4 gap-3">{COMPARE_KEYS.map((key) => { const metric = MICRO_METRICS.find((m) => m.key === key); return <div key={key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3"><p className="text-zinc-500 text-xs">{metric?.label || key}</p><p className="text-white font-bold text-lg">{fmt(metricValue(summary, key), metric?.unit)}</p></div>; })}</div><div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 space-y-3"><h3 className="text-white font-bold flex items-center gap-2"><Tag size={16} />Etiquetas</h3><div className="flex flex-wrap gap-2">{(summary.tags || []).map((tag) => <button key={tag} onClick={() => onTag(summary, tag, true)} className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs">{tag} ×</button>)}{SUGGESTED_TAGS.map((tag) => <button key={tag} onClick={() => onTag(summary, tag)} className="px-3 py-1 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-xs">+ {tag}</button>)}</div><div className="flex gap-2"><input value={tagDraft} onChange={(e) => setTagDraft(e.target.value)} placeholder="Nueva etiqueta" className="flex-1 bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white" /><button onClick={() => onTag(summary, tagDraft)} className="px-3 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold">Agregar</button></div></div><div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4"><h3 className="text-white font-bold mb-3">Sesiones guardadas</h3>{(summary.sessions_snapshot || []).length ? <div className="space-y-2">{summary.sessions_snapshot.map((s) => <div key={s.id || s.title} className="bg-zinc-950 border border-zinc-800 rounded-xl p-3 text-sm"><p className="text-white font-bold">{s.title}</p><p className="text-zinc-500">{s.date} · {s.session_type || "Sesión"} · {s.match_day_code || s.microcycle_day || "—"}</p></div>)}</div> : <p className="text-zinc-500 text-sm">Sin sesiones congeladas en este registro.</p>}</div><div className="flex flex-wrap gap-2"><button onClick={() => onExport(summary)} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-sm font-bold"><FileText size={16} />Exportar / descargar PDF</button>{["borrador", "en_curso", "finalizado", "archivado"].map((state) => <button key={state} onClick={() => onStatus(summary, state)} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold">{stateLabel(state)}</button>)}</div></div></div>;
 }
 
 export default function MicrocycleHistory() {
   const { activeSquadId } = useWorkspace();
-  const [summaries, setSummaries] = useState([]), [squads, setSquads] = useState([]), [filters, setFilters] = useState({}), [selected, setSelected] = useState(null), [loading, setLoading] = useState(true), [syncing, setSyncing] = useState(false);
-  async function load() { setLoading(true); const [s, q] = await Promise.all([base44.entities.MicrocycleSummary.list("-fecha_inicio", 500), base44.entities.Squad.list("name", 200)]); setSummaries(s); setSquads(q); setLoading(false); }
+  const [summaries, setSummaries] = useState([]);
+  const [squads, setSquads] = useState([]);
+  const [filters, setFilters] = useState({});
+  const [selected, setSelected] = useState(null);
+  const [tagDraft, setTagDraft] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  async function load() {
+    setLoading(true);
+    const [rows, squadRows] = await Promise.all([base44.entities.MicrocycleSummary.list("-updated_at", 500), base44.entities.Squad.list("name", 200)]);
+    setSummaries(rows);
+    setSquads(squadRows);
+    setLoading(false);
+  }
   useEffect(() => { load(); }, []);
+
   const seasons = useMemo(() => [...new Set(summaries.map((s) => s.season_id).filter(Boolean))].sort().reverse(), [summaries]);
-  const filtered = useMemo(() => summaries.filter((s) => (!activeSquadId || s.squad_id === activeSquadId) && (!filters.season || s.season_id === filters.season) && (!filters.squad || s.squad_id === filters.squad) && (!filters.rival || (s.rival || "").toLowerCase().includes(filters.rival.toLowerCase())) && (!filters.resultado || (s.resultado || "").includes(filters.resultado)) && (!filters.fecha || s.fecha_inicio === filters.fecha || s.fecha_fin === filters.fecha) && (!filters.entrenador || (s.entrenador || "").toLowerCase().includes(filters.entrenador.toLowerCase())) && (!filters.competencia || (s.competencia || "").toLowerCase().includes(filters.competencia.toLowerCase()))), [summaries, filters, activeSquadId]);
-  async function sync() { setSyncing(true); await base44.functions.invoke("archiveMicrocycleSummaries", activeSquadId ? { squad_id: activeSquadId } : {}); await load(); setSyncing(false); }
-  async function duplicate(s) { const { id, created_date, updated_date, created_by_id, ...copy } = s; await base44.entities.MicrocycleSummary.create({ ...copy, microcycle_name: `${s.microcycle_name} (copia)`, created_at: new Date().toISOString() }); await load(); }
-  async function keep(s) { await base44.entities.MicrocycleSummary.update(s.id, { snapshot_locked: true, estado: "congelado" }); await load(); }
-  async function recalc(s) { await base44.functions.invoke("archiveMicrocycleSummaries", { weekly_plan_id: s.source_weekly_plan_id, force_recalculate: true }); await load(); }
-  async function exportPdf(s) { const doc = new jsPDF(); doc.setFillColor(0, 128, 62); doc.rect(0, 0, 210, 18, "F"); doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text(s.microcycle_name || "Microciclo", 12, 12); doc.setTextColor(30, 30, 30); doc.setFontSize(10); doc.text(`${s.fecha_inicio} - ${s.fecha_fin} · ${s.rival || "Sin rival"} · ${s.resultado || ""}`, 12, 28); let y = 42; METRICS.forEach(([key, label]) => { doc.text(`${label}: ${fmt(metricValue(s, key))}`, 12, y); y += 8; }); doc.text("Observaciones:", 12, y + 6); doc.text(doc.splitTextToSize(s.observations || "Sin observaciones", 180), 12, y + 14); const fileName = `microciclo-${s.fecha_inicio}.pdf`; const pdfBlob = doc.output("blob"); const file = new File([pdfBlob], fileName, { type: "application/pdf" }); const uploaded = await base44.integrations.Core.UploadFile({ file }); await base44.entities.MicrocycleSummary.update(s.id, { pdf_url: uploaded.file_url, pdf_generated_at: new Date().toISOString() }); doc.save(fileName); await load(); }
+  const filtered = useMemo(() => summaries.filter((s) => {
+    const q = String(filters.query || "").toLowerCase();
+    const text = `${displayName(s)} ${s.microcycle_number || ""} ${s.rival || ""} ${s.competencia || ""} ${s.squad_name || ""}`.toLowerCase();
+    if (activeSquadId && s.squad_id !== activeSquadId) return false;
+    if (q && !text.includes(q)) return false;
+    if (filters.fecha && s.fecha_inicio !== filters.fecha && s.fecha_fin !== filters.fecha && !(s.fecha_inicio <= filters.fecha && s.fecha_fin >= filters.fecha)) return false;
+    if (filters.season && s.season_id !== filters.season) return false;
+    if (filters.squad && s.squad_id !== filters.squad) return false;
+    if (filters.tag && !(s.tags || []).some((t) => t.toLowerCase().includes(filters.tag.toLowerCase()))) return false;
+    return true;
+  }), [summaries, filters, activeSquadId]);
+
+  async function duplicate(summary) {
+    const { id, created_date, updated_date, created_by_id, ...copy } = summary;
+    await base44.entities.MicrocycleSummary.create({ ...copy, microcycle_name: `${displayName(summary)} (copia)`, nombre_microciclo: `${displayName(summary)} (copia)`, estado: "borrador", snapshot_locked: false, duplicated_from_id: id, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await load();
+  }
+  async function updateStatus(summary, estado) {
+    await base44.entities.MicrocycleSummary.update(summary.id, { estado, snapshot_locked: estado === "finalizado" || estado === "archivado", updated_at: new Date().toISOString() });
+    await load();
+    setSelected((prev) => prev ? { ...prev, estado } : prev);
+  }
+  async function updateTag(summary, tag, remove = false) {
+    const clean = String(tag || "").trim();
+    if (!clean) return;
+    const tags = remove ? (summary.tags || []).filter((t) => t !== clean) : [...new Set([...(summary.tags || []), clean])];
+    await base44.entities.MicrocycleSummary.update(summary.id, { tags, updated_at: new Date().toISOString() });
+    setTagDraft("");
+    await load();
+    setSelected((prev) => prev ? { ...prev, tags } : prev);
+  }
+  async function exportPdf(summary) {
+    if (summary.pdf_url) { window.open(summary.pdf_url, "_blank"); return; }
+    const doc = new jsPDF();
+    doc.setFillColor(5, 150, 105); doc.rect(0, 0, 210, 20, "F");
+    doc.setTextColor(255, 255, 255); doc.setFontSize(14); doc.text(displayName(summary), 12, 13);
+    doc.setTextColor(30, 30, 30); doc.setFontSize(10); doc.text(`${dateRange(summary)} · ${summary.squad_name || ""} · ${summary.rival || "Sin rival"}`, 12, 30);
+    let y = 44; COMPARE_KEYS.forEach((key) => { const metric = MICRO_METRICS.find((m) => m.key === key); doc.text(`${metric?.label || key}: ${fmt(metricValue(summary, key), metric?.unit)}`, 12, y); y += 8; });
+    doc.text("Sesiones:", 12, y + 6); y += 14;
+    (summary.sessions_snapshot || []).slice(0, 18).forEach((s) => { doc.text(`• ${s.date || ""} ${s.title || "Sesión"} (${s.session_type || ""})`, 14, y); y += 7; });
+    const fileName = `microciclo-${summary.microcycle_number || summary.fecha_inicio}.pdf`;
+    const file = new File([doc.output("blob")], fileName, { type: "application/pdf" });
+    const uploaded = await base44.integrations.Core.UploadFile({ file });
+    await base44.entities.MicrocycleSummary.update(summary.id, { pdf_url: uploaded.file_url, pdf_generated_at: new Date().toISOString(), exports_snapshot: { ...(summary.exports_snapshot || {}), pdf_url: uploaded.file_url } });
+    doc.save(fileName);
+    await load();
+  }
+
   if (loading) return <div className="h-64 flex items-center justify-center"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
-  return <div className="space-y-5"><div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"><div><p className="text-emerald-400 text-xs font-bold uppercase">Carga Externa</p><h1 className="text-white text-3xl font-bold">Histórico de Microciclos</h1><p className="text-zinc-400 text-sm">Snapshots congelados para comparar, analizar y reutilizar como referencia.</p></div><button onClick={sync} disabled={syncing} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{syncing ? "Archivando..." : "Actualizar histórico"}</button></div><Filters filters={filters} setFilters={setFilters} squads={squads} seasons={seasons} /><Comparison summaries={filtered} /><Evolution summaries={filtered} /><div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden"><table className="w-full text-sm"><thead><tr className="text-left text-zinc-500 border-b border-zinc-800"><th className="p-3">Semana</th><th className="p-3">Fechas</th><th className="p-3">Rival</th><th className="p-3">Resultado</th><th className="p-3">Sesiones</th><th className="p-3">Estado</th><th className="p-3">Acciones</th></tr></thead><tbody>{filtered.map((s) => <tr key={s.id} className="border-b border-zinc-800/60"><td className="p-3 text-white font-semibold">{s.microcycle_name}</td><td className="p-3 text-zinc-400">{s.fecha_inicio} - {s.fecha_fin}</td><td className="p-3 text-zinc-300">{s.rival || "—"}</td><td className="p-3 text-zinc-300">{s.resultado || "—"}</td><td className="p-3 text-emerald-300 font-bold">{s.cantidad_sesiones || 0}</td><td className="p-3"><span className="px-2 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">{s.estado || "congelado"}</span></td><td className="p-3"><div className="flex gap-2"><button onClick={() => setSelected(s)} className="px-3 py-1 bg-zinc-800 hover:bg-zinc-700 text-white rounded-lg">Abrir</button><button onClick={() => exportPdf(s)} className="px-3 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg"><Download size={14} /></button><button onClick={() => duplicate(s)} className="px-3 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg"><Copy size={14} /></button></div></td></tr>)}</tbody></table></div><Detail summary={selected} onClose={() => setSelected(null)} onRecalculate={recalc} onKeep={keep} onExport={exportPdf} /></div>;
+  return <div className="space-y-5"><div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4"><div><p className="text-emerald-400 text-xs font-bold uppercase">Biblioteca histórica</p><h1 className="text-white text-3xl font-bold">Historial de Microciclos</h1><p className="text-zinc-400 text-sm">Consultá, compará, duplicá y exportá cualquier semana de la temporada.</p></div><div className="bg-zinc-900 border border-zinc-800 rounded-2xl px-4 py-3"><p className="text-zinc-500 text-xs">Microciclos visibles</p><p className="text-white text-2xl font-bold">{filtered.length}</p></div></div><Filters filters={filters} setFilters={setFilters} squads={squads} seasons={seasons} /><ComparisonPanel summaries={filtered} /><div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{filtered.map((s) => <MicrocycleCard key={s.id} summary={s} selected={selected?.id === s.id} onOpen={setSelected} onDuplicate={duplicate} onExport={exportPdf} />)}{!filtered.length && <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center text-zinc-500 md:col-span-2 xl:col-span-3">No hay microciclos para esos filtros.</div>}</div><DetailPanel summary={selected} tagDraft={tagDraft} setTagDraft={setTagDraft} onClose={() => setSelected(null)} onTag={updateTag} onStatus={updateStatus} onExport={exportPdf} /></div>;
 }

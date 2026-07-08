@@ -14,6 +14,15 @@
       "type": "string",
       "description": "Temporada"
     },
+    "microcycle_number": {
+      "type": "number",
+      "description": "N\u00famero secuencial del microciclo dentro de la temporada"
+    },
+    "version_number": {
+      "type": "number",
+      "default": 1,
+      "description": "N\u00famero de versi\u00f3n hist\u00f3rica del microciclo"
+    },
     "microcycle_name": {
       "type": "string",
       "description": "Nombre del microciclo (compatibilidad)"
@@ -44,6 +53,18 @@
       "type": "string",
       "description": "Resultado si existe"
     },
+    "competencia": {
+      "type": "string",
+      "description": "Competencia principal"
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas del microciclo"
+    },
     "cantidad_sesiones": {
       "type": "number",
       "description": "Cantidad de sesiones con GPS v\u00e1lido"
@@ -55,23 +76,21 @@
     "estado": {
       "type": "string",
       "enum": [
+        "borrador",
+        "en_curso",
+        "finalizado",
+        "archivado",
         "abierto",
         "cerrado",
-        "archivado",
         "congelado",
-        "recalculado",
-        "borrador"
+        "recalculado"
       ],
-      "default": "abierto",
+      "default": "borrador",
       "description": "Estado del microciclo"
     },
     "entrenador": {
       "type": "string",
       "description": "Entrenador o responsable"
-    },
-    "competencia": {
-      "type": "string",
-      "description": "Competencia principal"
     },
     "created_at": {
       "type": "string",
@@ -81,9 +100,21 @@
       "type": "string",
       "description": "Fecha/hora de \u00faltima actualizaci\u00f3n del snapshot"
     },
+    "archived_at": {
+      "type": "string",
+      "description": "Fecha/hora de archivado"
+    },
+    "finalized_at": {
+      "type": "string",
+      "description": "Fecha/hora de finalizaci\u00f3n"
+    },
     "source_weekly_plan_id": {
       "type": "string",
       "description": "Plan semanal origen"
+    },
+    "duplicated_from_id": {
+      "type": "string",
+      "description": "ID del microciclo usado como base para duplicar"
     },
     "snapshot_locked": {
       "type": "boolean",
@@ -97,6 +128,54 @@
     "pdf_generated_at": {
       "type": "string",
       "description": "Fecha de \u00faltima exportaci\u00f3n PDF"
+    },
+    "exports_snapshot": {
+      "type": "object",
+      "description": "URLs y metadatos de exportaciones preservadas"
+    },
+    "days_snapshot": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "D\u00edas del microciclo congelados"
+    },
+    "sessions_snapshot": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Sesiones del microciclo congeladas"
+    },
+    "physical_objectives_snapshot": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Objetivos f\u00edsicos por d\u00eda/sesi\u00f3n"
+    },
+    "md_codes_snapshot": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "C\u00f3digos MD por d\u00eda/sesi\u00f3n"
+    },
+    "load_summary_snapshot": {
+      "type": "object",
+      "description": "Resumen de carga congelado"
+    },
+    "ai_analysis_snapshot": {
+      "type": "object",
+      "description": "An\u00e1lisis IA guardado"
+    },
+    "reports_snapshot": {
+      "type": "object",
+      "description": "Reportes asociados conservados"
     },
     "snapshot": {
       "type": "object",

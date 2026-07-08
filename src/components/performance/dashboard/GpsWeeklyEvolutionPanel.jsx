@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import moment from "moment";
+import { Link } from "react-router-dom";
 import { Archive, CheckCircle2, History, Save } from "lucide-react";
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import GpsMicrocycleDailyTable from "./GpsMicrocycleDailyTable";
@@ -88,6 +89,10 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
 
   const latestSummary = useMemo(() => [...summaries].sort((a, b) => String(b.updated_at || b.created_at || b.fecha_inicio || "").localeCompare(String(a.updated_at || a.created_at || a.fecha_inicio || "")))[0] || null, [summaries]);
   const selectedSummary = useMemo(() => summaries.find((s) => s.id === selectedSummaryId), [summaries, selectedSummaryId]);
+  const nextMicrocycleNumber = useMemo(() => {
+    const numbers = summaries.map((s) => Number(s.microcycle_number)).filter(Number.isFinite);
+    return numbers.length ? Math.max(...numbers) + 1 : summaries.length + 1;
+  }, [summaries]);
 
   useEffect(() => {
     if (cycleMode === "lastSaved" && latestSummary && selectedSummaryId !== latestSummary.id) setSelectedSummaryId(latestSummary.id);
@@ -138,36 +143,59 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
   const weekStart = shownDailySummaries[0]?.date || effectiveCycleDays[0]?.date;
   const weekEnd = shownDailySummaries[shownDailySummaries.length - 1]?.date || effectiveCycleDays[effectiveCycleDays.length - 1]?.date;
 
-  const cycleTitle = selectedSummary?.nombre_microciclo || selectedSummary?.microcycle_name || (cycleMode === "previous" ? "Microciclo anterior" : `Microciclo ${weekStart || "actual"}`);
+  const cycleTitle = selectedSummary?.nombre_microciclo || selectedSummary?.microcycle_name || `Microciclo ${nextMicrocycleNumber}`;
 
   async function saveMicrocycle(nextState, silent = false) {
     if (!squadId || !weekStart || !weekEnd) return;
+    const existing = selectedSummary || summaries.find((s) => s.squad_id === squadId && s.fecha_inicio === weekStart && (!season || !s.season_id || s.season_id === season) && !["finalizado", "archivado", "cerrado", "congelado"].includes(s.estado));
+    if (existing?.snapshot_locked && !silent) {
+      const shouldUpdate = window.confirm("Este microciclo ya está finalizado. ¿Desea actualizar también el microciclo guardado?");
+      if (!shouldUpdate) return;
+    }
     if (!silent) {
       setSavingState(nextState);
       setSaveMessage("");
     }
     const now = new Date().toISOString();
-    const gpsVariables = Object.fromEntries(MICRO_METRICS.map((metric) => [metric.key, { label: metric.label, value: aggregateRows(cycleRows, metric), mode: metric.mode }]));
+    const gpsVariables = Object.fromEntries(MICRO_METRICS.map((metric) => [metric.key, { label: metric.label, value: aggregateRows(cycleRows, metric), mode: metric.mode, unit: metric.unit }]));
     const rankings = Object.fromEntries(highlights.map((item) => [item.metric.key, { label: item.metric.label, top3: item.top.map((p) => ({ player_id: p.player?.id || p.player_id || "", name: p.name, value: p.value })) }]));
+    const sessionsInCycle = sessions.filter((s) => s.date >= weekStart && s.date <= weekEnd && (!squadId || !s.squad_id || s.squad_id === squadId));
     const sessionsWithGps = new Set(cycleRows.map((row) => row.session_id).filter(Boolean));
+    const daysSnapshot = effectiveCycleDays.map((day) => ({ date: day.date, md: day.md || "—", objective: day.objetivo || day.physical_objective || day.objetivo_fisico || "—", sessions: sessionsInCycle.filter((s) => s.date === day.date).map((s) => s.id) }));
+    const sessionsSnapshot = sessionsInCycle.map((s) => ({ id: s.id, title: s.title, date: s.date, session_type: s.session_type, duration_minutes: s.duration_minutes, session_objective: s.session_objective, objective: s.objective, match_day_code: s.match_day_code, microcycle_day: s.microcycle_day, squad_id: s.squad_id, squad_name: s.squad_name, season_id: s.season_id, csv_url: s.csv_url, pdf_exported: s.pdf_exported, notes: s.notes }));
     const payload = {
       squad_id: squadId,
       squad_name: squadName || "",
       season_id: season || "",
+      microcycle_number: selectedSummary?.microcycle_number || existing?.microcycle_number || nextMicrocycleNumber,
+      version_number: (selectedSummary?.version_number || existing?.version_number || 0) + (nextState === "finalizado" && !existing ? 1 : 0) || 1,
       microcycle_name: cycleTitle,
       nombre_microciclo: cycleTitle,
       fecha_inicio: weekStart,
       fecha_fin: weekEnd,
-      rival: selectedSummary?.rival || "",
-      partido_asociado: selectedSummary?.partido_asociado || selectedSummary?.rival || "",
-      cantidad_sesiones: sessionsWithGps.size,
-      cantidad_partidos: selectedSummary?.cantidad_partidos || 0,
+      rival: selectedSummary?.rival || existing?.rival || "",
+      partido_asociado: selectedSummary?.partido_asociado || selectedSummary?.rival || existing?.partido_asociado || existing?.rival || "",
+      resultado: selectedSummary?.resultado || existing?.resultado || "",
+      competencia: selectedSummary?.competencia || existing?.competencia || "",
+      tags: selectedSummary?.tags || existing?.tags || [],
+      cantidad_sesiones: sessionsWithGps.size || sessionsInCycle.length,
+      cantidad_partidos: selectedSummary?.cantidad_partidos || existing?.cantidad_partidos || 0,
       estado: nextState,
-      created_at: selectedSummary?.created_at || now,
+      created_at: selectedSummary?.created_at || existing?.created_at || now,
       updated_at: now,
-      snapshot_locked: nextState === "cerrado",
-      pdf_url: selectedSummary?.pdf_url || "",
-      pdf_generated_at: selectedSummary?.pdf_generated_at || "",
+      archived_at: nextState === "finalizado" || nextState === "archivado" ? now : selectedSummary?.archived_at || existing?.archived_at || "",
+      finalized_at: nextState === "finalizado" ? now : selectedSummary?.finalized_at || existing?.finalized_at || "",
+      snapshot_locked: nextState === "finalizado" || nextState === "archivado",
+      pdf_url: selectedSummary?.pdf_url || existing?.pdf_url || "",
+      pdf_generated_at: selectedSummary?.pdf_generated_at || existing?.pdf_generated_at || "",
+      exports_snapshot: { pdf_url: selectedSummary?.pdf_url || existing?.pdf_url || "", cronograma_url: "", resumen_url: "", informes_gps_url: "" },
+      days_snapshot: daysSnapshot,
+      sessions_snapshot: sessionsSnapshot,
+      physical_objectives_snapshot: daysSnapshot.map((d) => ({ date: d.date, objective: d.objective })),
+      md_codes_snapshot: daysSnapshot.map((d) => ({ date: d.date, md: d.md })),
+      load_summary_snapshot: gpsVariables,
+      ai_analysis_snapshot: selectedSummary?.ai_analysis_snapshot || existing?.ai_analysis_snapshot || {},
+      reports_snapshot: { gps_rows_included: cycleRows.length, gps_rows_excluded: Math.max(0, allCycleRows.length - cycleRows.length), pdf_url: selectedSummary?.pdf_url || existing?.pdf_url || "" },
       summary_snapshot: { daily: dailySummaries, gps_rows_included: cycleRows.length, gps_rows_excluded: Math.max(0, allCycleRows.length - cycleRows.length) },
       charts_snapshot: { daily: dailySummaries, metrics: visibleMetrics },
       rankings_snapshot: rankings,
@@ -176,15 +204,14 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       highlighted_players_snapshot: { items: highlights },
       weekly_comparison_snapshot: { items: comparison },
       filters_snapshot: filters,
-      snapshot: { dailySummaries, highlights, comparison, filters, metrics: visibleMetrics },
+      snapshot: { days: daysSnapshot, sessions: sessionsSnapshot, dailySummaries, highlights, comparison, filters, metrics: visibleMetrics, loadSummary: gpsVariables },
     };
-    const existing = selectedSummary || summaries.find((s) => s.squad_id === squadId && s.fecha_inicio === weekStart && (!season || !s.season_id || s.season_id === season));
     if (existing) await base44.entities.MicrocycleSummary.update(existing.id, payload);
     else await base44.entities.MicrocycleSummary.create(payload);
     await loadSummaries();
     if (!silent) {
       setSavingState("");
-      setSaveMessage(nextState === "cerrado" ? "Microciclo cerrado y congelado en historial." : "Microciclo guardado en historial.");
+      setSaveMessage(nextState === "finalizado" ? "Microciclo guardado y archivado como snapshot histórico." : "Microciclo guardado en historial.");
     }
   }
 
@@ -207,8 +234,8 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
   useEffect(() => {
     const hasFilters = Object.keys(filters || {}).some((key) => filters[key] && !(Array.isArray(filters[key]) && filters[key].length === 0));
     const existing = summaries.find((s) => s.squad_id === squadId && s.fecha_inicio === weekStart && (!season || !s.season_id || s.season_id === season));
-    if (cycleMode !== "current" || hasFilters || !squadId || !weekStart || !weekEnd || !cycleRows.length || existing?.snapshot_locked || existing?.estado === "cerrado") return;
-    const timer = setTimeout(() => saveMicrocycle("borrador", true), 2500);
+    if (cycleMode !== "current" || hasFilters || !squadId || !weekStart || !weekEnd || !cycleRows.length || existing?.snapshot_locked || ["finalizado", "archivado", "cerrado", "congelado"].includes(existing?.estado)) return;
+    const timer = setTimeout(() => saveMicrocycle("en_curso", true), 2500);
     return () => clearTimeout(timer);
   }, [cycleMode, squadId, weekStart, weekEnd, cycleRows.length, summaries.length]);
 
@@ -222,7 +249,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
             <p className="text-zinc-400 text-sm mt-1">{squadName || "Plantel activo"} · {weekStart ? moment(weekStart).format("DD/MM") : ""} - {weekEnd ? moment(weekEnd).format("DD/MM/YYYY") : ""}</p>
             {saveMessage && <p className="text-emerald-300 text-xs font-semibold mt-2 flex items-center gap-1"><CheckCircle2 size={13} />{saveMessage}</p>}
           </div>
-          <div className="flex gap-2 flex-wrap"><button onClick={() => setShowHistory((v) => !v)} className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold"><History size={16} />Historial</button><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocycleAiAnalysis dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /><button onClick={() => saveMicrocycle("abierto")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Save size={16} />{savingState === "abierto" ? "Guardando..." : "Guardar microciclo"}</button><button onClick={() => saveMicrocycle("cerrado")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{savingState === "cerrado" ? "Cerrando..." : "Cerrar microciclo"}</button></div>
+          <div className="flex gap-2 flex-wrap"><Link to="/performance/microcycle-history" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold"><History size={16} />Historial de Microciclos</Link><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocycleAiAnalysis dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /><button onClick={() => saveMicrocycle("finalizado")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{savingState === "finalizado" ? "Archivando..." : "Guardar y Archivar Microciclo"}</button></div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <label className="space-y-1"><span className="text-xs font-semibold text-zinc-400">Selector de microciclo</span><select value={cycleMode} onChange={(e) => { const value = e.target.value; setCycleMode(value); if (value === "current") setSelectedSummaryId(""); if (value === "lastSaved") setSelectedSummaryId(latestSummary?.id || ""); if (value === "historical") setSelectedSummaryId(""); }} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="current">Microciclo actual</option><option value="lastSaved">Último microciclo guardado</option><option value="historical">Elegir otro microciclo</option></select></label>
