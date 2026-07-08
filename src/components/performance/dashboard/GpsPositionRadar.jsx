@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Cell, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const POSITION_ORDER = [
@@ -20,16 +20,24 @@ const POSITION_COLORS = {
   "Delantero Centro": "#a3e635",
 };
 const METRICS = [
-  { key: "total_distance", label: "Distancia", unit: "m" },
-  { key: "player_load", label: "Player Load", unit: "" },
-  { key: "sprints", label: "Sprints", unit: "" },
-  { key: "m_min", label: "m/min", unit: "" },
+  { key: "total_distance", label: "Distancia", unit: "m", aggregate: "sum" },
+  { key: "player_load", label: "Player Load", unit: "", aggregate: "sum" },
+  { key: "sprints", label: "Sprints", unit: "", aggregate: "sum" },
+  { key: "m_min", label: "m/min", unit: "", aggregate: "avg" },
 ];
 
+function numericValues(values) {
+  return values.map((v) => Number(v)).filter(Number.isFinite);
+}
+
 function average(values) {
-  const nums = values.map((v) => Number(v)).filter(Number.isFinite);
+  const nums = numericValues(values);
   if (!nums.length) return 0;
   return nums.reduce((a, b) => a + b, 0) / nums.length;
+}
+
+function sum(values) {
+  return numericValues(values).reduce((a, b) => a + b, 0);
 }
 
 function normalizePosition(position) {
@@ -47,6 +55,7 @@ function normalizePosition(position) {
 }
 
 export default function GpsPositionRadar({ rows = [] }) {
+  const [analysisMode, setAnalysisMode] = useState("sum");
   const grouped = useMemo(() => {
     const map = Object.fromEntries(POSITION_ORDER.map((position) => [position, []]));
     rows.forEach((row) => {
@@ -58,23 +67,30 @@ export default function GpsPositionRadar({ rows = [] }) {
 
   const chartData = useMemo(() => {
     const fieldRows = rows.filter((row) => normalizePosition(row.position));
-    const teamAverages = Object.fromEntries(METRICS.map((metric) => [metric.key, average(fieldRows.map((r) => r[metric.key]))]));
     return POSITION_ORDER.map((position) => {
       const positionRows = grouped[position];
       const item = { position, jugadores: new Set(positionRows.map((r) => r.player_id)).size };
       METRICS.forEach((metric) => {
-        const positionAvg = average(positionRows.map((r) => r[metric.key]));
-        item[metric.key] = teamAverages[metric.key] > 0 ? Math.round((positionAvg / teamAverages[metric.key]) * 100) : 0;
+        const useSum = analysisMode === "sum" && metric.aggregate === "sum";
+        const teamValue = useSum ? sum(fieldRows.map((r) => r[metric.key])) : average(fieldRows.map((r) => r[metric.key]));
+        const positionValue = useSum ? sum(positionRows.map((r) => r[metric.key])) : average(positionRows.map((r) => r[metric.key]));
+        item[metric.key] = teamValue > 0 ? Math.round((positionValue / teamValue) * 100) : 0;
       });
       return item;
     });
-  }, [rows, grouped]);
+  }, [rows, grouped, analysisMode]);
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-      <div className="mb-4">
-        <h3 className="text-white font-bold text-lg">Carga por posición de campo</h3>
-        <p className="text-zinc-500 text-sm">Comparativo relativo (%) por posición específica. Arqueros excluidos del análisis GPS.</p>
+      <div className="flex items-start justify-between gap-3 mb-4 flex-wrap">
+        <div>
+          <h3 className="text-white font-bold text-lg">Carga por posición</h3>
+          <p className="text-zinc-500 text-sm">{analysisMode === "sum" ? "Sumatoria relativa (%) de cargas del microciclo por posición." : "Promedio relativo (%) de cargas del microciclo por posición."}</p>
+        </div>
+        <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-1 flex text-xs">
+          <button onClick={() => setAnalysisMode("sum")} className={`px-3 py-1.5 rounded-lg transition-colors ${analysisMode === "sum" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-white"}`}>Sumatoria</button>
+          <button onClick={() => setAnalysisMode("avg")} className={`px-3 py-1.5 rounded-lg transition-colors ${analysisMode === "avg" ? "bg-blue-600 text-white" : "text-zinc-400 hover:text-white"}`}>Promedio</button>
+        </div>
       </div>
       <div className="h-[420px]">
         <ResponsiveContainer width="100%" height="100%">
