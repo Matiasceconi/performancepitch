@@ -10,6 +10,14 @@
       "type": "string",
       "description": "Nombre normalizado para detectar duplicados"
     },
+    "aliases": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Nombres alternativos detectados para el mismo ejercicio"
+    },
     "squad_id": {
       "type": "string",
       "description": "Plantel propietario (vac\u00edo si global=true)"
@@ -73,6 +81,10 @@
       "type": "string",
       "description": "URL de video"
     },
+    "thumbnail_url": {
+      "type": "string",
+      "description": "Miniatura generada autom\u00e1ticamente desde el video"
+    },
     "restore_exercise": {
       "type": "string",
       "description": "Ejercicio restaura"
@@ -134,6 +146,14 @@
       "type": "number",
       "default": 1,
       "description": "Veces utilizado"
+    },
+    "usage_sessions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Sesiones donde apareci\u00f3 el ejercicio"
     },
     "last_used_at": {
       "type": "string",

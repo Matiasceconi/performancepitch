@@ -91,17 +91,59 @@ export function fieldImportantChanged(original, form) {
   return ["name", "image_url", "video_url", "description", "external_load_summary"].some((key) => String(original[key] || "") !== String(form[key] || ""));
 }
 
+export function getVideoThumbnailUrl(url = "") {
+  const youtubeId = String(url).match(/(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)([A-Za-z0-9_-]{6,})/)?.[1];
+  return youtubeId ? `https://img.youtube.com/vi/${youtubeId}/hqdefault.jpg` : "";
+}
+
+export function canonicalExerciseName(value) {
+  let text = normalizeExerciseName(value);
+  if (text === "bulgara" || text === "sentadilla bulgara" || text === "sentadilla búlgara" || text === "split squat") return "sentadilla bulgara";
+  text = text.replace(/\bsplit squat\b/g, "sentadilla bulgara");
+  return text;
+}
+
+function similarityScore(a, b) {
+  const left = new Set(canonicalExerciseName(a).split(" ").filter(Boolean));
+  const right = new Set(canonicalExerciseName(b).split(" ").filter(Boolean));
+  if (!left.size || !right.size) return 0;
+  const intersection = [...left].filter(token => right.has(token)).length;
+  return intersection / Math.max(left.size, right.size);
+}
+
+function sameStrengthTemplate(item, station, squadId) {
+  const name = station.exercise_name || station.name || "";
+  return (item.global === true || item.squad_id === squadId) && canonicalExerciseName(item.name) === canonicalExerciseName(name);
+}
+
+export async function findSimilarStrengthExercise(station, squadId) {
+  const name = station.exercise_name || station.name || "";
+  if (!normalizeExerciseName(name)) return null;
+  const all = await base44.entities.StrengthExerciseLibrary.list("-times_used", 500);
+  const visible = all.filter(item => item.global === true || item.squad_id === squadId);
+  const exact = visible.find(item => canonicalExerciseName(item.name) === canonicalExerciseName(name));
+  if (exact) return { type: "exact", exercise: exact };
+  const similar = visible
+    .map(item => ({ exercise: item, score: similarityScore(item.name, name) }))
+    .filter(item => item.score >= 0.55)
+    .sort((a, b) => b.score - a.score)[0];
+  return similar ? { type: "similar", exercise: similar.exercise } : null;
+}
+
 export function buildStrengthLibraryPayload(station, sessionId, squadId, squadName) {
   const name = station.exercise_name || station.name || "";
+  const thumbnail_url = getVideoThumbnailUrl(station.video_url) || station.thumbnail_url || station.image_url || undefined;
   return {
     name,
-    normalized_name: normalizeExerciseName(name),
+    normalized_name: canonicalExerciseName(name),
+    aliases: [normalizeExerciseName(name)].filter(Boolean),
     method: station.method || undefined,
     exercise_type: station.exercise_type || undefined,
     description: station.description || undefined,
     volume: station.volume || undefined,
     image_url: station.image_url || undefined,
     video_url: station.video_url || undefined,
+    thumbnail_url,
     restore_exercise: station.restore_exercise || undefined,
     compensate_exercise: station.compensate_exercise || undefined,
     sets: station.sets || undefined,
@@ -121,33 +163,64 @@ export function buildStrengthLibraryPayload(station, sessionId, squadId, squadNa
   };
 }
 
-function sameStrengthTemplate(item, station, squadId) {
-  const name = station.exercise_name || station.name || "";
-  return (item.global === true || item.squad_id === squadId) &&
-    normalizeExerciseName(item.name) === normalizeExerciseName(name) &&
-    String(item.method || "") === String(station.method || "") &&
-    String(item.exercise_type || "") === String(station.exercise_type || "");
+function usageEntry(sessionId, options = {}) {
+  return {
+    session_id: sessionId,
+    title: options.session?.title || options.session_title || "Sesión",
+    date: options.session?.date || options.session_date || moment().format("YYYY-MM-DD"),
+  };
+}
+
+function mergedUsage(existing, sessionId, options) {
+  const sessions = Array.isArray(existing.usage_sessions) ? existing.usage_sessions : [];
+  const entry = usageEntry(sessionId, options);
+  const byId = new Map(sessions.filter(item => item?.session_id).map(item => [item.session_id, item]));
+  if (entry.session_id) byId.set(entry.session_id, { ...byId.get(entry.session_id), ...entry });
+  return [...byId.values()].sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 80);
+}
+
+function buildStrengthLibraryUpdate(existing, payload, sessionId, options) {
+  const usage_sessions = mergedUsage(existing, sessionId, options);
+  const aliases = [...new Set([...(existing.aliases || []), ...(payload.aliases || [])].filter(Boolean))];
+  const update = {
+    method: payload.method || existing.method,
+    exercise_type: payload.exercise_type || existing.exercise_type,
+    description: payload.description || existing.description,
+    volume: payload.volume || existing.volume,
+    image_url: payload.image_url || existing.image_url,
+    video_url: payload.video_url || existing.video_url,
+    thumbnail_url: payload.thumbnail_url || existing.thumbnail_url,
+    restore_exercise: payload.restore_exercise || existing.restore_exercise,
+    compensate_exercise: payload.compensate_exercise || existing.compensate_exercise,
+    sets: payload.sets || existing.sets,
+    reps: payload.reps || existing.reps,
+    time: payload.time || existing.time,
+    rest_time: payload.rest_time || existing.rest_time,
+    rir: payload.rir || existing.rir,
+    objective: payload.objective || existing.objective,
+    muscle_group: payload.muscle_group || existing.muscle_group,
+    vector_pattern: payload.vector_pattern || existing.vector_pattern,
+    notes: payload.notes || existing.notes,
+    tags: payload.tags?.length ? payload.tags : existing.tags,
+    aliases,
+    usage_sessions,
+    times_used: usage_sessions.length || existing.times_used || 1,
+    last_used_at: usage_sessions[0]?.date || moment().format("YYYY-MM-DD"),
+  };
+  return update;
 }
 
 export async function syncToStrengthLibrary(station, sessionId, squadId, squadName, options = {}) {
   const today = moment().format("YYYY-MM-DD");
   const payload = buildStrengthLibraryPayload(station, sessionId, squadId, squadName);
   const linkedId = options.updateExistingId || station.library_strength_exercise_id || station.library_exercise_id;
-  if (options.updateExistingId) {
-    const { global, squad_id, squad_name, created_from_session_id, ...updatePayload } = payload;
-    await base44.entities.StrengthExerciseLibrary.update(options.updateExistingId, { ...updatePayload, last_used_at: today });
-    return options.updateExistingId;
-  }
   const all = await base44.entities.StrengthExerciseLibrary.list("-times_used", 500);
-  const match = linkedId ? all.find((item) => item.id === linkedId) : all.find((item) => sameStrengthTemplate(item, station, squadId));
+  const match = linkedId ? all.find(item => item.id === linkedId) : all.find(item => sameStrengthTemplate(item, station, squadId));
   if (match) {
-    await base44.entities.StrengthExerciseLibrary.update(match.id, {
-      times_used: (match.times_used || 1) + (options.incrementUsage === false ? 0 : 1),
-      last_used_at: today,
-    });
+    await base44.entities.StrengthExerciseLibrary.update(match.id, buildStrengthLibraryUpdate(match, payload, sessionId, options));
     return match.id;
   }
-  const created = await base44.entities.StrengthExerciseLibrary.create({ ...payload, times_used: 1, first_created_at: today, last_used_at: today });
+  const created = await base44.entities.StrengthExerciseLibrary.create({ ...payload, times_used: 1, usage_sessions: [usageEntry(sessionId, options)], first_created_at: today, last_used_at: today });
   return created.id;
 }
 

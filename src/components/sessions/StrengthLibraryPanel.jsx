@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { base44 } from "@/api/base44Client";
-import { Star, Search, ChevronDown, ChevronUp, Trash2 } from "lucide-react";
+import { Star, Search, ChevronDown, ChevronUp, Trash2, GitMerge, Play } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { canonicalExerciseName, getVideoThumbnailUrl } from "@/components/sessions/exerciseLibrarySync";
 import moment from "moment";
 
 const METHOD_COLORS = {
@@ -26,6 +27,7 @@ export default function StrengthLibraryPanel() {
   const [filterMethod, setFilterMethod] = useState("");
   const [sortBy, setSortBy] = useState("times_used");
   const [expanded, setExpanded] = useState({});
+  const [merging, setMerging] = useState("");
   const { toast } = useToast();
 
   useEffect(() => {
@@ -46,6 +48,36 @@ export default function StrengthLibraryPanel() {
     await base44.entities.StrengthExerciseLibrary.delete(ex.id);
     setExercises(prev => prev.filter(e => e.id !== ex.id));
     toast({ title: "✓ Ejercicio eliminado de la biblioteca" });
+  }
+
+  function mergeUsageSessions(target, source) {
+    const sessions = [...(target.usage_sessions || []), ...(source.usage_sessions || [])];
+    const byId = new Map(sessions.filter(item => item?.session_id).map(item => [item.session_id, item]));
+    return [...byId.values()].sort((a, b) => String(b.date || "").localeCompare(String(a.date || ""))).slice(0, 80);
+  }
+
+  async function mergeExercises(source, target) {
+    if (!window.confirm(`¿Unificar "${source.name}" dentro de "${target.name}"?`)) return;
+    setMerging(source.id);
+    const usage_sessions = mergeUsageSessions(target, source);
+    const aliases = [...new Set([...(target.aliases || []), ...(source.aliases || []), source.normalized_name, source.name].filter(Boolean))];
+    const patch = {
+      aliases,
+      usage_sessions,
+      times_used: usage_sessions.length || (target.times_used || 1) + (source.times_used || 1),
+      last_used_at: usage_sessions[0]?.date || target.last_used_at || source.last_used_at,
+      video_url: target.video_url || source.video_url || "",
+      thumbnail_url: target.thumbnail_url || getVideoThumbnailUrl(target.video_url || source.video_url) || source.thumbnail_url || source.image_url || "",
+      image_url: target.image_url || source.image_url || "",
+      notes: target.notes || source.notes || "",
+    };
+    const updatedTarget = await base44.entities.StrengthExerciseLibrary.update(target.id, patch);
+    await base44.entities.StrengthStation.updateMany({ library_strength_exercise_id: source.id }, { $set: { library_strength_exercise_id: target.id, library_exercise_id: target.id } });
+    await base44.entities.StrengthStation.updateMany({ library_exercise_id: source.id }, { $set: { library_strength_exercise_id: target.id, library_exercise_id: target.id } });
+    await base44.entities.StrengthExerciseLibrary.delete(source.id);
+    setExercises(prev => prev.filter(e => e.id !== source.id).map(e => e.id === target.id ? { ...e, ...updatedTarget } : e));
+    setMerging("");
+    toast({ title: "✓ Ejercicios unificados" });
   }
 
   const filtered = exercises
@@ -115,9 +147,11 @@ export default function StrengthLibraryPanel() {
         {filtered.map(ex => {
           const mc = METHOD_COLORS[ex.method] || METHOD_COLORS["Otro"];
           const isExp = expanded[ex.id];
+          const previewUrl = getVideoThumbnailUrl(ex.video_url) || ex.thumbnail_url || ex.image_url;
+          const possibleDuplicates = exercises.filter(other => other.id !== ex.id && canonicalExerciseName(other.name) === canonicalExerciseName(ex.name));
           return (
             <div key={ex.id} className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
-              {ex.image_url && <img src={ex.image_url} alt={ex.name} className="w-full max-h-36 object-cover" />}
+              {previewUrl && <div className="relative"><img src={previewUrl} alt={ex.name} className="w-full max-h-36 object-cover" />{ex.video_url && <span className="absolute inset-0 flex items-center justify-center bg-black/25"><Play size={22} className="text-white fill-white" /></span>}</div>}
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex-1 min-w-0">
@@ -160,6 +194,8 @@ export default function StrengthLibraryPanel() {
                     </div>
                     {ex.notes && <p className="text-xs text-zinc-500">{ex.notes}</p>}
                     {ex.last_used_at && <p className="text-[10px] text-zinc-600">Último uso: {moment(ex.last_used_at).format("DD/MM/YYYY")}</p>}
+                    {!!ex.usage_sessions?.length && <div className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-2"><p className="text-[10px] text-zinc-500 font-semibold mb-1">Sesiones donde apareció</p>{ex.usage_sessions.slice(0, 6).map(item => <p key={item.session_id} className="text-[10px] text-zinc-300 truncate">{moment(item.date).format("DD/MM/YYYY")} · {item.title || "Sesión"}</p>)}</div>}
+                    {possibleDuplicates.length > 0 && <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-2 space-y-1"><p className="text-[10px] text-amber-200 font-semibold">Posibles duplicados</p>{possibleDuplicates.map(item => <button key={item.id} onClick={() => mergeExercises(ex, item)} disabled={merging === ex.id} className="w-full flex items-center justify-between gap-2 text-left text-[10px] text-amber-100 hover:text-white disabled:opacity-50"><span className="truncate">Unificar con {item.name}</span><GitMerge size={11} /></button>)}</div>}
                     {ex.video_url && (
                       <a href={ex.video_url} target="_blank" rel="noreferrer"
                         className="text-[10px] text-blue-400 hover:text-blue-300">▶ Ver video</a>

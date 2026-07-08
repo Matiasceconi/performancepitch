@@ -6,7 +6,8 @@ import { useToast } from "@/components/ui/use-toast";
 import StrengthGroupTable from "@/components/sessions/strength/StrengthGroupTable";
 import StrengthPDFExport from "@/components/sessions/strength/StrengthPDFExport";
 import StrengthImageImportModal from "@/components/sessions/strength/StrengthImageImportModal";
-import { METHOD_OPTIONS, TYPE_OPTIONS } from "@/components/sessions/strength/strengthOptions";
+import { METHOD_OPTIONS, TYPE_OPTIONS, syncToLibrary } from "@/components/sessions/strength/strengthOptions";
+import { findSimilarStrengthExercise } from "@/components/sessions/exerciseLibrarySync";
 
 const BLOCK_TEMPLATES = [
   { name: "Restaura", color: "#ef4444", icon: "rotate" },
@@ -109,7 +110,6 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       session_id: session.id,
       name: initial.name || `Cuadro ${blocks.length + 1}`,
       description: initial.description || "",
-      estimated_time: initial.estimated_time || "",
       color: initial.color || template.color,
       icon: initial.icon || template.icon,
       order: blocks.length + 1,
@@ -141,7 +141,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   }
 
   async function duplicateBlock(block) {
-    const created = await createBlock({ name: `${block.name} copia`, description: block.description, estimated_time: block.estimated_time, color: block.color, icon: block.icon });
+    const created = await createBlock({ name: `${block.name} copia`, description: block.description, color: block.color, icon: block.icon });
     const sourceRows = stationsByBlock[block.id] || [];
     const createdRows = [];
     for (let index = 0; index < sourceRows.length; index += 1) {
@@ -187,7 +187,16 @@ export default function SessionStrength({ session, onSessionUpdate }) {
   }
 
   async function onBlurField(station) {
-    await base44.entities.StrengthStation.update(station.id, {
+    let libraryId = station.library_strength_exercise_id || station.library_exercise_id || "";
+    if (station.exercise_name) {
+      if (!libraryId) {
+        const match = await findSimilarStrengthExercise(station, session.squad_id);
+        if (match?.type === "exact") libraryId = match.exercise.id;
+        if (match?.type === "similar" && window.confirm(`Este ejercicio parece similar a: ${match.exercise.name}. ¿Querés usar el existente?`)) libraryId = match.exercise.id;
+      }
+      libraryId = await syncToLibrary(station, session.id, session.squad_id, session.squad_name, { updateExistingId: libraryId || undefined, session, incrementUsage: false });
+    }
+    const payload = {
       work_block_id: station.work_block_id,
       strength_group: station.strength_group || blocks.find(b => b.id === station.work_block_id)?.name || "",
       method: station.method || undefined,
@@ -208,9 +217,11 @@ export default function SessionStrength({ session, onSessionUpdate }) {
       vector_pattern: station.vector_pattern || undefined,
       tags: station.tags || [],
       notes: station.notes || undefined,
-      library_exercise_id: station.library_exercise_id || station.library_strength_exercise_id || undefined,
-      library_strength_exercise_id: station.library_strength_exercise_id || station.library_exercise_id || undefined,
-    });
+      library_exercise_id: libraryId || undefined,
+      library_strength_exercise_id: libraryId || undefined,
+    };
+    const updated = await base44.entities.StrengthStation.update(station.id, payload);
+    setStations(prev => prev.map(row => row.id === station.id ? { ...row, ...updated } : row));
   }
 
   async function onPickLibrary(id, ex) {
@@ -241,7 +252,7 @@ export default function SessionStrength({ session, onSessionUpdate }) {
     };
     setStations(prev => prev.map(s => s.id === id ? { ...s, ...updated } : s));
     await base44.entities.StrengthStation.update(id, updated);
-    base44.entities.StrengthExerciseLibrary.update(ex.id, { times_used: (ex.times_used || 1) + 1, last_used_at: new Date().toISOString().slice(0, 10) });
+    await syncToLibrary({ ...current, ...updated }, session.id, session.squad_id, session.squad_name, { updateExistingId: ex.id, session });
   }
 
   async function onDuplicate(station) {

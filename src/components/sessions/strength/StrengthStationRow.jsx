@@ -34,7 +34,7 @@ function ExercisePreview({ station }) {
 }
 
 export default function StrengthStationRow({ station, index, squadId, onChange, onBlurField, onPickLibrary, onDuplicate, onDelete, onMoveUp, onMoveDown, isLast, compact = false }) {
-  const middleFields = ["sets", "reps", "time", "rest_time", "rir", "objective", "muscle_group", "vector_pattern"];
+  const middleFields = ["sets", "time", "rest_time", "rir", "objective", "muscle_group", "vector_pattern"];
 
   return (
     <Draggable draggableId={station.id} index={index}>

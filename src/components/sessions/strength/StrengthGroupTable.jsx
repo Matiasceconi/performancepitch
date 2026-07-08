@@ -14,13 +14,13 @@ const ICON_OPTIONS = [
 ];
 
 export default function StrengthGroupTable({ block, index, totalBlocks, stations, summary, icons, squadId, handlers }) {
-  const [draft, setDraft] = useState({ name: block.name || "", color: block.color || "#22c55e", icon: block.icon || "dumbbell", description: block.description || "", estimated_time: block.estimated_time || "" });
+  const [draft, setDraft] = useState({ name: block.name || "", color: block.color || "#22c55e", icon: block.icon || "dumbbell", description: block.description || "" });
   const Icon = icons[draft.icon] || icons.dumbbell;
   const hidden = !!block.hidden;
 
   useEffect(() => {
-    setDraft({ name: block.name || "", color: block.color || "#22c55e", icon: block.icon || "dumbbell", description: block.description || "", estimated_time: block.estimated_time || "" });
-  }, [block.id, block.name, block.color, block.icon, block.description, block.estimated_time]);
+    setDraft({ name: block.name || "", color: block.color || "#22c55e", icon: block.icon || "dumbbell", description: block.description || "" });
+  }, [block.id, block.name, block.color, block.icon, block.description]);
 
   function commitDraft(patch) {
     const changed = Object.fromEntries(Object.entries(patch).filter(([key, value]) => value !== (block[key] || (key === "color" ? "#22c55e" : key === "icon" ? "dumbbell" : ""))));
@@ -41,10 +41,7 @@ export default function StrengthGroupTable({ block, index, totalBlocks, stations
                   {ICON_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-[150px_1fr] gap-2">
-                <input value={draft.estimated_time} onChange={e => setDraft(prev => ({ ...prev, estimated_time: e.target.value }))} onBlur={() => commitDraft({ estimated_time: draft.estimated_time })} placeholder="Tiempo estimado manual..." className="w-full bg-zinc-950/30 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-amber-200 focus:outline-none focus:border-zinc-600" />
-                <input value={draft.description} onChange={e => setDraft(prev => ({ ...prev, description: e.target.value }))} onBlur={() => commitDraft({ description: draft.description })} placeholder="Descripción del cuadro..." className="w-full bg-zinc-950/30 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-600" />
-              </div>
+              <input value={draft.description} onChange={e => setDraft(prev => ({ ...prev, description: e.target.value }))} onBlur={() => commitDraft({ description: draft.description })} placeholder="Descripción del cuadro..." className="w-full bg-zinc-950/30 border border-zinc-800 rounded-lg px-2 py-1 text-[11px] text-zinc-300 focus:outline-none focus:border-zinc-600" />
             </div>
           </div>
           <div className="flex items-center gap-1 shrink-0">
@@ -56,10 +53,8 @@ export default function StrengthGroupTable({ block, index, totalBlocks, stations
           </div>
         </div>
 
-        <div className="grid grid-cols-4 gap-2 mt-3">
+        <div className="grid grid-cols-2 gap-2 mt-3">
           <Summary label="Ejercicios" value={summary.exercises} />
-          <Summary label="Tiempo estimado" value={block.estimated_time || "—"} />
-          <Summary label="Cantidad de repeticiones totales" value={summary.volume || "—"} />
           <Summary label="Cantidad de series totales" value={summary.sets || "—"} />
         </div>
       </div>
@@ -77,7 +72,6 @@ export default function StrengthGroupTable({ block, index, totalBlocks, stations
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Ejercicio</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Volumen</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Series</th>
-                <th className="text-left py-2 px-2 text-zinc-500 font-medium">Reps</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Tiempo</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">Pausa</th>
                 <th className="text-left py-2 px-2 text-zinc-500 font-medium">RIR</th>
@@ -93,7 +87,7 @@ export default function StrengthGroupTable({ block, index, totalBlocks, stations
             <Droppable droppableId={block.id}>
               {(provided) => <tbody ref={provided.innerRef} {...provided.droppableProps}>
                 {stations.map((station, rowIndex) => <StrengthStationRow key={station.id} station={station} index={rowIndex} squadId={squadId} compact onChange={handlers.onChange} onBlurField={handlers.onBlurField} onPickLibrary={handlers.onPickLibrary} onDuplicate={handlers.onDuplicate} onDelete={handlers.onDelete} onMoveUp={() => handlers.onMoveInBlock(block.id, rowIndex, -1)} onMoveDown={() => handlers.onMoveInBlock(block.id, rowIndex, 1)} isLast={rowIndex === stations.length - 1} />)}
-                {stations.length === 0 && <tr><td colSpan={15} className="text-center text-zinc-600 py-6">Sin ejercicios en este cuadro</td></tr>}
+                {stations.length === 0 && <tr><td colSpan={14} className="text-center text-zinc-600 py-6">Sin ejercicios en este cuadro</td></tr>}
                 {provided.placeholder}
               </tbody>}
             </Droppable>
