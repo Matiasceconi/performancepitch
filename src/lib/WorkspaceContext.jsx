@@ -219,10 +219,13 @@ export function WorkspaceProvider({ children }) {
         }).catch(() => {});
       }
     } catch (err) {
-      console.error("WorkspaceContext error:", err);
-      console.warn("[Workspace] Falla al cargar el workspace — Administración se mantiene según el último estado confirmado (admin_locked_for_session):", adminLockRef.current);
-      if (!hasLoadedOnceRef.current) {
-        setWorkspaceError(err?.message || "Error al cargar el espacio de trabajo.");
+      const emptyJsonParse = err instanceof SyntaxError && err.message === "Unexpected end of input";
+      if (!emptyJsonParse) {
+        console.error("WorkspaceContext error:", err);
+        console.warn("[Workspace] Falla al cargar el workspace — Administración se mantiene según el último estado confirmado (admin_locked_for_session):", adminLockRef.current);
+        if (!hasLoadedOnceRef.current) {
+          setWorkspaceError(err?.message || "Error al cargar el espacio de trabajo.");
+        }
       }
     } finally {
       hasLoadedOnceRef.current = true;

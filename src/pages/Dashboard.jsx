@@ -255,17 +255,26 @@ export default function Dashboard() {
     if (!silent) setLoading(true); else setRefreshing(true);
     setLoadError(null);
 
+    const safeList = async (loader, fallback = []) => {
+      try {
+        return await loader();
+      } catch (err) {
+        if (err instanceof SyntaxError && err.message === "Unexpected end of input") return fallback;
+        throw err;
+      }
+    };
+
     try {
       const [allPlayers, statuses, allSquads, mb, events, s, matchReports, todayEventsRaw, tomorrowEventsRaw] = await Promise.all([
-        base44.entities.Player.list("-created_date", 500),
-        ensureDailyStatusForDate(today),
-        base44.entities.Squad.list("name", 100),
-        base44.entities.SquadMembership.list("-effective_from", 1000),
-        base44.entities.DayEvent.list("date", 500),
-        base44.entities.TrainingSession.list("-date", 50),
-        base44.entities.MatchReport.list("-date", 20),
-        base44.entities.DayEvent.filter({ date: today }, "time", 100),
-        base44.entities.DayEvent.filter({ date: tomorrow }, "time", 100),
+        safeList(() => base44.entities.Player.list("-created_date", 500)),
+        safeList(() => ensureDailyStatusForDate(today)),
+        safeList(() => base44.entities.Squad.list("name", 100)),
+        safeList(() => base44.entities.SquadMembership.list("-effective_from", 1000)),
+        safeList(() => base44.entities.DayEvent.list("date", 500)),
+        safeList(() => base44.entities.TrainingSession.list("-date", 50)),
+        safeList(() => base44.entities.MatchReport.list("-date", 20)),
+        safeList(() => base44.entities.DayEvent.filter({ date: today }, "time", 100)),
+        safeList(() => base44.entities.DayEvent.filter({ date: tomorrow }, "time", 100)),
       ]);
 
       const map = {};
@@ -294,8 +303,10 @@ export default function Dashboard() {
 
       setLastSync(new Date());
     } catch (err) {
-      console.error("Dashboard loadData error:", err);
-      setLoadError(err?.message || "No se pudo cargar el dashboard.");
+      if (!(err instanceof SyntaxError && err.message === "Unexpected end of input")) {
+        console.error("Dashboard loadData error:", err);
+        setLoadError(err?.message || "No se pudo cargar el dashboard.");
+      }
     } finally {
       if (!silent) setLoading(false); else setRefreshing(false);
     }
