@@ -161,11 +161,11 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
   function exportPDF() {
     setExporting(true);
-    base44.functions.invoke("exportMinutesPDF", {})
+    base44.functions.invoke("exportMinutesPDF", { squadId: activeSquadId, torneoId })
       .then((res) => {
         const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
         const a = document.createElement("a");
-        a.href = url; a.download = "minutos-por-jugador.pdf"; a.click();
+        a.href = url; a.download = "minutos-jugados-defensa-y-justicia.pdf"; a.click();
         URL.revokeObjectURL(url);
         toast({ title: "PDF descargado" });
       })
