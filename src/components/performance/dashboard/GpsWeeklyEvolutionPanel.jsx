@@ -81,10 +81,10 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
   async function loadSummaries() {
     if (!squadId) { setSummaries([]); return; }
     const rows = await base44.entities.MicrocycleSummary.filter({ squad_id: squadId }, "-fecha_inicio", 300);
-    setSummaries(rows.filter((row) => !season || !row.season_id || row.season_id === season));
+    setSummaries(rows);
   }
 
-  useEffect(() => { loadSummaries(); }, [squadId, season]);
+  useEffect(() => { loadSummaries(); }, [squadId]);
 
   const latestSummary = useMemo(() => [...summaries].sort((a, b) => String(b.updated_at || b.created_at || b.fecha_inicio || "").localeCompare(String(a.updated_at || a.created_at || a.fecha_inicio || "")))[0] || null, [summaries]);
   const selectedSummary = useMemo(() => summaries.find((s) => s.id === selectedSummaryId), [summaries, selectedSummaryId]);
