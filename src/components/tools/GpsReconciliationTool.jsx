@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { RefreshCw, CheckCircle, AlertCircle, Link, Search, Users, Database, X, Check } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function normalize(str) {
   return (str || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
@@ -241,9 +242,12 @@ function EntryRow({ entry, players, assigned, onAssign }) {
         <div className="flex items-center gap-2 shrink-0">
           {assignedPlayer && (
             <div className="flex items-center gap-1.5">
-              {assignedPlayer.photo_url
-                ? <img src={assignedPlayer.photo_url} className="w-6 h-6 rounded-full object-cover border border-zinc-600" />
-                : <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center text-[9px] font-bold text-zinc-400">{(assignedPlayer.full_name || "?").charAt(0)}</div>}
+              <PlayerPhoto
+                player={assignedPlayer}
+                className="w-6 h-6 rounded-full object-cover border border-zinc-600"
+                fallbackClassName="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center"
+                textClassName="text-[9px] font-bold text-zinc-400"
+              />
               <span className={`text-xs font-medium ${isNew ? "text-blue-300" : "text-emerald-300"}`}>
                 {assignedPlayer.full_name || assignedPlayer.name}
               </span>

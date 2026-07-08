@@ -1,6 +1,7 @@
 import React from "react";
 import { X, Edit2, Save, Camera } from "lucide-react";
 import moment from "moment";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 const POSITIONS = [
   "Arquero","Defensor Central","Lateral Derecho","Lateral Izquierdo",
@@ -51,14 +52,13 @@ export default function PlayerCard360Header({
         {/* Photo */}
         <div className="relative shrink-0">
           <div className="w-16 h-16 rounded-2xl overflow-hidden border-2 border-zinc-700 bg-zinc-800">
-            {(editing ? editForm.photo_url : player.photo_url) ? (
-              <img src={editing ? editForm.photo_url : player.photo_url} alt={player.full_name}
-                className="w-full h-full object-cover" />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <span className="text-xl font-bold text-zinc-400">{(player.full_name || "?").charAt(0)}</span>
-              </div>
-            )}
+            <PlayerPhoto
+              player={player}
+              src={editing ? editForm.photo_url : player.photo_url}
+              className="w-full h-full object-cover"
+              fallbackClassName="w-full h-full flex items-center justify-center"
+              textClassName="text-xl font-bold text-zinc-400"
+            />
           </div>
           {canUploadPhoto && (
             <label className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center cursor-pointer hover:bg-zinc-600 transition-colors">

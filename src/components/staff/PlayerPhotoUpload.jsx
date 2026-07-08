@@ -2,6 +2,8 @@ import React, { useState, useRef } from "react";
 import { Camera, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useToast } from "@/components/ui/use-toast";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
+import { fileToTransparentPng } from "@/lib/playerPhotoPng";
 
 export default function PlayerPhotoUpload({ player, onPhotoUpdate }) {
   const [uploading, setUploading] = useState(false);
@@ -14,7 +16,8 @@ export default function PlayerPhotoUpload({ player, onPhotoUpdate }) {
 
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const pngFile = await fileToTransparentPng(file);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file: pngFile });
       await base44.entities.Player.update(player.id, { photo_url: file_url });
       // No mutar el prop directamente — notificar con la nueva URL para que el padre actualice su estado
       onPhotoUpdate?.(file_url);
@@ -32,7 +35,7 @@ export default function PlayerPhotoUpload({ player, onPhotoUpdate }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/png,image/jpeg,image/webp,image/*"
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploading}
@@ -42,17 +45,12 @@ export default function PlayerPhotoUpload({ player, onPhotoUpdate }) {
         disabled={uploading}
         className="relative group"
       >
-        {player.photo_url ? (
-          <img
-            src={player.photo_url}
-            alt={player.full_name}
-            className="w-10 h-10 rounded-full object-cover border-2 border-zinc-700 group-hover:opacity-75 transition-opacity"
-          />
-        ) : (
-          <div className="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center group-hover:bg-zinc-700 transition-colors">
-            <span className="text-xs font-bold text-zinc-500">{player.full_name?.charAt(0) || "?"}</span>
-          </div>
-        )}
+        <PlayerPhoto
+          player={player}
+          className="w-10 h-10 rounded-full object-cover border-2 border-zinc-700 group-hover:opacity-75 transition-opacity"
+          fallbackClassName="w-10 h-10 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center group-hover:bg-zinc-700 transition-colors"
+          textClassName="text-xs font-bold text-zinc-500"
+        />
         <div className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <Camera size={14} className="text-white" />
         </div>

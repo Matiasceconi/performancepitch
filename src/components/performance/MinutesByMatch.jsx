@@ -5,6 +5,7 @@ import { base44 } from "@/api/base44Client";
 import { getRivalLogo } from "@/lib/match-utils";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { buildActiveMatchMap } from "@/lib/minutesUtils";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
@@ -347,13 +348,13 @@ function MatchCard({ match, logo, playerKeys, recs, totalMins, playerMap, highli
                     {player?.jersey_number || rec.player_number || i + 1}
                   </span>
                   <div className="flex items-center gap-2">
-                    {player?.photo_url ? (
-                      <img src={player.photo_url} alt={rec.player_name} className="w-6 h-6 rounded-full object-cover border border-zinc-700 shrink-0" />
-                    ) : (
-                      <div className="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                        <span className="text-[10px] font-bold text-zinc-500">{(rec.player_name || "?").charAt(0)}</span>
-                      </div>
-                    )}
+                    <PlayerPhoto
+                      player={player || { full_name: rec.player_name }}
+                      alt={rec.player_name}
+                      className="w-6 h-6 rounded-full object-cover border border-zinc-700 shrink-0"
+                      fallbackClassName="w-6 h-6 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0"
+                      textClassName="text-[10px] font-bold text-zinc-500"
+                    />
                     <span className={`text-sm truncate ${recMatchesPlayerHighlight(rec) ? "text-yellow-300 font-semibold" : "text-white"}`}>{rec.player_name}</span>
                   </div>
                   <span className={`text-sm font-mono font-semibold text-right ${recMatchesPlayerHighlight(rec) ? "text-yellow-300" : "text-white"}`}>{rec.minutes}'</span>

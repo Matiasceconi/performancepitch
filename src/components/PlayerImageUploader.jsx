@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { fileToTransparentPng } from '@/lib/playerPhotoPng';
 
 // name=src/components/PlayerImageUploader.jsx
 export default function PlayerImageUploader({ playerId, currentImageUrl, onSaved, currentUser }) {
@@ -20,7 +21,7 @@ export default function PlayerImageUploader({ playerId, currentImageUrl, onSaved
     setPreview(currentImageUrl || '');
   }, [currentImageUrl]);
 
-  function onFileChange(e) {
+  async function onFileChange(e) {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
     if (!f.type.startsWith('image/')) {
@@ -29,8 +30,9 @@ export default function PlayerImageUploader({ playerId, currentImageUrl, onSaved
     if (f.size > maxSizeMB * 1024 * 1024) {
       return alert(`Máximo ${maxSizeMB} MB.`);
     }
-    setFile(f);
-    setPreview(URL.createObjectURL(f));
+    const pngFile = await fileToTransparentPng(f);
+    setFile(pngFile);
+    setPreview(URL.createObjectURL(pngFile));
   }
 
   async function upload() {
@@ -81,7 +83,7 @@ export default function PlayerImageUploader({ playerId, currentImageUrl, onSaved
         )}
       </div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
-        <input type="file" accept="image/*" onChange={onFileChange} />
+        <input type="file" accept="image/png,image/jpeg,image/webp,image/*" onChange={onFileChange} />
         <div style={{ marginTop: 6 }}>
           <button onClick={upload} disabled={uploading}>{uploading ? 'Subiendo...' : 'Guardar imagen'}</button>
         </div>

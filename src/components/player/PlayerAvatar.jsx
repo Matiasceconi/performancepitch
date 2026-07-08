@@ -8,6 +8,7 @@
  */
 import React from "react";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 const SIZES = {
   xs: { wrap: "w-6 h-6", text: "text-[9px]" },
@@ -34,13 +35,13 @@ export default function PlayerAvatar({ player, size = "sm", showName = false, cl
       className={`flex items-center gap-2 group focus:outline-none ${className}`}
     >
       <div className={`${s.wrap} rounded-full overflow-hidden border border-zinc-700 bg-zinc-800 shrink-0 group-hover:ring-2 group-hover:ring-white/30 transition-all`}>
-        {player?.photo_url ? (
-          <img src={player.photo_url} alt={name} className="w-full h-full object-cover" />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <span className={`font-bold text-zinc-400 ${s.text}`}>{initial}</span>
-          </div>
-        )}
+        <PlayerPhoto
+          player={player}
+          alt={name}
+          className="w-full h-full object-cover"
+          fallbackClassName="w-full h-full flex items-center justify-center"
+          textClassName={`font-bold text-zinc-400 ${s.text}`}
+        />
       </div>
       {showName && (
         <span className="text-sm text-white group-hover:text-blue-300 transition-colors truncate font-medium">

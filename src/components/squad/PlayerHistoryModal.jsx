@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X, AlertCircle, Activity, ArrowUp, ArrowDown } from "lucide-react";
 import { STATUS_LABELS, STATUS_COLORS } from "@/components/squad/squadConstants";
 import moment from "moment";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import "moment/locale/es";
 moment.locale("es");
 
@@ -61,13 +62,12 @@ export default function PlayerHistoryModal({ player, onClose }) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-3">
-            {player.photo_url ? (
-              <img src={player.photo_url} alt={player.full_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700" />
-            ) : (
-              <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-                <span className="text-sm font-bold text-zinc-400">{(player.full_name || "?").charAt(0)}</span>
-              </div>
-            )}
+            <PlayerPhoto
+              player={player}
+              className="w-10 h-10 rounded-full object-cover border border-zinc-700"
+              fallbackClassName="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center"
+              textClassName="text-sm font-bold text-zinc-400"
+            />
             <div>
               <h2 className="text-base font-bold text-white">{player.full_name}</h2>
               <p className="text-xs text-zinc-500">Historial de estados diarios</p>

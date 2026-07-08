@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Activity, AlertTriangle, CheckCircle, ChevronDown, ChevronRight, UserCheck } from "lucide-react";
 import { FileSpreadsheet, Users } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, ReferenceLine, Cell,
@@ -322,13 +323,13 @@ export default function MatchGpsReport({ match }) {
                     <tr key={ri} className={`${ri % 2 === 0 ? "bg-zinc-900" : "bg-zinc-800/10"} ${row.unresolved ? "opacity-50" : ""}`}>
                       <td className="px-2.5 py-1.5 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          {row.photo_url ? (
-                            <img src={row.photo_url} alt={row.player_name} className="w-4 h-4 rounded-full object-cover border border-zinc-700 shrink-0" />
-                          ) : (
-                            <div className="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
-                              <span className="text-[8px] font-bold text-zinc-400">{row.player_name?.charAt(0)}</span>
-                            </div>
-                          )}
+                          <PlayerPhoto
+                            src={row.photo_url}
+                            alt={row.player_name}
+                            className="w-4 h-4 rounded-full object-cover border border-zinc-700 shrink-0"
+                            fallbackClassName="w-4 h-4 rounded-full bg-zinc-700 flex items-center justify-center shrink-0"
+                            textClassName="text-[8px] font-bold text-zinc-400"
+                          />
                           <span className="text-zinc-200 font-medium">{row.player_name}</span>
                           {row.unresolved && (
                             <span title={`CSV: "${row.csv_name}"`}>

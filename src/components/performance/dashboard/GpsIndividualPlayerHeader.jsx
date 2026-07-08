@@ -1,22 +1,18 @@
 import React from "react";
-import { User, Shirt } from "lucide-react";
+import { Shirt } from "lucide-react";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 export default function GpsIndividualPlayerHeader({ player }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6 flex items-start gap-6">
       {/* Photo */}
       <div className="shrink-0">
-        {player.photo_url ? (
-          <img
-            src={player.photo_url}
-            alt={player.full_name}
-            className="w-24 h-24 rounded-xl object-cover border border-zinc-700"
-          />
-        ) : (
-          <div className="w-24 h-24 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center">
-            <User size={40} className="text-zinc-600" />
-          </div>
-        )}
+        <PlayerPhoto
+          player={player}
+          className="w-24 h-24 rounded-xl object-cover border border-zinc-700"
+          fallbackClassName="w-24 h-24 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center"
+          textClassName="text-2xl font-bold text-zinc-500"
+        />
       </div>
 
       {/* Info */}

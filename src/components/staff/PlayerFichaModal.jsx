@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X, Plus, Trash2, Tag, Copy, Check, AlertCircle, User, GitMerge, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import "moment/locale/es";
 moment.locale("es");
 
@@ -141,13 +142,12 @@ export default function PlayerFichaModal({ player, onClose, onEdit }) {
 
         {/* Header */}
         <div className="flex items-center gap-4 px-6 pt-5 pb-4 border-b border-zinc-800 shrink-0">
-          {player.photo_url ? (
-            <img src={player.photo_url} alt={player.full_name} className="w-16 h-16 rounded-full object-cover border-2 border-zinc-700 shrink-0" />
-          ) : (
-            <div className="w-16 h-16 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center shrink-0">
-              <span className="text-xl font-bold text-zinc-400">{(player.full_name || "?").charAt(0)}</span>
-            </div>
-          )}
+          <PlayerPhoto
+            player={player}
+            className="w-16 h-16 rounded-full object-cover border-2 border-zinc-700 shrink-0"
+            fallbackClassName="w-16 h-16 rounded-full bg-zinc-800 border-2 border-zinc-700 flex items-center justify-center shrink-0"
+            textClassName="text-xl font-bold text-zinc-400"
+          />
           <div className="flex-1 min-w-0">
             <h2 className="text-lg font-bold text-white leading-tight">{player.full_name}</h2>
             <p className="text-sm text-zinc-500 mt-0.5">{player.position}{player.jersey_number ? ` · #${player.jersey_number}` : ""}</p>

@@ -1,4 +1,5 @@
 import React from "react";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function fmt(value, unit) {
   if (!value || Number.isNaN(value)) return `0 ${unit}`.trim();
@@ -37,13 +38,13 @@ export default function GpsTopAccumulatedPlayers({ rows, playerMap, metrics }) {
               {players.length ? players.map((item, index) => (
                 <div key={`${metric.key}-${item.player?.id || item.name}`} className="flex items-center gap-3">
                   <span className="w-5 text-xs font-bold text-zinc-500">#{index + 1}</span>
-                  {item.player?.photo_url ? (
-                    <img src={item.player.photo_url} alt={item.name} className="w-9 h-9 rounded-full object-cover border border-zinc-700" />
-                  ) : (
-                    <div className="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">
-                      {initials(item.name)}
-                    </div>
-                  )}
+                  <PlayerPhoto
+                    player={item.player || { full_name: item.name }}
+                    alt={item.name}
+                    className="w-9 h-9 rounded-full object-cover border border-zinc-700"
+                    fallbackClassName="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center"
+                    textClassName="text-xs font-bold text-zinc-300"
+                  />
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-white truncate">{item.name}</p>
                     <p className="text-xs text-zinc-500">{fmt(item.total, metric.unit)}</p>

@@ -1,11 +1,12 @@
 import React from "react";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import { fmt } from "./gpsMicrocycleReportUtils";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 function initials(name) { return (name || "J").split(" ").slice(0, 2).map((p) => p[0]).join("").toUpperCase(); }
 
 function PlayerRank({ item, metric, index }) {
-  return <div className="flex items-center gap-3 rounded-xl bg-zinc-900/70 border border-zinc-800 p-3"><div className="text-lg w-7 text-center">{MEDALS[index]}</div>{item.player?.photo_url ? <img src={item.player.photo_url} alt={item.name} className="w-11 h-11 rounded-full object-cover border border-zinc-700" /> : <div className="w-11 h-11 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-xs font-bold text-zinc-300">{initials(item.name)}</div>}<div className="min-w-0 flex-1"><p className="text-white font-bold text-sm truncate">{item.name}</p><p className="text-xs text-zinc-500 truncate">{item.player?.position || "Sin posición"}</p></div><div className="text-right"><p className="font-bold text-sm" style={{ color: metric.color }}>{fmt(item.value, metric.unit)}</p></div></div>;
+  return <div className="flex items-center gap-3 rounded-xl bg-zinc-900/70 border border-zinc-800 p-3"><div className="text-lg w-7 text-center">{MEDALS[index]}</div><PlayerPhoto player={item.player || { full_name: item.name }} alt={item.name} className="w-11 h-11 rounded-full object-cover border border-zinc-700" fallbackClassName="w-11 h-11 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center" textClassName="text-xs font-bold text-zinc-300" /><div className="min-w-0 flex-1"><p className="text-white font-bold text-sm truncate">{item.name}</p><p className="text-xs text-zinc-500 truncate">{item.player?.position || "Sin posición"}</p></div><div className="text-right"><p className="font-bold text-sm" style={{ color: metric.color }}>{fmt(item.value, metric.unit)}</p></div></div>;
 }
 
 export default function GpsMicrocycleHighlights({ highlights }) {

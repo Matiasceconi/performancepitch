@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { Plus, Save, X, Check, ChevronDown, ChevronUp, Trash2, Edit2 } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
@@ -388,13 +389,13 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                       const player = val.player_id ? playerMap[val.player_id] : null;
                       return (
                         <div key={key} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/30 transition-colors group">
-                          {player?.photo_url ? (
-                            <img src={player.photo_url} alt={val.name} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
-                          ) : (
-                            <div className="w-7 h-7 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center shrink-0">
-                              <span className="text-xs font-bold text-zinc-400">{(val.name || "?").charAt(0)}</span>
-                            </div>
-                          )}
+                          <PlayerPhoto
+                            player={player || { full_name: val.name }}
+                            alt={val.name}
+                            className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0"
+                            fallbackClassName="w-7 h-7 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center shrink-0"
+                            textClassName="text-xs font-bold text-zinc-400"
+                          />
                           {player?.jersey_number && (
                             <span className="text-xs text-zinc-500 font-mono w-5 text-center shrink-0">{player.jersey_number}</span>
                           )}
@@ -437,13 +438,12 @@ function JuvMatchCard({ match, players, onDelete, onLogoUpdated, onMatchUpdated 
                       .filter(p => !editMinutesMap[p.id] && !editMinutesMap[`name:${normalizeStr(p.full_name)}`])
                       .map(p => (
                         <div key={p.id} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-zinc-800/30 transition-colors">
-                          {p.photo_url ? (
-                            <img src={p.photo_url} alt={p.full_name} className="w-6 h-6 rounded-full object-cover border border-zinc-700 shrink-0" />
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">
-                              <span className="text-[10px] font-bold text-zinc-400">{p.full_name?.charAt(0)}</span>
-                            </div>
-                          )}
+                          <PlayerPhoto
+                            player={p}
+                            className="w-6 h-6 rounded-full object-cover border border-zinc-700 shrink-0"
+                            fallbackClassName="w-6 h-6 rounded-full bg-zinc-700 flex items-center justify-center shrink-0"
+                            textClassName="text-[10px] font-bold text-zinc-400"
+                          />
                           <span className="text-xs text-zinc-500 font-mono w-5 shrink-0">{p.jersey_number || "—"}</span>
                           <span className="text-xs text-zinc-400 flex-1">{p.full_name}</span>
                           <span className="text-xs text-zinc-600 shrink-0">{p.division || ""}</span>

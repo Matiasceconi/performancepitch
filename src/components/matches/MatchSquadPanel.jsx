@@ -3,15 +3,16 @@ import { Clock, Save, X, Edit2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
+import TransparentPlayerPhoto from "@/components/player/PlayerPhoto";
 
 function PlayerPhoto({ player }) {
-  if (player?.photo_url) {
-    return <img src={player.photo_url} alt={player.full_name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />;
-  }
   return (
-    <div className="w-8 h-8 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center shrink-0">
-      <span className="text-xs font-bold text-zinc-400">{player?.full_name?.charAt(0) || "?"}</span>
-    </div>
+    <TransparentPlayerPhoto
+      player={player}
+      className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0"
+      fallbackClassName="w-8 h-8 rounded-full bg-zinc-700 border border-zinc-600 flex items-center justify-center shrink-0"
+      textClassName="text-xs font-bold text-zinc-400"
+    />
   );
 }
 

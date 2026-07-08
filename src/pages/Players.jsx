@@ -5,6 +5,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
 import { resolvePlayerType, resolvePositionGroup } from "@/components/squad/squadConstants";
 import { useToast } from "@/components/ui/use-toast";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 const POSITIONS = ["Arquero", "Defensor Central", "Lateral Derecho", "Lateral Izquierdo", "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro"];
 const STATUSES = ["Disponible", "Lesionado", "En recuperación", "Suspendido", "Permiso", "Selección", "Subio a primera", "Bajo a juveniles", "Subieron de juveniles", "Bajo de primera", "Sparring"];
@@ -231,7 +232,7 @@ export default function Players() {
               const membership = currentMembership(player);
               return (
                 <tr key={player.id} className="border-t border-zinc-800 hover:bg-zinc-800/30">
-                  <td className="p-3"><div className="flex items-center gap-3">{player.photo_url ? <img src={player.photo_url} alt={player.full_name} className="w-10 h-10 rounded-full object-cover border border-zinc-700" /> : <div className="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center text-zinc-500 font-bold">{(player.first_name || player.full_name || "?").charAt(0)}</div>}<div><p className="text-white font-semibold">{player.first_name || "—"} {player.last_name || ""}</p><p className="text-xs text-zinc-500">{player.full_name || ""}</p></div></div></td>
+                  <td className="p-3"><div className="flex items-center gap-3"><PlayerPhoto player={player} className="w-10 h-10 rounded-full object-cover border border-zinc-700" fallbackClassName="w-10 h-10 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center" textClassName="text-zinc-500 font-bold" /><div><p className="text-white font-semibold">{player.first_name || "—"} {player.last_name || ""}</p><p className="text-xs text-zinc-500">{player.full_name || ""}</p></div></div></td>
                   <td className="p-3 text-zinc-300">{player.dni || player.document_number || "—"}</td>
                   <td className="p-3 text-zinc-300">{player.birth_date || "—"}</td>
                   <td className="p-3 text-zinc-300">{ageFromBirth(player.birth_date)}</td>
