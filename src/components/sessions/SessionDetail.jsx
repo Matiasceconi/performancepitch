@@ -93,8 +93,9 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
     setSaving(true);
     const mdOverride = planDefaults?.match_day_code ? editForm.match_day_code !== planDefaults.match_day_code : editManualMeta.md;
     const objectiveOverride = planDefaults?.session_objective ? editForm.session_objective !== planDefaults.session_objective : editManualMeta.objective;
+    const sessionNumber = Number(editForm.session_number || currentSession.session_number || 1);
     const updated = await base44.entities.TrainingSession.update(currentSession.id, {
-      title: editForm.title, date: editForm.date, session_type: editForm.session_type,
+      title: `Sesión ${sessionNumber}`, session_number: sessionNumber, date: editForm.date, session_type: editForm.session_type,
       match_day_code: editForm.match_day_code, microcycle_day: editForm.match_day_code,
       session_objective: editForm.session_objective,
       md_manual_override: mdOverride,
@@ -193,14 +194,15 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                   </span>
                 )}
               </div>
-              <h1 className="text-xl font-bold text-white">{currentSession.title}</h1>
+              <h1 className="text-xl font-bold text-white">SESIÓN {currentSession.session_number || currentSession.title?.replace(/[^0-9]/g, "") || "—"}</h1>
             </div>
           ) : (
             <div className="w-full space-y-3">
               <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Título</label>
-                <input value={editForm.title || ""} onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                <label className="text-xs text-zinc-400 mb-1 block">Número de sesión</label>
+                <input type="number" min={1} value={editForm.session_number || ""} onChange={e => setEditForm(f => ({ ...f, session_number: e.target.value }))}
                   className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
+                <p className="mt-1 text-[10px] text-zinc-500">Se mostrará como “SESIÓN {editForm.session_number || "—"}”.</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>

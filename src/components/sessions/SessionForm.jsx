@@ -25,7 +25,7 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
   const { activeSquadId, activeSeasonId } = useWorkspace();
   const [squads, setSquads] = useState([]);
   const [form, setForm] = useState({
-    title: "", date: moment().format("YYYY-MM-DD"),
+    title: "", session_number: nextSessionNumber || "", date: moment().format("YYYY-MM-DD"),
     squad_id: activeSquadId || "", session_type: "Campo", match_day_code: "MD-1",
     duration_minutes: 90, objective: "", location: "", session_objective: "Volumen", notes: "",
   });
@@ -201,9 +201,11 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
     const available = squadPlayers.filter(({ ds }) => AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
     const unavailable = squadPlayers.filter(({ ds }) => !AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
 
+    const sessionNumber = Number(form.session_number || nextSessionNumber || 1);
     const session = await base44.entities.TrainingSession.create({
       ...form,
-      session_number: nextSessionNumber || 1,
+      title: `Sesión ${sessionNumber}`,
+      session_number: sessionNumber,
       microcycle_day: form.match_day_code,
       md_manual_override: manualMeta.md,
       physical_objective_manual_override: manualMeta.objective,
@@ -290,17 +292,11 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
         <h2 className="text-sm font-semibold text-white">Datos de la sesión</h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div className="sm:col-span-2">
-            <div className="flex items-center justify-between mb-1">
-              <label className="text-xs text-zinc-400 block">Título *</label>
-              <button type="button" onClick={suggestSessionName} disabled={aiLoadingTitle}
-                className="flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200 transition-colors disabled:opacity-50">
-                {aiLoadingTitle ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                Sugerir nombre con IA
-              </button>
-            </div>
-            <input required value={form.title} onChange={e => setF("title", e.target.value)}
-              placeholder="Ej: Entrenamiento martes"
+            <label className="text-xs text-zinc-400 mb-1 block">Número de sesión *</label>
+            <input required type="number" min={1} value={form.session_number || ""} onChange={e => setF("session_number", e.target.value)}
+              placeholder="Ej: 99"
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
+            <p className="mt-1 text-[10px] text-zinc-500">Se mostrará automáticamente como “SESIÓN {form.session_number || nextSessionNumber || "—"}”.</p>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
