@@ -5,8 +5,36 @@ import { fmt, MICRO_METRICS } from "./gpsMicrocycleReportUtils";
 
 const EXAMPLES = ["¿Cuál fue el día de mayor carga mecánica?", "¿Qué día tuvo mayor volumen?", "¿Qué jugadores acumularon más Player Load?", "¿Qué diferencias hubo respecto de la semana anterior?", "¿El microciclo respetó el modelo esperado?"];
 
-function buildPayload({ dailySummaries, highlights, comparison }) {
-  return { days: dailySummaries.map((d) => ({ date: d.date, md: d.md, sessions: d.sessions.map((s) => s.title), gpsPlayers: d.gpsPlayers, excludedPlayers: d.excludedRows.map((r) => ({ name: r.player_name, group: r.gps_group || r.exclusion_reason || "excluido" })), metrics: Object.fromEntries(MICRO_METRICS.map((m) => [m.key, fmt(d[m.key], m.unit)])) })), rankings: highlights.map((h) => ({ metric: h.metric.label, top3: (h.top || []).map((p) => ({ player: p.name, position: p.player?.position, value: fmt(p.value, h.metric.unit) })) })), comparison: comparison.map((c) => ({ metric: c.metric.label, current: fmt(c.current, c.metric.unit), previous: fmt(c.previous, c.metric.unit), diff: c.diff == null ? null : `${c.diff.toFixed(0)}%`, trend: c.trend })) };
+function buildPayload({ dailySummaries = [], highlights = [], comparison = [] }) {
+  const safeDays = Array.isArray(dailySummaries) ? dailySummaries : [];
+  const safeHighlights = Array.isArray(highlights) ? highlights : [];
+  const safeComparison = Array.isArray(comparison) ? comparison : [];
+
+  return {
+    days: safeDays.map((d) => {
+      const sessions = Array.isArray(d.sessions) ? d.sessions : [];
+      const excludedRows = Array.isArray(d.excludedRows) ? d.excludedRows : [];
+      return {
+        date: d.date,
+        md: d.md,
+        sessions: sessions.map((s) => typeof s === "string" ? s : s?.title).filter(Boolean),
+        gpsPlayers: d.gpsPlayers ?? d.players ?? 0,
+        excludedPlayers: excludedRows.map((r) => ({ name: r.player_name, group: r.gps_group || r.exclusion_reason || "excluido" })),
+        metrics: Object.fromEntries(MICRO_METRICS.map((m) => [m.key, fmt(d[m.key] ?? d.metrics?.[m.key]?.value, m.unit)])),
+      };
+    }),
+    rankings: safeHighlights.map((h) => ({
+      metric: h.metric?.label || h.label || "Métrica",
+      top3: (h.top || h.top3 || []).map((p) => ({ player: p.name, position: p.player?.position, value: fmt(p.value, h.metric?.unit) })),
+    })),
+    comparison: safeComparison.map((c) => ({
+      metric: c.metric?.label || c.label || "Métrica",
+      current: fmt(c.current, c.metric?.unit),
+      previous: fmt(c.previous, c.metric?.unit),
+      diff: c.diff == null ? null : `${Number(c.diff).toFixed(0)}%`,
+      trend: c.trend,
+    })),
+  };
 }
 
 export default function GpsMicrocycleAiAnalysis({ dailySummaries, highlights, comparison }) {
