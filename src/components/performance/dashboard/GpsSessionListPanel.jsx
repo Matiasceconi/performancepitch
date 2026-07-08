@@ -25,6 +25,8 @@ export default function GpsSessionListPanel({ sessions, selectedSessionId, onSel
               <th className="text-left px-4 py-2 font-semibold">Fecha</th>
               <th className="text-left px-2 py-2 font-semibold">Tipo</th>
               <th className="text-left px-2 py-2 font-semibold">Descripción</th>
+              <th className="text-left px-2 py-2 font-semibold">Objetivo</th>
+              <th className="text-center px-2 py-2 font-semibold">Min.</th>
               <th className="text-center px-2 py-2 font-semibold">Jug.</th>
               <th className="px-3 py-2" />
             </tr>
@@ -43,6 +45,8 @@ export default function GpsSessionListPanel({ sessions, selectedSessionId, onSel
                   </span>
                 </td>
                 <td className="px-2 py-2 text-zinc-300 max-w-[160px] truncate">{s.title}</td>
+                <td className="px-2 py-2 text-zinc-400 max-w-[150px] truncate">{s.session_objective || "—"}</td>
+                <td className="px-2 py-2 text-center text-zinc-300">{s.durationForFilter || s.duration_minutes || "—"}</td>
                 <td className="px-2 py-2 text-center text-zinc-300">{s.playerCount}</td>
                 <td className="px-3 py-2 text-right">
                   <button
@@ -55,7 +59,7 @@ export default function GpsSessionListPanel({ sessions, selectedSessionId, onSel
               </tr>
             ))}
             {sessions.length === 0 && (
-              <tr><td colSpan={5} className="text-center text-zinc-600 text-xs py-8">Sin sesiones GPS cargadas</td></tr>
+              <tr><td colSpan={7} className="text-center text-zinc-600 text-xs py-8">Sin sesiones para los filtros aplicados</td></tr>
             )}
           </tbody>
         </table>
