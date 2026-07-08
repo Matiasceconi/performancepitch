@@ -5,19 +5,12 @@ import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { avg, withRetry } from "../externalGpsLoadUtils";
 import ImportHistoricalGPSModal from "../ImportHistoricalGPSModal";
 import GpsDashboardHeader from "./GpsDashboardHeader";
-import GpsKpiCards from "./GpsKpiCards";
-import GpsSessionListPanel from "./GpsSessionListPanel";
-import GpsSessionSummaryPanel from "./GpsSessionSummaryPanel";
-import GpsLoadAlerts from "./GpsLoadAlerts";
-import GpsPlayerTable from "./GpsPlayerTable";
-import GpsPositionRadar from "./GpsPositionRadar";
-import GpsExportButtons from "./GpsExportButtons";
 import GpsWeeklyEvolutionPanel from "./GpsWeeklyEvolutionPanel";
 import GpsIndividualProfilePanel from "./GpsIndividualProfilePanel";
 import GpsIndividualPlayerTab from "./GpsIndividualPlayerTab";
 import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import GpsSessionAnalyticsFilters from "./GpsSessionAnalyticsFilters";
-import { useNavigate } from "react-router-dom";
+import GpsSessionsAdvancedTable from "./GpsSessionsAdvancedTable";
 import moment from "moment";
 
 function positionGroup(position, player) {
@@ -55,7 +48,6 @@ function minutesMatch(value, filters) {
 
 export default function ExternalGpsDashboard() {
   const { activeSquadId } = useWorkspace();
-  const navigate = useNavigate();
   const dashboardRef = useRef(null);
 
   const [squads, setSquads] = useState([]);
@@ -432,26 +424,13 @@ export default function ExternalGpsDashboard() {
             resultCount={filteredAnalyticsSessions.length}
             totalCount={allSessionsData.length}
           />
-          <GpsKpiCards kpis={{
-            sessionsCount: filteredAnalyticsSessions.length,
-            lastSessionDate: filteredAnalyticsSessions[0]?.date,
-            lastSessionTitle: filteredAnalyticsSessions[0] ? `${filteredAnalyticsSessions[0].match_day_code || ""} ${filteredAnalyticsSessions[0].title || ""}`.trim() : "",
-            avgPlayersPerSession: avg(filteredAnalyticsSessions.map((s) => s.playerCount)),
-            avgTotalDistance: avg(analyticsSessionRows.map((r) => r.total_distance)),
-            avgPlayerLoad: avg(analyticsSessionRows.map((r) => r.player_load)),
-            avgSprints: avg(analyticsSessionRows.map((r) => r.sprints)),
-          }} />
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <GpsSessionListPanel
-              sessions={filteredAnalyticsSessions}
-              selectedSessionId={selectedSessionId}
-              onSelect={setSelectedSessionId}
-              onViewReport={(id) => navigate(`/sessions?session=${id}`)}
-            />
-            <GpsSessionSummaryPanel session={selectedAnalyticsSession} summary={analyticsSessionSummary} highlights={analyticsHighlights} />
-          </div>
-          <GpsPlayerTable rows={analyticsSessionRows} />
-          <GpsExportButtons session={selectedAnalyticsSession} rows={analyticsSessionRows} dashboardRef={dashboardRef} />
+          <GpsSessionsAdvancedTable
+            sessions={filteredAnalyticsSessions}
+            gpsBySession={allGpsBySession}
+            playerMap={playerMap}
+            sessionFilters={sessionFilters}
+            loading={loading}
+          />
         </div>
       )}
 
