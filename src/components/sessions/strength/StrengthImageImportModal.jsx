@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X, Upload, Loader, Sparkles, Trash2, Check, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { METHOD_OPTIONS, TYPE_OPTIONS } from "@/components/sessions/strength/strengthOptions";
+import { syncToStrengthLibrary } from "@/components/sessions/exerciseLibrarySync";
 
 const DEFAULT_COLORS = ["#ef4444", "#22c55e", "#38bdf8", "#f59e0b", "#a855f7", "#14b8a6"];
 const DEFAULT_ICONS = ["rotate", "activity", "zap", "shield", "target", "users"];
@@ -98,7 +99,7 @@ export default function StrengthImageImportModal({ session, hasExisting, onClose
         const block = byName[String(r.work_block_name || "").toLowerCase().trim()] || createdBlocks[0];
         const order = rows.filter((item, idx) => idx <= i && String(item.work_block_name || "").toLowerCase().trim() === String(r.work_block_name || "").toLowerCase().trim()).length;
         const linked = libraryByName[normalizeName(r.exercise_name)];
-        created.push(await base44.entities.StrengthStation.create({
+        const createdStation = await base44.entities.StrengthStation.create({
           session_id: session.id,
           work_block_id: block.id,
           strength_group: block.name,
@@ -117,7 +118,10 @@ export default function StrengthImageImportModal({ session, hasExisting, onClose
           video_url: linked?.video_url || "",
           library_exercise_id: linked?.id || "",
           library_strength_exercise_id: linked?.id || "",
-        }));
+        });
+        const libraryId = await syncToStrengthLibrary(createdStation, session.id, session.squad_id, session.squad_name, { updateExistingId: linked?.id || undefined, session });
+        const stationWithLibrary = libraryId ? await base44.entities.StrengthStation.update(createdStation.id, { library_exercise_id: libraryId, library_strength_exercise_id: libraryId }) : createdStation;
+        created.push(stationWithLibrary);
       }
       const sessionUpdate = { strength_purpose: meta.strength_purpose || session.strength_purpose, strength_session_type: meta.strength_session_type || session.strength_session_type, strength_vector_pattern: meta.strength_vector_pattern || session.strength_vector_pattern };
       await base44.entities.TrainingSession.update(session.id, sessionUpdate);
