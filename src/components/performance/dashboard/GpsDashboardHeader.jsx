@@ -1,10 +1,9 @@
 import React from "react";
-import { Activity, Upload, ChevronDown } from "lucide-react";
+import { Activity, ChevronDown } from "lucide-react";
 
 export default function GpsDashboardHeader({
   squads, selectedSquadId, onSquadChange,
   seasons, selectedSeason, onSeasonChange,
-  onImport,
 }) {
   return (
     <div className="flex items-center justify-between flex-wrap gap-3">
@@ -19,13 +18,6 @@ export default function GpsDashboardHeader({
       </div>
 
       <div className="flex items-center gap-2 flex-wrap">
-        <button
-          onClick={onImport}
-          className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <Upload size={15} /> Cargar archivo GPS
-        </button>
-
         <div className="relative">
           <select
             value={selectedSquadId || ""}

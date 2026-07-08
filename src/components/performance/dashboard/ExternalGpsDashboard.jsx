@@ -391,7 +391,6 @@ export default function ExternalGpsDashboard() {
         seasons={seasons}
         selectedSeason={selectedSeason}
         onSeasonChange={setSelectedSeason}
-        onImport={() => setShowImportModal(true)}
       />
 
       {showImportModal && <ImportHistoricalGPSModal onClose={() => { setShowImportModal(false); load(); }} />}
