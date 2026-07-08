@@ -42,7 +42,7 @@ function header(doc, logo, meta) {
   doc.setFillColor(250, 204, 21); doc.rect(0, 10, PAGE.w, 2.5, "F");
   addImage(doc, logo, 12, 16, 18, 18);
   setText(doc, [0, 80, 42], 14, "bold"); doc.text("PerformancePitch", 36, 22);
-  setText(doc, [35, 35, 35], 10, "bold"); doc.text("Informe profesional de rendimiento · Resumen del microciclo", 36, 29);
+  setText(doc, [35, 35, 35], 10, "bold"); doc.text("Informe profesional de rendimiento · Carga del Microciclo", 36, 29);
   setText(doc, [90, 90, 90], 7.5);
   doc.text(`Plantel: ${meta.squadName || "Reserva"} · Temporada: ${meta.season || "—"} · Microciclo: ${meta.microcycle || "—"}`, 36, 35);
   doc.text(`Fechas: ${meta.start || "—"} - ${meta.end || "—"} · Rival: ${meta.rival || "—"} · Resultado: ${meta.result || "—"}`, 170, 22);

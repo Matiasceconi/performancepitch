@@ -2,19 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import moment from "moment";
 import { Link } from "react-router-dom";
-import { Archive, CheckCircle2, History, Save } from "lucide-react";
+import { Archive, CheckCircle2, History } from "lucide-react";
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
-import GpsMicrocycleDailyTable from "./GpsMicrocycleDailyTable";
 import GpsMicrocycleHighlights from "./GpsMicrocycleHighlights";
-import GpsMicrocycleComparison from "./GpsMicrocycleComparison";
-import GpsMicrocycleAiAnalysis from "./GpsMicrocycleAiAnalysis";
 import GpsMicrocyclePdfButton from "./GpsMicrocyclePdfButton";
 import GpsMicrocycleFiltersPanel, { getMicrocycleFilterLabels } from "./GpsMicrocycleFiltersPanel";
-import GpsHistoricalAnalysisPanel from "./GpsHistoricalAnalysisPanel";
 import GpsMicrocycleHistoryPanel from "./GpsMicrocycleHistoryPanel";
+import GpsPositionRadar from "./GpsPositionRadar";
 import {
   MICRO_METRICS,
-  HIGHLIGHT_METRICS,
   buildDailySummaries,
   rowsForCycle,
   buildHighlights,
@@ -22,6 +18,10 @@ import {
   getCycleDays,
   buildSessionAverages,
 } from "./gpsMicrocycleReportUtils";
+
+const RANKING_KEYS = new Set(["total_distance", "sprints", "player_load"]);
+const OBJECTIVES = ["Fuerza", "Velocidad", "Resistencia", "Prevención"];
+const LOAD_METRIC_KEYS = ["total_distance", "player_load", "sprints", "m_min"];
 
 function MetricChart({ metric, data }) {
   return (
@@ -66,6 +66,64 @@ function aggregateRows(rows, metric) {
   if (!values.length) return null;
   if (metric.mode === "max") return Math.max(...values);
   return values.reduce((a, b) => a + b, 0) / values.length;
+}
+
+function normalizeText(value) {
+  return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+}
+
+function avg(values) {
+  const numbers = values.map((v) => Number(v)).filter(Number.isFinite);
+  if (!numbers.length) return null;
+  return numbers.reduce((a, b) => a + b, 0) / numbers.length;
+}
+
+function getStatus(diff) {
+  if (diff == null) return "NORMAL";
+  if (diff <= -8) return "BAJO";
+  if (diff >= 8) return "ALTO";
+  return "NORMAL";
+}
+
+function statusClass(status) {
+  if (status === "ALTO") return "bg-red-500/15 text-red-300 border-red-500/30";
+  if (status === "BAJO") return "bg-blue-500/15 text-blue-300 border-blue-500/30";
+  return "bg-emerald-500/15 text-emerald-300 border-emerald-500/30";
+}
+
+function ObjectiveComparisonTable({ rows }) {
+  return (
+    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 overflow-x-auto">
+      <div className="mb-4">
+        <h3 className="text-white font-bold text-lg">Comparativa por objetivo físico</h3>
+        <p className="text-zinc-500 text-sm">Promedio actual vs histórico (últimas 2 semanas) para días equivalentes y mismo objetivo.</p>
+      </div>
+      <table className="w-full min-w-[760px] text-sm">
+        <thead>
+          <tr className="text-left text-zinc-500 border-b border-zinc-800">
+            <th className="py-2 pr-3">Objetivo</th>
+            <th className="py-2 pr-3">Promedio actual</th>
+            <th className="py-2 pr-3">Histórico 2 semanas</th>
+            <th className="py-2 pr-3">Dif. %</th>
+            <th className="py-2 pr-3">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.objective} className="border-b border-zinc-800/60">
+              <td className="py-2 pr-3 text-white font-semibold">{row.objective}</td>
+              <td className="py-2 pr-3 text-zinc-300">{row.current == null ? "—" : row.current.toFixed(1)}</td>
+              <td className="py-2 pr-3 text-zinc-300">{row.historical == null ? "—" : row.historical.toFixed(1)}</td>
+              <td className="py-2 pr-3 text-zinc-300">{row.diff == null ? "—" : `${row.diff > 0 ? "+" : ""}${row.diff.toFixed(1)}%`}</td>
+              <td className="py-2 pr-3">
+                <span className={`inline-flex px-2 py-1 rounded-lg border text-xs font-bold ${statusClass(row.status)}`}>{row.status}</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [] }) {
@@ -128,20 +186,43 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
   }, [baseCycleDays, normalizedCurrentDays, filters.rangePreset, filters.dateFrom, filters.dateTo, filters.selectedDates]);
 
   const visibleMetrics = useMemo(() => filters.metricKey ? MICRO_METRICS.filter((m) => m.key === filters.metricKey) : MICRO_METRICS, [filters.metricKey]);
-  const visibleHighlightMetrics = useMemo(() => filters.metricKey ? HIGHLIGHT_METRICS.filter((m) => m.key === filters.metricKey) : HIGHLIGHT_METRICS, [filters.metricKey]);
+  const rankingMetrics = useMemo(() => MICRO_METRICS.filter((metric) => RANKING_KEYS.has(metric.key)).map((metric) => ({ ...metric, mode: "sum" })), []);
   const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters, visibleMetrics]);
   const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters]);
   const allCycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, includeExcluded: true }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters]);
-  const highlights = useMemo(() => buildHighlights(cycleRows, playerMap, visibleHighlightMetrics), [cycleRows, playerMap, visibleHighlightMetrics]);
+  const highlights = useMemo(() => buildHighlights(cycleRows, playerMap, rankingMetrics), [cycleRows, playerMap, rankingMetrics]);
   const comparison = useMemo(() => buildComparison({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters, visibleMetrics]);
   const sessionAverages = useMemo(() => buildSessionAverages({ sessions, gpsBySession, playerMap, weeklyPlans, filters: { ...filters, dateFrom: "", dateTo: "", date: "", selectedDates: [] }, metrics: MICRO_METRICS }), [sessions, gpsBySession, playerMap, weeklyPlans, filters]);
   const isSavedMicrocycleView = (cycleMode === "historical" || cycleMode === "lastSaved") && selectedSummary;
   const shownDailySummaries = (isSavedMicrocycleView && selectedSummary?.snapshot?.dailySummaries) || (isSavedMicrocycleView && selectedSummary?.summary_snapshot?.daily) || dailySummaries;
-  const shownHighlights = (isSavedMicrocycleView && selectedSummary?.snapshot?.highlights) || highlights;
+  const shownHighlights = highlights;
   const shownComparison = (isSavedMicrocycleView && selectedSummary?.snapshot?.comparison) || comparison;
   const filterLabels = useMemo(() => getMicrocycleFilterLabels(filters, { players, sessions, metrics: MICRO_METRICS }), [filters, players, sessions]);
   const weekStart = shownDailySummaries[0]?.date || effectiveCycleDays[0]?.date;
   const weekEnd = shownDailySummaries[shownDailySummaries.length - 1]?.date || effectiveCycleDays[effectiveCycleDays.length - 1]?.date;
+  const objectiveTableRows = useMemo(() => {
+    if (!effectiveCycleDays.length || !sessionAverages.length) {
+      return OBJECTIVES.map((objective) => ({ objective, current: null, historical: null, diff: null, status: "NORMAL" }));
+    }
+    const cycleStart = effectiveCycleDays[0]?.date;
+    const cycleEnd = effectiveCycleDays[effectiveCycleDays.length - 1]?.date;
+    const historyStart = cycleStart ? moment(cycleStart).subtract(14, "days").format("YYYY-MM-DD") : "";
+    const baselineByMetric = Object.fromEntries(LOAD_METRIC_KEYS.map((key) => [key, avg(sessionAverages.map((session) => session[key])) || 0]));
+    const indexedSessions = sessionAverages.map((session) => {
+      const normalized = LOAD_METRIC_KEYS.map((key) => baselineByMetric[key] > 0 ? Number(session[key] || 0) / baselineByMetric[key] : null).filter(Number.isFinite);
+      return { ...session, load_index: normalized.length ? (normalized.reduce((a, b) => a + b, 0) / normalized.length) * 100 : null };
+    });
+    return OBJECTIVES.map((objective) => {
+      const objectiveDays = effectiveCycleDays.filter((day) => normalizeText(day.objetivo || day.physical_objective || day.objetivo_fisico) === normalizeText(objective));
+      const weekdaySet = new Set(objectiveDays.map((day) => String(moment(day.date).isoWeekday())));
+      const currentRows = indexedSessions.filter((session) => session.date >= cycleStart && session.date <= cycleEnd && weekdaySet.has(String(moment(session.date).isoWeekday())) && normalizeText(session.objective) === normalizeText(objective));
+      const historicalRows = indexedSessions.filter((session) => session.date < cycleStart && session.date >= historyStart && weekdaySet.has(String(moment(session.date).isoWeekday())) && normalizeText(session.objective) === normalizeText(objective));
+      const current = avg(currentRows.map((row) => row.load_index));
+      const historical = avg(historicalRows.map((row) => row.load_index));
+      const diff = current != null && historical ? ((current - historical) / historical) * 100 : null;
+      return { objective, current, historical, diff, status: getStatus(diff) };
+    });
+  }, [effectiveCycleDays, sessionAverages]);
 
   const cycleTitle = selectedSummary?.nombre_microciclo || selectedSummary?.microcycle_name || `Microciclo ${nextMicrocycleNumber}`;
 
@@ -245,11 +326,11 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
         <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
           <div>
             <p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider">Análisis histórico de carga</p>
-            <h2 className="text-2xl font-bold text-white mt-1">Resumen del microciclo</h2>
+            <h2 className="text-2xl font-bold text-white mt-1">Carga del Microciclo</h2>
             <p className="text-zinc-400 text-sm mt-1">{squadName || "Plantel activo"} · {weekStart ? moment(weekStart).format("DD/MM") : ""} - {weekEnd ? moment(weekEnd).format("DD/MM/YYYY") : ""}</p>
             {saveMessage && <p className="text-emerald-300 text-xs font-semibold mt-2 flex items-center gap-1"><CheckCircle2 size={13} />{saveMessage}</p>}
           </div>
-          <div className="flex gap-2 flex-wrap"><Link to="/performance/microcycle-history" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold"><History size={16} />Historial de Microciclos</Link><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocycleAiAnalysis dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /><button onClick={() => saveMicrocycle("finalizado")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{savingState === "finalizado" ? "Archivando..." : "Guardar y Archivar Microciclo"}</button></div>
+          <div className="flex gap-2 flex-wrap"><Link to="/performance/microcycle-history" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold"><History size={16} />Historial de Microciclos</Link><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /><button onClick={() => saveMicrocycle("finalizado")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{savingState === "finalizado" ? "Archivando..." : "Guardar y Archivar Microciclo"}</button></div>
         </div>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
           <label className="space-y-1"><span className="text-xs font-semibold text-zinc-400">Selector de microciclo</span><select value={cycleMode} onChange={(e) => { const value = e.target.value; setCycleMode(value); if (value === "current") setSelectedSummaryId(""); if (value === "lastSaved") setSelectedSummaryId(latestSummary?.id || ""); if (value === "historical") setSelectedSummaryId(""); }} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="current">Microciclo actual</option><option value="lastSaved">Último microciclo guardado</option><option value="historical">Elegir otro microciclo</option></select></label>
@@ -265,11 +346,9 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           {visibleMetrics.map((metric) => <MetricChart key={metric.key} metric={metric} data={shownDailySummaries} />)}
         </div>
-
-        <GpsMicrocycleDailyTable dailySummaries={shownDailySummaries} metrics={visibleMetrics} />
+        <GpsPositionRadar rows={cycleRows} />
         <GpsMicrocycleHighlights highlights={shownHighlights} />
-        <GpsMicrocycleComparison comparison={shownComparison} />
-        <GpsHistoricalAnalysisPanel sessionAverages={sessionAverages} season={season} />
+        <ObjectiveComparisonTable rows={objectiveTableRows} />
       </div>
     </div>
   );
