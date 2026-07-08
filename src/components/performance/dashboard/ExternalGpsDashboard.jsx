@@ -371,7 +371,7 @@ export default function ExternalGpsDashboard() {
   );
 
   const tabs = [
-    { id: "microcycle", label: "Resumen del microciclo" },
+    { id: "microcycle", label: "Carga del Microciclo" },
     { id: "sessions", label: "Buscar sesiones" },
     { id: "individual-player", label: "Individual" },
     { id: "individual", label: "Perfil competitivo individual" },
