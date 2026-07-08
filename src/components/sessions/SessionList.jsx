@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from "react";
-import { Calendar, Users, Clock, Trash2, Dumbbell, Zap, Video, Eye, Heart, Activity, RotateCcw, BarChart3, PlaySquare, Footprints } from "lucide-react";
+import { Calendar, Users, Clock, Trash2, Dumbbell, Goal, LocateFixed, Zap, Video, Eye, Heart, Activity, RotateCcw, BarChart3, PlaySquare, Footprints } from "lucide-react";
 import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
 import moment from "moment";
 import { effectiveSessionMeta, findPlanDay } from "@/components/planning/microcycleSync";
@@ -71,14 +71,15 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
               <div className="flex flex-wrap xl:flex-nowrap items-center gap-0 border-t xl:border-t-0 xl:border-l border-zinc-800/80 px-3 py-3 xl:py-0" onClick={(e) => e.stopPropagation()}>
                 <div className="grid grid-cols-2 sm:grid-cols-4 xl:flex gap-0 w-full xl:w-auto">
                   <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><Users size={13} />{session.players_selected || 0}</p><p className="text-[11px] text-zinc-500">Jugadores</p></div>
-                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><Dumbbell size={13} />{exercisesCount}</p><p className="text-[11px] text-zinc-500">Ejercicios</p></div>
-                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-xs font-bold text-zinc-300">GPS</p><p className="text-[11px] font-semibold">{statusText(hasGPS, "Cargado", "Sin GPS")}</p></div>
+                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><Goal size={13} />{exercisesCount}</p><p className="text-[11px] text-zinc-500">Ejercicios</p></div>
+                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><LocateFixed size={13} />GPS</p><p className="text-[11px] font-semibold">{statusText(hasGPS, "Cargado", "Sin GPS")}</p></div>
                   <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-xs font-bold text-zinc-300">Video</p><p className="text-[11px] font-semibold">{statusText(hasVideo, "Cargado", "Sin video")}</p></div>
                 </div>
                 <div className="flex gap-2 flex-wrap justify-end ml-auto pt-3 xl:pt-0">
                   <button onClick={() => onSelect(session, "players")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800`}><Eye size={16} className="text-sky-400" />Ver sesión</button>
-                  <button onClick={() => onSelect(session, "exercises")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800`}><Dumbbell size={16} />Ejercicios</button>
-                  <button onClick={() => onSelect(session, "gps")} className={`${actionBtn} ${hasGPS ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800"}`}><BarChart3 size={16} />GPS</button>
+                  <button onClick={() => onSelect(session, "exercises")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800`}><Goal size={16} />Ejercicios</button>
+                  <button onClick={() => onSelect(session, "strength")} className={`${actionBtn} bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20`}><Dumbbell size={16} />Fuerza</button>
+                  <button onClick={() => onSelect(session, "gps")} className={`${actionBtn} ${hasGPS ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800"}`}><LocateFixed size={16} />GPS</button>
                   {hasVideo ? <button onClick={() => setPreview({ url: session.video_url || sessionVideoLinks[0].video_url, title: session.video_url ? session.title : sessionVideoLinks[0].title })} className={`${actionBtn} bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20`}><PlaySquare size={16} />Video</button> : <button onClick={() => onSelect(session, "video")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800`}><Video size={16} />Video</button>}
                   <button onClick={() => onDelete(session.id)} className="self-center p-2 rounded-lg text-zinc-700 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-100 xl:opacity-0 xl:group-hover:opacity-100"><Trash2 size={15} /></button>
                 </div>

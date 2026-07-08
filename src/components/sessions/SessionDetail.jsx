@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Zap, Calendar, Clock, Target, MapPin, Video, Download, FileText, Edit2, Save, X, UserCog } from "lucide-react";
+import { ArrowLeft, Users, Dumbbell, Goal, LocateFixed, Calendar, Clock, Target, MapPin, Video, Download, FileText, Edit2, Save, X, UserCog } from "lucide-react";
 import { Link } from "react-router-dom";
 import SessionVideoPanel from "@/components/sessions/SessionVideoPanel";
 import SessionPDFExport from "@/components/sessions/SessionPDFExport";
@@ -38,9 +38,9 @@ const TYPE_COLORS = {
 
 const TABS = [
   { key: "players",    label: "Jugadores",   icon: Users },
-  { key: "exercises",  label: "Ejercicios",  icon: Dumbbell },
-  { key: "strength",   label: "Fuerza",      icon: Zap },
-  { key: "gps",        label: "GPS",         icon: Zap },
+  { key: "exercises",  label: "Ejercicios",  icon: Goal },
+  { key: "strength",   label: "Fuerza",      icon: Dumbbell },
+  { key: "gps",        label: "GPS",         icon: LocateFixed },
   { key: "video",      label: "Video / Obs.", icon: Video },
 ];
 
