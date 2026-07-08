@@ -21,7 +21,7 @@ const STATUS_LABELS = {
   reintegro: "Reintegro", descanso: "Descanso",
 };
 
-export default function SessionForm({ onCreated, onCancel }) {
+export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) {
   const { activeSquadId, activeSeasonId } = useWorkspace();
   const [squads, setSquads] = useState([]);
   const [form, setForm] = useState({
@@ -203,6 +203,7 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
 
     const session = await base44.entities.TrainingSession.create({
       ...form,
+      session_number: nextSessionNumber || 1,
       microcycle_day: form.match_day_code,
       md_manual_override: manualMeta.md,
       physical_objective_manual_override: manualMeta.objective,

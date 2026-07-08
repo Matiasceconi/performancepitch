@@ -20,6 +20,7 @@ export default function Sessions() {
   const [exerciseCounts, setExerciseCounts] = useState({});
   const [videoLinksBySession, setVideoLinksBySession] = useState({});
   const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [physicalObjectives, setPhysicalObjectives] = useState([]);
   const [selectedTab, setSelectedTab] = useState("players");
   const [autoOpenPDF, setAutoOpenPDF] = useState(false);
   const { toast } = useToast();
@@ -33,12 +34,14 @@ export default function Sessions() {
       base44.entities.SessionExercise.list("-order", 3000),
       base44.entities.SessionVideoLink.list("-created_date", 1000),
       base44.entities.WeeklyPlan.list("-week_start", 100),
-    ]).then(([all, allExercises, allVideoLinks, allPlans]) => {
+      base44.entities.PhysicalObjective.list("order", 100),
+    ]).then(([all, allExercises, allVideoLinks, allPlans, allObjectives]) => {
       const filtered = activeSquadId
         ? all.filter(s => s.squad_id === activeSquadId)
         : all;
       setSessions(filtered);
       setWeeklyPlans(activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans);
+      setPhysicalObjectives(allObjectives.filter(o => o.active !== false && o.hidden !== true));
       const counts = {};
       allExercises.forEach(ex => { counts[ex.session_id] = (counts[ex.session_id] || 0) + 1; });
       setExerciseCounts(counts);
@@ -121,9 +124,6 @@ export default function Sessions() {
     if (f.gps === "sin") list = list.filter(s => !s.csv_label);
     if (f.video === "con") list = list.filter(s => !!s.video_url);
     if (f.video === "sin") list = list.filter(s => !s.video_url);
-    if (f.pdf === "con") list = list.filter(s => !!s.pdf_exported);
-    if (f.pdf === "sin") list = list.filter(s => !s.pdf_exported);
-
     if (f.sort === "antiguas") list.sort((a, b) => a.date.localeCompare(b.date));
     else if (f.sort === "duracion") list.sort((a, b) => (b.duration_minutes || 0) - (a.duration_minutes || 0));
     else if (f.sort === "jugadores") list.sort((a, b) => (b.players_selected || 0) - (a.players_selected || 0));
@@ -133,6 +133,10 @@ export default function Sessions() {
   }, [sessions, filters, weeklyPlans]);
 
   const hasActiveFilters = Object.entries(filters).some(([k, v]) => k !== "sort" && v !== "" && v !== "todos");
+  const nextSessionNumber = useMemo(() => {
+    const numbers = sessions.map(s => Number(s.session_number)).filter(Number.isFinite);
+    return numbers.length ? Math.max(...numbers) + 1 : sessions.length + 1;
+  }, [sessions]);
 
   return (
     <div className="space-y-6">
@@ -162,7 +166,7 @@ export default function Sessions() {
             <h1 className="text-2xl font-bold text-white tracking-tight">Nueva sesión</h1>
             <p className="text-zinc-500 text-sm mt-0.5">Los jugadores se cargan automáticamente desde Estado del Plantel</p>
           </div>
-          <SessionForm onCreated={handleCreated} onCancel={handleBack} />
+          <SessionForm onCreated={handleCreated} onCancel={handleBack} nextSessionNumber={nextSessionNumber} />
         </>
       )}
 
@@ -174,7 +178,7 @@ export default function Sessions() {
         ) : (
           <>
             <SessionFilters filters={filters} onChange={setFilters} />
-            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} videoLinksBySession={videoLinksBySession} weeklyPlans={weeklyPlans} />
+            <SessionList sessions={filteredSessions} onSelect={handleSelect} onDelete={handleDelete} hasFilters={hasActiveFilters} exerciseCounts={exerciseCounts} videoLinksBySession={videoLinksBySession} weeklyPlans={weeklyPlans} physicalObjectives={physicalObjectives} />
           </>
         )
       )}

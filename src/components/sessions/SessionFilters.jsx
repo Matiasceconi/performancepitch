@@ -7,7 +7,7 @@ const MD_CODES = SESSION_MD_CODES;
 
 export const DEFAULT_FILTERS = {
   search: "", dateFrom: "", dateTo: "", type: "", md: "",
-  minPlayers: "", gps: "todos", video: "todos", pdf: "todos", sort: "recientes",
+  minPlayers: "", gps: "todos", video: "todos", sort: "recientes",
 };
 
 function hasActiveFilters(f) {
@@ -64,13 +64,6 @@ export default function SessionFilters({ filters, onChange }) {
           <option value="todos">Video: todos</option>
           <option value="con">Con video</option>
           <option value="sin">Sin video</option>
-        </select>
-
-        <select value={filters.pdf} onChange={e => set("pdf", e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600">
-          <option value="todos">PDF: todos</option>
-          <option value="con">Con PDF exportado</option>
-          <option value="sin">Sin PDF</option>
         </select>
 
         <select value={filters.sort} onChange={e => set("sort", e.target.value)}
