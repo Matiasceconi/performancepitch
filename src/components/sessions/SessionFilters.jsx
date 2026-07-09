@@ -2,11 +2,10 @@ import React, { useState } from "react";
 import { Search, X, SlidersHorizontal } from "lucide-react";
 import { SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
-const TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
 const MD_CODES = SESSION_MD_CODES;
 
 export const DEFAULT_FILTERS = {
-  search: "", sessionNumber: "", dateFrom: "", dateTo: "", type: "", md: "", physicalObjective: "",
+  search: "", sessionNumber: "", dateFrom: "", dateTo: "", md: "", physicalObjective: "",
   minPlayers: "", gps: "todos", video: "todos", sort: "recientes",
 };
 
@@ -53,12 +52,6 @@ export default function SessionFilters({ filters, onChange, physicalObjectives =
         <input type="date" value={filters.dateTo} onChange={e => set("dateTo", e.target.value)}
           title="Hasta"
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600" />
-
-        <select value={filters.type} onChange={e => set("type", e.target.value)}
-          className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600">
-          <option value="">Todos los tipos</option>
-          {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-        </select>
 
         <select value={filters.md} onChange={e => set("md", e.target.value)}
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600">

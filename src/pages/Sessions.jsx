@@ -118,7 +118,6 @@ export default function Sessions() {
     if (f.sessionNumber) list = list.filter(s => String(s.session_number || "").includes(String(f.sessionNumber).trim()));
     if (f.dateFrom) list = list.filter(s => s.date >= f.dateFrom);
     if (f.dateTo) list = list.filter(s => s.date <= f.dateTo);
-    if (f.type) list = list.filter(s => s.session_type === f.type);
     if (f.md) list = list.filter(s => effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id })).match_day_code === f.md);
     if (f.physicalObjective) list = list.filter(s => effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id })).session_objective === f.physicalObjective);
     if (f.minPlayers) list = list.filter(s => (s.players_selected || 0) >= parseInt(f.minPlayers));

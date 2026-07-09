@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink, Clock, Save, Trophy } from "lucide-react";
+import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink, Clock, Save, Trophy, SlidersHorizontal } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import moment from "moment";
@@ -10,6 +10,7 @@ import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
 import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
 import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
+import MatchCompetitionFilters from "@/components/matches/MatchCompetitionFilters.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -224,14 +225,26 @@ const COMPETITION_LABELS = {
   "Amistosos": "Amistosos",
 };
 
-const COMPETITION_OPTIONS = [
+const DEFAULT_COMPETITION_OPTIONS = [
   "Torneo Proyección Apertura 2026",
   "Torneo Proyección Clausura 2026",
   "Amistosos",
 ];
+const COMPETITION_TAGS_KEY = "matches_competition_tags";
+function loadCompetitionTags() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COMPETITION_TAGS_KEY) || "[]");
+    return saved.length ? saved : DEFAULT_COMPETITION_OPTIONS;
+  } catch {
+    return DEFAULT_COMPETITION_OPTIONS;
+  }
+}
+function saveCompetitionTags(tags) {
+  localStorage.setItem(COMPETITION_TAGS_KEY, JSON.stringify(tags));
+}
 
 // ── MatchCard ─────────────────────────────────────────────────────────────────
-function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId }) {
+function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, competitionOptions }) {
   const [expanded, setExpanded] = useState(false);
   const [matchData, setMatchData] = useState(match);
   const [editingCompetition, setEditingCompetition] = useState(false);
@@ -315,7 +328,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId }
               onClick={e => e.stopPropagation()}
             >
               <option value="">— Sin etiqueta —</option>
-              {COMPETITION_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+              {competitionOptions.map(o => <option key={o} value={o}>{o}</option>)}
             </select>
           ) : (
             <span
@@ -457,7 +470,7 @@ const EMPTY = {
   squad_called: [], squad_names: [], notes: "", rival_logo_url: "",
 };
 
-function MatchForm({ initial, players, onSave, onCancel }) {
+function MatchForm({ initial, players, onSave, onCancel, competitionOptions }) {
   const [form, setForm] = useState(initial || EMPTY);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -489,9 +502,7 @@ function MatchForm({ initial, players, onSave, onCancel }) {
           <label className="text-xs text-zinc-400 mb-1 block">Torneo</label>
           <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.competition || ""} onChange={e => set("competition", e.target.value)}>
             <option value="">— Sin etiqueta —</option>
-            <option value="Torneo Proyección Apertura 2026">Torneo Proyección Apertura 2026</option>
-            <option value="Torneo Proyección Clausura 2026">Torneo Proyección Clausura 2026</option>
-            <option value="Amistosos">Amistosos</option>
+            {competitionOptions.map(option => <option key={option} value={option}>{option}</option>)}
           </select>
         </div>
         <div>
@@ -572,11 +583,17 @@ export default function Matches() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, minutesCount }
+  const [showFilters, setShowFilters] = useState(false);
+  const [competitionFilter, setCompetitionFilter] = useState("");
+  const [competitionTags, setCompetitionTags] = useState(loadCompetitionTags);
   const { toast } = useToast();
 
   function handleMatchUpdated(id, data) {
     setMatches(ms => ms.map(m => m.id === id ? { ...m, ...data } : m));
   }
+
+  const competitionOptions = useMemo(() => Array.from(new Set([...competitionTags, ...matches.map(m => m.competition).filter(Boolean)])), [competitionTags, matches]);
+  const visibleMatches = useMemo(() => competitionFilter ? matches.filter(m => m.competition === competitionFilter) : matches, [matches, competitionFilter]);
 
   useEffect(() => { loadAll(); }, [activeSquadId]);
 
@@ -642,6 +659,32 @@ export default function Matches() {
     loadAll();
   }
 
+  function addCompetitionTag(tag) {
+    const next = Array.from(new Set([...competitionTags, tag]));
+    setCompetitionTags(next);
+    saveCompetitionTags(next);
+  }
+
+  async function renameCompetitionTag(oldTag, newTag) {
+    const clean = newTag.trim();
+    if (!clean || clean === oldTag) return;
+    const next = competitionTags.map(tag => tag === oldTag ? clean : tag);
+    setCompetitionTags(next);
+    saveCompetitionTags(next);
+    const affected = matches.filter(match => match.competition === oldTag);
+    await Promise.all(affected.map(match => base44.entities.MatchReport.update(match.id, { competition: clean })));
+    setMatches(ms => ms.map(match => match.competition === oldTag ? { ...match, competition: clean } : match));
+    if (competitionFilter === oldTag) setCompetitionFilter(clean);
+    toast({ title: "Etiqueta de torneo actualizada" });
+  }
+
+  function deleteCompetitionTag(tag) {
+    const next = competitionTags.filter(item => item !== tag);
+    setCompetitionTags(next);
+    saveCompetitionTags(next);
+    if (competitionFilter === tag) setCompetitionFilter("");
+  }
+
   if (loading) return (
     <div className="flex items-center justify-center h-48">
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
@@ -653,15 +696,34 @@ export default function Matches() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-white">Partidos</h1>
-          {activeSquad && <p className="text-xs text-zinc-500 mt-0.5">{activeSquad.name} · {matches.length} partido{matches.length !== 1 ? "s" : ""}</p>}
+          {activeSquad && <p className="text-xs text-zinc-500 mt-0.5">{activeSquad.name} · {visibleMatches.length} partido{visibleMatches.length !== 1 ? "s" : ""}</p>}
         </div>
-        <button
-          onClick={() => { setEditing(null); setShowForm(true); }}
-          className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
-        >
-          <Plus size={15} /> Nuevo partido
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(prev => !prev)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || competitionFilter ? "bg-blue-500/15 border-blue-500/30 text-blue-300" : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"}`}
+          >
+            <SlidersHorizontal size={15} /> {showFilters ? "Ocultar filtros" : "Mostrar filtros"}
+          </button>
+          <button
+            onClick={() => { setEditing(null); setShowForm(true); }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
+          >
+            <Plus size={15} /> Nuevo partido
+          </button>
+        </div>
       </div>
+
+      {showFilters && (
+        <MatchCompetitionFilters
+          options={competitionOptions}
+          selected={competitionFilter}
+          onSelect={setCompetitionFilter}
+          onAdd={addCompetitionTag}
+          onRename={renameCompetitionTag}
+          onDelete={deleteCompetitionTag}
+        />
+      )}
 
       {showForm && (
         <MatchForm
@@ -669,6 +731,7 @@ export default function Matches() {
           players={players}
           onSave={save}
           onCancel={() => { setShowForm(false); setEditing(null); }}
+          competitionOptions={competitionOptions}
         />
       )}
 
@@ -695,14 +758,14 @@ export default function Matches() {
         </div>
       )}
 
-      {matches.length === 0 && !showForm ? (
+      {visibleMatches.length === 0 && !showForm ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-          <p className="text-zinc-500 text-sm">No hay partidos registrados para {activeSquad?.name || "este plantel"}</p>
+          <p className="text-zinc-500 text-sm">No hay partidos registrados para {competitionFilter || activeSquad?.name || "este plantel"}</p>
         </div>
       ) : (
         <div className="space-y-3">
-          {matches.map(m => (
-            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} squadId={activeSquadId} />
+          {visibleMatches.map(m => (
+            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} squadId={activeSquadId} competitionOptions={competitionOptions} />
           ))}
         </div>
       )}
