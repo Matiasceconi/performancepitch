@@ -14,9 +14,12 @@ export function buildActiveMatchMap(matches) {
 // options.requirePositive: si es true (default), exige minutes > 0
 export function getValidMinuteRecords(records, matches, options = {}) {
   const { squadId, requirePositive = true } = options;
-  const matchMap = buildActiveMatchMap(matches);
+  const activeMatches = (matches || []).filter((m) => m.status !== "archivado");
+  const matchMap = buildActiveMatchMap(activeMatches);
   return (records || []).filter((r) => {
-    const match = r.match_id ? matchMap[r.match_id] : null;
+    const match = r.match_id
+      ? matchMap[r.match_id]
+      : activeMatches.find((m) => m.date === r.match_date && (!squadId || m.squad_id === squadId));
     if (!match) return false;
     if (squadId && match.squad_id !== squadId) return false;
     if (requirePositive && !(r.minutes > 0)) return false;

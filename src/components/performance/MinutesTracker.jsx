@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, FileDown } from "lucide-react";
+import { Search, FileDown, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getValidMinuteRecords } from "@/lib/minutesUtils";
 import MinutesExportView from "@/components/performance/MinutesExportView";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 const TORNEOS = [
   { id: "all",                  label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
@@ -42,6 +43,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [records, setRecords] = useState([]);
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
@@ -149,7 +151,6 @@ export default function MinutesTracker({ onSelectPlayer }) {
     return playerData
       .filter(p => {
         if (search && !norm(p.player_name).includes(norm(search))) return false;
-        if (squadPlayerIds instanceof Set && p.player_id && !squadPlayerIds.has(p.player_id)) return false;
         return true;
       })
       .map(p => ({ ...p, ...getMinutes(p) }))
@@ -195,37 +196,45 @@ export default function MinutesTracker({ onSelectPlayer }) {
       </div>
 
       {/* Controles */}
-      <div className="flex flex-wrap gap-3 items-center justify-between">
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar jugador..."
-            className="bg-zinc-900 border-zinc-800 text-white pl-8 w-56 h-8 text-sm"
-          />
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-            {TORNEOS.map((t) => (
-              <button key={t.id} onClick={() => { setTorneoId(t.id); setSortBy(t.res_total ? "res" : "juv"); }}
-                className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${torneoId === t.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-                {t.label}
-              </button>
-            ))}
-          </div>
-          <button onClick={exportPDF}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-yellow-400/15 border border-yellow-400/30 text-yellow-200 hover:bg-yellow-400/25 rounded-lg transition-colors">
-            <FileDown size={13} />
-            Exportar / PDF
-          </button>
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-            {showRes && <button onClick={() => setSortBy("res")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "res" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Reserva</button>}
-            {showJuv && <button onClick={() => setSortBy("juv")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "juv" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Juv.</button>}
-            <button onClick={() => setSortBy("name")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "name" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>A-Z</button>
-          </div>
-        </div>
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        <button onClick={() => setShowFilters((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
+          <SlidersHorizontal size={13} /> {showFilters ? "Ocultar filtros" : "Mostrar filtros"}
+        </button>
+        <button onClick={exportPDF}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-yellow-400/15 border border-yellow-400/30 text-yellow-200 hover:bg-yellow-400/25 rounded-lg transition-colors">
+          <FileDown size={13} />
+          Exportar / PDF
+        </button>
       </div>
+
+      {showFilters && (
+        <div className="flex flex-wrap gap-3 items-center justify-between bg-zinc-950/40 border border-zinc-800 rounded-xl p-3">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Buscar jugador..."
+              className="bg-zinc-900 border-zinc-800 text-white pl-8 w-56 h-8 text-sm"
+            />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+              {TORNEOS.map((t) => (
+                <button key={t.id} onClick={() => { setTorneoId(t.id); setSortBy(t.res_total ? "res" : "juv"); }}
+                  className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${torneoId === t.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+              {showRes && <button onClick={() => setSortBy("res")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "res" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Reserva</button>}
+              {showJuv && <button onClick={() => setSortBy("juv")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "juv" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>↓ Juv.</button>}
+              <button onClick={() => setSortBy("name")} className={`px-3 py-1.5 text-xs font-medium transition-all ${sortBy === "name" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>A-Z</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Tabla */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
@@ -240,7 +249,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
         <div className="divide-y divide-zinc-800/50">
           {display.map((p, i) => {
-            const photo = p.player_id ? photoMap[p.player_id] : null;
+            const player = p.player_id ? playerMap[p.player_id] : null;
             const num = p.player_id ? (numberMap[p.player_id] || p.player_number) : p.player_number;
             return (
               <div key={p.player_id || p.player_name}
@@ -248,13 +257,13 @@ export default function MinutesTracker({ onSelectPlayer }) {
                 className="grid items-center gap-4 px-4 py-2.5 hover:bg-zinc-800/30 transition-colors cursor-pointer"
                 style={{ gridTemplateColumns: cols }}>
                 <span className="text-zinc-600 text-sm font-mono">{num || i + 1}</span>
-                {photo ? (
-                  <img src={photo} alt={p.player_name} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                    <span className="text-xs font-bold text-zinc-500">{(p.player_name || "?").charAt(0)}</span>
-                  </div>
-                )}
+                <PlayerPhoto
+                  player={player || { full_name: p.player_name }}
+                  alt={p.player_name}
+                  className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0"
+                  fallbackClassName="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0"
+                  textClassName="text-xs font-bold text-zinc-500"
+                />
                 <p className="text-sm text-white font-medium">{p.player_name}</p>
 
                 {showRes && (

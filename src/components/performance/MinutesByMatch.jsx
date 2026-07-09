@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { Search, ChevronDown, ChevronUp } from "lucide-react";
+import { Search, ChevronDown, ChevronUp, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { getRivalLogo } from "@/lib/match-utils";
@@ -26,6 +26,7 @@ export default function MinutesByMatch({ selectedPlayer }) {
   const [search, setSearch] = useState("");
   const [tournamentFilter, setTournamentFilter] = useState("all");
   const [fechaFilter, setFechaFilter] = useState("all");
+  const [showFilters, setShowFilters] = useState(false);
   const [minutesRecords, setMinutesRecords] = useState([]);
   const [matchReports, setMatchReports] = useState([]);
   const [players, setPlayers] = useState([]);
@@ -202,45 +203,53 @@ export default function MinutesByMatch({ selectedPlayer }) {
   return (
     <div className="space-y-5">
       {/* Controles */}
-      <div className="flex flex-wrap gap-3 items-center justify-between">
-        <div className="flex flex-wrap gap-2">
-          <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-            {FILTER_OPTIONS.map((o) => (
-              <button key={o.id} onClick={() => { setTournamentFilter(o.id); setFechaFilter("all"); }}
-                className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${tournamentFilter === o.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-                {o.label}
-              </button>
-            ))}
-          </div>
-          {availableFechas.length > 0 && (
-            <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
-              <button onClick={() => setFechaFilter("all")}
-                className={`px-3 py-1.5 text-xs font-medium transition-all ${fechaFilter === "all" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
-                Todas las fechas
-              </button>
-              <select
-                value={fechaFilter}
-                onChange={e => setFechaFilter(e.target.value)}
-                className="bg-zinc-800 border-l border-zinc-700 text-white text-xs px-2 py-1.5 focus:outline-none"
-              >
-                <option value="all">Seleccionar fecha...</option>
-                {availableFechas.map(f => (
-                  <option key={f.value} value={f.value}>{f.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
-        </div>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <Input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar jugador..."
-            className="bg-zinc-900 border-zinc-800 text-white pl-8 w-56 h-8 text-sm"
-          />
-        </div>
+      <div className="flex flex-wrap gap-2 items-center justify-between">
+        <button onClick={() => setShowFilters((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
+          <SlidersHorizontal size={13} /> {showFilters ? "Ocultar filtros" : "Mostrar filtros"}
+        </button>
       </div>
+
+      {showFilters && (
+        <div className="flex flex-wrap gap-3 items-center justify-between bg-zinc-950/40 border border-zinc-800 rounded-xl p-3">
+          <div className="flex flex-wrap gap-2">
+            <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+              {FILTER_OPTIONS.map((o) => (
+                <button key={o.id} onClick={() => { setTournamentFilter(o.id); setFechaFilter("all"); }}
+                  className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${tournamentFilter === o.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {availableFechas.length > 0 && (
+              <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
+                <button onClick={() => setFechaFilter("all")}
+                  className={`px-3 py-1.5 text-xs font-medium transition-all ${fechaFilter === "all" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+                  Todas las fechas
+                </button>
+                <select
+                  value={fechaFilter}
+                  onChange={e => setFechaFilter(e.target.value)}
+                  className="bg-zinc-800 border-l border-zinc-700 text-white text-xs px-2 py-1.5 focus:outline-none"
+                >
+                  <option value="all">Seleccionar fecha...</option>
+                  {availableFechas.map(f => (
+                    <option key={f.value} value={f.value}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <Input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar jugador..."
+              className="bg-zinc-900 border-zinc-800 text-white pl-8 w-56 h-8 text-sm"
+            />
+          </div>
+        </div>
+      )}
 
       {/* Tarjetas de partidos */}
       {visibleMatches.length === 0 ? (
