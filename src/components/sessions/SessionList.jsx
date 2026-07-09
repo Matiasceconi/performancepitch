@@ -41,10 +41,11 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
         const sessionVideoLinks = videoLinksBySession[session.id] || [];
         const hasVideo = !!session.video_url || sessionVideoLinks.length > 0;
         const effectiveMeta = effectiveSessionMeta(session, findPlanDay(weeklyPlans, { date: session.date, squadId: session.squad_id, seasonId: session.season_id }));
-        const objectiveName = effectiveMeta.session_objective || session.session_objective || session.objective || session.session_type || "Sesión";
+        const objectiveName = effectiveMeta.session_objective || session.session_objective || "Sesión";
         const objective = objectiveMap[String(objectiveName).toLowerCase()] || DEFAULT_OBJECTIVE;
         const Icon = iconForObjective(objectiveName);
         const sessionNumber = session.session_number || sessions.length - index;
+        const period = session.period || "Competencia";
 
         return (
           <div key={session.id} className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-r from-zinc-950 via-zinc-950 to-zinc-900/95 hover:border-zinc-700 transition-colors">
@@ -57,6 +58,7 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
                 <div className="flex-1 min-w-0 px-4 py-4">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-white font-extrabold tracking-wide text-lg">SESIÓN {sessionNumber}</h3>
+                    <span className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">{period}</span>
                     {effectiveMeta.match_day_code && <span className="px-3 py-1 rounded-lg text-xs font-bold" style={{ color: objective.text_color || "#fff", backgroundColor: `${objective.color || DEFAULT_OBJECTIVE.color}55` }}>{effectiveMeta.match_day_code}</span>}
                   </div>
                   <p className="text-sm font-semibold mt-0.5" style={{ color: objective.color || DEFAULT_OBJECTIVE.color }}>{objectiveName}</p>

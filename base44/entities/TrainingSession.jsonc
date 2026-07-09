@@ -27,18 +27,15 @@
       "type": "string",
       "description": "Temporada del plantel"
     },
-    "session_type": {
+    "period": {
       "type": "string",
       "enum": [
-        "Campo",
-        "Fuerza",
-        "Regenerativo",
-        "Activaci\u00f3n",
-        "Partido reducido",
-        "Mixto",
-        "Otro"
+        "Pretemporada",
+        "Competencia",
+        "Transici\u00f3n"
       ],
-      "description": "Tipo de sesi\u00f3n"
+      "default": "Competencia",
+      "description": "Per\u00edodo de planificaci\u00f3n de la sesi\u00f3n"
     },
     "match_day_code": {
       "type": "string",
@@ -65,10 +62,6 @@
     "duration_minutes": {
       "type": "number",
       "description": "Duraci\u00f3n en minutos"
-    },
-    "objective": {
-      "type": "string",
-      "description": "Objetivo de la sesi\u00f3n"
     },
     "location": {
       "type": "string",
@@ -114,11 +107,7 @@
     "pdf_exported": {
       "type": "boolean",
       "default": false,
-      "description": "Si el PDF de la sesi\u00f3n fue exportado al menos una vez"
-    },
-    "notes": {
-      "type": "string",
-      "description": "Observaciones generales"
+      "description": "Si la sesi\u00f3n fue exportada al menos una vez"
     },
     "created_by": {
       "type": "string",
@@ -158,7 +147,6 @@
   },
   "required": [
     "title",
-    "date",
-    "session_type"
+    "date"
   ]
 }

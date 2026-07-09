@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { ArrowLeft, Users, Dumbbell, Goal, LocateFixed, Calendar, Clock, Target, MapPin, Video, Download, FileText, Edit2, Save, X, UserCog } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowLeft, Users, Dumbbell, Goal, LocateFixed, Calendar, Clock, MapPin, Video, FileText, Edit2, Save, X } from "lucide-react";
 import SessionVideoPanel from "@/components/sessions/SessionVideoPanel";
 import SessionPDFExport from "@/components/sessions/SessionPDFExport";
 import moment from "moment";
@@ -15,9 +14,9 @@ import { useToast } from "@/components/ui/use-toast";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { effectiveSessionMeta, getMicrocycleDefaults, SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
-const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
 const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
+const PERIOD_OPTIONS = ["Pretemporada", "Competencia", "Transición"];
 const OBJECTIVE_COLORS = {
   "Tensión": "bg-red-500/15 text-red-300 border-red-500/30",
   "Volumen": "bg-blue-500/15 text-blue-300 border-blue-500/30",
@@ -26,14 +25,10 @@ const OBJECTIVE_COLORS = {
   "Recuperación": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
   "Otro": "bg-zinc-500/15 text-zinc-300 border-zinc-600",
 };
-const TYPE_COLORS = {
-  Campo: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
-  Fuerza: "bg-orange-500/15 text-orange-300 border-orange-500/30",
-  Regenerativo: "bg-blue-500/15 text-blue-300 border-blue-500/30",
-  Activación: "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
-  "Partido reducido": "bg-purple-500/15 text-purple-300 border-purple-500/30",
-  Mixto: "bg-zinc-500/15 text-zinc-300 border-zinc-600",
-  Otro: "bg-zinc-500/15 text-zinc-300 border-zinc-600",
+const PERIOD_COLORS = {
+  Pretemporada: "bg-blue-500/15 text-blue-300 border-blue-500/30",
+  Competencia: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
+  Transición: "bg-amber-500/15 text-amber-300 border-amber-500/30",
 };
 
 const TABS = [
@@ -95,13 +90,12 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
     const objectiveOverride = planDefaults?.session_objective ? editForm.session_objective !== planDefaults.session_objective : editManualMeta.objective;
     const sessionNumber = Number(editForm.session_number || currentSession.session_number || 1);
     const updated = await base44.entities.TrainingSession.update(currentSession.id, {
-      title: `Sesión ${sessionNumber}`, session_number: sessionNumber, date: editForm.date, session_type: editForm.session_type,
+      title: `Sesión ${sessionNumber}`, session_number: sessionNumber, date: editForm.date, period: editForm.period || "Competencia",
       match_day_code: editForm.match_day_code, microcycle_day: editForm.match_day_code,
       session_objective: editForm.session_objective,
       md_manual_override: mdOverride,
       physical_objective_manual_override: objectiveOverride,
       duration_minutes: editForm.duration_minutes, location: editForm.location,
-      objective: editForm.objective, notes: editForm.notes,
     });
     setCurrentSession(updated);
     setEditForm(updated);
@@ -116,7 +110,7 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
   const kinesiologia = sessionPlayers.filter(sp => sp.attendance === "kinesiologia").length;
   const presentesField = presentRows.filter(sp => !isGoalkeeper({ position: sp.position })).length;
   const presentesGK = presentRows.filter(sp => isGoalkeeper({ position: sp.position })).length;
-  const typeClass = TYPE_COLORS[currentSession.session_type] || TYPE_COLORS["Otro"];
+  const periodClass = PERIOD_COLORS[currentSession.period || "Competencia"] || PERIOD_COLORS.Competencia;
   const effectiveMeta = effectiveSessionMeta(currentSession, planDefaults ? { values: planDefaults } : null);
   const sessionForDisplay = { ...currentSession, ...effectiveMeta };
   const objectiveOptions = [...new Set([...OBJECTIVE_OPTS, ...physicalObjectives, planDefaults?.session_objective, editForm.session_objective].filter(Boolean))];
@@ -157,12 +151,7 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                 </button>
               </>
             )}
-            <Link
-              to="/daily-squad"
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 rounded-lg transition-colors"
-            >
-              <UserCog size={12} /> Modificar Estados
-            </Link>
+
             <button
               onClick={() => setShowVideoPanel(true)}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-blue-500/15 border border-blue-500/30 text-blue-300 hover:bg-blue-500/25 rounded-lg transition-colors"
@@ -180,8 +169,8 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
           {!editing ? (
             <div>
               <div className="flex items-center gap-2 flex-wrap mb-1">
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${typeClass}`}>
-                  {currentSession.session_type}
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full border ${periodClass}`}>
+                  {currentSession.period || "Competencia"}
                 </span>
                 {effectiveMeta.match_day_code && (
                   <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-300">
@@ -211,10 +200,10 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
                 </div>
                 <div>
-                  <label className="text-xs text-zinc-400 mb-1 block">Tipo</label>
-                  <select value={editForm.session_type || ""} onChange={e => setEditForm(f => ({ ...f, session_type: e.target.value }))}
+                  <label className="text-xs text-zinc-400 mb-1 block">Período</label>
+                  <select value={editForm.period || "Competencia"} onChange={e => setEditForm(f => ({ ...f, period: e.target.value }))}
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
-                    {SESSION_TYPES.map(t => <option key={t}>{t}</option>)}
+                    {PERIOD_OPTIONS.map(period => <option key={period}>{period}</option>)}
                   </select>
                 </div>
                 <div>
@@ -242,16 +231,7 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                     className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
                 </div>
               </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Objetivo</label>
-                <input value={editForm.objective || ""} onChange={e => setEditForm(f => ({ ...f, objective: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
-                <textarea rows={2} value={editForm.notes || ""} onChange={e => setEditForm(f => ({ ...f, notes: e.target.value }))}
-                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 resize-none" />
-              </div>
+
             </div>
           )}
         </div>
@@ -284,13 +264,6 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
               )}
             </div>
 
-            {currentSession.objective && (
-              <div className="flex items-start gap-1.5 text-xs text-zinc-400">
-                <Target size={12} className="shrink-0 mt-0.5" />
-                <span>{currentSession.objective}</span>
-              </div>
-            )}
-
             {/* Stats */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
               {[
@@ -306,10 +279,6 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                 </div>
               ))}
             </div>
-
-            {currentSession.notes && (
-              <p className="text-xs text-zinc-500 italic border-t border-zinc-800 pt-3">{currentSession.notes}</p>
-            )}
 
             {/* Video link */}
             {currentSession.video_url && (

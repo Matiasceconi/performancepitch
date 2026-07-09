@@ -109,8 +109,8 @@ export default function Sessions() {
       list = list.filter(s => {
         const meta = effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id }));
         const haystack = [
-          s.title, moment(s.date).format("DD/MM/YYYY"), s.date, s.session_type,
-          meta.match_day_code, meta.session_objective, s.squad_name, s.objective,
+          s.title, moment(s.date).format("DD/MM/YYYY"), s.date,
+          meta.match_day_code, meta.session_objective, s.squad_name, s.period,
         ].filter(Boolean).join(" ").toLowerCase();
         return haystack.includes(q);
       });
@@ -118,6 +118,7 @@ export default function Sessions() {
     if (f.sessionNumber) list = list.filter(s => String(s.session_number || "").includes(String(f.sessionNumber).trim()));
     if (f.dateFrom) list = list.filter(s => s.date >= f.dateFrom);
     if (f.dateTo) list = list.filter(s => s.date <= f.dateTo);
+    if (f.period) list = list.filter(s => (s.period || "Competencia") === f.period);
     if (f.md) list = list.filter(s => effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id })).match_day_code === f.md);
     if (f.physicalObjective) list = list.filter(s => effectiveSessionMeta(s, findPlanDay(weeklyPlans, { date: s.date, squadId: s.squad_id, seasonId: s.season_id })).session_objective === f.physicalObjective);
     if (f.minPlayers) list = list.filter(s => (s.players_selected || 0) >= parseInt(f.minPlayers));

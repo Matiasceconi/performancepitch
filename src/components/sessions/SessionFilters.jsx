@@ -3,9 +3,10 @@ import { Search, X, SlidersHorizontal } from "lucide-react";
 import { SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
 const MD_CODES = SESSION_MD_CODES;
+const PERIOD_OPTIONS = ["Pretemporada", "Competencia", "Transición"];
 
 export const DEFAULT_FILTERS = {
-  search: "", sessionNumber: "", dateFrom: "", dateTo: "", md: "", physicalObjective: "",
+  search: "", sessionNumber: "", dateFrom: "", dateTo: "", period: "", md: "", physicalObjective: "",
   minPlayers: "", gps: "todos", video: "todos", sort: "recientes",
 };
 
@@ -52,6 +53,12 @@ export default function SessionFilters({ filters, onChange, physicalObjectives =
         <input type="date" value={filters.dateTo} onChange={e => set("dateTo", e.target.value)}
           title="Hasta"
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600" />
+
+        <select value={filters.period} onChange={e => set("period", e.target.value)}
+          className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600">
+          <option value="">Todos los períodos</option>
+          {PERIOD_OPTIONS.map(period => <option key={period} value={period}>{period}</option>)}
+        </select>
 
         <select value={filters.md} onChange={e => set("md", e.target.value)}
           className="bg-zinc-900 border border-zinc-800 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-zinc-600">

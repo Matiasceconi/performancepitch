@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Users, CheckSquare, Square, Search, X, Sparkles, Loader2 } from "lucide-react";
+import { Users, CheckSquare, Square, Search } from "lucide-react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getMicrocycleDefaults, SESSION_MD_CODES } from "@/components/planning/microcycleSync";
 
-const SESSION_TYPES = ["Campo", "Fuerza", "Regenerativo", "Activación", "Partido reducido", "Mixto", "Otro"];
 const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
+const PERIOD_OPTIONS = ["Pretemporada", "Competencia", "Transición"];
 
 const AVAILABLE_STATUSES = ["disponible", "subió", "convocado"];
 const KINESIO_STATUSES = ["lesionado", "reintegro"];
@@ -26,8 +26,8 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
   const [squads, setSquads] = useState([]);
   const [form, setForm] = useState({
     title: "", session_number: nextSessionNumber || "", date: moment().format("YYYY-MM-DD"),
-    squad_id: activeSquadId || "", session_type: "Campo", match_day_code: "MD-1",
-    duration_minutes: 90, objective: "", location: "", session_objective: "Volumen", notes: "",
+    squad_id: activeSquadId || "", period: "Competencia", match_day_code: "MD-1",
+    duration_minutes: 60, location: "", session_objective: "Volumen",
   });
   const [squadPlayers, setSquadPlayers] = useState([]); // {player, ds}
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -35,7 +35,6 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
   const [posFilter, setPosFilter] = useState("");
   const [loadingPlayers, setLoadingPlayers] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [aiLoadingTitle, setAiLoadingTitle] = useState(false);
   const [planDefaults, setPlanDefaults] = useState(null);
   const [physicalObjectives, setPhysicalObjectives] = useState([]);
   const [manualMeta, setManualMeta] = useState({ md: false, objective: false });
@@ -172,26 +171,6 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
     setSelectedIds(new Set(ids));
   }
 
-  async function suggestSessionName() {
-    setAiLoadingTitle(true);
-    try {
-      const squad = squads.find(s => s.id === form.squad_id);
-      const res = await base44.integrations.Core.InvokeLLM({
-        prompt: `Sugerí un nombre breve y profesional (estilo "MD-2 | Activación + Velocidad") para una sesión de entrenamiento de fútbol con estos datos:
-Plantel: ${squad?.name || "—"}
-Fecha: ${form.date}
-MD: ${form.match_day_code}
-Tipo de sesión: ${form.session_type}
-Objetivo físico: ${form.session_objective}
-Objetivo: ${form.objective || "no especificado"}
-Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
-      });
-      setF("title", (res || "").trim());
-    } finally {
-      setAiLoadingTitle(false);
-    }
-  }
-
   async function handleSubmit(e) {
     e.preventDefault();
     if (!form.squad_id) return;
@@ -233,7 +212,7 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
         squad_name: ds?.base_squad_name || squad?.name || "",
         status_at_session: status,
         attendance,
-        minutes: attendance === "presente" ? (form.duration_minutes || 90) : 0,
+        minutes: attendance === "presente" ? (form.duration_minutes || 60) : 0,
       };
     });
 
@@ -311,10 +290,10 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
             </select>
           </div>
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Tipo</label>
-            <select value={form.session_type} onChange={e => setF("session_type", e.target.value)}
+            <label className="text-xs text-zinc-400 mb-1 block">Período</label>
+            <select value={form.period} onChange={e => setF("period", e.target.value)}
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
-              {SESSION_TYPES.map(t => <option key={t}>{t}</option>)}
+              {PERIOD_OPTIONS.map(period => <option key={period}>{period}</option>)}
             </select>
           </div>
           <div>
@@ -344,18 +323,7 @@ Devolvé solo el nombre de la sesión, sin comillas ni explicación.`,
               placeholder="Campo 1, Gimnasio..."
               className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
           </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs text-zinc-400 mb-1 block">Objetivo</label>
-            <input value={form.objective} onChange={e => setF("objective", e.target.value)}
-              placeholder="Objetivo principal de la sesión..."
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
-          </div>
-          <div className="sm:col-span-2">
-            <label className="text-xs text-zinc-400 mb-1 block">Notas</label>
-            <textarea value={form.notes} onChange={e => setF("notes", e.target.value)}
-              rows={2} placeholder="Observaciones generales..."
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 resize-none" />
-          </div>
+
         </div>
       </div>
 

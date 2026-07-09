@@ -1,620 +1,112 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { FileText, X, Loader } from "lucide-react";
+import { X, Printer, Calendar, Clock, Users, MapPin, Dumbbell, Goal, LocateFixed, Video } from "lucide-react";
+import { CLUB_BRAND } from "@/lib/clubBrand";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
-import { useToast } from "@/components/ui/use-toast";
-import { fmtMetric, fmtSmax } from "@/utils";
 import moment from "moment";
-import jsPDF from "jspdf";
 
-const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
+const periodClass = {
+  Pretemporada: "bg-blue-100 text-blue-800 border-blue-200",
+  Competencia: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  Transición: "bg-amber-100 text-amber-800 border-amber-200",
+};
 
-const GPS_METRICS = [
-  { key: "total_distance", label: "Dist. Total (m)" },
-  { key: "m_min",          label: "m/min" },
-  { key: "distance_19_8",  label: "D >19.8 (m)" },
-  { key: "distance_25",    label: "D >25 (m)" },
-  { key: "sprints",        label: "Sprints" },
-  { key: "acc_3",          label: "ACC +3" },
-  { key: "dec_3",          label: "DEC +3" },
-  { key: "player_load",    label: "P.Load" },
-  { key: "smax",           label: "Smax km/h" },
-];
-
-function avg(rows, key) {
-  const vals = rows.map(r => r[key] || 0).filter(v => v > 0);
-  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+function Metric({ label, value, icon: Icon }) {
+  return <div className="rounded-xl border border-zinc-200 bg-white p-3"><div className="flex items-center gap-2 text-zinc-500 text-xs font-bold uppercase">{Icon && <Icon size={13} />}{label}</div><p className="mt-1 text-xl font-black text-zinc-950">{value}</p></div>;
 }
 
-function fmtVal(key, val) {
-  if (val == null) return "—";
-  return key === "smax" ? fmtSmax(val) : fmtMetric(val);
-}
-
-// Convert image URL to base64 dataURL
-async function toDataURL(url) {
-  try {
-    const resp = await fetch(url, { mode: "cors" });
-    const blob = await resp.blob();
-    return new Promise(resolve => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = () => resolve(null);
-      reader.readAsDataURL(blob);
-    });
-  } catch {
-    return null;
-  }
+function Section({ title, children }) {
+  return <section className="break-inside-avoid rounded-2xl border border-zinc-200 bg-white p-4"><h2 className="text-sm font-black uppercase tracking-wide mb-3" style={{ color: CLUB_BRAND.colors.greenDeep }}>{title}</h2>{children}</section>;
 }
 
 export default function SessionPDFExport({ session, sessionPlayers, onClose }) {
-  const [generating, setGenerating] = useState(false);
-  const { toast } = useToast();
+  const [data, setData] = useState({ exercises: [], gpsRows: [], videoLinks: [], strengthStations: [] });
+  const [loading, setLoading] = useState(true);
 
-  async function generate() {
-    setGenerating(true);
-    try {
-      // Fetch all data in parallel
-      const [exercises, gpsRows, videoLinks, strengthStations] = await Promise.all([
-        base44.entities.SessionExercise.filter({ session_id: session.id }, "order", 100),
-        base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200),
-        base44.entities.SessionVideoLink.filter({ session_id: session.id }, "-created_date", 100),
-        base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 100),
-      ]);
+  useEffect(() => {
+    Promise.all([
+      base44.entities.SessionExercise.filter({ session_id: session.id }, "order", 100),
+      base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200),
+      base44.entities.SessionVideoLink.filter({ session_id: session.id }, "-created_date", 100),
+      base44.entities.StrengthStation.filter({ session_id: session.id }, "order", 100),
+    ]).then(([exercises, gpsRows, videoLinks, strengthStations]) => {
+      setData({ exercises, gpsRows, videoLinks, strengthStations });
+      setLoading(false);
+    });
+  }, [session.id]);
 
-      exercises.sort((a, b) => (a.order || 0) - (b.order || 0));
-      strengthStations.sort((a, b) => (a.order || 0) - (b.order || 0));
+  const stats = useMemo(() => {
+    const presentes = sessionPlayers.filter(sp => sp.attendance === "presente");
+    return {
+      field: presentes.filter(sp => !isGoalkeeper({ position: sp.position })).length,
+      gk: presentes.filter(sp => isGoalkeeper({ position: sp.position })).length,
+      diff: sessionPlayers.filter(sp => sp.attendance === "diferenciado").length,
+      kin: sessionPlayers.filter(sp => sp.attendance === "kinesiologia").length,
+    };
+  }, [sessionPlayers]);
 
-      // Pre-fetch logo
-      const logoData = await toDataURL(DYJ_LOGO);
-
-      // Pre-fetch exercise images
-      const exerciseImgs = {};
-      await Promise.all(exercises.map(async ex => {
-        if (ex.image_url) {
-          exerciseImgs[ex.id] = await toDataURL(ex.image_url);
-        }
-      }));
-
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const pageW = 210;
-      const pageH = 297;
-      const margin = 14;
-      const contentW = pageW - margin * 2;
-      let y = 0;
-
-      // ── Colors ───────────────────────────────────────────────────────────────
-      const YELLOW = [240, 200, 0];
-      const DARK = [20, 20, 20];
-      const GRAY = [100, 100, 100];
-      const LIGHT = [245, 245, 245];
-      const WHITE = [255, 255, 255];
-
-      function addPageIfNeeded(needed = 20) {
-        if (y + needed > pageH - 10) {
-          doc.addPage();
-          y = 14;
-          drawPageHeader();
-        }
-      }
-
-      function drawPageHeader() {
-        // Thin top bar
-        doc.setFillColor(...YELLOW);
-        doc.rect(0, 0, pageW, 6, "F");
-        if (logoData) {
-          doc.addImage(logoData, "PNG", margin, 8, 10, 10);
-        }
-        doc.setFontSize(7);
-        doc.setTextColor(...GRAY);
-        doc.text("Defensa y Justicia — PerformancePitch", margin + 12, 12);
-        doc.text(session.title, margin + 12, 16);
-        doc.text(`Fecha: ${moment(session.date).format("DD/MM/YYYY")}`, pageW - margin, 12, { align: "right" });
-        doc.setDrawColor(220, 220, 220);
-        doc.line(margin, 20, pageW - margin, 20);
-        y = 24;
-      }
-
-      // ── COVER PAGE ────────────────────────────────────────────────────────────
-      // Background
-      doc.setFillColor(...DARK);
-      doc.rect(0, 0, pageW, pageH, "F");
-
-      // Yellow bar top
-      doc.setFillColor(...YELLOW);
-      doc.rect(0, 0, pageW, 12, "F");
-
-      // Logo centered
-      if (logoData) {
-        doc.addImage(logoData, "PNG", pageW / 2 - 20, 28, 40, 40);
-      }
-
-      // Club name
-      doc.setFontSize(16);
-      doc.setTextColor(...YELLOW);
-      doc.setFont("helvetica", "bold");
-      doc.text("DEFENSA Y JUSTICIA", pageW / 2, 80, { align: "center" });
-
-      doc.setFontSize(10);
-      doc.setTextColor(...WHITE);
-      doc.setFont("helvetica", "normal");
-      doc.text("Informe de Sesión de Entrenamiento", pageW / 2, 90, { align: "center" });
-
-      // Yellow divider
-      doc.setDrawColor(...YELLOW);
-      doc.setLineWidth(0.8);
-      doc.line(margin + 20, 96, pageW - margin - 20, 96);
-
-      // Session info box
-      const infoY = 105;
-      doc.setFillColor(35, 35, 35);
-      doc.roundedRect(margin, infoY, contentW, 80, 3, 3, "F");
-
-      const infoData = [
-        ["Sesión", session.title],
-        ["Plantel", session.squad_name || "—"],
-        ["Fecha", moment(session.date).format("dddd DD [de] MMMM YYYY")],
-        ["Tipo", session.session_type || "—"],
-        ["MD", session.match_day_code || "—"],
-        ["Duración", session.duration_minutes ? `${session.duration_minutes} min` : "—"],
-        ["Lugar", session.location || "—"],
-        ["Intensidad", session.intensity_goal || "—"],
-      ];
-
-      let iy = infoY + 8;
-      infoData.forEach(([label, value]) => {
-        doc.setFontSize(8);
-        doc.setTextColor(...YELLOW);
-        doc.setFont("helvetica", "bold");
-        doc.text(label + ":", margin + 6, iy);
-        doc.setTextColor(...WHITE);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(value), margin + 40, iy);
-        iy += 8;
-      });
-
-      if (session.objective) {
-        doc.setFillColor(45, 45, 45);
-        doc.roundedRect(margin, infoY + 84, contentW, 20, 2, 2, "F");
-        doc.setFontSize(7);
-        doc.setTextColor(...YELLOW);
-        doc.setFont("helvetica", "bold");
-        doc.text("OBJETIVO:", margin + 4, infoY + 91);
-        doc.setTextColor(...WHITE);
-        doc.setFont("helvetica", "normal");
-        const objLines = doc.splitTextToSize(session.objective, contentW - 50);
-        doc.text(objLines[0], margin + 28, infoY + 91);
-      }
-
-      // Footer cover
-      doc.setFontSize(7);
-      doc.setTextColor(...GRAY);
-      doc.text(`Exportado el ${moment().format("DD/MM/YYYY HH:mm")}`, pageW / 2, pageH - 10, { align: "center" });
-
-      doc.setFillColor(...YELLOW);
-      doc.rect(0, pageH - 6, pageW, 6, "F");
-
-      // ── PAGE 2+ ────────────────────────────────────────────────────────────────
-      doc.addPage();
-      doc.setFillColor(255, 255, 255);
-      doc.rect(0, 0, pageW, pageH, "F");
-      drawPageHeader();
-
-      // ── SECTION: JUGADORES ─────────────────────────────────────────────────────
-      function sectionTitle(title, color = YELLOW) {
-        addPageIfNeeded(14);
-        doc.setFillColor(...color);
-        doc.rect(margin, y, contentW, 7, "F");
-        doc.setFontSize(9);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...DARK);
-        doc.text(title.toUpperCase(), margin + 3, y + 5);
-        y += 10;
-      }
-
-      function subSectionTitle(title) {
-        addPageIfNeeded(8);
-        doc.setFontSize(8);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...GRAY);
-        doc.text(title, margin, y + 4);
-        y += 7;
-      }
-
-      function drawPlayersGroup(players, label) {
-        if (!players.length) return;
-        subSectionTitle(label + ` (${players.length})`);
-
-        // Table header
-        addPageIfNeeded(8);
-        doc.setFillColor(...LIGHT);
-        doc.rect(margin, y, contentW, 6, "F");
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...DARK);
-        doc.text("Jugador", margin + 2, y + 4);
-        doc.text("Posición", margin + 55, y + 4);
-        doc.text("Estado", margin + 90, y + 4);
-        doc.text("Asistencia", margin + 120, y + 4);
-        doc.text("Observaciones", margin + 152, y + 4);
-        y += 6;
-
-        players.forEach((sp, idx) => {
-          addPageIfNeeded(7);
-          if (idx % 2 === 0) {
-            doc.setFillColor(250, 250, 250);
-            doc.rect(margin, y, contentW, 6, "F");
-          }
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...DARK);
-          doc.text(sp.player_name || "—", margin + 2, y + 4, { maxWidth: 50 });
-          doc.text(sp.position || "—", margin + 55, y + 4);
-          doc.text(sp.status_at_session || "—", margin + 90, y + 4, { maxWidth: 28 });
-          doc.text(sp.attendance || "—", margin + 120, y + 4);
-          doc.text(sp.notes || "", margin + 152, y + 4, { maxWidth: 40 });
-          y += 6;
-        });
-        y += 4;
-      }
-
-      sectionTitle("1. Jugadores presentes");
-
-      const presentes = sessionPlayers.filter(sp => sp.attendance === "presente");
-      const diferenciados = sessionPlayers.filter(sp => sp.attendance === "diferenciado");
-      const ausentes = sessionPlayers.filter(sp => sp.attendance === "ausente");
-      const kinesiologia = sessionPlayers.filter(sp => sp.attendance === "kinesiologia");
-      const presentesField = presentes.filter(sp => !isGoalkeeper({ position: sp.position }));
-      const presentesGK = presentes.filter(sp => isGoalkeeper({ position: sp.position }));
-
-      if (sessionPlayers.length === 0) {
-        doc.setFontSize(8);
-        doc.setTextColor(...GRAY);
-        doc.text("Sin jugadores registrados", margin, y + 5);
-        y += 10;
-      } else {
-        drawPlayersGroup(presentesField, "Jugadores de campo presentes");
-        drawPlayersGroup(presentesGK, "Arqueros presentes");
-        drawPlayersGroup(diferenciados, "Diferenciados");
-        drawPlayersGroup(kinesiologia, "Trabajaron en kinesiología");
-        drawPlayersGroup(ausentes, "Ausentes");
-      }
-
-      // ── SECTION: EJERCICIOS ────────────────────────────────────────────────────
-      sectionTitle("2. Ejercicios del día");
-
-      if (exercises.length === 0) {
-        doc.setFontSize(8);
-        doc.setTextColor(...GRAY);
-        doc.text("Sin ejercicios cargados", margin, y + 5);
-        y += 10;
-      } else {
-        exercises.forEach((ex, idx) => {
-          addPageIfNeeded(50);
-          // Exercise header
-          doc.setFillColor(235, 235, 235);
-          doc.rect(margin, y, contentW, 7, "F");
-          doc.setFontSize(9);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...DARK);
-          doc.text(`${idx + 1}. ${ex.name}`, margin + 2, y + 5);
-          if (ex.type) {
-            doc.setFontSize(7);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(...GRAY);
-            doc.text(ex.type, pageW - margin - 2, y + 5, { align: "right" });
-          }
-          y += 9;
-
-          // Image (left) + details (right)
-          const imgSize = 40;
-          const detailX = margin + imgSize + 4;
-          const detailW = contentW - imgSize - 4;
-          const startY = y;
-
-          const imgData = exerciseImgs[ex.id];
-          if (imgData) {
-            addPageIfNeeded(imgSize + 5);
-            doc.addImage(imgData, "JPEG", margin, y, imgSize, imgSize);
-          }
-
-          const details = [
-            ["Objetivo", ex.objective],
-            ["Descripción", ex.description],
-            ["Duración", ex.duration_min ? `${ex.duration_min} min` : null],
-            ["Bloques", ex.blocks ? `${ex.blocks}` : null],
-            ["Trabajo / Pausa", (ex.work_time || ex.rest_time) ? `${ex.work_time || "—"} / ${ex.rest_time || "—"}` : null],
-            ["Dimensiones", (ex.length_m && ex.width_m) ? `${ex.length_m} × ${ex.width_m} m` : null],
-            ["Jugadores", ex.players_count ? `${ex.players_count}` : null],
-            ["Superficie", ex.total_area ? `${ex.total_area} m²` : null],
-            ["EII", ex.eii ? `${ex.eii} m²/jug` : null],
-            ["Notas", ex.notes],
-          ].filter(([, v]) => v);
-
-          let dy = y;
-          details.forEach(([label, value]) => {
-            if (dy - startY > (imgData ? imgSize : 0) + 5 || !imgData) {
-              addPageIfNeeded(6);
-            }
-            const xBase = imgData ? detailX : margin;
-            const wBase = imgData ? detailW : contentW;
-            doc.setFontSize(7);
-            doc.setFont("helvetica", "bold");
-            doc.setTextColor(...GRAY);
-            doc.text(`${label}:`, xBase, dy + 4);
-            doc.setFont("helvetica", "normal");
-            doc.setTextColor(...DARK);
-            const lines = doc.splitTextToSize(String(value), wBase - 28);
-            doc.text(lines, xBase + 26, dy + 4);
-            dy += lines.length * 5 + 1;
-          });
-
-          y = Math.max(startY + (imgData ? imgSize + 2 : 0), dy) + 6;
-        });
-      }
-
-      // ── SECTION: GPS ──────────────────────────────────────────────────────────
-      sectionTitle("3. Carga externa de la sesión");
-
-      if (gpsRows.length === 0) {
-        doc.setFontSize(8);
-        doc.setTextColor(...GRAY);
-        doc.text("Sin carga externa cargada", margin, y + 5);
-        y += 10;
-      } else {
-        // Solo el grupo principal (include_in_session_average !== false) entra en los promedios
-        const principalRows = gpsRows.filter(r => r.include_in_session_average !== false);
-        const excludedGpsRows = gpsRows.filter(r => r.include_in_session_average === false);
-
-        // Classify GPS rows (grupo principal)
-        const gpsField = principalRows.filter(r => !isGoalkeeper({ position: r.player_name_original }));
-        const gpsGK = principalRows.filter(r => isGoalkeeper({ position: r.player_name_original }));
-
-        // Summary row
-        addPageIfNeeded(30);
-        subSectionTitle(`Resumen del equipo — ${principalRows.length} jugadores en promedio (Campo: ${gpsField.length} · ARQ: ${gpsGK.length})${excludedGpsRows.length ? ` · ${excludedGpsRows.length} excluidos` : ""}`);
-
-        const summaryData = GPS_METRICS.map(m => ({
-          label: m.label,
-          value: fmtVal(m.key, avg(principalRows, m.key)),
-          field: fmtVal(m.key, avg(gpsField, m.key)),
-          gk: fmtVal(m.key, avg(gpsGK, m.key)),
-        }));
-
-        const colW = contentW / 3;
-        let sx = margin, sy = y;
-        summaryData.forEach((item, i) => {
-          if (i > 0 && i % 3 === 0) {
-            sy += 16;
-            sx = margin;
-            addPageIfNeeded(16);
-          }
-          doc.setFillColor(...LIGHT);
-          doc.roundedRect(sx, sy, colW - 2, 14, 1, 1, "F");
-          doc.setFontSize(6);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...GRAY);
-          doc.text(item.label, sx + 2, sy + 4);
-          doc.setFontSize(9);
-          doc.setTextColor(...DARK);
-          doc.text(item.value, sx + 2, sy + 9);
-          // Campo / ARQ sub-line
-          doc.setFontSize(5.5);
-          doc.setTextColor(...GRAY);
-          doc.text(`C: ${item.field}  A: ${item.gk}`, sx + 2, sy + 13);
-          sx += colW;
-        });
-        y = sy + 20;
-
-        // GPS Table
-        addPageIfNeeded(20);
-        subSectionTitle("Detalle por jugador");
-
-        // Header
-        doc.setFillColor(...DARK);
-        doc.rect(margin, y, contentW, 6, "F");
-        doc.setFontSize(6);
-        doc.setFont("helvetica", "bold");
-        doc.setTextColor(...WHITE);
-        const gpsHeaders = ["Jugador", ...GPS_METRICS.map(m => m.label)];
-        const colWidths = [38, ...GPS_METRICS.map(() => (contentW - 38) / GPS_METRICS.length)];
-        let hx = margin;
-        gpsHeaders.forEach((h, i) => {
-          doc.text(h, hx + 1, y + 4, { maxWidth: colWidths[i] - 2 });
-          hx += colWidths[i];
-        });
-        y += 6;
-
-        gpsRows.forEach((row, idx) => {
-          addPageIfNeeded(6);
-          const isExcluded = row.include_in_session_average === false;
-          if (idx % 2 === 0) {
-            doc.setFillColor(248, 248, 248);
-            doc.rect(margin, y, contentW, 5.5, "F");
-          }
-          doc.setFontSize(6);
-          doc.setFont("helvetica", isExcluded ? "italic" : "normal");
-          doc.setTextColor(isExcluded ? 180 : DARK[0], isExcluded ? 130 : DARK[1], isExcluded ? 0 : DARK[2]);
-          let rx = margin;
-          const nameLabel = (row.player_name || "—") + (isExcluded ? " (excluido)" : "");
-          const cells = [nameLabel, ...GPS_METRICS.map(m => fmtVal(m.key, row[m.key]))];
-          cells.forEach((cell, i) => {
-            doc.text(String(cell), rx + 1, y + 4, { maxWidth: colWidths[i] - 2 });
-            rx += colWidths[i];
-          });
-          y += 5.5;
-        });
-        y += 4;
-      }
-
-      // ── SECTION: FUERZA ────────────────────────────────────────────────────────
-      if (strengthStations.length > 0) {
-        sectionTitle("4. Plan de fuerza");
-
-        doc.setFontSize(7);
-        doc.setFont("helvetica", "normal");
-        doc.setTextColor(...GRAY);
-        const strengthInfo = [
-          session.strength_purpose && `Propósito mecánico: ${session.strength_purpose}`,
-          session.strength_vector_pattern && `Patrón vectorial: ${session.strength_vector_pattern}`,
-        ].filter(Boolean).join("   ·   ");
-        if (strengthInfo) {
-          addPageIfNeeded(8);
-          doc.text(strengthInfo, margin, y + 4, { maxWidth: contentW });
-          y += 8;
-        }
-
-        // Table header: N° | Método | Tipo | Ejercicio | Volumen | Observaciones
-        const stCols = [
-          { label: "N°", w: 10 },
-          { label: "Método", w: 26 },
-          { label: "Tipo", w: 30 },
-          { label: "Ejercicio", w: 44 },
-          { label: "Volumen", w: 22 },
-          { label: "Observaciones", w: contentW - (10 + 26 + 30 + 44 + 22) },
-        ];
-
-        function drawStrengthHeader() {
-          addPageIfNeeded(8);
-          doc.setFillColor(...DARK);
-          doc.rect(margin, y, contentW, 6, "F");
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...WHITE);
-          let hx = margin;
-          stCols.forEach(c => { doc.text(c.label, hx + 2, y + 4, { maxWidth: c.w - 3 }); hx += c.w; });
-          y += 6;
-        }
-
-        drawStrengthHeader();
-
-        strengthStations.forEach((st, idx) => {
-          const values = [String(idx + 1), st.method || "—", st.exercise_type || "—", st.exercise_name || "—", st.volume || "—", st.notes || "—"];
-          const lineSets = values.map((v, i) => doc.splitTextToSize(v, stCols[i].w - 3));
-          const rowLines = Math.max(...lineSets.map(l => l.length));
-          const rowH = Math.max(6, rowLines * 4 + 2);
-
-          addPageIfNeeded(rowH + 2);
-          if (idx % 2 === 0) {
-            doc.setFillColor(248, 248, 248);
-            doc.rect(margin, y, contentW, rowH, "F");
-          }
-          doc.setFontSize(7);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...DARK);
-          let rx = margin;
-          lineSets.forEach((lines, i) => {
-            doc.text(lines, rx + 2, y + 4, { maxWidth: stCols[i].w - 3 });
-            rx += stCols[i].w;
-          });
-          y += rowH;
-        });
-        y += 4;
-      }
-
-      // ── SECTION: VIDEOS ASOCIADOS ─────────────────────────────────────────────
-      if (videoLinks.length > 0) {
-        sectionTitle("5. Videos asociados");
-        videoLinks.forEach(link => {
-          addPageIfNeeded(12);
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "bold");
-          doc.setTextColor(...DARK);
-          doc.text(`${link.title} (${link.source || "—"})`, margin, y + 4);
-          y += 5;
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...GRAY);
-          const urlLines = doc.splitTextToSize(link.video_url, contentW);
-          doc.text(urlLines, margin, y + 4);
-          y += urlLines.length * 4 + 4;
-        });
-      }
-
-      // ── SECTION: NOTAS FINALES ────────────────────────────────────────────────
-      if (session.notes || session.created_by) {
-        sectionTitle("6. Observaciones finales");
-        if (session.notes) {
-          addPageIfNeeded(20);
-          doc.setFontSize(8);
-          doc.setFont("helvetica", "normal");
-          doc.setTextColor(...DARK);
-          const noteLines = doc.splitTextToSize(session.notes, contentW);
-          doc.text(noteLines, margin, y + 4);
-          y += noteLines.length * 5 + 8;
-        }
-        if (session.created_by) {
-          addPageIfNeeded(10);
-          doc.setFontSize(8);
-          doc.setTextColor(...GRAY);
-          doc.text(`Responsable: ${session.created_by}`, margin, y);
-          y += 6;
-        }
-      }
-
-      // Export date footer on last page
-      addPageIfNeeded(10);
-      doc.setFontSize(7);
-      doc.setTextColor(...GRAY);
-      doc.text(`Exportado el ${moment().format("DD/MM/YYYY [a las] HH:mm")}`, margin, y + 4);
-
-      // ── Thin yellow bottom bar on all pages ──────────────────────────────────
-      const totalPages = doc.internal.getNumberOfPages();
-      for (let p = 2; p <= totalPages; p++) {
-        doc.setPage(p);
-        doc.setFillColor(...YELLOW);
-        doc.rect(0, pageH - 4, pageW, 4, "F");
-        doc.setFontSize(6);
-        doc.setTextColor(...GRAY);
-        doc.text(`${p} / ${totalPages}`, pageW - margin, pageH - 6, { align: "right" });
-      }
-
-      const filename = `sesion_${moment(session.date).format("YYYY-MM-DD")}_${session.title.replace(/\s+/g, "_")}.pdf`;
-      doc.save(filename);
-      if (!session.pdf_exported) await base44.entities.TrainingSession.update(session.id, { pdf_exported: true });
-      toast({ title: "✓ PDF exportado correctamente" });
-    } catch (err) {
-      console.error(err);
-      toast({ title: "Error al generar el PDF: " + err.message, variant: "destructive" });
-    } finally {
-      setGenerating(false);
-      onClose();
-    }
+  async function printView() {
+    if (!session.pdf_exported) await base44.entities.TrainingSession.update(session.id, { pdf_exported: true });
+    window.print();
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
-      <div className="bg-zinc-900 border border-zinc-700 rounded-xl w-full max-w-sm">
-        <div className="flex items-center justify-between p-4 border-b border-zinc-800">
-          <div className="flex items-center gap-2">
-            <FileText size={15} className="text-yellow-400" />
-            <p className="text-sm font-semibold text-white">Exportar sesión en PDF</p>
-          </div>
-          <button onClick={onClose} disabled={generating} className="text-zinc-500 hover:text-white transition-colors">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="p-5 space-y-3">
-          <p className="text-xs text-zinc-400">El PDF incluirá:</p>
-          <ul className="text-xs text-zinc-400 space-y-1 list-disc list-inside">
-            <li>Portada con datos de la sesión</li>
-            <li>Jugadores presentes, diferenciados y ausentes</li>
-            <li>Ejercicios con imagen y descripción</li>
-            <li>Carga externa GPS (resumen + detalle por jugador)</li>
-            <li>Observaciones finales</li>
-          </ul>
-          <button
-            onClick={generate}
-            disabled={generating}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-semibold text-sm rounded-xl transition-colors disabled:opacity-50"
-          >
-            {generating ? (
-              <><Loader size={15} className="animate-spin" /> Generando PDF...</>
-            ) : (
-              <><FileText size={15} /> Generar y descargar PDF</>
-            )}
-          </button>
-        </div>
+    <div className="fixed inset-0 z-50 bg-white text-zinc-950 overflow-y-auto">
+      <style>{`@page { size: A4; margin: 10mm; } @media print { .no-print { display:none!important; } body { background:white!important; } .break-inside-avoid { break-inside: avoid; } }`}</style>
+      <div className="no-print sticky top-0 z-10 bg-zinc-950 border-b border-zinc-800 px-5 py-3 flex justify-end gap-2">
+        <button onClick={printView} disabled={loading} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-500 text-zinc-950 text-sm font-black disabled:opacity-50"><Printer size={15} /> Imprimir / PDF</button>
+        <button onClick={onClose} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-zinc-800 text-zinc-300 text-sm"><X size={15} /> Volver</button>
       </div>
+
+      <main className="max-w-6xl mx-auto p-6 print:p-0 space-y-5">
+        <header className="rounded-3xl border-b-4 p-5 flex items-start justify-between gap-5" style={{ borderColor: CLUB_BRAND.colors.green, background: `linear-gradient(135deg, ${CLUB_BRAND.colors.panel}, #ffffff 62%, ${CLUB_BRAND.colors.yellow}22)` }}>
+          <div className="flex items-center gap-4">
+            <img src={CLUB_BRAND.logoUrl} alt={CLUB_BRAND.name} className="w-16 h-16 object-contain" />
+            <div><p className="text-xs font-black uppercase" style={{ color: CLUB_BRAND.colors.greenDeep }}>{CLUB_BRAND.name} · PerformancePitch</p><h1 className="text-3xl font-black">SESIÓN {session.session_number || "—"}</h1><p className="text-sm text-zinc-600">{session.squad_name || "Plantel"}</p></div>
+          </div>
+          <div className="text-right space-y-1"><span className={`inline-block px-3 py-1 rounded-full border text-xs font-black ${periodClass[session.period] || periodClass.Competencia}`}>{session.period || "Competencia"}</span><p className="text-xs text-zinc-500">Vista imprimible · {moment().format("DD/MM/YYYY HH:mm")}</p></div>
+        </header>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <Metric label="Fecha" value={moment(session.date).format("DD/MM/YYYY")} icon={Calendar} />
+          <Metric label="Duración" value={`${session.duration_minutes || 60} min`} icon={Clock} />
+          <Metric label="Jugadores" value={session.players_selected || sessionPlayers.length || 0} icon={Users} />
+          <Metric label="Lugar" value={session.location || "—"} icon={MapPin} />
+        </div>
+
+        <div className="grid md:grid-cols-4 gap-3">
+          <Metric label="Campo" value={stats.field} icon={Users} />
+          <Metric label="Arqueros" value={stats.gk} icon={Users} />
+          <Metric label="Diferenciados" value={stats.diff} icon={Users} />
+          <Metric label="Kinesiología" value={stats.kin} icon={Users} />
+        </div>
+
+        {loading ? <div className="text-center py-12 text-zinc-500">Cargando vista previa...</div> : (
+          <div className="space-y-5">
+            <Section title="Jugadores">
+              <div className="grid md:grid-cols-2 gap-2 text-xs">
+                {sessionPlayers.map(sp => <div key={sp.id} className="flex justify-between gap-3 rounded-xl bg-zinc-50 border border-zinc-200 px-3 py-2"><span className="font-bold text-zinc-800">{sp.player_name}</span><span className="text-zinc-500">{sp.attendance}</span></div>)}
+              </div>
+            </Section>
+
+            <Section title="Ejercicios de campo">
+              {data.exercises.length ? <div className="grid md:grid-cols-2 gap-3">{data.exercises.map((ex, idx) => <div key={ex.id} className="rounded-xl border border-zinc-200 p-3"><p className="font-black text-sm">{idx + 1}. {ex.name}</p><p className="text-xs text-zinc-500 mt-1">{[ex.duration_min && `${ex.duration_min} min`, ex.blocks && `${ex.blocks} bloques`, ex.players_count && `${ex.players_count} jug.`].filter(Boolean).join(" · ")}</p>{ex.description && <p className="text-xs text-zinc-600 mt-2">{ex.description}</p>}</div>)}</div> : <p className="text-sm text-zinc-500">Sin ejercicios cargados.</p>}
+            </Section>
+
+            <Section title="Fuerza">
+              {data.strengthStations.length ? <div className="grid md:grid-cols-2 gap-3">{data.strengthStations.map((st, idx) => <div key={st.id} className="rounded-xl border border-zinc-200 p-3"><p className="font-black text-sm flex items-center gap-2"><Dumbbell size={14} />{idx + 1}. {st.exercise_name || "Ejercicio"}</p><p className="text-xs text-zinc-500 mt-1">{[st.method, st.exercise_type, st.volume].filter(Boolean).join(" · ")}</p></div>)}</div> : <p className="text-sm text-zinc-500">Sin fuerza cargada.</p>}
+            </Section>
+
+            <Section title="GPS">
+              {data.gpsRows.length ? <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="bg-zinc-100"><th className="text-left p-2">Jugador</th><th className="text-right p-2">Distancia</th><th className="text-right p-2">m/min</th><th className="text-right p-2">Sprints</th><th className="text-right p-2">PL</th></tr></thead><tbody>{data.gpsRows.map(row => <tr key={row.id} className="border-t"><td className="p-2 font-bold">{row.player_name}</td><td className="p-2 text-right">{row.total_distance || "—"}</td><td className="p-2 text-right">{row.m_min || "—"}</td><td className="p-2 text-right">{row.sprints || "—"}</td><td className="p-2 text-right">{row.player_load || "—"}</td></tr>)}</tbody></table></div> : <p className="text-sm text-zinc-500">Sin GPS cargado.</p>}
+            </Section>
+
+            <Section title="Videos">
+              {data.videoLinks.length ? <div className="space-y-2">{data.videoLinks.map(link => <a key={link.id} href={link.video_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-blue-700 underline"><Video size={14} />{link.title || link.video_url}</a>)}</div> : <p className="text-sm text-zinc-500">Sin videos vinculados.</p>}
+            </Section>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
