@@ -10,6 +10,7 @@ import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professi
 import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
 import ScheduleExportView from "@/components/schedule/ScheduleExportView";
 import { findPlanDay } from "@/components/planning/microcycleSync";
+import { getLogoForRival } from "@/lib/match-utils";
 
 moment.locale("es");
 
@@ -420,7 +421,9 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
   async function handleSave() {
     if (!form.title || !form.date) return;
     setSaving(true);
-    const payload = { ...form, duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined };
+    const isMatchEvent = (form.event_type || form.type) === "Partido" || form.type === "Jornada de Juveniles";
+    const autoLogo = isMatchEvent ? getLogoForRival(form.rival) : null;
+    const payload = { ...form, rival_logo_url: form.rival_logo_url || autoLogo || "", duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined };
     await onSave(payload);
     setSaving(false);
     onClose();
@@ -492,7 +495,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
             {((form.event_type || form.type) === "Partido" || form.type === "Jornada de Juveniles") && (
               <div className="col-span-2 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-zinc-400 mb-1 block">Rival</label><input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Ej: River" value={form.rival || ""} onChange={(e) => set("rival", e.target.value)} /></div>
+                  <div><label className="text-xs text-zinc-400 mb-1 block">Rival</label><div className="flex items-center gap-2">{(form.rival_logo_url || getLogoForRival(form.rival)) && <img src={form.rival_logo_url || getLogoForRival(form.rival)} alt="Escudo" className="w-6 h-6 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} />}<input className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Ej: River" value={form.rival || ""} onChange={(e) => { const val = e.target.value; const autoLogo = getLogoForRival(val); setForm((f) => ({ ...f, rival: val, rival_logo_url: autoLogo || f.rival_logo_url })); }} /></div></div>
                   <div><label className="text-xs text-zinc-400 mb-1 block">Local/Visitante</label><select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.home_away || ""} onChange={(e) => set("home_away", e.target.value)}><option value="">—</option><option>Local</option><option>Visitante</option><option>Neutral</option></select></div>
                 </div>
                 <label className="text-xs text-zinc-400 mb-1 block">URL escudo rival (opcional)</label>
@@ -781,7 +784,7 @@ export default function Schedule() {
                     const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
                     return (
                       <div key={ev.id} className={`flex items-center gap-1 text-xs px-1 py-0.5 rounded truncate cursor-pointer ${c.bg} ${c.text}`} onClick={() => openEdit(ev)}>
-                        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />
+                        {ev.rival_logo_url ? <img src={ev.rival_logo_url} alt="Escudo" className="w-3 h-3 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />}
                         <span className="truncate">{ev.time && `${ev.time} `}{ev.title}</span>
                       </div>
                     );
