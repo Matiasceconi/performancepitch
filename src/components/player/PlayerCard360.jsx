@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
 import {
-  User, Shield, Activity, Zap, Heart, Award, Paperclip,
+  User, Shield, Activity, Zap, Heart, Award, Paperclip, Apple,
   BarChart2, CheckCircle, TrendingUp, Timer, History as HistoryIcon,
 } from "lucide-react";
 
@@ -21,6 +21,7 @@ import PlayerSessionsTab from "@/components/player/tabs/PlayerSessionsTab";
 import PlayerMatchesTab from "@/components/player/tabs/PlayerMatchesTab";
 import PlayerMinutesTab from "@/components/player/tabs/PlayerMinutesTab";
 import PlayerMedicalTab from "@/components/player/tabs/PlayerMedicalTab";
+import PlayerNutritionTab from "@/components/player/tabs/PlayerNutritionTab";
 import PlayerHistoryTab from "@/components/player/tabs/PlayerHistoryTab";
 import { getValidMinuteRecords } from "@/lib/minutesUtils";
 
@@ -41,6 +42,7 @@ const TABS = [
   { id: "partidos",     label: "Partidos",        icon: BarChart2 },
   { id: "minutos",      label: "Minutos",         icon: Timer },
   { id: "medico",       label: "Área médica",     icon: Heart },
+  { id: "nutricion",    label: "Nutrición",       icon: Apple },
   { id: "wellness",     label: "Wellness",        icon: CheckCircle },
   { id: "evaluaciones", label: "Evaluaciones",    icon: Award },
   { id: "planteles",    label: "Planteles",       icon: Shield },
@@ -80,6 +82,7 @@ export default function PlayerCard360() {
   const [gpsData, setGpsData] = useState([]);
   const [minutes, setMinutes] = useState([]);
   const [medical, setMedical] = useState([]);
+  const [nutrition, setNutrition] = useState([]);
   const [matchReports, setMatchReports] = useState([]);
   const [loadedTabs, setLoadedTabs] = useState(new Set());
   const [tabLoading, setTabLoading] = useState(false);
@@ -88,12 +91,13 @@ export default function PlayerCard360() {
   const loadCore = useCallback(async (id) => {
     const today = moment().format("YYYY-MM-DD");
     const [
-      membershipsArr, dayStatusArr, medicalArr, minutesArr, gpsArr, gpsProfileArr,
+      membershipsArr, dayStatusArr, medicalArr, nutritionArr, minutesArr, gpsArr, gpsProfileArr,
       sessionPlayersArr, todaysSessions, allSessions, allMatches,
     ] = await Promise.all([
       base44.entities.SquadMembership.filter({ player_id: id, status: "activo" }, "-effective_from", 1),
       base44.entities.DailySquadStatus.filter({ player_id: id, date: today }, "-created_date", 1),
       base44.entities.MedicalRecord.filter({ player_id: id }, "-injury_date", 30),
+      base44.entities.NutritionAssessment.filter({ player_id: id }, "-fecha", 100),
       base44.entities.MinutesRecord.filter({ player_id: id }, "-match_date", 100),
       base44.entities.SessionGPSData.filter({ player_id: id }, "-created_date", 200),
       base44.entities.PlayerGPSProfile.filter({ player_id: id }, "-created_date", 1),
@@ -107,6 +111,7 @@ export default function PlayerCard360() {
     setActiveMembership(membership);
     setDayStatus(dayStatusArr[0] || null);
     setMedical(medicalArr);
+    setNutrition(nutritionArr);
     setMinutes(minutesArr);
     setGpsData(gpsArr);
     setGpsProfile(gpsProfileArr[0] || null);
@@ -310,6 +315,7 @@ export default function PlayerCard360() {
               )}
               {activeTab === "minutos" && <PlayerMinutesTab minutes={validMinutes} orphanCount={orphanMinutesCount} />}
               {activeTab === "medico" && <PlayerMedicalTab medical={medical} userRole={userAccess?.role} />}
+              {activeTab === "nutricion" && <PlayerNutritionTab assessments={nutrition} />}
               {activeTab === "wellness" && (
                 <div className="text-center py-12">
                   <p className="text-zinc-500 text-sm">Módulo Wellness próximamente</p>

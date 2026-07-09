@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { RefreshCw, Wrench, FileDown, FileUp, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import OrphanMinutesRepair from "@/components/admin/OrphanMinutesRepair";
+import NutritionRepairPanel from "@/components/nutrition/NutritionRepairPanel";
 
 const TOOLS = [
   {
@@ -92,6 +93,19 @@ export default function AdminTools() {
   const { toast } = useToast();
   const [running, setRunning] = useState(null);
   const [results, setResults] = useState({});
+  const [nutritionRows, setNutritionRows] = useState([]);
+  const [players, setPlayers] = useState([]);
+
+  async function loadNutritionRepair() {
+    const [rows, playerRows] = await Promise.all([
+      base44.entities.NutritionAssessment.list("-fecha", 3000),
+      base44.entities.Player.list("full_name", 3000),
+    ]);
+    setNutritionRows(rows);
+    setPlayers(playerRows);
+  }
+
+  React.useEffect(() => { loadNutritionRepair(); }, []);
 
   async function runTool(tool) {
     setRunning(tool.id);
@@ -147,6 +161,8 @@ export default function AdminTools() {
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
         <OrphanMinutesRepair />
       </div>
+
+      <NutritionRepairPanel assessments={nutritionRows} players={players} onReload={loadNutritionRepair} />
 
       {/* Importaciones / Exportaciones */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
