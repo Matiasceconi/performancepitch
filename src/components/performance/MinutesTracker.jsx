@@ -43,6 +43,9 @@ export default function MinutesTracker({ onSelectPlayer }) {
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
+  const [viewMode, setViewMode] = useState("reserva");
+  const [exportViewMode, setExportViewMode] = useState("reserva");
+  const [showExportOptions, setShowExportOptions] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [records, setRecords] = useState([]);
   const [matches, setMatches] = useState([]);
@@ -81,7 +84,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
   // Solo registros vinculados a un partido real, activo y del plantel activo, con minutos > 0
   const validRecords = useMemo(
-    () => getValidMinuteRecords(records, matches, { squadId: activeSquadId }),
+    () => getValidMinuteRecords(records, matches, { squadId: activeSquadId, requirePositive: false }),
     [records, matches, activeSquadId]
   );
 
@@ -122,21 +125,24 @@ export default function MinutesTracker({ onSelectPlayer }) {
           reserva: 0,
           juveniles: 0,
           amistosos: 0,
+          hasReserva: false,
+          hasJuveniles: false,
+          hasAmistosos: false,
         };
       }
       const t = r.tournament;
       const mins = r.minutes || 0;
-      if (t === "Proyección Apertura" || t === "Clausura") map[playerKey].reserva += mins;
-      else if (t === "Juveniles") map[playerKey].juveniles += mins;
-      else if (t === "Amistosos") map[playerKey].amistosos += mins;
+      if (t === "Proyección Apertura" || t === "Clausura") { map[playerKey].reserva += mins; map[playerKey].hasReserva = true; }
+      else if (t === "Juveniles") { map[playerKey].juveniles += mins; map[playerKey].hasJuveniles = true; }
+      else if (t === "Amistosos") { map[playerKey].amistosos += mins; map[playerKey].hasAmistosos = true; }
     });
 
     return Object.values(map);
   }, [validRecords]);
 
   const torneo = TORNEOS.find(t => t.id === torneoId);
-  const showRes = torneo.res_total !== null;
-  const showJuv = torneo.juv_total !== null;
+  const showRes = torneo.res_total !== null && (viewMode === "reserva" || viewMode === "ambos");
+  const showJuv = torneo.juv_total !== null && (viewMode === "juveniles" || viewMode === "ambos");
 
   function getMinutes(p) {
     switch (torneoId) {
@@ -147,11 +153,26 @@ export default function MinutesTracker({ onSelectPlayer }) {
     }
   }
 
-  const display = useMemo(() => {
+  function changeViewMode(mode) {
+    setViewMode(mode);
+    setTorneoId("all");
+    setSortBy(mode === "juveniles" ? "juv" : "res");
+  }
+
+  function matchesView(p, mode, selectedTorneoId) {
+    if (selectedTorneoId === "Proyección Apertura") return p.hasReserva;
+    if (selectedTorneoId === "Juveniles") return p.hasJuveniles;
+    if (selectedTorneoId === "Amistosos") return p.hasAmistosos;
+    if (mode === "reserva") return p.hasReserva;
+    if (mode === "juveniles") return p.hasJuveniles;
+    return p.hasReserva || p.hasJuveniles;
+  }
+
+  function buildRows(mode) {
     return playerData
       .filter(p => {
         if (search && !norm(p.player_name).includes(norm(search))) return false;
-        return true;
+        return matchesView(p, mode, torneoId);
       })
       .map(p => ({ ...p, ...getMinutes(p) }))
       .sort((a, b) => {
@@ -159,15 +180,20 @@ export default function MinutesTracker({ onSelectPlayer }) {
         if (sortBy === "name") return (a.player_name || "").localeCompare(b.player_name || "");
         return (b.res || 0) - (a.res || 0);
       });
-  }, [playerData, search, sortBy, torneoId]);
+  }
 
-  function exportPDF() {
+  const display = useMemo(() => buildRows(viewMode), [playerData, search, sortBy, torneoId, viewMode]);
+  const exportRows = useMemo(() => buildRows(exportViewMode), [playerData, search, sortBy, torneoId, exportViewMode]);
+
+  function exportPDF(mode) {
+    setExportViewMode(mode);
     setExportMode(true);
+    setShowExportOptions(false);
   }
 
   const cols = showRes && showJuv ? "2rem 2.5rem 1fr 1fr 1fr" : "2rem 2.5rem 1fr 1fr";
 
-  if (exportMode) return <MinutesExportView rows={display} torneo={torneo} playerMap={playerMap} activeSquad={activeSquad} activeSeasonId={activeSeasonId} onExit={() => setExportMode(false)} />;
+  if (exportMode) return <MinutesExportView rows={exportRows} torneo={torneo} viewMode={exportViewMode} playerMap={playerMap} activeSquad={activeSquad} activeSeasonId={activeSeasonId} onExit={() => setExportMode(false)} />;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -177,8 +203,21 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
   return (
     <div className="space-y-5">
+      {/* Selector de vista */}
+      <div className="flex bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden w-fit">
+        {[
+          { id: "reserva", label: "Reserva" },
+          { id: "juveniles", label: "Juveniles" },
+          { id: "ambos", label: "Ambos" },
+        ].map((option) => (
+          <button key={option.id} onClick={() => changeViewMode(option.id)} className={`px-4 py-2 text-sm font-semibold transition-all ${viewMode === option.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
+            {option.label}
+          </button>
+        ))}
+      </div>
+
       {/* Stats cards */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {showRes && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total disponible — Reserva</p>
@@ -200,11 +239,20 @@ export default function MinutesTracker({ onSelectPlayer }) {
         <button onClick={() => setShowFilters((v) => !v)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-zinc-900 border border-zinc-800 text-zinc-300 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors">
           <SlidersHorizontal size={13} /> {showFilters ? "Ocultar filtros" : "Mostrar filtros"}
         </button>
-        <button onClick={exportPDF}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-yellow-400/15 border border-yellow-400/30 text-yellow-200 hover:bg-yellow-400/25 rounded-lg transition-colors">
-          <FileDown size={13} />
-          Exportar / PDF
-        </button>
+        <div className="relative">
+          <button onClick={() => setShowExportOptions((v) => !v)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-yellow-400/15 border border-yellow-400/30 text-yellow-200 hover:bg-yellow-400/25 rounded-lg transition-colors">
+            <FileDown size={13} />
+            Exportar / PDF
+          </button>
+          {showExportOptions && (
+            <div className="absolute right-0 top-9 z-20 w-52 bg-zinc-900 border border-zinc-800 rounded-xl shadow-xl p-1">
+              <button onClick={() => exportPDF("reserva")} className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 rounded-lg">Exportar solo Reserva</button>
+              <button onClick={() => exportPDF("juveniles")} className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 rounded-lg">Exportar solo Juveniles</button>
+              <button onClick={() => exportPDF("ambos")} className="w-full text-left px-3 py-2 text-sm text-zinc-200 hover:bg-zinc-800 rounded-lg">Exportar ambos</button>
+            </div>
+          )}
+        </div>
       </div>
 
       {showFilters && (
@@ -221,7 +269,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
           <div className="flex flex-wrap gap-2">
             <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
               {TORNEOS.map((t) => (
-                <button key={t.id} onClick={() => { setTorneoId(t.id); setSortBy(t.res_total ? "res" : "juv"); }}
+                <button key={t.id} onClick={() => { setTorneoId(t.id); if (t.id === "Juveniles") setViewMode("juveniles"); if (t.res_total && t.juv_total === null) setViewMode("reserva"); setSortBy(t.res_total ? "res" : "juv"); }}
                   className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${torneoId === t.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
                   {t.label}
                 </button>

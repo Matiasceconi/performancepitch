@@ -19,19 +19,38 @@ function PctPill({ value }) {
   return <span className="inline-flex min-w-12 justify-center rounded-full px-2 py-1 text-[10px] font-black" style={{ backgroundColor: bg, color }}>{value}%</span>;
 }
 
-export default function MinutesExportView({ rows, torneo, playerMap, activeSquad, activeSeasonId, onExit }) {
+export default function MinutesExportView({ rows, torneo, viewMode = "ambos", playerMap, activeSquad, activeSeasonId, onExit }) {
   const totals = rows.reduce((acc, row) => ({
     res: acc.res + Number(row.res || 0),
     juv: acc.juv + Number(row.juv || 0),
     total: acc.total + Number(row.res || 0) + Number(row.juv || 0),
   }), { res: 0, juv: 0, total: 0 });
-  const showRes = torneo?.res_total !== null;
-  const showJuv = torneo?.juv_total !== null;
+  const showRes = torneo?.res_total !== null && (viewMode === "reserva" || viewMode === "ambos");
+  const showJuv = torneo?.juv_total !== null && (viewMode === "juveniles" || viewMode === "ambos");
+  const viewLabel = viewMode === "reserva" ? "Reserva" : viewMode === "juveniles" ? "Juveniles" : "Reserva + Juveniles";
+
+  function downloadCsv() {
+    const headers = ["Jugador", "Posición", ...(showRes ? ["Reserva"] : []), ...(showJuv ? ["Juveniles"] : []), "Total"];
+    const lines = rows.map((row, index) => {
+      const player = row.player_id ? playerMap[row.player_id] : null;
+      const total = (showRes ? Number(row.res || 0) : 0) + (showJuv ? Number(row.juv || 0) : 0);
+      return [row.player_name, player?.position || "", ...(showRes ? [row.res || 0] : []), ...(showJuv ? [row.juv || 0] : []), total]
+        .map((value) => `"${String(value).replace(/"/g, '""')}"`).join(",");
+    });
+    const blob = new Blob([[headers.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `minutos-${viewMode}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
 
   return (
     <div className="min-h-screen bg-white text-zinc-950 p-6 print:p-0">
       <style>{`@media print { .no-print { display: none !important; } body { background: white !important; } .break-inside-avoid { break-inside: avoid; } }`}</style>
       <div className="no-print flex justify-end gap-2 mb-4">
+        <button onClick={downloadCsv} className="px-3 py-2 bg-emerald-700 text-white rounded-lg text-sm">Descargar Excel CSV</button>
         <button onClick={() => window.print()} className="px-3 py-2 bg-zinc-900 text-white rounded-lg text-sm flex items-center gap-2"><Printer size={15} /> Imprimir / PDF</button>
         <button onClick={onExit} className="px-3 py-2 bg-zinc-200 rounded-lg text-sm">Volver</button>
       </div>
@@ -42,7 +61,7 @@ export default function MinutesExportView({ rows, torneo, playerMap, activeSquad
           <div>
             <p className="text-xs font-bold uppercase" style={{ color: CLUB_BRAND.colors.greenDark }}>{CLUB_BRAND.name}</p>
             <h1 className="text-3xl font-black">Minutos Jugados</h1>
-            <p className="text-sm text-zinc-600">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"} · {torneo?.label || "Todo el semestre"}</p>
+            <p className="text-sm text-zinc-600">{activeSquad?.name || "Plantel"} · {activeSeasonId || activeSquad?.season || "Temporada"} · {torneo?.label || "Todo el semestre"} · {viewLabel}</p>
           </div>
         </div>
         <div className="text-right text-sm">
@@ -51,11 +70,11 @@ export default function MinutesExportView({ rows, torneo, playerMap, activeSquad
         </div>
       </div>
 
-      <div className="grid grid-cols-4 gap-3 mb-5">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
         <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Jugadores</p><p className="text-2xl font-black">{rows.length}</p></div>
-        <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Reserva</p><p className="text-2xl font-black" style={{ color: CLUB_BRAND.colors.greenDark }}>{minutes(totals.res)}</p></div>
-        <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Juveniles</p><p className="text-2xl font-black" style={{ color: CLUB_BRAND.colors.greenDark }}>{minutes(totals.juv)}</p></div>
-        <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Total</p><p className="text-2xl font-black">{minutes(totals.total)}</p></div>
+        {showRes && <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Reserva</p><p className="text-2xl font-black" style={{ color: CLUB_BRAND.colors.greenDark }}>{minutes(totals.res)}</p></div>}
+        {showJuv && <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Juveniles</p><p className="text-2xl font-black" style={{ color: CLUB_BRAND.colors.greenDark }}>{minutes(totals.juv)}</p></div>}
+        <div className="rounded-xl border p-3" style={{ borderColor: CLUB_BRAND.colors.line }}><p className="text-[10px] font-black uppercase text-zinc-500">Total</p><p className="text-2xl font-black">{minutes((showRes ? totals.res : 0) + (showJuv ? totals.juv : 0))}</p></div>
       </div>
 
       <div className="rounded-2xl border overflow-hidden" style={{ borderColor: CLUB_BRAND.colors.line }}>
@@ -74,7 +93,7 @@ export default function MinutesExportView({ rows, torneo, playerMap, activeSquad
                 <p className="text-xs font-bold text-zinc-600">{player?.position || "—"}</p>
                 {showRes && <div><p className="text-sm font-black">{minutes(row.res)}</p><PctPill value={resPct} /></div>}
                 {showJuv && <div><p className="text-sm font-black">{minutes(row.juv)}</p><PctPill value={juvPct} /></div>}
-                <p className="text-sm font-black" style={{ color: CLUB_BRAND.colors.greenDeep }}>{minutes((row.res || 0) + (row.juv || 0))}</p>
+                <p className="text-sm font-black" style={{ color: CLUB_BRAND.colors.greenDeep }}>{minutes((showRes ? Number(row.res || 0) : 0) + (showJuv ? Number(row.juv || 0) : 0))}</p>
               </div>
             );
           })}
