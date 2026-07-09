@@ -8,6 +8,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
 import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professionalSchedulePdf";
 import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
+import ScheduleExportView from "@/components/schedule/ScheduleExportView";
 import { findPlanDay } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
@@ -540,6 +541,7 @@ export default function Schedule() {
   const [copyingEvent, setCopyingEvent] = useState(null); // event being copied
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
   const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [exportDays, setExportDays] = useState(null);
 
   async function loadEvents() {
     setLoading(true);
@@ -658,28 +660,16 @@ export default function Schedule() {
     return Array.from({ length: 7 }, (_, i) => currentWeekStart.clone().add(i, "day"));
   }
 
-  async function downloadWeekPDF() {
-    const days = getWeekDays();
-    const weekLabel = `${days[0].format("D MMM")} – ${days[6].format("D MMM YYYY")}`.toUpperCase();
-    const doc = await buildProfessionalWeekSchedulePDF({
-      days,
-      eventsForDate: getEventsForDate,
-      weekLabel,
-      squadName: activeSquad?.name || "Plantel",
-      season: activeSeasonId || activeSquad?.season || "",
-      planMetaByDate: Object.fromEntries(days.map((day) => {
-        const date = day.format("YYYY-MM-DD");
-        const match = findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season });
-        return [date, match?.values || null];
-      })),
-    });
-    doc.save(`cronograma-semana-${days[0].format("YYYY-MM-DD")}.pdf`);
+  function getPlanMetaForDate(date) {
+    return findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values || null;
   }
 
-  async function downloadDayPDF(day) {
-    const evs = getEventsForDate(day.format("YYYY-MM-DD"));
-    const doc = await buildDailySchedulePDF({ day, events: evs, squadName: activeSquad?.name || "Plantel" });
-    doc.save(`cronograma-${day.format("YYYY-MM-DD")}.pdf`);
+  function downloadWeekPDF() {
+    setExportDays(getWeekDays());
+  }
+
+  function downloadDayPDF(day) {
+    setExportDays([day]);
   }
 
   // ── WEEK VIEW ──
@@ -811,6 +801,8 @@ export default function Schedule() {
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
     </div>
   );
+
+  if (exportDays) return <ScheduleExportView days={exportDays} eventsForDate={getEventsForDate} activeSquad={activeSquad} activeSeasonId={activeSeasonId || activeSquad?.season || ""} getPlanMeta={getPlanMetaForDate} onExit={() => setExportDays(null)} />;
 
   return (
     <div className="space-y-6">
