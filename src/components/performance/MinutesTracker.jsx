@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getValidMinuteRecords } from "@/lib/minutesUtils";
-import MinutesExportView from "@/components/performance/MinutesExportView";
+import { generateMinutesPdf } from "@/lib/reports/minutesPdf";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 const TORNEOS = [
@@ -39,12 +39,10 @@ function norm(s) {
 
 export default function MinutesTracker({ onSelectPlayer }) {
   const { activeSquadId, activeSquad, activeSeasonId } = useWorkspace();
-  const [exportMode, setExportMode] = useState(false);
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState("res");
   const [torneoId, setTorneoId] = useState("all");
   const [viewMode, setViewMode] = useState("reserva");
-  const [exportViewMode, setExportViewMode] = useState("reserva");
   const [showExportOptions, setShowExportOptions] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [records, setRecords] = useState([]);
@@ -183,17 +181,13 @@ export default function MinutesTracker({ onSelectPlayer }) {
   }
 
   const display = useMemo(() => buildRows(viewMode), [playerData, search, sortBy, torneoId, viewMode]);
-  const exportRows = useMemo(() => buildRows(exportViewMode), [playerData, search, sortBy, torneoId, exportViewMode]);
 
-  function exportPDF(mode) {
-    setExportViewMode(mode);
-    setExportMode(true);
+  async function exportPDF(mode) {
     setShowExportOptions(false);
+    await generateMinutesPdf({ rows: buildRows(mode), torneo, viewMode: mode, playerMap, activeSquad, activeSeasonId });
   }
 
   const cols = showRes && showJuv ? "2rem 2.5rem 1fr 1fr 1fr" : "2rem 2.5rem 1fr 1fr";
-
-  if (exportMode) return <MinutesExportView rows={exportRows} torneo={torneo} viewMode={exportViewMode} playerMap={playerMap} activeSquad={activeSquad} activeSeasonId={activeSeasonId} onExit={() => setExportMode(false)} />;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
