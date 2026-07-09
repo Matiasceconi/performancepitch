@@ -7,8 +7,17 @@ function avg(rows, field) {
   return nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
 }
 function fmt(n, d = 1) { return n ? n.toFixed(d) : "—"; }
-function Stat({ icon: Icon, label, value, color = "text-white", sub }) {
-  return <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4"><Icon size={15} className={color} /><p className={`text-2xl font-bold mt-2 ${color}`}>{value}</p><p className="text-xs text-zinc-500">{label}</p>{sub && <p className="text-[10px] text-zinc-600 mt-1">{sub}</p>}</div>;
+
+function Stat({ icon: Icon, label, value, sub, accent = "emerald" }) {
+  const tones = {
+    emerald: "text-emerald-600 bg-emerald-50 border-emerald-100",
+    blue: "text-blue-600 bg-blue-50 border-blue-100",
+    orange: "text-orange-600 bg-orange-50 border-orange-100",
+    violet: "text-violet-600 bg-violet-50 border-violet-100",
+    amber: "text-amber-600 bg-amber-50 border-amber-100",
+    slate: "text-slate-700 bg-slate-50 border-slate-100",
+  };
+  return <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm"><div className={`w-9 h-9 rounded-lg border flex items-center justify-center ${tones[accent]}`}><Icon size={18} /></div><p className="text-2xl font-bold mt-3 text-slate-900">{value}</p><p className="text-xs font-medium text-slate-500">{label}</p>{sub && <p className="text-[11px] text-emerald-600 mt-1">{sub}</p>}</div>;
 }
 
 export default function NutritionDashboard({ assessments, playerCount = 0 }) {
@@ -17,8 +26,9 @@ export default function NutritionDashboard({ assessments, playerCount = 0 }) {
   const latestRows = latestDate ? linked.filter(a => a.fecha === latestDate) : linked;
   const latestByPlayer = new Map();
   linked.forEach(a => { if (!latestByPlayer.has(a.player_id) || (a.fecha || "") > (latestByPlayer.get(a.player_id).fecha || "")) latestByPlayer.set(a.player_id, a); });
-  const staleLimit = moment().subtract(45, "days").format("YYYY-MM-DD");
+  const staleLimit = moment().subtract(30, "days").format("YYYY-MM-DD");
   const stale = [...latestByPlayer.values()].filter(a => (a.fecha || "") < staleLimit).length;
-  const alerts = latestRows.filter(a => (a.porcentaje_grasa && a.porcentaje_grasa >= 18) || (a.sumatoria_6p && a.sumatoria_6p >= 80));
-  return <div className="space-y-4"><div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3"><Stat icon={Users} label="Jugadores evaluados" value={new Set(linked.map(a => a.player_id)).size} sub={`${playerCount || "—"} jugadores oficiales`} color="text-emerald-400" /><Stat icon={Calendar} label="Última medición" value={latestDate ? moment(latestDate).format("DD/MM") : "—"} color="text-blue-400" /><Stat icon={AlertTriangle} label="Sin medición reciente" value={stale} color="text-yellow-400" /><Stat icon={Scale} label="Prom. peso" value={`${fmt(avg(latestRows, "peso"))} kg`} color="text-white" /><Stat icon={Activity} label="Prom. Sum. 6P" value={fmt(avg(latestRows, "sumatoria_6p"))} color="text-orange-400" /><Stat icon={Percent} label="Prom. % grasa" value={`${fmt(avg(latestRows, "porcentaje_grasa"))}%`} color="text-pink-400" /><Stat icon={Dumbbell} label="Prom. kg MM" value={`${fmt(avg(latestRows, "kg_masa_muscular"))} kg`} color="text-purple-400" /></div>{alerts.length > 0 && <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4"><p className="text-sm font-semibold text-amber-300 flex items-center gap-2"><AlertTriangle size={15} /> Alertas nutricionales ({alerts.length})</p><p className="text-xs text-amber-200/70 mt-1">Jugadores con % grasa o sumatoria 6P por encima de los umbrales de seguimiento.</p></div>}</div>;
+  const evaluated = new Set(linked.map(a => a.player_id)).size;
+  const coverage = playerCount ? Math.round((evaluated / playerCount) * 100) : 0;
+  return <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-3"><Stat icon={Users} label="Jugadores evaluados" value={evaluated} sub={`${coverage}% del plantel`} /><Stat icon={Calendar} label="Última medición" value={latestDate ? moment(latestDate).format("DD/MM/YYYY") : "—"} accent="emerald" /><Stat icon={AlertTriangle} label="Sin medición reciente" value={stale} sub="Más de 30 días" accent="orange" /><Stat icon={Scale} label="Peso promedio" value={`${fmt(avg(latestRows, "peso"))} kg`} accent="blue" /><Stat icon={Activity} label="Sumatoria 6P prom." value={`${fmt(avg(latestRows, "sumatoria_6p"))} mm`} accent="amber" /><Stat icon={Percent} label="% Grasa prom." value={`${fmt(avg(latestRows, "porcentaje_grasa"))}%`} accent="violet" /><Stat icon={Dumbbell} label="Kg Masa Muscular prom." value={`${fmt(avg(latestRows, "kg_masa_muscular"))} kg`} accent="emerald" /></div>;
 }
