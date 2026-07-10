@@ -301,7 +301,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
 
         <div className="flex items-center justify-center px-3 py-4">
           {hasResult ? (
-            <div className={`min-w-20 text-center rounded-lg px-4 py-2 text-2xl font-black tracking-wide ${won ? "bg-emerald-500/10 text-emerald-300" : drew ? "bg-zinc-800 text-white" : "bg-red-500/10 text-red-300"}`}>
+            <div className={`w-24 h-14 rounded-lg px-3 py-2 text-2xl font-black tracking-wide whitespace-nowrap leading-none flex items-center justify-center ${won ? "bg-emerald-500/10 text-emerald-300" : drew ? "bg-zinc-800 text-white" : "bg-red-500/10 text-red-300"}`}>
               {leftScore} - {rightScore}
             </div>
           ) : <div className="text-zinc-600 font-bold">VS</div>}
