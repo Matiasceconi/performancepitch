@@ -56,6 +56,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
   const [sort, setSort] = useState({ key: "total_distance", dir: "desc" });
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedMetric, setSelectedMetric] = useState("total_distance");
+  const [showAllMetrics, setShowAllMetrics] = useState(false);
 
   const sessionMap = useMemo(() => Object.fromEntries(sessions.map((s) => [s.id, s])), [sessions]);
   const profileMap = useMemo(() => Object.fromEntries(competitionProfiles.map((p) => [p.player_id, p])), [competitionProfiles]);
@@ -147,7 +148,20 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
 
   const selected = tableRows.find((p) => p.id === selectedPlayerId) || tableRows[0] || allPlayerRows[0];
   const selectedMetricConfig = METRICS.find((m) => m.key === selectedMetric) || METRICS[0];
-  const chartData = useMemo(() => (selected?.rows || []).map((row, index) => ({ label: `Día ${index + 1}`, date: moment(row.date).format("DD/MM"), value: number(row[selectedMetric]) })), [selected, selectedMetric]);
+  const chartData = useMemo(() => {
+    const byDate = {};
+    (selected?.rows || []).forEach((row) => {
+      if (!row.date) return;
+      if (!byDate[row.date]) byDate[row.date] = { rawDate: row.date, value: 0 };
+      byDate[row.date].value += number(row[selectedMetric]);
+    });
+    return Object.values(byDate).sort((a, b) => String(a.rawDate).localeCompare(String(b.rawDate))).map((row, index) => ({ label: `Día ${index + 1}`, date: moment(row.rawDate).format("DD/MM"), value: row.value }));
+  }, [selected, selectedMetric]);
+  const selectedMetricTotals = useMemo(() => METRICS.map((metric) => ({ ...metric, value: (selected?.rows || []).reduce((sum, row) => sum + number(row[metric.key]), 0) })), [selected]);
+  const selectedMedical = selected ? medicalByPlayer[selected.id]?.episode : null;
+  const latestSelectedDate = [...(selected?.rows || [])].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0]?.date;
+  const injuryStart = selectedMedical?.fecha_inicio_tto || selectedMedical?.fecha_inicio || selectedMedical?.fecha;
+  const daysSinceInjury = injuryStart && latestSelectedDate ? Math.max(1, moment(latestSelectedDate).diff(moment(injuryStart), "days") + 1) : null;
   const todayCount = new Set(differentiatedRows.filter((r) => r.date === dateFilter).map((r) => r.player_id || r.player_name)).size;
   const progressingCount = allPlayerRows.filter((p) => p.progressing).length;
 
@@ -197,14 +211,37 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-        <h3 className="text-white font-bold">Evolución individual</h3><p className="text-xs text-zinc-500 mt-1 mb-4">Solo se contabilizan los días con trabajo diferenciado.</p>
-        <div className="grid grid-cols-1 lg:grid-cols-[280px_220px_1fr] gap-3 mb-4">
-          <select value={selected?.id || ""} onChange={(e) => setSelectedPlayerId(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white">{tableRows.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
-          <select value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)} className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white">{METRICS.map((m) => <option key={m.key} value={m.key}>{m.label}</option>)}</select>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+          <div><h3 className="text-white font-bold">Evolución individual <span className="text-xs text-zinc-500 font-normal">(solo días con trabajo diferenciado)</span></h3></div>
+          <button onClick={() => setShowAllMetrics((prev) => !prev)} className="self-start md:self-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-950 border border-zinc-800 text-xs text-zinc-300 hover:text-white"> <TrendingUp size={13} /> {showAllMetrics ? "Ocultar métricas" : "Ver todas las métricas"}</button>
         </div>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 24, right: 20, left: 0, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="label" stroke="#71717a" fontSize={11} tickFormatter={(v, i) => `${v}\n${chartData[i]?.date || ""}`} /><YAxis stroke="#71717a" fontSize={11} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} formatter={(v) => format(v, selectedMetricConfig.unit)} /><Bar dataKey="value" name={selectedMetricConfig.label} fill="#10b981" radius={[8, 8, 0, 0]}><LabelList dataKey="value" position="top" fill="#fff" fontSize={11} formatter={(v) => format(v, selectedMetricConfig.unit)} /></Bar></BarChart></ResponsiveContainer>
+        <div className="grid grid-cols-1 lg:grid-cols-[260px_1px_1fr] gap-5">
+          <div className="space-y-3">
+            <div>
+              <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">Jugador</label>
+              <div className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 flex items-center gap-3">
+                <PlayerPhoto player={selected?.player} className="w-9 h-9 rounded-full object-cover border border-zinc-700" fallbackClassName="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center" textClassName="text-xs font-bold text-zinc-400" />
+                <select value={selected?.id || ""} onChange={(e) => setSelectedPlayerId(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-white font-semibold outline-none">{tableRows.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+              </div>
+            </div>
+            <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 grid grid-cols-2 gap-3">
+              <div><p className="text-[10px] uppercase text-zinc-500 font-bold">Días trabajo diferenciado</p><p className="text-2xl font-black text-white mt-2">{chartData.length}</p><p className="text-[11px] text-zinc-500">{daysSinceInjury ? `de ${daysSinceInjury} desde la lesión` : "días registrados"}</p></div>
+              <div><p className="text-[10px] uppercase text-zinc-500 font-bold">% Perfil competitivo actual</p><p className="text-2xl font-black text-emerald-400 mt-2">{selected?.profilePct != null ? `${selected.profilePct}%` : "—"}</p><p className="text-[11px] text-zinc-500">última medición filtrada</p></div>
+            </div>
+          </div>
+          <div className="hidden lg:block bg-zinc-800" />
+          <div className="min-w-0">
+            <div className="flex items-center gap-3 mb-3">
+              <label className="text-xs text-zinc-400">Métrica</label>
+              <select value={selectedMetric} onChange={(e) => setSelectedMetric(e.target.value)} className="w-full max-w-xs bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 text-xs text-white">{METRICS.map((m) => <option key={m.key} value={m.key}>{m.label} ({m.unit || "u"})</option>)}</select>
+            </div>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%"><BarChart data={chartData} margin={{ top: 24, right: 20, left: 0, bottom: 8 }}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" /><XAxis dataKey="label" interval={0} axisLine={false} tickLine={false} tick={({ x, y, payload, index }) => <g transform={`translate(${x},${y})`}><text textAnchor="middle" fill="#a1a1aa" fontSize="11"><tspan x="0" dy="12">{payload.value}</tspan><tspan x="0" dy="14">{chartData[index]?.date || ""}</tspan></text></g>} /><YAxis stroke="#71717a" fontSize={11} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ background: "#18181b", border: "1px solid #3f3f46", borderRadius: 12, color: "#fff" }} formatter={(v) => format(v, selectedMetricConfig.unit)} /><Bar dataKey="value" name={selectedMetricConfig.label} fill="#10b981" radius={[8, 8, 0, 0]}><LabelList dataKey="value" position="top" fill="#fff" fontSize={11} formatter={(v) => format(v, selectedMetricConfig.unit)} /></Bar></BarChart></ResponsiveContainer>
+            </div>
+          </div>
         </div>
+        {showAllMetrics && <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mt-4 pt-4 border-t border-zinc-800">{selectedMetricTotals.map((metric) => <button key={metric.key} onClick={() => setSelectedMetric(metric.key)} className={`text-left rounded-xl border p-3 ${selectedMetric === metric.key ? "bg-emerald-500/10 border-emerald-500/40" : "bg-zinc-950 border-zinc-800"}`}><p className="text-[10px] uppercase font-bold text-zinc-500">{metric.short}</p><p className="text-white font-black mt-1">{format(metric.value, metric.unit)}</p></button>)}</div>}
+        <p className="text-xs text-zinc-500 mt-4">Solo se contabilizan los días con trabajo diferenciado.</p>
       </div>
     </div>
   );
