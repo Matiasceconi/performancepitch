@@ -28,13 +28,17 @@ const STAGE_COLORS = ["bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
 function normalize(value = "") {
   return String(value).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
-function isDifferentiatedSession(session) {
-  const text = normalize(`${session?.title || ""} ${session?.session_objective || ""} ${session?.type || ""} ${session?.session_type || ""}`);
-  return text.includes("trabajo diferenciado");
-}
 function isDifferentiatedPlayerRow(row) {
+  const group = normalize(row?.gps_group || "");
+  const reason = normalize(row?.exclusion_reason || "");
   const status = normalize(row?.row_status || "");
-  return row?.include_in_session_average === false || (!!status && status !== "incluidos" && status !== "incluido");
+  return group === "diferenciado" || group === "kinesiologia" || reason === "diferenciado" || reason === "kinesiologia" || status.includes("diferenciado") || status.includes("kinesiologia");
+}
+function differentiatedLabel(row) {
+  const value = normalize(row?.exclusion_reason || row?.gps_group || "");
+  if (value === "kinesiologia") return "Kinesiología";
+  if (value === "diferenciado") return "Diferenciado";
+  return "Diferenciado";
 }
 function number(value) { return Number(value) || 0; }
 function format(value, unit = "") {
@@ -87,12 +91,11 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
     return Object.entries(gpsBySession).flatMap(([sessionId, rows]) => {
       const session = sessionMap[sessionId];
       if (!session?.date) return [];
-      const sessionMarked = isDifferentiatedSession(session);
-      const rowsToUse = sessionMarked ? rows : rows.filter(isDifferentiatedPlayerRow);
+      const rowsToUse = rows.filter((row) => isDifferentiatedPlayerRow(row) && hasExternalLoad(row));
       if (!rowsToUse.length) return [];
       return rowsToUse.map((row) => {
         const player = playerMap[row.player_id] || {};
-        return { ...row, session_id: sessionId, date: session.date, session_title: session.title || "Trabajo Diferenciado", objective: sessionMarked ? (session.session_objective || "Trabajo Diferenciado") : "Trabajo Diferenciado", player, player_name: row.player_name || player.full_name || player.name || "Jugador" };
+        return { ...row, session_id: sessionId, date: session.date, session_title: session.title || "Sesión", objective: differentiatedLabel(row), player, player_name: row.player_name || player.full_name || player.name || "Jugador" };
       });
     }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }, [gpsBySession, sessionMap, playerMap]);
@@ -130,7 +133,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
   }, [differentiatedRows, medicalByPlayer, profileMap]);
 
   const sessionTableRows = useMemo(() => {
-    return differentiatedRows.filter(hasExternalLoad).map((row) => {
+    return differentiatedRows.map((row) => {
       const playerId = row.player_id || row.player_name;
       const medical = medicalByPlayer[playerId]?.episode || {};
       const profile = profileMap[playerId] || {};
@@ -196,7 +199,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
   function openMedical(playerId) { window.location.href = `/performance/medical?player_id=${encodeURIComponent(playerId)}`; }
 
   if (!differentiatedRows.length) {
-    return <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center"><p className="text-white font-bold">Sin sesiones de Trabajo Diferenciado</p><p className="text-zinc-500 text-sm mt-1">Esta sección solo muestra cargas de sesiones marcadas como “Trabajo Diferenciado”.</p></div>;
+    return <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-10 text-center"><p className="text-white font-bold">Sin cargas GPS diferenciadas</p><p className="text-zinc-500 text-sm mt-1">Esta sección solo muestra jugadores marcados como Diferenciado/Kinesiología con carga GPS en el CSV de la sesión.</p></div>;
   }
 
   return (
