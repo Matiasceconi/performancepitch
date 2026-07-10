@@ -8,6 +8,7 @@ import GpsDashboardHeader from "./GpsDashboardHeader";
 import GpsWeeklyEvolutionPanel from "./GpsWeeklyEvolutionPanel";
 import GpsIndividualProfilePanel from "./GpsIndividualProfilePanel";
 import GpsIndividualPlayerTab from "./GpsIndividualPlayerTab";
+import GpsKinesiologyLoadTab from "./GpsKinesiologyLoadTab";
 import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import GpsSessionAnalyticsFilters from "./GpsSessionAnalyticsFilters";
 import GpsSessionsAdvancedTable from "./GpsSessionsAdvancedTable";
@@ -373,6 +374,7 @@ export default function ExternalGpsDashboard() {
   const tabs = [
     { id: "microcycle", label: "Carga del Microciclo" },
     { id: "sessions", label: "Buscar sesiones" },
+    { id: "kinesiology", label: "Kinesiología" },
     { id: "individual-player", label: "Individual" },
     { id: "individual", label: "Perfil competitivo individual" },
     { id: "team", label: "Perfil del equipo" },
@@ -431,6 +433,10 @@ export default function ExternalGpsDashboard() {
             loading={loading}
           />
         </div>
+      )}
+
+      {activeTab === "kinesiology" && (
+        <GpsKinesiologyLoadTab sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} />
       )}
 
       {activeTab === "individual-player" && (
