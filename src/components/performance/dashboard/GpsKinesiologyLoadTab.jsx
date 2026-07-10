@@ -4,6 +4,7 @@ import "moment/locale/es";
 import { ArrowUpDown, CalendarDays, ExternalLink, Filter, TrendingUp, Users } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
+import { COLUMN_DEFS } from "@/components/sessions/gps/gpsColumnsConfig";
 
 moment.locale("es");
 
@@ -15,6 +16,12 @@ const METRICS = [
   { key: "acc_3", label: "ACC +3", short: "ACC +3", unit: "", profileKey: "avg_acc_3" },
   { key: "dec_3", label: "DEC +3", short: "DEC +3", unit: "", profileKey: "avg_dec_3" },
 ];
+
+const TABLE_METRICS = COLUMN_DEFS.filter((column) => !column.core).map((column) => ({
+  key: column.field,
+  label: column.label,
+  unit: column.field.includes("distance") || column.field.includes("hmld") || column.field === "total_distance" ? "m" : column.field === "smax" ? "km/h" : "",
+}));
 
 const STAGE_COLORS = ["bg-emerald-500/15 text-emerald-300 border-emerald-500/30", "bg-yellow-500/15 text-yellow-300 border-yellow-500/30", "bg-orange-500/15 text-orange-300 border-orange-500/30", "bg-blue-500/15 text-blue-300 border-blue-500/30", "bg-violet-500/15 text-violet-300 border-violet-500/30"];
 
@@ -31,7 +38,9 @@ function isDifferentiatedPlayerRow(row) {
 }
 function number(value) { return Number(value) || 0; }
 function format(value, unit = "") {
-  if (value == null || Number.isNaN(Number(value))) return "—";
+  if (value == null || value === "") return "—";
+  if (typeof value === "string") return value;
+  if (Number.isNaN(Number(value))) return "—";
   const n = Number(value);
   const shown = n >= 100 ? Math.round(n).toLocaleString("es-AR") : n.toFixed(1);
   return `${shown}${unit ? ` ${unit}` : ""}`;
@@ -53,7 +62,7 @@ function isProgressing(rows) {
 export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}, playerMap = {}, competitionProfiles = [], medicalEpisodes = [], medicalStatuses = [] }) {
   const [dateFilter, setDateFilter] = useState(moment().format("YYYY-MM-DD"));
   const [filters, setFilters] = useState({ player: "", position: "Todos", injury: "Todos", stage: "Todos", objective: "Todos" });
-  const [sort, setSort] = useState({ key: "total_distance", dir: "desc" });
+  const [sort, setSort] = useState({ key: "date", dir: "desc" });
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [selectedMetric, setSelectedMetric] = useState("total_distance");
   const [showAllMetrics, setShowAllMetrics] = useState(false);
@@ -94,43 +103,67 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
       byPlayer[id].rows.push(row);
     });
     return Object.values(byPlayer).map((item) => {
-      const filteredRows = item.rows.filter((row) => !dateFilter || row.date === dateFilter);
-      const rowsForTable = filteredRows.length ? filteredRows : item.rows.slice(-1);
       const medical = medicalByPlayer[item.id]?.episode || {};
       const profile = profileMap[item.id] || {};
-      const totalDistance = rowsForTable.reduce((a, r) => a + number(r.total_distance), 0);
-      const profilePct = profile.avg_total_distance ? Math.round((totalDistance / profile.avg_total_distance) * 100) : null;
       const latest = [...item.rows].sort((a, b) => String(b.date).localeCompare(String(a.date)))[0] || {};
+      const profilePct = profile.avg_total_distance && latest.total_distance ? Math.round((latest.total_distance / profile.avg_total_distance) * 100) : null;
       return {
         ...item,
-        rowsForTable,
         position: item.player?.position || "—",
         injury: medical.lesion_consulta || "—",
         days: new Set(item.rows.map((r) => r.date)).size,
         objective: latest.objective || "Trabajo Diferenciado",
         stage: medical.etapa_rhb || "Sin Etapa RHB",
-        total_distance: totalDistance,
-        distance_25: rowsForTable.reduce((a, r) => a + number(r.distance_25), 0),
-        sprints: rowsForTable.reduce((a, r) => a + number(r.sprints), 0),
-        player_load: rowsForTable.reduce((a, r) => a + number(r.player_load), 0),
-        acc_3: rowsForTable.reduce((a, r) => a + number(r.acc_3), 0),
-        dec_3: rowsForTable.reduce((a, r) => a + number(r.dec_3), 0),
+        total_distance: item.rows.reduce((a, r) => a + number(r.total_distance), 0),
+        distance_25: item.rows.reduce((a, r) => a + number(r.distance_25), 0),
+        sprints: item.rows.reduce((a, r) => a + number(r.sprints), 0),
+        player_load: item.rows.reduce((a, r) => a + number(r.player_load), 0),
+        acc_3: item.rows.reduce((a, r) => a + number(r.acc_3), 0),
+        dec_3: item.rows.reduce((a, r) => a + number(r.dec_3), 0),
         profilePct,
         progressing: isProgressing(item.rows),
       };
     });
-  }, [differentiatedRows, dateFilter, medicalByPlayer, profileMap]);
+  }, [differentiatedRows, medicalByPlayer, profileMap]);
+
+  const sessionTableRows = useMemo(() => {
+    const differentiatedPlayerIds = new Set(allPlayerRows.map((p) => p.id));
+    return Object.entries(gpsBySession).flatMap(([sessionId, rows]) => {
+      const session = sessionMap[sessionId];
+      if (!session?.date) return [];
+      return rows.filter((row) => differentiatedPlayerIds.has(row.player_id || row.player_name)).map((row) => {
+        const player = playerMap[row.player_id] || {};
+        const playerId = row.player_id || row.player_name;
+        const medical = medicalByPlayer[playerId]?.episode || {};
+        const profile = profileMap[playerId] || {};
+        return {
+          ...row,
+          id: row.id || `${sessionId}-${playerId}`,
+          player_id: playerId,
+          player,
+          name: row.player_name || player.full_name || player.name || "Jugador",
+          date: session.date,
+          session_title: session.title || "Sesión",
+          objective: row.include_in_session_average === false ? (row.exclusion_reason || row.gps_group || "Trabajo Diferenciado") : (session.session_objective || "Grupo principal"),
+          position: player?.position || "—",
+          injury: medical.lesion_consulta || "—",
+          stage: medical.etapa_rhb || "Sin Etapa RHB",
+          profilePct: profile.avg_total_distance && row.total_distance ? Math.round((row.total_distance / profile.avg_total_distance) * 100) : null,
+        };
+      });
+    });
+  }, [allPlayerRows, gpsBySession, sessionMap, playerMap, medicalByPlayer, profileMap]);
 
   const options = useMemo(() => ({
     positions: ["Todos", ...new Set(allPlayerRows.map((p) => p.position).filter((v) => v && v !== "—"))],
     injuries: ["Todos", ...new Set(allPlayerRows.map((p) => p.injury).filter((v) => v && v !== "—"))],
     stages: ["Todos", ...new Set(allPlayerRows.map((p) => p.stage).filter(Boolean))],
-    objectives: ["Todos", ...new Set(allPlayerRows.map((p) => p.objective).filter(Boolean))],
-  }), [allPlayerRows]);
+    objectives: ["Todos", ...new Set(sessionTableRows.map((p) => p.objective).filter(Boolean))],
+  }), [allPlayerRows, sessionTableRows]);
 
   const tableRows = useMemo(() => {
     const searched = normalize(filters.player);
-    const filtered = allPlayerRows.filter((p) => {
+    const filtered = sessionTableRows.filter((p) => {
       if (searched && !normalize(p.name).includes(searched)) return false;
       if (filters.position !== "Todos" && p.position !== filters.position) return false;
       if (filters.injury !== "Todos" && p.injury !== filters.injury) return false;
@@ -144,9 +177,9 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
       const result = typeof av === "string" ? String(av).localeCompare(String(bv)) : number(av) - number(bv);
       return sort.dir === "asc" ? result : -result;
     });
-  }, [allPlayerRows, filters, sort]);
+  }, [sessionTableRows, filters, sort]);
 
-  const selected = tableRows.find((p) => p.id === selectedPlayerId) || tableRows[0] || allPlayerRows[0];
+  const selected = allPlayerRows.find((p) => p.id === selectedPlayerId) || allPlayerRows[0];
   const selectedMetricConfig = METRICS.find((m) => m.key === selectedMetric) || METRICS[0];
   const chartData = useMemo(() => {
     const byDate = {};
@@ -193,18 +226,25 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-zinc-800"><h3 className="text-white font-bold">Tabla de jugadores diferenciados</h3><p className="text-xs text-zinc-500 mt-1">Datos de trabajos diferenciados: sesiones “Trabajo Diferenciado” o jugadores excluidos del promedio en una sesión del plantel. La etapa se lee desde Área Médica.</p></div>
+        <div className="px-5 py-4 border-b border-zinc-800"><h3 className="text-white font-bold">Tabla de jugadores diferenciados</h3><p className="text-xs text-zinc-500 mt-1">Detalle por sesión de todos los jugadores que tuvieron trabajo diferenciado o Kinesiología en algún momento. La etapa se lee desde Área Médica.</p></div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1450px] text-xs">
-            <thead className="bg-zinc-800/60 text-zinc-500 uppercase"><tr>{[
-              ["photo", "Foto"], ["name", "Jugador"], ["position", "Posición"], ["injury", "Lesión / motivo"], ["days", "Días trab. diferenciado"], ["objective", "Objetivo actual"], ["total_distance", "Distancia Total"], ["distance_25", "D > 25 km/h"], ["sprints", "Sprints"], ["player_load", "Player Load"], ["acc_3", "ACC +3"], ["dec_3", "DEC +3"], ["profilePct", "% Perfil Competitivo"], ["stage", "Etapa de Rehabilitación"]
-            ].map(([key, label]) => <th key={key} className="text-left px-3 py-3 whitespace-nowrap"><button onClick={() => key !== "photo" && changeSort(key)} className="inline-flex items-center gap-1 hover:text-white">{label}{key !== "photo" && <ArrowUpDown size={11} />}</button></th>)}</tr></thead>
-            <tbody>{tableRows.map((p) => <tr key={p.id} onClick={() => setSelectedPlayerId(p.id)} className={`border-t border-zinc-800/70 cursor-pointer ${selected?.id === p.id ? "bg-emerald-500/5" : "hover:bg-zinc-800/40"}`}>
+          <table className="w-full min-w-[2400px] text-xs">
+            <thead className="bg-zinc-800/60 text-zinc-500 uppercase">
+              <tr>{[
+                ["photo", "Foto"], ["name", "Jugador"], ["date", "Fecha"], ["session_title", "Sesión"], ["position", "Posición"], ["injury", "Lesión / motivo"], ["objective", "Estado / objetivo"], ["stage", "Etapa RHB"], ...TABLE_METRICS.map((m) => [m.key, m.label]), ["profilePct", "% Perfil Competitivo"]
+              ].map(([key, label]) => <th key={key} className="text-left px-3 py-3 whitespace-nowrap"><button onClick={() => key !== "photo" && changeSort(key)} className="inline-flex items-center gap-1 hover:text-white">{label}{key !== "photo" && <ArrowUpDown size={11} />}</button></th>)}</tr>
+            </thead>
+            <tbody>{tableRows.map((p) => <tr key={p.id} onClick={() => setSelectedPlayerId(p.player_id)} className={`border-t border-zinc-800/70 cursor-pointer ${selected?.id === p.player_id ? "bg-emerald-500/5" : "hover:bg-zinc-800/40"}`}>
               <td className="px-3 py-2"><PlayerPhoto player={p.player} className="w-9 h-9 rounded-full object-cover border border-zinc-700" fallbackClassName="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center" textClassName="text-xs font-bold text-zinc-400" /></td>
-              <td className="px-3 py-2 text-white font-semibold">{p.name}</td><td className="px-3 py-2 text-zinc-300">{p.position}</td><td className="px-3 py-2 text-zinc-300">{p.injury}</td><td className="px-3 py-2 text-center text-zinc-300">{p.days}</td><td className="px-3 py-2 text-zinc-300">{p.objective}</td>
-              {METRICS.map((m) => <td key={m.key} className="px-3 py-2 text-zinc-300 whitespace-nowrap">{format(p[m.key], m.unit)}</td>)}
+              <td className="px-3 py-2 text-white font-semibold whitespace-nowrap">{p.name}</td>
+              <td className="px-3 py-2 text-zinc-300 whitespace-nowrap">{moment(p.date).format("DD/MM/YYYY")}</td>
+              <td className="px-3 py-2 text-zinc-300 whitespace-nowrap">{p.session_title}</td>
+              <td className="px-3 py-2 text-zinc-300 whitespace-nowrap">{p.position}</td>
+              <td className="px-3 py-2 text-zinc-300 whitespace-nowrap">{p.injury}</td>
+              <td className="px-3 py-2 text-zinc-300 whitespace-nowrap">{p.objective}</td>
+              <td className="px-3 py-2"><button onClick={(e) => { e.stopPropagation(); openMedical(p.player_id); }} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border font-semibold whitespace-nowrap ${stageColor(p.stage)}`}>{p.stage}<ExternalLink size={11} /></button></td>
+              {TABLE_METRICS.map((m) => <td key={m.key} className="px-3 py-2 text-zinc-300 whitespace-nowrap">{format(p[m.key], m.unit)}</td>)}
               <td className="px-3 py-2"><div className="flex items-center gap-2"><span className="text-white font-bold w-10">{p.profilePct != null ? `${p.profilePct}%` : "—"}</span><div className="h-1.5 w-16 bg-zinc-800 rounded-full"><div className={`h-1.5 rounded-full ${pctColor(p.profilePct || 0)}`} style={{ width: `${Math.min(100, p.profilePct || 0)}%` }} /></div></div></td>
-              <td className="px-3 py-2"><button onClick={(e) => { e.stopPropagation(); openMedical(p.id); }} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full border font-semibold ${stageColor(p.stage)}`}>{p.stage}<ExternalLink size={11} /></button></td>
             </tr>)}</tbody>
           </table>
         </div>
@@ -221,7 +261,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
               <label className="text-[10px] uppercase font-bold text-zinc-500 mb-1 block">Jugador</label>
               <div className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 flex items-center gap-3">
                 <PlayerPhoto player={selected?.player} className="w-9 h-9 rounded-full object-cover border border-zinc-700" fallbackClassName="w-9 h-9 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center" textClassName="text-xs font-bold text-zinc-400" />
-                <select value={selected?.id || ""} onChange={(e) => setSelectedPlayerId(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-white font-semibold outline-none">{tableRows.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
+                <select value={selected?.id || ""} onChange={(e) => setSelectedPlayerId(e.target.value)} className="min-w-0 flex-1 bg-transparent text-sm text-white font-semibold outline-none">{allPlayerRows.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</select>
               </div>
             </div>
             <div className="bg-zinc-950 border border-zinc-800 rounded-xl p-4 grid grid-cols-2 gap-3">
