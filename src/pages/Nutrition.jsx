@@ -1,97 +1,183 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { base44 } from "@/api/base44Client";
-import { RefreshCw, CheckCircle2 } from "lucide-react";
+import { RefreshCw, CheckCircle2, Upload, AlertTriangle } from "lucide-react";
 import moment from "moment";
-import NutritionDashboard from "@/components/nutrition/NutritionDashboard";
-import NutritionTable from "@/components/nutrition/NutritionTable";
+import SkinfoldTab from "@/components/nutrition/SkinfoldTab";
+import ReadingTab from "@/components/nutrition/ReadingTab";
 import NutritionRepairPanel from "@/components/nutrition/NutritionRepairPanel";
-import NutritionInsights from "@/components/nutrition/NutritionInsights";
-import NutritionCharts from "@/components/nutrition/NutritionCharts";
+import NutritionImportModal from "@/components/nutrition/NutritionImportModal";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { useToast } from "@/components/ui/use-toast";
 
 const TABS = [
-  { id: "table", label: "Tabla Nutricional" },
-  { id: "evolution", label: "Evolución por Jugador" },
-  { id: "charts", label: "Gráficos" },
-  { id: "alerts", label: "Alertas" },
-  { id: "unlinked", label: "Jugadores sin vincular" },
+  { id: "skinfold", label: "Seguimiento de pliegues" },
+  { id: "reading", label: "Informe de una lectura" },
 ];
 
 export default function Nutrition() {
   const [assessments, setAssessments] = useState([]);
+  const [interpretations, setInterpretations] = useState([]);
+  const [readingStatuses, setReadingStatuses] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [squads, setSquads] = useState([]);
   const [syncState, setSyncState] = useState(null);
-  const [activeTab, setActiveTab] = useState("table");
+  const [activeTab, setActiveTab] = useState("skinfold");
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [showImport, setShowImport] = useState(false);
+  const { activeSquad, activeSeasonId } = useWorkspace();
   const { toast } = useToast();
 
   async function load() {
     setLoading(true);
-    const [rows, playerRows, syncRows] = await Promise.all([
-      base44.entities.NutritionAssessment.list("-fecha", 3000),
-      base44.entities.Player.list("full_name", 3000),
-      base44.entities.NutritionSyncState.list("-updated_date", 5),
-    ]);
-    setAssessments(rows);
-    setPlayers(playerRows);
-    setSyncState(syncRows[0] || null);
-    setLoading(false);
-  }
-
-  async function sync() {
-    setSyncing(true);
     try {
-      const res = await base44.functions.invoke("syncNutritionFromSheet", {});
-      toast({ title: `Nutrición sincronizada: ${res.data?.created || 0} nuevas, ${res.data?.updated || 0} actualizadas` });
-      await load();
+      const [rows, interpRows, statusRows, playerRows, squadRows, syncRows] = await Promise.all([
+        base44.entities.NutritionAssessment.list("-fecha", 3000),
+        base44.entities.NutritionInterpretation.list("-fecha", 3000),
+        base44.entities.NutritionReadingStatus.list("order", 100).catch(() => []),
+        base44.entities.Player.list("full_name", 3000),
+        base44.entities.Squad.filter({ active: true }, "name", 100),
+        base44.entities.NutritionSyncState.list("-updated_date", 5),
+      ]);
+      setAssessments(rows);
+      setInterpretations(interpRows);
+      setReadingStatuses(statusRows);
+      setPlayers(playerRows);
+      setSquads(squadRows);
+      setSyncState(syncRows[0] || null);
     } catch (e) {
-      toast({ title: "Error al sincronizar nutrición", description: e.message, variant: "destructive" });
+      toast({ title: "Error al cargar datos", description: e.message, variant: "destructive" });
     } finally {
-      setSyncing(false);
+      setLoading(false);
     }
   }
 
   useEffect(() => { load(); }, []);
 
-  const lastSync = syncState?.last_synced_at ? moment(syncState.last_synced_at).format("DD/MM/YYYY HH:mm") : "Sin sincronizar";
-  const unlinkedCount = useMemo(() => assessments.filter(a => !a.linked || !a.player_id).length, [assessments]);
+  const lastSync = syncState?.last_synced_at
+    ? moment(syncState.last_synced_at).format("DD/MM/YYYY HH:mm")
+    : "Sin sincronizar";
 
-  if (loading) return <div className="flex justify-center py-16"><div className="w-7 h-7 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
+  const unlinkedCount = useMemo(
+    () => assessments.filter((a) => !a.linked || !a.player_id).length,
+    [assessments]
+  );
+
+  const allTabs = useMemo(() => {
+    const tabs = [...TABS];
+    if (unlinkedCount > 0) {
+      tabs.push({ id: "unlinked", label: `Sin vincular (${unlinkedCount})`, warn: true });
+    }
+    return tabs;
+  }, [unlinkedCount]);
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-24">
+        <div className="w-7 h-7 border-2 border-zinc-700 border-t-emerald-500 rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
-    <div className="bg-slate-50 text-slate-900 rounded-2xl p-5 md:p-6 shadow-2xl shadow-black/20 min-h-[calc(100vh-64px)]">
-      <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4 mb-5">
+    <div className="bg-zinc-950 text-white min-h-[calc(100vh-64px)] p-5 md:p-6 space-y-5">
+      {/* Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Nutrición</h1>
-          <p className="text-sm text-slate-500 mt-1">Seguimiento y análisis antropométrico</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">Nutrición</h1>
+          <p className="text-sm text-zinc-500 mt-0.5">
+            Seguimiento antropométrico y lecturas nutricionales
+            {activeSquad && (
+              <span className="ml-2 text-zinc-400">
+                · <span className="text-emerald-400 font-medium">{activeSquad.name}</span>
+                {(activeSeasonId || activeSquad?.season) && (
+                  <span className="text-zinc-500 ml-1">· {activeSeasonId || activeSquad.season}</span>
+                )}
+              </span>
+            )}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={sync} disabled={syncing} className="inline-flex items-center gap-2 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-semibold rounded-lg shadow-sm">
-            <RefreshCw size={15} className={syncing ? "animate-spin" : ""} /> {syncing ? "Sincronizando..." : "Sincronizar Nutrición"}
-          </button>
-          <div className="hidden sm:flex items-center gap-2 text-xs text-slate-500">
-            <span>Última sincronización:<br /><b className="text-slate-700">{lastSync}</b></span>
-            <CheckCircle2 size={16} className="text-emerald-600" />
+
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Last sync */}
+          <div className="hidden sm:flex items-center gap-1.5 text-xs text-zinc-500 bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2">
+            <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+            <span>Última sync: <b className="text-zinc-300">{lastSync}</b></span>
           </div>
+
+          {/* Import button */}
+          <button
+            onClick={() => setShowImport(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-300 text-sm font-medium rounded-lg transition-colors"
+          >
+            <Upload size={14} />
+            Importar
+          </button>
+
+          {/* Unlinked warning chip */}
+          {unlinkedCount > 0 && (
+            <button
+              onClick={() => setActiveTab("unlinked")}
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-amber-900/30 border border-amber-700/40 text-amber-400 text-xs font-medium rounded-lg hover:bg-amber-900/50 transition-colors"
+            >
+              <AlertTriangle size={13} />
+              {unlinkedCount} sin vincular
+            </button>
+          )}
         </div>
       </div>
 
-      <NutritionDashboard assessments={assessments} playerCount={players.length} />
-
-      <div className="flex gap-7 border-b border-slate-200 mt-5 mb-4 overflow-x-auto">
-        {TABS.map(tab => <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`pb-3 text-sm whitespace-nowrap border-b-2 transition-colors ${activeTab === tab.id ? "border-emerald-600 text-emerald-700 font-semibold" : "border-transparent text-slate-500 hover:text-slate-800"}`}>{tab.label}{tab.id === "unlinked" && unlinkedCount > 0 ? ` (${unlinkedCount})` : ""}</button>)}
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-zinc-800 overflow-x-auto">
+        {allTabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveTab(tab.id)}
+            className={`pb-3 px-4 text-sm whitespace-nowrap border-b-2 transition-colors font-medium ${
+              activeTab === tab.id
+                ? "border-emerald-500 text-emerald-400"
+                : tab.warn
+                  ? "border-transparent text-amber-500/70 hover:text-amber-400"
+                  : "border-transparent text-zinc-500 hover:text-zinc-300"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-[1fr_260px] gap-4">
-        <div className="space-y-4">
-          {activeTab === "table" && <NutritionTable assessments={assessments} players={players} onReload={load} />}
-          {(activeTab === "evolution" || activeTab === "charts") && <NutritionCharts assessments={assessments} players={players} mode={activeTab} />}
-          {activeTab === "alerts" && <NutritionInsights assessments={assessments} players={players} syncState={syncState} detailed />}
-          {activeTab === "unlinked" && <NutritionRepairPanel assessments={assessments} players={players} onReload={load} />}
-        </div>
-        <NutritionInsights assessments={assessments} players={players} syncState={syncState} />
-      </div>
+      {/* Tab content */}
+      {activeTab === "skinfold" && (
+        <SkinfoldTab
+          assessments={assessments}
+          players={players}
+          squads={squads}
+          onReload={load}
+        />
+      )}
+      {activeTab === "reading" && (
+        <ReadingTab
+          interpretations={interpretations}
+          players={players}
+          readingStatuses={readingStatuses}
+          squads={squads}
+          onReload={load}
+        />
+      )}
+      {activeTab === "unlinked" && (
+        <NutritionRepairPanel
+          assessments={assessments}
+          players={players}
+          onReload={load}
+        />
+      )}
+
+      {/* Import modal */}
+      {showImport && (
+        <NutritionImportModal
+          onClose={() => setShowImport(false)}
+          onImported={load}
+        />
+      )}
     </div>
   );
 }

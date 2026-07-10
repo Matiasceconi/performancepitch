@@ -146,6 +146,27 @@
     "updated_at": {
       "type": "string",
       "description": "Fecha/hora de \u00faltima actualizaci\u00f3n l\u00f3gica"
+    },
+    "reading_status_id": {
+      "type": "string",
+      "description": "ID del estado de lectura nutricional (NutritionReadingStatus)"
+    },
+    "observation": {
+      "type": "string",
+      "description": "Observaci\u00f3n libre sobre la lectura nutricional"
+    },
+    "responsible_user_id": {
+      "type": "string",
+      "description": "ID del usuario responsable de la lectura"
+    },
+    "next_control_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del pr\u00f3ximo control nutricional"
+    },
+    "nutrition_assessment_id": {
+      "type": "string",
+      "description": "ID directo de la evaluaci\u00f3n antropom\u00e9trica vinculada (NutritionAssessment)"
     }
   },
   "required": [
