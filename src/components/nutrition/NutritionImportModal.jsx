@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, FileSpreadsheet, CheckCircle2, AlertTriangle, X } from "lucide-react";
+import { RefreshCw, FileSpreadsheet, CheckCircle2, AlertTriangle } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
 export default function NutritionImportModal({ onClose, onImported }) {
@@ -26,13 +26,20 @@ export default function NutritionImportModal({ onClose, onImported }) {
     }
   }
 
+  function handleClose() {
+    if (result?.success) {
+      onImported?.();
+    }
+    onClose();
+  }
+
   function handleDone() {
     onImported?.();
     onClose();
   }
 
   return (
-    <Dialog open onOpenChange={onClose}>
+    <Dialog open onOpenChange={handleClose}>
       <DialogContent className="bg-zinc-900 border border-zinc-800 text-white max-w-lg">
         <DialogHeader>
           <DialogTitle className="text-white flex items-center gap-2">
