@@ -137,33 +137,33 @@ function drawHeader(doc, day, squadName, logo) {
 }
 
 function drawTable(doc, events) {
-  const x = 7; const y = 66; const w = 196; const rows = Math.max(events.length, 1); const rowH = events.length ? Math.max(18, Math.min(32, 170 / rows)) : 26; const h = 12 + rowH * rows;
-  const cols = [26, 73, 36, 61];
+  const x = 7; const y = 66; const w = 196; const rows = Math.max(events.length, 1); const rowH = events.length ? Math.max(20, Math.min(38, 185 / rows)) : 30; const h = 14 + rowH * rows;
+  const cols = [24, 68, 48, 56];
   setFill(doc, "#FFFFFF"); setStroke(doc, "#DCDCDC"); doc.roundedRect(x, y, w, h, 2.2, 2.2, "FD");
-  setFill(doc, BRAND.greenDeep); doc.roundedRect(x, y, w, 12, 2.2, 2.2, "F");
-  setText(doc, "#FFFFFF"); doc.setFont("helvetica", "bold"); doc.setFontSize(8);
-  ["ACT.", "DESCRIPCIÓN", "HORA", "LUGAR"].forEach((label, i) => doc.text(label, x + cols.slice(0, i).reduce((a, b) => a + b, 0) + cols[i] / 2, y + 8, { align: "center" }));
+  setFill(doc, BRAND.greenDeep); doc.roundedRect(x, y, w, 14, 2.2, 2.2, "F");
+  setText(doc, "#FFFFFF"); doc.setFont("helvetica", "bold"); doc.setFontSize(9);
+  ["ACT.", "DESCRIPCIÓN", "HORA", "LUGAR"].forEach((label, i) => doc.text(label, x + cols.slice(0, i).reduce((a, b) => a + b, 0) + cols[i] / 2, y + 9.3, { align: "center" }));
   let cx = x;
   cols.slice(0, -1).forEach((cw) => { cx += cw; setStroke(doc, BRAND.yellow); doc.setLineWidth(0.25); doc.line(cx, y, cx, y + h); });
 
   for (let i = 0; i < rows; i++) {
-    const ev = events[i]; const ry = y + 12 + i * rowH;
+    const ev = events[i]; const ry = y + 14 + i * rowH;
     setStroke(doc, "#E2E2E2"); doc.setLineWidth(0.25); doc.line(x, ry, x + w, ry);
     if (!ev) continue;
     const key = eventKey(ev);
     drawActivityIcon(doc, key, x + cols[0] / 2, ry + rowH / 2);
-    setText(doc, BRAND.greenDeep); doc.setFont("helvetica", "bold"); doc.setFontSize(8.8);
-    doc.text(doc.splitTextToSize(String(ev.title || ev.event_type || ev.type || "ACTIVIDAD").toUpperCase(), cols[1] - 13).slice(0, 3), x + cols[0] + 8, ry + rowH / 2 - 1.5);
+    setText(doc, BRAND.greenDeep); doc.setFont("helvetica", "bold"); doc.setFontSize(10);
+    doc.text(doc.splitTextToSize(String(ev.title || ev.event_type || ev.type || "ACTIVIDAD").toUpperCase(), cols[1] - 12).slice(0, 3), x + cols[0] + 7, ry + rowH / 2 - 1.5);
 
-    setFill(doc, BRAND.greenDeep); doc.roundedRect(x + cols[0] + cols[1] + 6, ry + rowH / 2 - 7, 24, 14, 3.2, 3.2, "F");
-    setText(doc, "#FFFFFF"); doc.setFont("helvetica", "bold"); doc.setFontSize(String(timeText(ev)).includes("\n") ? 6.4 : 7.8);
+    setFill(doc, BRAND.greenDeep); doc.roundedRect(x + cols[0] + cols[1] + 4, ry + rowH / 2 - 8, 40, 16, 3.5, 3.5, "F");
+    setText(doc, "#FFFFFF"); doc.setFont("helvetica", "bold"); doc.setFontSize(String(timeText(ev)).includes("\n") ? 7.8 : 10);
     const t = String(timeText(ev)).split("\n");
-    if (t.length > 1) { doc.text(t[0], x + cols[0] + cols[1] + 18, ry + rowH / 2 - 1.8, { align: "center" }); doc.text(t[1], x + cols[0] + cols[1] + 18, ry + rowH / 2 + 4.2, { align: "center" }); }
-    else doc.text(t[0], x + cols[0] + cols[1] + 18, ry + rowH / 2 + 2.5, { align: "center" });
+    if (t.length > 1) { doc.text(t[0], x + cols[0] + cols[1] + 24, ry + rowH / 2 - 2.2, { align: "center" }); doc.text(t[1], x + cols[0] + cols[1] + 24, ry + rowH / 2 + 5.1, { align: "center" }); }
+    else doc.text(t[0], x + cols[0] + cols[1] + 24, ry + rowH / 2 + 3.2, { align: "center" });
 
     drawPin(doc, x + cols[0] + cols[1] + cols[2] + cols[3] / 2, ry + rowH / 2 - 6);
-    setText(doc, BRAND.greenDeep); doc.setFont("helvetica", "bold"); doc.setFontSize(7.2);
-    doc.text(doc.splitTextToSize(String(ev.location || "—").toUpperCase(), cols[3] - 12).slice(0, 3), x + cols[0] + cols[1] + cols[2] + cols[3] / 2, ry + rowH / 2 + 8, { align: "center" });
+    setText(doc, BRAND.greenDeep); doc.setFont("helvetica", "bold"); doc.setFontSize(8.4);
+    doc.text(doc.splitTextToSize(String(ev.location || "—").toUpperCase(), cols[3] - 10).slice(0, 3), x + cols[0] + cols[1] + cols[2] + cols[3] / 2, ry + rowH / 2 + 9, { align: "center" });
   }
 }
 

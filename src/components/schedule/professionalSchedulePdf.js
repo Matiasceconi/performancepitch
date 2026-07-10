@@ -323,20 +323,21 @@ function drawActivityCard(doc, ev, x, y, w, h, imageCache) {
   const iconBg = st.text === "#FFFFFF" ? "#FFFFFF" : "#111827";
   const iconColor = st.text === "#FFFFFF" ? st.color : "#FFFFFF";
   setFill(doc, iconBg);
-  doc.roundedRect(x + 1.5, y + 1.5, 5.5, 5.5, 1.2, 1.2, "F");
-  drawIcon(doc, key, x + 4.25, y + 4.25, iconColor);
+  doc.roundedRect(x + 1.5, y + 1.5, 6.5, 6.5, 1.4, 1.4, "F");
+  drawIcon(doc, key, x + 4.75, y + 4.75, iconColor);
 
   setText(doc, st.text);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(h < 11 ? 4.6 : 5.3);
-  doc.text(doc.splitTextToSize(eventTitle(ev).toUpperCase(), w - 10).slice(0, 2), x + 8, y + 4.1);
+  doc.setFontSize(h < 11 ? 5.2 : 6.2);
+  doc.text(doc.splitTextToSize(eventTitle(ev).toUpperCase(), w - 12).slice(0, 2), x + 9.5, y + 4.6);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(4.3);
+  doc.setFontSize(5.8);
   const time = eventTime(ev);
-  if (time) doc.text(`${time} HS`, x + 8, y + h - 2.2);
+  if (time) doc.text(`${time} HS`, x + 9.5, y + h - 2.4);
   if (ev.location && h > 12) {
-    doc.setFont("helvetica", "normal");
-    doc.text(doc.splitTextToSize(String(ev.location).toUpperCase(), w - 10).slice(0, 1), x + 8, y + h - 6.3);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(5.1);
+    doc.text(doc.splitTextToSize(String(ev.location).toUpperCase(), w - 12).slice(0, 1), x + 9.5, y + h - 7.1);
   }
 }
 
@@ -362,7 +363,7 @@ function drawMatchCard(doc, ev, x, y, w, h, imageCache) {
   doc.text("PARTIDO", x + w / 2, y + 3.7, { align: "center" });
   doc.setFontSize(6.2);
   doc.text(doc.splitTextToSize((ev.rival ? `VS ${ev.rival}` : eventTitle(ev)).toUpperCase(), w - 4).slice(0, 2), x + w / 2, y + 20, { align: "center" });
-  doc.setFontSize(4.7);
+  doc.setFontSize(5.4);
   const details = [ev.home_away, eventTime(ev) && `${eventTime(ev)} HS`, meta.competition, meta.round && `FECHA ${meta.round}`].filter(Boolean).join(" · ");
   if (details) doc.text(doc.splitTextToSize(details.toUpperCase(), w - 4).slice(0, 2), x + w / 2, y + h - 4.3, { align: "center" });
 }
