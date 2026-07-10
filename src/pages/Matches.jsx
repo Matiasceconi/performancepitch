@@ -180,21 +180,15 @@ function MatchCsvPanel({ match, onCsvSaved }) {
 // ── Logo helpers ──────────────────────────────────────────────────────────────
 function ClubLogo({ url, name, size = 10 }) {
   const [err, setErr] = useState(false);
+  const sizeClass = { 8: "w-8 h-8", 10: "w-10 h-10", 12: "w-12 h-12", 16: "w-16 h-16" }[size] || "w-10 h-10";
   if (!url || err) {
     return (
-      <div className={`w-${size} h-${size} rounded-full bg-zinc-700 flex items-center justify-center shrink-0`}>
+      <div className={`${sizeClass} rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0`}>
         <span className="text-[10px] font-bold text-zinc-400">{name?.charAt(0)}</span>
       </div>
     );
   }
-  return (
-    <img
-      src={url}
-      alt={name}
-      className={`w-${size} h-${size} object-contain shrink-0`}
-      onError={() => setErr(true)}
-    />
-  );
+  return <img src={url} alt={name} className={`${sizeClass} object-contain shrink-0`} onError={() => setErr(true)} />;
 }
 
 function YoutubeEmbed({ url, label }) {
@@ -254,13 +248,16 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
   const hasResult = match.our_score != null && match.rival_score != null;
   const won = match.our_score > match.rival_score;
   const drew = match.our_score === match.rival_score;
-  const competitionName = competitionMap[matchData.competition_id]?.short_name || competitionMap[matchData.competition_id]?.name || matchData.competition || "";
+  const competition = competitionMap[matchData.competition_id];
+  const competitionName = competition?.short_name || competition?.name || matchData.competition || "Sin competencia";
   const roundLabel = matchData.matchday_number ? `Fecha ${matchData.matchday_number}` : matchData.competition_round;
-  const headerTags = [matchData.squad_name, competitionName, matchData.competition_stage, roundLabel, matchData.group_name, matchData.location].filter(Boolean).map((item) => String(item).toUpperCase());
+  const resultLetter = !hasResult ? "" : won ? "V" : drew ? "E" : "D";
+  const resultClass = won ? "bg-emerald-500/20 text-emerald-300" : drew ? "bg-zinc-700 text-zinc-200" : "bg-red-500/20 text-red-300";
+  const borderClass = won ? "border-l-emerald-500" : drew ? "border-l-zinc-500" : "border-l-red-500";
 
   async function saveCompetition(value) {
-    const competition = competitionMap[value];
-    const patch = { competition_id: value || null, competition: competition?.name || "" };
+    const selected = competitionMap[value];
+    const patch = { competition_id: value || null, competition: selected?.name || "" };
     await base44.entities.MatchReport.update(match.id, patch);
     setMatchData(m => ({ ...m, ...patch }));
     match.competition_id = patch.competition_id;
@@ -279,103 +276,72 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
   const rightScore = isLocal ? match.rival_score : match.our_score;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
-      <div
-        className="flex items-center justify-between px-4 py-3 cursor-pointer hover:bg-zinc-800/40 transition-colors"
-        onClick={() => setExpanded(!expanded)}
-      >
-        {/* Fecha */}
-        <div className="text-center min-w-[44px] shrink-0">
-          <p className="text-white font-bold text-sm">{moment(match.date).format("DD/MM")}</p>
-          <p className="text-zinc-600 text-xs">{moment(match.date).format("YYYY")}</p>
+    <div className={`bg-gradient-to-r from-zinc-900 to-zinc-900/80 border border-zinc-800 border-l-4 ${borderClass} rounded-xl overflow-hidden shadow-lg shadow-black/20`}>
+      <div className="grid grid-cols-1 lg:grid-cols-[88px_1fr_100px_1fr_210px_94px] items-stretch cursor-pointer" onClick={() => setExpanded(!expanded)}>
+        <div className="bg-black/20 border-b lg:border-b-0 lg:border-r border-zinc-800 p-3 flex lg:flex-col items-center justify-between lg:justify-center gap-2">
+          <div className="text-center leading-none">
+            <p className="text-2xl font-black text-white tracking-tight">{moment(match.date).format("DD")}</p>
+            <p className="text-xs font-bold text-white uppercase mt-1">{moment(match.date).format("MMM")}</p>
+            <p className="text-[10px] text-zinc-500 mt-1">{moment(match.date).format("YYYY")}</p>
+          </div>
+          {roundLabel && <span className="text-[10px] px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-300 whitespace-nowrap">{roundLabel}</span>}
         </div>
 
-        {/* Escudos + marcador */}
-        <div className="flex items-center gap-3 flex-1 justify-center px-3">
-          <div className="flex items-center gap-2 min-w-0 flex-1 justify-end">
-            <span className="text-xs text-zinc-300 hidden sm:block truncate max-w-[90px] text-right">
-              {leftName === "Defensa y Justicia" ? "Def. y Justicia" : leftName}
-            </span>
-            <ClubLogo url={leftLogo} name={leftName} size={8} />
-          </div>
-
-          {hasResult ? (
-            <div className={`flex items-center gap-1 px-3 py-1 rounded-lg font-bold text-base shrink-0 ${won ? "bg-green-900/40 text-green-400" : drew ? "bg-zinc-700 text-zinc-200" : "bg-red-900/40 text-red-400"}`}>
-              <span>{leftScore}</span>
-              <span className="text-zinc-500 text-xs mx-0.5">-</span>
-              <span>{rightScore}</span>
+        <div className="p-4 flex items-center gap-3 min-w-0">
+          <ClubLogo url={leftLogo} name={leftName} size={10} />
+          <div className="min-w-0">
+            <p className="text-sm font-black text-white uppercase leading-tight truncate">{leftName}</p>
+            <div className="flex flex-wrap items-center gap-3 mt-3 text-[10px] uppercase tracking-wide text-zinc-500">
+              {matchData.squad_name && <span className="flex items-center gap-1"><Users size={11} /> {matchData.squad_name}</span>}
+              {roundLabel && <span className="flex items-center gap-1"><Clock size={11} /> {roundLabel}</span>}
+              {matchData.location && <span>{matchData.location}</span>}
             </div>
-          ) : (
-            <div className="px-3 py-1 rounded-lg text-zinc-600 text-xs shrink-0">vs</div>
-          )}
-
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <ClubLogo url={rightLogo} name={rightName} size={8} />
-            <span className="text-xs text-zinc-300 hidden sm:block truncate max-w-[90px]">
-              {rightName === "Defensa y Justicia" ? "Def. y Justicia" : rightName}
-            </span>
           </div>
         </div>
 
-        {/* Acciones */}
-        <div className="flex items-center gap-1.5 shrink-0">
-          {hasResult && (
-            <span className={`text-xs font-bold px-1.5 py-0.5 rounded ${won ? "text-green-400" : drew ? "text-zinc-400" : "text-red-400"}`}>
-              {won ? "W" : drew ? "D" : "L"}
-            </span>
-          )}
-          {editingCompetition ? (
-            <select
-              autoFocus
-              className="text-xs bg-zinc-800 border border-zinc-600 rounded-lg px-2 py-0.5 text-white focus:outline-none focus:border-zinc-400 hidden sm:block"
-              defaultValue={matchData.competition_id || ""}
-              onBlur={() => setEditingCompetition(false)}
-              onChange={e => saveCompetition(e.target.value)}
-              onClick={e => e.stopPropagation()}
-            >
-              <option value="">— Sin competencia —</option>
-              {competitions.map(o => <option key={o.id} value={o.id}>{o.short_name || o.name}</option>)}
-            </select>
-          ) : (
-            <span
-              onClick={e => { e.stopPropagation(); setEditingCompetition(true); }}
-              title="Clic para cambiar etiqueta"
-              className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline-block cursor-pointer hover:opacity-80 transition-opacity ${
-                !competitionName ? "bg-zinc-700/40 text-zinc-500 border border-dashed border-zinc-600" :
-                competitionName === "Amistosos" ? "bg-zinc-700/60 text-zinc-400" :
-                competitionName?.includes("Apertura") ? "bg-blue-900/30 text-blue-400" :
-                competitionName?.includes("Clausura") ? "bg-emerald-900/30 text-emerald-400" :
-                "bg-zinc-700/60 text-zinc-300"
-              }`}>
-              {!competitionName ? "Vincular" :
-               COMPETITION_LABELS[competitionName] ||
-               (competitionName?.includes("Apertura") ? "T.Proyección Apertura 2026" :
-                competitionName?.includes("Clausura") ? "T.Proyección Clausura 2026" :
-                competitionName)}
-            </span>
-          )}
-          {match.squad_names?.length > 0 && (
-            <span className="text-zinc-500 text-xs flex items-center gap-1 hidden sm:flex"><Users size={11} />{match.squad_names.length}</span>
-          )}
-          <button onClick={e => { e.stopPropagation(); onEdit(match); }} className="p-1.5 rounded hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors">
-            <Edit2 size={13} />
-          </button>
-          <button onClick={e => { e.stopPropagation(); onDelete(match.id); }} className="p-1.5 rounded hover:bg-red-900/40 text-zinc-500 hover:text-red-400 transition-colors">
-            <Trash2 size={13} />
-          </button>
-          {expanded ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
+        <div className="flex items-center justify-center px-3 py-4">
+          {hasResult ? (
+            <div className={`min-w-20 text-center rounded-lg px-4 py-2 text-2xl font-black tracking-wide ${won ? "bg-emerald-500/10 text-emerald-300" : drew ? "bg-zinc-800 text-white" : "bg-red-500/10 text-red-300"}`}>
+              {leftScore} - {rightScore}
+            </div>
+          ) : <div className="text-zinc-600 font-bold">VS</div>}
+        </div>
+
+        <div className="p-4 flex items-center gap-3 min-w-0">
+          <ClubLogo url={rightLogo} name={rightName} size={10} />
+          <div className="min-w-0">
+            <p className="text-sm font-black text-white uppercase leading-tight truncate">{rightName}</p>
+            {matchData.competition_stage && <p className="text-[10px] text-zinc-500 uppercase mt-2">{matchData.competition_stage}{matchData.group_name ? ` · ${matchData.group_name}` : ""}</p>}
+          </div>
+        </div>
+
+        <div className="p-4 border-t lg:border-t-0 lg:border-l border-zinc-800/70 flex items-center gap-3 min-w-0">
+          {competition?.logo ? <img src={competition.logo} alt={competitionName} className="w-10 h-10 object-contain shrink-0" /> : <div className="w-10 h-10 rounded-lg bg-blue-500/15 border border-blue-400/20 flex items-center justify-center shrink-0"><Trophy size={18} className="text-blue-300" /></div>}
+          <div className="min-w-0 flex-1">
+            {editingCompetition ? (
+              <select autoFocus className="w-full text-xs bg-zinc-800 border border-zinc-600 rounded-lg px-2 py-1 text-white focus:outline-none focus:border-zinc-400" defaultValue={matchData.competition_id || ""} onBlur={() => setEditingCompetition(false)} onChange={e => saveCompetition(e.target.value)} onClick={e => e.stopPropagation()}>
+                <option value="">— Sin competencia —</option>
+                {competitions.map(o => <option key={o.id} value={o.id}>{o.short_name || o.name}</option>)}
+              </select>
+            ) : (
+              <button onClick={(e) => { e.stopPropagation(); setEditingCompetition(true); }} className="text-left w-full hover:opacity-80">
+                <p className="text-xs font-black text-white uppercase leading-tight truncate">{competitionName}</p>
+                <p className="text-[10px] text-zinc-500 mt-1">{match.squad_names?.length || 0} jugadores</p>
+              </button>
+            )}
+          </div>
+        </div>
+
+        <div className="p-4 flex items-center justify-end gap-2">
+          {hasResult && <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${resultClass}`}>{resultLetter}</span>}
+          <button onClick={e => { e.stopPropagation(); onEdit(match); }} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors"><Edit2 size={15} /></button>
+          <button onClick={e => { e.stopPropagation(); onDelete(match.id); }} className="p-2 rounded-lg hover:bg-red-900/40 text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
+          {expanded ? <ChevronUp size={18} className="text-zinc-500" /> : <ChevronDown size={18} className="text-zinc-500" />}
         </div>
       </div>
-      {headerTags.length > 0 && (
-        <div className="px-4 pb-3 -mt-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
-          {headerTags.join(" · ")}
-        </div>
-      )}
 
-      {/* Detalle expandido */}
       {expanded && (
         <div className="border-t border-zinc-800 p-4 space-y-5">
-          {/* Banner con escudos grandes */}
           <div className="bg-zinc-800/60 rounded-xl p-5">
             <div className="flex items-center justify-center gap-8">
               <div className="flex flex-col items-center gap-2">
@@ -384,24 +350,10 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
               </div>
               <div className="text-center">
                 {hasResult ? (
-                  <p className={`text-4xl font-black tracking-tight ${won ? "text-green-400" : drew ? "text-zinc-200" : "text-red-400"}`}>
-                    {leftScore} — {rightScore}
-                  </p>
+                  <p className={`text-4xl font-black tracking-tight ${won ? "text-green-400" : drew ? "text-zinc-200" : "text-red-400"}`}>{leftScore} — {rightScore}</p>
                 ) : <p className="text-zinc-600 text-2xl font-bold">vs</p>}
-                {competitionName && (
-                  <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    competitionName === "Amistosos" ? "bg-zinc-700 text-zinc-300" :
-                    competitionName?.includes("Apertura") ? "bg-blue-900/40 text-blue-300" :
-                    competitionName?.includes("Clausura") ? "bg-emerald-900/40 text-emerald-300" :
-                    "bg-zinc-700 text-zinc-300"
-                  }`}>{COMPETITION_LABELS[competitionName] || competitionName}</span>
-                )}
                 <p className="text-xs text-zinc-600 mt-0.5">{moment(match.date).format("dddd DD [de] MMMM YYYY")}</p>
-                <p className="text-xs mt-1">
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.location === "Local" ? "bg-green-900/40 text-green-400" : "bg-orange-900/40 text-orange-400"}`}>
-                    {match.location}
-                  </span>
-                </p>
+                <p className="text-xs mt-1"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.location === "Local" ? "bg-green-900/40 text-green-400" : "bg-orange-900/40 text-orange-400"}`}>{match.location}</span></p>
               </div>
               <div className="flex flex-col items-center gap-2">
                 <ClubLogo url={rightLogo} name={rightName} size={16} />
@@ -410,61 +362,17 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
             </div>
           </div>
 
-          {/* Video del partido */}
           <MatchVideoPanel match={matchData} onVideoSaved={(url) => setMatchData(m => ({ ...m, match_video_url: url }))} />
-
-          {/* Plan de partido PDF */}
           <MatchPlanPdfPanel match={matchData} onPdfSaved={(url, label) => setMatchData(m => ({ ...m, match_plan_pdf_url: url, match_plan_pdf_label: label }))} />
-
-          {/* Pelota parada video */}
-          {matchData.video_set_pieces_url && (
-            <YoutubeEmbed url={matchData.video_set_pieces_url} label={"\u26bd Pelota parada"} />
-          )}
-
-          {/* An\u00e1lisis del rival */}
-          {matchData.video_analysis_url && (
-            <YoutubeEmbed url={matchData.video_analysis_url} label={"\uD83C\uDFA5 An\u00e1lisis del rival"} />
-          )}
-
-          {matchData.video_extra_url && (
-            <YoutubeEmbed url={matchData.video_extra_url} label={"\uD83D\uDCF9 Video adicional"} />
-          )}
-
-          {/* GPS CSV */}
-          <MatchCsvPanel
-            match={matchData}
-            onCsvSaved={(url, label) => setMatchData(m => ({ ...m, csv_url: url, csv_label: label }))}
-          />
-
-          {/* Informe GPS del partido */}
+          {matchData.video_set_pieces_url && <YoutubeEmbed url={matchData.video_set_pieces_url} label={"⚽ Pelota parada"} />}
+          {matchData.video_analysis_url && <YoutubeEmbed url={matchData.video_analysis_url} label={"🎥 Análisis del rival"} />}
+          {matchData.video_extra_url && <YoutubeEmbed url={matchData.video_extra_url} label={"📹 Video adicional"} />}
+          <MatchCsvPanel match={matchData} onCsvSaved={(url, label) => setMatchData(m => ({ ...m, csv_url: url, csv_label: label }))} />
           <MatchGpsReport match={matchData} />
-
-          {/* Convocados + Minutos */}
           <MatchSquadPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} squadId={squadId} />
-
-          {/* Análisis del rival */}
-          {match.rival_notes && (
-            <div>
-              <p className="text-xs font-semibold text-zinc-400 mb-1 flex items-center gap-1.5"><FileText size={12} /> Análisis del rival</p>
-              <p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-800/40 rounded-lg p-3">{match.rival_notes}</p>
-            </div>
-          )}
-
-          {/* Pelota parada */}
-          {match.set_pieces_notes && (
-            <div>
-              <p className="text-xs font-semibold text-zinc-400 mb-1 flex items-center gap-1.5"><FileText size={12} /> Pelota parada</p>
-              <p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-800/40 rounded-lg p-3">{match.set_pieces_notes}</p>
-            </div>
-          )}
-
-          {/* Notas */}
-          {match.notes && (
-            <div>
-              <p className="text-xs font-semibold text-zinc-400 mb-1">Notas generales</p>
-              <p className="text-zinc-400 text-sm">{match.notes}</p>
-            </div>
-          )}
+          {match.rival_notes && <div><p className="text-xs font-semibold text-zinc-400 mb-1 flex items-center gap-1.5"><FileText size={12} /> Análisis del rival</p><p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-800/40 rounded-lg p-3">{match.rival_notes}</p></div>}
+          {match.set_pieces_notes && <div><p className="text-xs font-semibold text-zinc-400 mb-1 flex items-center gap-1.5"><FileText size={12} /> Pelota parada</p><p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-800/40 rounded-lg p-3">{match.set_pieces_notes}</p></div>}
+          {match.notes && <div><p className="text-xs font-semibold text-zinc-400 mb-1">Notas generales</p><p className="text-zinc-400 text-sm">{match.notes}</p></div>}
         </div>
       )}
     </div>
@@ -637,7 +545,7 @@ export default function Matches() {
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, minutesCount }
-  const [showFilters, setShowFilters] = useState(false);
+  const [showFilters, setShowFilters] = useState(true);
   const [filters, setFilters] = useState({ squad_id: activeSquadId || "" });
   const { toast } = useToast();
 
