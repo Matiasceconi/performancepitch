@@ -74,6 +74,26 @@
       "type": "string",
       "description": "URL del logo"
     },
+    "phase_config": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Fases configuradas: {name, order, uses_matchday, is_knockout, matchday_start, matchday_end}"
+    },
+    "groups": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Grupos o zonas disponibles"
+    },
+    "matchday_count": {
+      "type": "number",
+      "description": "Cantidad total de fechas/jornadas si aplica"
+    },
     "description": {
       "type": "string",
       "description": "Descripci\u00f3n"

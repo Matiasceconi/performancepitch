@@ -10,6 +10,7 @@ import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
 import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
 import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
+import MatchFiltersPanel from "@/components/matches/MatchFiltersPanel.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -254,6 +255,8 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
   const won = match.our_score > match.rival_score;
   const drew = match.our_score === match.rival_score;
   const competitionName = competitionMap[matchData.competition_id]?.short_name || competitionMap[matchData.competition_id]?.name || matchData.competition || "";
+  const roundLabel = matchData.matchday_number ? `Fecha ${matchData.matchday_number}` : matchData.competition_round;
+  const headerTags = [matchData.squad_name, competitionName, matchData.competition_stage, roundLabel, matchData.group_name, matchData.location].filter(Boolean).map((item) => String(item).toUpperCase());
 
   async function saveCompetition(value) {
     const competition = competitionMap[value];
@@ -363,6 +366,11 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
           {expanded ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
         </div>
       </div>
+      {headerTags.length > 0 && (
+        <div className="px-4 pb-3 -mt-1 text-[10px] font-semibold tracking-wider text-zinc-500 uppercase">
+          {headerTags.join(" · ")}
+        </div>
+      )}
 
       {/* Detalle expandido */}
       {expanded && (
@@ -465,7 +473,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
 
 // ── MatchForm ─────────────────────────────────────────────────────────────────
 const EMPTY = {
-  date: "", rival: "", competition: "", competition_id: "", location: "Local",
+  squad_id: "", squad_name: "", season_id: "", date: "", rival: "", competition: "", competition_id: "", competition_stage: "", competition_round: "", group_name: "", matchday_number: "", phase_label: "", location: "Local",
   our_score: "", rival_score: "", rival_formation: "",
   rival_notes: "", set_pieces_notes: "",
   video_analysis_url: "", video_set_pieces_url: "", video_extra_url: "",
@@ -473,9 +481,20 @@ const EMPTY = {
   squad_called: [], squad_names: [], notes: "", rival_logo_url: "",
 };
 
-function MatchForm({ initial, players, onSave, onCancel, competitions }) {
-  const [form, setForm] = useState(initial || EMPTY);
+function MatchForm({ initial, players, onSave, onCancel, competitions, squads, activeSquad, activeSeasonId }) {
+  const [form, setForm] = useState({ ...EMPTY, ...(initial || {}), squad_id: initial?.squad_id || activeSquad?.id || "", squad_name: initial?.squad_name || activeSquad?.name || "", season_id: initial?.season_id || activeSeasonId || "" });
+  useEffect(() => {
+    setForm({ ...EMPTY, ...(initial || {}), squad_id: initial?.squad_id || activeSquad?.id || "", squad_name: initial?.squad_name || activeSquad?.name || "", season_id: initial?.season_id || activeSeasonId || "" });
+  }, [initial, activeSquad?.id, activeSeasonId]);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
+  const selectedCompetition = competitions.find((competition) => competition.id === form.competition_id);
+  const phases = selectedCompetition?.phase_config || [];
+  const groups = selectedCompetition?.groups || [];
+  function setCompetition(value) {
+    const competition = competitions.find((item) => item.id === value);
+    const defaultPhase = competition?.phase_config?.[0]?.name || "";
+    setForm((current) => ({ ...current, competition_id: value, competition: competition?.name || "", competition_stage: current.competition_stage || defaultPhase }));
+  }
 
   function togglePlayer(player) {
     const already = form.squad_called.includes(player.id);
@@ -490,6 +509,19 @@ function MatchForm({ initial, players, onSave, onCancel, competitions }) {
       <p className="text-white font-semibold">{initial?.id ? "Editar partido" : "Nuevo partido"}</p>
       <div className="grid grid-cols-2 gap-3">
         <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Plantel</label>
+          <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.squad_id || ""} onChange={e => {
+            const squad = squads.find((item) => item.id === e.target.value);
+            setForm((current) => ({ ...current, squad_id: squad?.id || "", squad_name: squad?.name || "", season_id: squad?.season || current.season_id || "" }));
+          }}>
+            {activeSquad && <option value={activeSquad.id}>{activeSquad.name}</option>}
+          </select>
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Temporada</label>
+          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="2026" value={form.season_id || ""} onChange={e => set("season_id", e.target.value)} />
+        </div>
+        <div>
           <label className="text-xs text-zinc-400 mb-1 block">Rival *</label>
           <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Nombre del rival" value={form.rival} onChange={e => {
             const val = e.target.value;
@@ -503,10 +535,28 @@ function MatchForm({ initial, players, onSave, onCancel, competitions }) {
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Competencia</label>
-          <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.competition_id || ""} onChange={e => set("competition_id", e.target.value)}>
+          <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.competition_id || ""} onChange={e => setCompetition(e.target.value)}>
             <option value="">— Sin competencia —</option>
             {competitions.map(option => <option key={option.id} value={option.id}>{option.short_name || option.name}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Fase / instancia</label>
+          <input list="match-form-phases" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Fase regular" value={form.competition_stage || ""} onChange={e => set("competition_stage", e.target.value)} />
+          <datalist id="match-form-phases">{phases.map((phase) => <option key={phase.name} value={phase.name} />)}</datalist>
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Fecha del torneo / jornada</label>
+          <input type="number" min="1" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="18" value={form.matchday_number || ""} onChange={e => set("matchday_number", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Grupo / zona</label>
+          <input list="match-form-groups" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Grupo A" value={form.group_name || ""} onChange={e => set("group_name", e.target.value)} />
+          <datalist id="match-form-groups">{groups.map((group) => <option key={group} value={group} />)}</datalist>
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Etiqueta manual de etapa</label>
+          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Fecha 18 / Ida / Final" value={form.phase_label || ""} onChange={e => set("phase_label", e.target.value)} />
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Condición</label>
@@ -579,7 +629,7 @@ function MatchForm({ initial, players, onSave, onCancel, competitions }) {
 
 // ── Main ──────────────────────────────────────────────────────────────────────
 export default function Matches() {
-  const { activeSquadId, activeSquad } = useWorkspace();
+  const { activeSquadId, activeSquad, activeSeasonId, mySquads } = useWorkspace();
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
   const [competitions, setCompetitions] = useState([]);
@@ -588,7 +638,7 @@ export default function Matches() {
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, minutesCount }
   const [showFilters, setShowFilters] = useState(false);
-  const [competitionFilter, setCompetitionFilter] = useState("");
+  const [filters, setFilters] = useState({ squad_id: activeSquadId || "" });
   const { toast } = useToast();
 
   function handleMatchUpdated(id, data) {
@@ -596,9 +646,19 @@ export default function Matches() {
   }
 
   const competitionMap = useMemo(() => Object.fromEntries(competitions.map((competition) => [competition.id, competition])), [competitions]);
-  const visibleMatches = useMemo(() => competitionFilter ? matches.filter(m => m.competition_id === competitionFilter) : matches, [matches, competitionFilter]);
+  const hasActiveFilters = Object.entries(filters).some(([key, value]) => key !== "squad_id" && value);
+  const visibleMatches = useMemo(() => matches.filter((match) => {
+    if ((filters.squad_id || activeSquadId) && match.squad_id !== (filters.squad_id || activeSquadId)) return false;
+    if (filters.season_id && match.season_id !== filters.season_id) return false;
+    if (filters.competition_id && match.competition_id !== filters.competition_id) return false;
+    if (filters.competition_stage && match.competition_stage !== filters.competition_stage) return false;
+    if (filters.matchday_number && Number(match.matchday_number) !== Number(filters.matchday_number)) return false;
+    if (filters.location && match.location !== filters.location) return false;
+    if (filters.rival && !normalizeStr(match.rival || "").includes(normalizeStr(filters.rival))) return false;
+    return true;
+  }), [matches, filters, activeSquadId]);
 
-  useEffect(() => { loadAll(); }, [activeSquadId]);
+  useEffect(() => { setFilters({ squad_id: activeSquadId || "" }); loadAll(); }, [activeSquadId]);
 
   async function loadAll() {
     setLoading(true);
@@ -617,11 +677,17 @@ export default function Matches() {
 
   async function save(form) {
     const selectedCompetition = competitions.find((competition) => competition.id === form.competition_id);
+    const selectedSquad = mySquads.find((squad) => squad.id === (form.squad_id || activeSquadId)) || activeSquad;
+    const matchdayNumber = form.matchday_number !== "" && form.matchday_number !== null && form.matchday_number !== undefined ? Number(form.matchday_number) : null;
     const data = {
       ...form,
       competition: selectedCompetition?.name || "",
-      squad_id: activeSquadId || undefined,
-      squad_name: activeSquad?.name || undefined,
+      squad_id: selectedSquad?.id || activeSquadId || undefined,
+      squad_name: selectedSquad?.name || activeSquad?.name || undefined,
+      season_id: form.season_id || selectedSquad?.season || activeSeasonId || undefined,
+      matchday_number: matchdayNumber,
+      competition_round: form.competition_round || (matchdayNumber ? `Fecha ${matchdayNumber}` : ""),
+      phase_label: form.phase_label || (matchdayNumber ? `Fecha ${matchdayNumber}` : form.competition_stage || ""),
       our_score: form.our_score !== "" ? Number(form.our_score) : null,
       rival_score: form.rival_score !== "" ? Number(form.rival_score) : null,
     };
@@ -682,7 +748,7 @@ export default function Matches() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowFilters(prev => !prev)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || competitionFilter ? "bg-blue-500/15 border-blue-500/30 text-blue-300" : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"}`}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${showFilters || hasActiveFilters ? "bg-blue-500/15 border-blue-500/30 text-blue-300" : "bg-zinc-800 border-zinc-700 text-zinc-300 hover:bg-zinc-700"}`}
           >
             <SlidersHorizontal size={15} /> {showFilters ? "Ocultar filtros" : "Mostrar filtros"}
           </button>
@@ -696,12 +762,7 @@ export default function Matches() {
       </div>
 
       {showFilters && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex flex-wrap gap-3">
-          <select value={competitionFilter} onChange={(e) => setCompetitionFilter(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
-            <option value="">Todas las competencias</option>
-            {competitions.map((competition) => <option key={competition.id} value={competition.id}>{competition.short_name || competition.name}</option>)}
-          </select>
-        </div>
+        <MatchFiltersPanel filters={filters} setFilters={setFilters} activeSquad={activeSquad} activeSeasonId={activeSeasonId} competitions={competitions} matches={matches} />
       )}
 
       {showForm && (
@@ -711,6 +772,9 @@ export default function Matches() {
           onSave={save}
           onCancel={() => { setShowForm(false); setEditing(null); }}
           competitions={competitions}
+          squads={mySquads}
+          activeSquad={activeSquad}
+          activeSeasonId={activeSeasonId}
         />
       )}
 
@@ -739,7 +803,7 @@ export default function Matches() {
 
       {visibleMatches.length === 0 && !showForm ? (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-12 text-center">
-          <p className="text-zinc-500 text-sm">No hay partidos registrados para {competitionFilter || activeSquad?.name || "este plantel"}</p>
+          <p className="text-zinc-500 text-sm">No hay partidos registrados para los filtros seleccionados.</p>
         </div>
       ) : (
         <div className="space-y-3">

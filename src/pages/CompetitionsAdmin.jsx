@@ -5,6 +5,7 @@ import CompetitionForm from "@/components/admin/competitions/CompetitionForm";
 import CompetitionList from "@/components/admin/competitions/CompetitionList";
 import AliasManager from "@/components/admin/competitions/AliasManager";
 import CompetitionMigrationTool from "@/components/admin/competitions/CompetitionMigrationTool";
+import CompetitionPhaseManager from "@/components/admin/competitions/CompetitionPhaseManager";
 
 export default function CompetitionsAdmin() {
   const [competitions, setCompetitions] = useState([]);
@@ -39,6 +40,7 @@ export default function CompetitionsAdmin() {
     <div className="flex items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-white flex items-center gap-2"><Trophy size={20} className="text-yellow-400" /> Competencias</h2><p className="text-zinc-500 text-sm">Base central para vincular partidos por competition_id y evitar duplicados por escritura.</p></div><button onClick={() => setEditing({})} className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 rounded-lg text-sm"><Plus size={15} /> Nueva</button></div>
     {editing && <CompetitionForm competition={editing.id ? editing : null} squads={squads} onCancel={() => setEditing(null)} onSaved={() => { setEditing(null); loadAll(); }} />}
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4"><CompetitionList competitions={competitions} selectedId={selected?.id} onSelect={setSelected} onEdit={setEditing} /><AliasManager competition={selected} aliases={selectedAliases} onChanged={loadAll} /></div>
-    <CompetitionMigrationTool matches={matches} competitions={competitions} aliases={aliases} onDone={loadAll} />
+    <CompetitionPhaseManager competition={selected} onSaved={loadAll} />
+    <CompetitionMigrationTool matches={matches} competitions={competitions} aliases={aliases} squads={squads} onDone={loadAll} />
   </div>;
 }
