@@ -103,6 +103,20 @@ export default function SessionGPS({ session, sessionPlayers }) {
     allPlayers.forEach(p => { allPlayerMap[normalize(p.full_name || "")] = p.id; });
     const spByPlayerId = {};
     sessionPlayers.forEach(sp => { spByPlayerId[sp.player_id] = sp; });
+    const sessionPlayerIds = new Set(sessionPlayers.map(sp => sp.player_id).filter(Boolean));
+    const resolvePlayerId = (rawName) => {
+      const normName = normalize(rawName);
+      const exact = aliasMap[normName] || spMap[normName] || allPlayerMap[normName];
+      if (exact) return exact;
+      const candidates = allPlayers.filter((p) => {
+        const full = normalize(p.full_name || "");
+        const last = normalize(p.last_name || full.split(" ").filter(Boolean).slice(-1)[0] || "");
+        return last === normName || full.endsWith(` ${normName}`);
+      });
+      const squadCandidates = candidates.filter((p) => sessionPlayerIds.has(p.id));
+      const pool = squadCandidates.length ? squadCandidates : candidates;
+      return pool.length === 1 ? pool[0].id : "";
+    };
 
     const selectedMatched = matched.filter(m => m.colDef.core || selectedFields.includes(m.colDef.field));
     const usedHeaders = new Set(selectedMatched.map(m => m.header));
@@ -112,8 +126,7 @@ export default function SessionGPS({ session, sessionPlayers }) {
 
     parsedRows.forEach(row => {
       const rawName = row["Name"] || "";
-      const normName = normalize(rawName);
-      const playerId = aliasMap[normName] || spMap[normName] || allPlayerMap[normName];
+      const playerId = resolvePlayerId(rawName);
       const playerRecord = allPlayers.find(p => p.id === playerId);
 
       const cls = classifyGpsInclusion(spByPlayerId[playerId]);
