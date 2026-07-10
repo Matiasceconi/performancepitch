@@ -58,6 +58,9 @@ function isProgressing(rows) {
   const ordered = [...rows].sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(-3);
   return ordered.length >= 2 && ordered[ordered.length - 1].total_distance > ordered[0].total_distance;
 }
+function hasExternalLoad(row) {
+  return TABLE_METRICS.some((metric) => metric.key !== "duration" && row?.[metric.key] !== undefined && row?.[metric.key] !== null && row?.[metric.key] !== "");
+}
 
 export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}, playerMap = {}, competitionProfiles = [], medicalEpisodes = [], medicalStatuses = [] }) {
   const [dateFilter, setDateFilter] = useState(moment().format("YYYY-MM-DD"));
@@ -131,7 +134,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
     return Object.entries(gpsBySession).flatMap(([sessionId, rows]) => {
       const session = sessionMap[sessionId];
       if (!session?.date) return [];
-      return rows.filter((row) => differentiatedPlayerIds.has(row.player_id || row.player_name)).map((row) => {
+      return rows.filter((row) => differentiatedPlayerIds.has(row.player_id || row.player_name) && hasExternalLoad(row)).map((row) => {
         const player = playerMap[row.player_id] || {};
         const playerId = row.player_id || row.player_name;
         const medical = medicalByPlayer[playerId]?.episode || {};
@@ -226,7 +229,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-zinc-800"><h3 className="text-white font-bold">Tabla de jugadores diferenciados</h3><p className="text-xs text-zinc-500 mt-1">Detalle por sesión de todos los jugadores que tuvieron trabajo diferenciado o Kinesiología en algún momento. La etapa se lee desde Área Médica.</p></div>
+        <div className="px-5 py-4 border-b border-zinc-800"><h3 className="text-white font-bold">Tabla de jugadores diferenciados</h3><p className="text-xs text-zinc-500 mt-1">Solo sesiones con carga externa GPS registrada de jugadores que tuvieron trabajo diferenciado o Kinesiología. La etapa se lee desde Área Médica.</p></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[2400px] text-xs">
             <thead className="bg-zinc-800/60 text-zinc-500 uppercase">
