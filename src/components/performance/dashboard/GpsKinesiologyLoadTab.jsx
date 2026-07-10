@@ -13,8 +13,23 @@ const STATUS_LABELS = {
   kinesiologia: "Kinesiología",
   lesionados: "Lesionado",
   lesionado: "Lesionado",
-  excluidos: "Excluido",
+  excluidos: "Diferenciado",
 };
+
+const GPS_PARAM_COLUMNS = [
+  { key: "total_distance", label: "Distancia", unit: "m" },
+  { key: "duration_minutes", label: "Min." },
+  { key: "m_min", label: "m/min" },
+  { key: "distance_19_8", label: "D>19.8", unit: "m" },
+  { key: "distance_25", label: "D>25", unit: "m" },
+  { key: "sprints", label: "Sprints" },
+  { key: "acc_3", label: "ACC +3" },
+  { key: "dec_3", label: "DEC -3" },
+  { key: "player_load", label: "Player Load", unit: "u" },
+  { key: "smax", label: "S Max" },
+  { key: "max_speed", label: "Vel. máx" },
+  { key: "rhie_bouts", label: "RHIE" },
+];
 
 const KPI_CARDS = [
   { key: "total_distance", label: "Distancia", unit: "m", icon: Activity, color: "text-emerald-300" },
@@ -32,7 +47,7 @@ function format(value, unit = "") {
 
 function statusLabel(row) {
   const key = String(row?.row_status || "excluidos").toLowerCase();
-  return STATUS_LABELS[key] || "Excluido";
+  return STATUS_LABELS[key] || "Diferenciado";
 }
 
 function sum(rows, key) {
@@ -89,7 +104,8 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
 
   const selected = playersData.find((item) => item.id === selectedPlayerId) || playersData[0];
   const selectedRows = selected?.rows || [];
-  const chartData = useMemo(() => selectedRows.map((row) => ({
+  const differentiatedSessionRows = useMemo(() => playersData.flatMap((item) => item.rows.map((row) => ({ ...row, playerName: item.name, playerPosition: item.player?.position || "—", status: [...item.statuses].join(" · ") }))).sort((a, b) => String(b.date).localeCompare(String(a.date)) || String(a.playerName).localeCompare(String(b.playerName))), [playersData]);
+  const chartData = useMemo(() => selectedRows.map((row) => ({ 
     label: moment(row.date).format("dd DD/MM"),
     date: row.date,
     distancia: Math.round(Number(row.total_distance || 0)),
@@ -187,23 +203,30 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
 
           <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-zinc-800">
-              <h3 className="text-white font-bold">Detalle de sesiones</h3>
+              <h3 className="text-white font-bold">Sesiones de jugadores diferenciados</h3>
+              <p className="text-zinc-500 text-sm mt-1">Tabla general con todos los parámetros cargados para cada jugador diferenciado del microciclo.</p>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full text-xs">
+              <table className="w-full min-w-[1250px] text-xs">
                 <thead className="bg-zinc-800/60 text-zinc-500 uppercase">
-                  <tr><th className="text-left px-4 py-2">Fecha</th><th className="text-left px-3 py-2">Sesión</th><th className="text-left px-3 py-2">Objetivo</th><th className="text-center px-3 py-2">Dist.</th><th className="text-center px-3 py-2">m/min</th><th className="text-center px-3 py-2">PL</th><th className="text-center px-3 py-2">Sprints</th></tr>
+                  <tr>
+                    <th className="text-left px-4 py-2">Fecha</th>
+                    <th className="text-left px-3 py-2">Jugador</th>
+                    <th className="text-left px-3 py-2">Estado</th>
+                    <th className="text-left px-3 py-2">Sesión</th>
+                    <th className="text-left px-3 py-2">Objetivo</th>
+                    {GPS_PARAM_COLUMNS.map((col) => <th key={col.key} className="text-center px-3 py-2 whitespace-nowrap">{col.label}</th>)}
+                  </tr>
                 </thead>
                 <tbody>
-                  {selectedRows.map((row, index) => (
-                    <tr key={`${row.session_id || row.date}-${index}`} className="border-t border-zinc-800/70">
+                  {differentiatedSessionRows.map((row, index) => (
+                    <tr key={`${row.player_id || row.playerName}-${row.session_id || row.date}-${index}`} className={`border-t border-zinc-800/70 ${row.player_id === selected?.id ? "bg-emerald-500/5" : ""}`}>
                       <td className="px-4 py-2 text-zinc-300 whitespace-nowrap">{moment(row.date).format("DD/MM/YYYY")}</td>
-                      <td className="px-3 py-2 text-white font-semibold">{row.session_title || row.md || "Sesión"}</td>
-                      <td className="px-3 py-2 text-zinc-400">{row.objective || "—"}</td>
-                      <td className="px-3 py-2 text-center text-zinc-300">{format(row.total_distance, "m")}</td>
-                      <td className="px-3 py-2 text-center text-zinc-300">{format(row.m_min)}</td>
-                      <td className="px-3 py-2 text-center text-zinc-300">{format(row.player_load)}</td>
-                      <td className="px-3 py-2 text-center text-zinc-300">{format(row.sprints)}</td>
+                      <td className="px-3 py-2 text-white font-semibold whitespace-nowrap">{row.playerName}</td>
+                      <td className="px-3 py-2 text-emerald-300 whitespace-nowrap">{row.status}</td>
+                      <td className="px-3 py-2 text-zinc-300 whitespace-nowrap">{row.session_title || row.md || "Sesión"}</td>
+                      <td className="px-3 py-2 text-zinc-400 whitespace-nowrap">{row.objective || "—"}</td>
+                      {GPS_PARAM_COLUMNS.map((col) => <td key={col.key} className="px-3 py-2 text-center text-zinc-300 whitespace-nowrap">{format(row[col.key], col.unit)}</td>)}
                     </tr>
                   ))}
                 </tbody>
