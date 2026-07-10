@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { AlertTriangle, Clock, CheckCircle, TrendingUp, User, Calendar, ChevronRight } from "lucide-react";
 import moment from "moment";
@@ -60,6 +60,7 @@ export default function MedicalDashboard({ squadPlayerIds }) {
   const [statuses, setStatuses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const openedFromQueryRef = useRef(false);
   const { getPlayer } = usePlayers();
 
   useEffect(() => {
@@ -94,6 +95,17 @@ export default function MedicalDashboard({ squadPlayerIds }) {
 
   const relevantPlayerIds = new Set(filteredStatuses.map(s => s.player_id));
   const relevantEpisodes = episodes.filter(e => e.player_id && relevantPlayerIds.has(e.player_id));
+
+  useEffect(() => {
+    if (openedFromQueryRef.current || loading) return;
+    const playerId = new URLSearchParams(window.location.search).get("player_id");
+    if (!playerId) return;
+    const episode = episodes.find((e) => e.player_id === playerId);
+    if (!episode) return;
+    const playerData = getPlayer(playerId, episode.player_name_original);
+    setSelectedPlayer({ id: playerId, name: playerData?.name || episode.player_name_original, photo_url: playerData?.photo_url, position: playerData?.position, number: playerData?.number, category_division: episode.categoria_division });
+    openedFromQueryRef.current = true;
+  }, [loading, episodes, getPlayer]);
 
   // Stats
   const totalInjured = activeInjured.length;

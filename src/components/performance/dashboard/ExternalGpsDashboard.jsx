@@ -62,6 +62,8 @@ export default function ExternalGpsDashboard() {
   const [physicalObjectives, setPhysicalObjectives] = useState([]);
   const [competitionProfiles, setCompetitionProfiles] = useState([]);
   const [microcycleProfiles, setMicrocycleProfiles] = useState([]);
+  const [medicalEpisodes, setMedicalEpisodes] = useState([]);
+  const [medicalStatuses, setMedicalStatuses] = useState([]);
   const [memberships, setMemberships] = useState([]);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -113,11 +115,13 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMemberships, allWeeklyPlans] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
         base44.entities.PlayerMicrocycleGPSProfile.list("-updated_at", 2000),
+        base44.entities.MedicalEpisode.list("-fecha_inicio_tto", 2000),
+        base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
         base44.entities.SquadMembership.list("-created_date", 2000),
         base44.entities.WeeklyPlan.list("-week_start", 100),
       ]);
@@ -127,6 +131,8 @@ export default function ExternalGpsDashboard() {
       setPlayers(allPlayers.filter((p) => p.active !== false));
       setCompetitionProfiles(allCompetitionProfiles.filter((p) => (!selectedSquadId || p.squad_id === selectedSquadId) && (!selectedSeason || p.season_id === selectedSeason)));
       setMicrocycleProfiles(allMicrocycleProfiles.filter((p) => (!selectedSquadId || p.squad_id === selectedSquadId) && (!selectedSeason || p.season_id === selectedSeason)));
+      setMedicalEpisodes(allMedicalEpisodes.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
+      setMedicalStatuses(allMedicalStatuses.filter((s) => (!selectedSquadId || !s.squad_id || s.squad_id === selectedSquadId)));
       setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
       setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
 
@@ -374,7 +380,7 @@ export default function ExternalGpsDashboard() {
   const tabs = [
     { id: "microcycle", label: "Carga del Microciclo" },
     { id: "sessions", label: "Buscar sesiones" },
-    { id: "kinesiology", label: "Kinesiología" },
+    { id: "kinesiology", label: "Diferenciados en Kinesiología" },
     { id: "individual-player", label: "Individual" },
     { id: "individual", label: "Perfil competitivo individual" },
     { id: "team", label: "Perfil del equipo" },
@@ -436,7 +442,7 @@ export default function ExternalGpsDashboard() {
       )}
 
       {activeTab === "kinesiology" && (
-        <GpsKinesiologyLoadTab sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} />
+        <GpsKinesiologyLoadTab sessions={sessions} gpsBySession={gpsBySession} playerMap={playerMap} competitionProfiles={competitionProfiles} medicalEpisodes={medicalEpisodes} medicalStatuses={medicalStatuses} />
       )}
 
       {activeTab === "individual-player" && (
