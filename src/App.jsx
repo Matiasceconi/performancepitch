@@ -114,6 +114,7 @@ const AuthenticatedApp = () => {
           <Route path="/catapult" element={<Catapult />} />
           <Route path="/tactical" element={<Tactical />} />
           <Route path="/performance/external-load" element={<PerformanceExternalLoad />} />
+          <Route path="/gps" element={<PerformanceExternalLoad />} />
           <Route path="/performance/microcycle-history" element={<MicrocycleHistory />} />
           <Route path="/performance/internal-load" element={<PerformanceInternalLoad />} />
           <Route path="/performance/medical" element={<PerformanceMedical />} />
