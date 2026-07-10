@@ -1,7 +1,10 @@
 import React from "react";
 import { Printer, Trophy, MapPin, Clock, Dumbbell, Utensils, Bus, Video, CalendarDays } from "lucide-react";
 import moment from "moment";
+import "moment/locale/es";
 import { CLUB_BRAND } from "@/lib/clubBrand";
+
+moment.locale("es");
 
 function norm(value) {
   return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");

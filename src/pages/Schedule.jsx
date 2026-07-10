@@ -667,12 +667,26 @@ export default function Schedule() {
     return findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values || null;
   }
 
-  function downloadWeekPDF() {
-    setExportDays(getWeekDays());
+  async function downloadWeekPDF() {
+    const days = getWeekDays();
+    const doc = await buildProfessionalWeekSchedulePDF({
+      days,
+      eventsForDate: getEventsForDate,
+      weekLabel: `${days[0].format("DD-MM")}_${days[6].format("DD-MM-YYYY")}`,
+      squadName: activeSquad?.name || "Plantel",
+      season: activeSeasonId || activeSquad?.season || "",
+    });
+    doc.save(`cronograma_semanal_${days[0].format("YYYY-MM-DD")}.pdf`);
   }
 
-  function downloadDayPDF(day) {
-    setExportDays([day]);
+  async function downloadDayPDF(day) {
+    const dateStr = day.format("YYYY-MM-DD");
+    const doc = await buildDailySchedulePDF({
+      day,
+      events: getEventsForDate(dateStr),
+      squadName: activeSquad?.name || "Plantel",
+    });
+    doc.save(`cronograma_diario_${dateStr}.pdf`);
   }
 
   // ── WEEK VIEW ──
@@ -804,8 +818,6 @@ export default function Schedule() {
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
     </div>
   );
-
-  if (exportDays) return <ScheduleExportView days={exportDays} eventsForDate={getEventsForDate} activeSquad={activeSquad} activeSeasonId={activeSeasonId || activeSquad?.season || ""} getPlanMeta={getPlanMetaForDate} onExit={() => setExportDays(null)} />;
 
   return (
     <div className="space-y-6">
