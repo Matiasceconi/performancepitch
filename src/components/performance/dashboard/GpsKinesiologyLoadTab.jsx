@@ -25,6 +25,10 @@ function isDifferentiatedSession(session) {
   const text = normalize(`${session?.title || ""} ${session?.session_objective || ""} ${session?.type || ""} ${session?.session_type || ""}`);
   return text.includes("trabajo diferenciado");
 }
+function isDifferentiatedPlayerRow(row) {
+  const status = normalize(row?.row_status || "");
+  return row?.include_in_session_average === false || (!!status && status !== "incluidos" && status !== "incluido");
+}
 function number(value) { return Number(value) || 0; }
 function format(value, unit = "") {
   if (value == null || Number.isNaN(Number(value))) return "—";
@@ -69,10 +73,13 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
   const differentiatedRows = useMemo(() => {
     return Object.entries(gpsBySession).flatMap(([sessionId, rows]) => {
       const session = sessionMap[sessionId];
-      if (!session?.date || !isDifferentiatedSession(session)) return [];
-      return rows.map((row) => {
+      if (!session?.date) return [];
+      const sessionMarked = isDifferentiatedSession(session);
+      const rowsToUse = sessionMarked ? rows : rows.filter(isDifferentiatedPlayerRow);
+      if (!rowsToUse.length) return [];
+      return rowsToUse.map((row) => {
         const player = playerMap[row.player_id] || {};
-        return { ...row, session_id: sessionId, date: session.date, session_title: session.title || "Trabajo Diferenciado", objective: session.session_objective || "Trabajo Diferenciado", player, player_name: row.player_name || player.full_name || player.name || "Jugador" };
+        return { ...row, session_id: sessionId, date: session.date, session_title: session.title || "Trabajo Diferenciado", objective: sessionMarked ? (session.session_objective || "Trabajo Diferenciado") : "Trabajo Diferenciado", player, player_name: row.player_name || player.full_name || player.name || "Jugador" };
       });
     }).sort((a, b) => String(a.date).localeCompare(String(b.date)));
   }, [gpsBySession, sessionMap, playerMap]);
@@ -172,7 +179,7 @@ export default function GpsKinesiologyLoadTab({ sessions = [], gpsBySession = {}
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-zinc-800"><h3 className="text-white font-bold">Tabla de jugadores diferenciados</h3><p className="text-xs text-zinc-500 mt-1">Datos provenientes únicamente de sesiones “Trabajo Diferenciado”. La etapa se lee desde Área Médica.</p></div>
+        <div className="px-5 py-4 border-b border-zinc-800"><h3 className="text-white font-bold">Tabla de jugadores diferenciados</h3><p className="text-xs text-zinc-500 mt-1">Datos de trabajos diferenciados: sesiones “Trabajo Diferenciado” o jugadores excluidos del promedio en una sesión del plantel. La etapa se lee desde Área Médica.</p></div>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[1450px] text-xs">
             <thead className="bg-zinc-800/60 text-zinc-500 uppercase"><tr>{[
