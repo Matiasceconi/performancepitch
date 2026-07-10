@@ -172,6 +172,7 @@ export default function MatchSquadPanel({ match, players, onMatchUpdated, squadI
           tournament,
           match_id: match.id,
           squad_id: squadId,
+          competition_id: match.competition_id || null,
         };
         if (existing) {
           await base44.entities.MinutesRecord.update(existing.id, payload);

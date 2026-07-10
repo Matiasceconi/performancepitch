@@ -10,7 +10,6 @@ import MatchGpsReport from "@/components/matches/MatchGpsReport.jsx";
 import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
 import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
-import MatchCompetitionFilters from "@/components/matches/MatchCompetitionFilters.jsx";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -244,7 +243,7 @@ function saveCompetitionTags(tags) {
 }
 
 // ── MatchCard ─────────────────────────────────────────────────────────────────
-function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, competitionOptions }) {
+function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, competitions, competitionMap }) {
   const [expanded, setExpanded] = useState(false);
   const [matchData, setMatchData] = useState(match);
   const [editingCompetition, setEditingCompetition] = useState(false);
@@ -254,13 +253,17 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
   const hasResult = match.our_score != null && match.rival_score != null;
   const won = match.our_score > match.rival_score;
   const drew = match.our_score === match.rival_score;
+  const competitionName = competitionMap[matchData.competition_id]?.short_name || competitionMap[matchData.competition_id]?.name || matchData.competition || "";
 
   async function saveCompetition(value) {
-    await base44.entities.MatchReport.update(match.id, { competition: value });
-    setMatchData(m => ({ ...m, competition: value }));
-    match.competition = value;
+    const competition = competitionMap[value];
+    const patch = { competition_id: value || null, competition: competition?.name || "" };
+    await base44.entities.MatchReport.update(match.id, patch);
+    setMatchData(m => ({ ...m, ...patch }));
+    match.competition_id = patch.competition_id;
+    match.competition = patch.competition;
     setEditingCompetition(false);
-    toast({ title: "Etiqueta actualizada" });
+    toast({ title: "Competencia vinculada" });
   }
 
   const isLocal = match.location === "Local";
@@ -322,30 +325,30 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
             <select
               autoFocus
               className="text-xs bg-zinc-800 border border-zinc-600 rounded-lg px-2 py-0.5 text-white focus:outline-none focus:border-zinc-400 hidden sm:block"
-              defaultValue={match.competition || ""}
+              defaultValue={matchData.competition_id || ""}
               onBlur={() => setEditingCompetition(false)}
               onChange={e => saveCompetition(e.target.value)}
               onClick={e => e.stopPropagation()}
             >
-              <option value="">— Sin etiqueta —</option>
-              {competitionOptions.map(o => <option key={o} value={o}>{o}</option>)}
+              <option value="">— Sin competencia —</option>
+              {competitions.map(o => <option key={o.id} value={o.id}>{o.short_name || o.name}</option>)}
             </select>
           ) : (
             <span
               onClick={e => { e.stopPropagation(); setEditingCompetition(true); }}
               title="Clic para cambiar etiqueta"
               className={`text-xs px-2 py-0.5 rounded-full hidden sm:inline-block cursor-pointer hover:opacity-80 transition-opacity ${
-                !match.competition ? "bg-zinc-700/40 text-zinc-500 border border-dashed border-zinc-600" :
-                match.competition === "Amistosos" ? "bg-zinc-700/60 text-zinc-400" :
-                match.competition?.includes("Apertura") ? "bg-blue-900/30 text-blue-400" :
-                match.competition?.includes("Clausura") ? "bg-emerald-900/30 text-emerald-400" :
+                !competitionName ? "bg-zinc-700/40 text-zinc-500 border border-dashed border-zinc-600" :
+                competitionName === "Amistosos" ? "bg-zinc-700/60 text-zinc-400" :
+                competitionName?.includes("Apertura") ? "bg-blue-900/30 text-blue-400" :
+                competitionName?.includes("Clausura") ? "bg-emerald-900/30 text-emerald-400" :
                 "bg-zinc-700/60 text-zinc-300"
               }`}>
-              {!match.competition ? "Etiquetar" :
-               COMPETITION_LABELS[match.competition] ||
-               (match.competition?.includes("Apertura") ? "T.Proyección Apertura 2026" :
-                match.competition?.includes("Clausura") ? "T.Proyección Clausura 2026" :
-                match.competition)}
+              {!competitionName ? "Vincular" :
+               COMPETITION_LABELS[competitionName] ||
+               (competitionName?.includes("Apertura") ? "T.Proyección Apertura 2026" :
+                competitionName?.includes("Clausura") ? "T.Proyección Clausura 2026" :
+                competitionName)}
             </span>
           )}
           {match.squad_names?.length > 0 && (
@@ -377,13 +380,13 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
                     {leftScore} — {rightScore}
                   </p>
                 ) : <p className="text-zinc-600 text-2xl font-bold">vs</p>}
-                {matchData.competition && (
+                {competitionName && (
                   <span className={`inline-block mt-2 px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    matchData.competition === "Amistosos" ? "bg-zinc-700 text-zinc-300" :
-                    matchData.competition?.includes("Apertura") ? "bg-blue-900/40 text-blue-300" :
-                    matchData.competition?.includes("Clausura") ? "bg-emerald-900/40 text-emerald-300" :
+                    competitionName === "Amistosos" ? "bg-zinc-700 text-zinc-300" :
+                    competitionName?.includes("Apertura") ? "bg-blue-900/40 text-blue-300" :
+                    competitionName?.includes("Clausura") ? "bg-emerald-900/40 text-emerald-300" :
                     "bg-zinc-700 text-zinc-300"
-                  }`}>{COMPETITION_LABELS[matchData.competition] || matchData.competition}</span>
+                  }`}>{COMPETITION_LABELS[competitionName] || competitionName}</span>
                 )}
                 <p className="text-xs text-zinc-600 mt-0.5">{moment(match.date).format("dddd DD [de] MMMM YYYY")}</p>
                 <p className="text-xs mt-1">
@@ -462,7 +465,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
 
 // ── MatchForm ─────────────────────────────────────────────────────────────────
 const EMPTY = {
-  date: "", rival: "", competition: "", location: "Local",
+  date: "", rival: "", competition: "", competition_id: "", location: "Local",
   our_score: "", rival_score: "", rival_formation: "",
   rival_notes: "", set_pieces_notes: "",
   video_analysis_url: "", video_set_pieces_url: "", video_extra_url: "",
@@ -470,7 +473,7 @@ const EMPTY = {
   squad_called: [], squad_names: [], notes: "", rival_logo_url: "",
 };
 
-function MatchForm({ initial, players, onSave, onCancel, competitionOptions }) {
+function MatchForm({ initial, players, onSave, onCancel, competitions }) {
   const [form, setForm] = useState(initial || EMPTY);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
 
@@ -499,10 +502,10 @@ function MatchForm({ initial, players, onSave, onCancel, competitionOptions }) {
           <input type="date" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.date} onChange={e => set("date", e.target.value)} />
         </div>
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">Torneo</label>
-          <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.competition || ""} onChange={e => set("competition", e.target.value)}>
-            <option value="">— Sin etiqueta —</option>
-            {competitionOptions.map(option => <option key={option} value={option}>{option}</option>)}
+          <label className="text-xs text-zinc-400 mb-1 block">Competencia</label>
+          <select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.competition_id || ""} onChange={e => set("competition_id", e.target.value)}>
+            <option value="">— Sin competencia —</option>
+            {competitions.map(option => <option key={option.id} value={option.id}>{option.short_name || option.name}</option>)}
           </select>
         </div>
         <div>
@@ -579,40 +582,44 @@ export default function Matches() {
   const { activeSquadId, activeSquad } = useWorkspace();
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
+  const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, minutesCount }
   const [showFilters, setShowFilters] = useState(false);
   const [competitionFilter, setCompetitionFilter] = useState("");
-  const [competitionTags, setCompetitionTags] = useState(loadCompetitionTags);
   const { toast } = useToast();
 
   function handleMatchUpdated(id, data) {
     setMatches(ms => ms.map(m => m.id === id ? { ...m, ...data } : m));
   }
 
-  const competitionOptions = useMemo(() => Array.from(new Set([...competitionTags, ...matches.map(m => m.competition).filter(Boolean)])), [competitionTags, matches]);
-  const visibleMatches = useMemo(() => competitionFilter ? matches.filter(m => m.competition === competitionFilter) : matches, [matches, competitionFilter]);
+  const competitionMap = useMemo(() => Object.fromEntries(competitions.map((competition) => [competition.id, competition])), [competitions]);
+  const visibleMatches = useMemo(() => competitionFilter ? matches.filter(m => m.competition_id === competitionFilter) : matches, [matches, competitionFilter]);
 
   useEffect(() => { loadAll(); }, [activeSquadId]);
 
   async function loadAll() {
     setLoading(true);
-    const [all, p] = await Promise.all([
+    const [all, p, competitionRows] = await Promise.all([
       base44.entities.MatchReport.list("-date", 200),
       base44.entities.Player.list("-created_date", 100),
+      base44.entities.Competitions.list("name", 200),
     ]);
     // Filtrar estrictamente por plantel activo (sin fallback a registros sin squad_id) y ocultar archivados
     const filtered = all.filter(x => (!activeSquadId || x.squad_id === activeSquadId) && x.status !== "archivado");
     setMatches(filtered);
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
+    setCompetitions(competitionRows.filter((competition) => competition.active !== false));
     setLoading(false);
   }
 
   async function save(form) {
+    const selectedCompetition = competitions.find((competition) => competition.id === form.competition_id);
     const data = {
       ...form,
+      competition: selectedCompetition?.name || "",
       squad_id: activeSquadId || undefined,
       squad_name: activeSquad?.name || undefined,
       our_score: form.our_score !== "" ? Number(form.our_score) : null,
@@ -659,32 +666,6 @@ export default function Matches() {
     loadAll();
   }
 
-  function addCompetitionTag(tag) {
-    const next = Array.from(new Set([...competitionTags, tag]));
-    setCompetitionTags(next);
-    saveCompetitionTags(next);
-  }
-
-  async function renameCompetitionTag(oldTag, newTag) {
-    const clean = newTag.trim();
-    if (!clean || clean === oldTag) return;
-    const next = competitionTags.map(tag => tag === oldTag ? clean : tag);
-    setCompetitionTags(next);
-    saveCompetitionTags(next);
-    const affected = matches.filter(match => match.competition === oldTag);
-    await Promise.all(affected.map(match => base44.entities.MatchReport.update(match.id, { competition: clean })));
-    setMatches(ms => ms.map(match => match.competition === oldTag ? { ...match, competition: clean } : match));
-    if (competitionFilter === oldTag) setCompetitionFilter(clean);
-    toast({ title: "Etiqueta de torneo actualizada" });
-  }
-
-  function deleteCompetitionTag(tag) {
-    const next = competitionTags.filter(item => item !== tag);
-    setCompetitionTags(next);
-    saveCompetitionTags(next);
-    if (competitionFilter === tag) setCompetitionFilter("");
-  }
-
   if (loading) return (
     <div className="flex items-center justify-center h-48">
       <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
@@ -715,14 +696,12 @@ export default function Matches() {
       </div>
 
       {showFilters && (
-        <MatchCompetitionFilters
-          options={competitionOptions}
-          selected={competitionFilter}
-          onSelect={setCompetitionFilter}
-          onAdd={addCompetitionTag}
-          onRename={renameCompetitionTag}
-          onDelete={deleteCompetitionTag}
-        />
+        <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 flex flex-wrap gap-3">
+          <select value={competitionFilter} onChange={(e) => setCompetitionFilter(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white">
+            <option value="">Todas las competencias</option>
+            {competitions.map((competition) => <option key={competition.id} value={competition.id}>{competition.short_name || competition.name}</option>)}
+          </select>
+        </div>
       )}
 
       {showForm && (
@@ -731,7 +710,7 @@ export default function Matches() {
           players={players}
           onSave={save}
           onCancel={() => { setShowForm(false); setEditing(null); }}
-          competitionOptions={competitionOptions}
+          competitions={competitions}
         />
       )}
 
@@ -765,7 +744,7 @@ export default function Matches() {
       ) : (
         <div className="space-y-3">
           {visibleMatches.map(m => (
-            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} squadId={activeSquadId} competitionOptions={competitionOptions} />
+            <MatchCard key={m.id} match={m} players={players} onEdit={m2 => { setEditing(m2); setShowForm(true); }} onDelete={remove} onMatchUpdated={handleMatchUpdated} squadId={activeSquadId} competitions={competitions} competitionMap={competitionMap} />
           ))}
         </div>
       )}

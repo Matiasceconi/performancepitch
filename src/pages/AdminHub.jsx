@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   Lock, Fingerprint, ShieldCheck, UserCog,
-  Settings, Wrench, ClipboardList, ChevronRight, Bug, KeyRound
+  Settings, Wrench, ClipboardList, ChevronRight, Bug, KeyRound, Trophy
 } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AdminAccessDebugPanel from "@/components/workspace/AdminAccessDebugPanel";
@@ -13,6 +13,7 @@ import AdminTools from "@/components/admin/AdminTools";
 import AdminConfig from "@/components/admin/AdminConfig";
 import AdminAudit from "@/components/admin/AdminAudit";
 import RolesPermissions from "@/pages/RolesPermissions";
+import CompetitionsAdmin from "@/pages/CompetitionsAdmin";
 
 const SECTIONS = [
   {
@@ -41,6 +42,15 @@ const SECTIONS = [
     bg: "bg-yellow-500/10 border-yellow-500/20",
     description: "Alias, cruce automático, vinculación manual y sincronización de player_id",
     tags: ["Alias", "Cruce automático", "Vinculación manual", "Sin reconocer", "Sincronización de player_id"],
+  },
+  {
+    id: "competitions",
+    label: "Competencias",
+    icon: Trophy,
+    color: "text-amber-400",
+    bg: "bg-amber-500/10 border-amber-500/20",
+    description: "Base central de competencias, alias, normalización y fusión de duplicados",
+    tags: ["competition_id", "Alias", "Normalización", "Fusión", "Sin vincular"],
   },
   {
     id: "squads",
@@ -139,6 +149,7 @@ export default function AdminHub() {
       case "users":    return <UsersAccess />;
       case "roles":    return <RolesPermissions />;
       case "identity": return <PlayerIdentity />;
+      case "competitions": return <CompetitionsAdmin />;
       case "squads":   return <SquadManager />;
       case "staff":    return <StaffManager />;
       case "config":   return <AdminConfig />;

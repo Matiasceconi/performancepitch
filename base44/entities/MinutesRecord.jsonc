@@ -22,6 +22,10 @@
       "type": "string",
       "description": "ID del plantel al que pertenece el partido (desnormalizado desde MatchReport)"
     },
+    "competition_id": {
+      "type": "string",
+      "description": "ID oficial de la competencia vinculada al partido"
+    },
     "hidden_from_reports": {
       "type": "boolean",
       "default": false,

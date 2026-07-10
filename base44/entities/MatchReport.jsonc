@@ -30,7 +30,11 @@
     },
     "competition": {
       "type": "string",
-      "description": "Competencia (ej: Liga, Copa Argentina)"
+      "description": "Nombre legado/desnormalizado de la competencia"
+    },
+    "competition_id": {
+      "type": "string",
+      "description": "ID oficial de la competencia en Competitions"
     },
     "location": {
       "type": "string",
