@@ -1,6 +1,8 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { base44 } from "@/api/base44Client";
 import { Settings, ChevronDown, ChevronUp, Plus, Trash2, Save } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import NutritionSettingsPanel from "@/components/nutrition/NutritionSettingsPanel";
 
 const DEFAULT_SEASONS = ["2024", "2025", "2026", "2025/2026"];
 const DEFAULT_CATEGORIES = ["Sub-14", "Sub-15", "Sub-16", "Sub-17", "Sub-18", "Sub-20", "Reserva", "Primera"];
@@ -82,6 +84,19 @@ export default function AdminConfig() {
   const [positions, setPositions] = useState(() => {
     try { return JSON.parse(localStorage.getItem("admin_positions") || "null") || DEFAULT_POSITIONS; } catch { return DEFAULT_POSITIONS; }
   });
+  const [nutritionStatuses, setNutritionStatuses] = useState([]);
+  const [nutritionReferences, setNutritionReferences] = useState([]);
+
+  async function loadNutritionConfig() {
+    const [statuses, references] = await Promise.all([
+      base44.entities.NutritionReadingStatus.list("order", 100).catch(() => []),
+      base44.entities.NutritionReferenceRange.list("order", 200).catch(() => []),
+    ]);
+    setNutritionStatuses(statuses);
+    setNutritionReferences(references);
+  }
+
+  useEffect(() => { loadNutritionConfig(); }, []);
 
   function saveConfig() {
     localStorage.setItem("admin_seasons", JSON.stringify(seasons));
@@ -143,6 +158,14 @@ export default function AdminConfig() {
           ))}
           <p className="text-xs text-zinc-600 mt-2">Las variables GPS son fijas según el esquema de importación Catapult.</p>
         </div>
+      </ConfigBlock>
+
+      <ConfigBlock title="Nutrición" icon={Settings}>
+        <NutritionSettingsPanel
+          readingStatuses={nutritionStatuses}
+          referenceRanges={nutritionReferences}
+          onReload={loadNutritionConfig}
+        />
       </ConfigBlock>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">

@@ -256,7 +256,7 @@ Deno.serve(async (req) => {
           player_name_original: item.originalName, normalized_player_name: normalize(item.originalName), fecha: item.fecha, period_start: item.period.start, period_end: item.period.end, position_label: String(item.row[0] || '').trim(),
           peso: parseNumber(item.row[3]), limite_mm: parseNumber(item.row[4]), triceps: parseNumber(item.row[5]), subescapular: parseNumber(item.row[6]), supraespinal: parseNumber(item.row[7]), abdominal: parseNumber(item.row[8]), muslo: parseNumber(item.row[9]), pantorrilla: parseNumber(item.row[10]),
           sumatoria_6p: parseNumber(item.row[11]), second_cut_sumatoria_6p: parseNumber(item.row[12]), cut_difference: parseNumber(item.row[13]), interpretation_note: String(item.row[13] || '').trim(),
-          nutrition_interpretation_key: key, nutrition_assessment_key: assessmentKey, linked: true, source_file_id: SOURCE_FILE_ID, source_file_mime_type: meta.mimeType, row_hash: rowHash(item.row), raw_values: rawObject(item.row), found_in_last_sync: true, last_synced_at: now, updated_at: now,
+          nutrition_interpretation_key: key, nutrition_assessment_key: assessmentKey, nutrition_assessment_id: assessByKey[assessmentKey]?.id || '', linked: true, source_file_id: SOURCE_FILE_ID, source_file_mime_type: meta.mimeType, row_hash: rowHash(item.row), raw_values: rawObject(item.row), found_in_last_sync: true, last_synced_at: now, updated_at: now,
         };
         Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
         const status = await upsertRecord(base44.asServiceRole.entities.NutritionInterpretation, payload, interpByKey, interpByRow, seenInterpretationIds);

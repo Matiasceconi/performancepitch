@@ -2,7 +2,7 @@ import React, { useMemo, useState } from "react";
 import moment from "moment";
 import * as XLSX from "xlsx";
 import {
-  Search, Download, FileText, Pencil,
+  Search, Download, FileText, Pencil, Eye,
   CheckCircle2, AlertTriangle, Activity, ChevronUp, ChevronDown, ChevronsUpDown,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -12,6 +12,7 @@ import {
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import ReadingStatusBadge from "@/components/nutrition/ReadingStatusBadge";
 import NutritionReadingEditModal from "@/components/nutrition/NutritionReadingEditModal";
+import NutritionAssessmentEditModal from "@/components/nutrition/NutritionAssessmentEditModal";
 import { exportReadingPdf } from "@/lib/reports/nutritionPdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
@@ -43,7 +44,7 @@ function SortIcon({ dir }) {
   return <ChevronsUpDown size={12} className="text-zinc-600" />;
 }
 
-export default function ReadingTab({ interpretations, players, readingStatuses, squads, onReload }) {
+export default function ReadingTab({ interpretations, assessments = [], players, readingStatuses, squads, onReload }) {
   const { can, activeSquad, activeSeasonId } = useWorkspace();
   const canEdit = can("edit");
 
@@ -54,6 +55,7 @@ export default function ReadingTab({ interpretations, players, readingStatuses, 
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
   const [editing, setEditing] = useState(null);
+  const [assessmentDetail, setAssessmentDetail] = useState(null);
   const [exporting, setExporting] = useState(false);
 
   const playerMap = useMemo(
@@ -68,6 +70,14 @@ export default function ReadingTab({ interpretations, players, readingStatuses, 
     () => Object.fromEntries(squads.map((s) => [s.id, s])),
     [squads]
   );
+  const assessmentMap = useMemo(() => {
+    const map = {};
+    assessments.forEach((assessment) => {
+      if (assessment.id) map[assessment.id] = assessment;
+      if (assessment.nutrition_assessment_key) map[assessment.nutrition_assessment_key] = assessment;
+    });
+    return map;
+  }, [assessments]);
 
   const playerName = (p) =>
     p?.full_name || `${p?.first_name || ""} ${p?.last_name || ""}`.trim();
@@ -305,6 +315,16 @@ export default function ReadingTab({ interpretations, players, readingStatuses, 
                       {r.next_control_date ? moment(r.next_control_date).format("DD/MM/YYYY") : "—"}
                     </td>
                     <td className="p-3">
+                      <div className="flex items-center gap-1.5">
+                      {(assessmentMap[r.nutrition_assessment_id] || assessmentMap[r.nutrition_assessment_key]) && (
+                        <button
+                          onClick={() => setAssessmentDetail(assessmentMap[r.nutrition_assessment_id] || assessmentMap[r.nutrition_assessment_key])}
+                          className="w-7 h-7 flex items-center justify-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+                          title="Ver evaluación vinculada"
+                        >
+                          <Eye size={12} />
+                        </button>
+                      )}
                       {canEdit && (
                         <button
                           onClick={() => setEditing(r)}
@@ -314,6 +334,7 @@ export default function ReadingTab({ interpretations, players, readingStatuses, 
                           <Pencil size={12} />
                         </button>
                       )}
+                      </div>
                     </td>
                   </tr>
                 );
@@ -372,6 +393,14 @@ export default function ReadingTab({ interpretations, players, readingStatuses, 
             ))}
           </div>
         </div>
+      )}
+
+      {assessmentDetail && (
+        <NutritionAssessmentEditModal
+          assessment={assessmentDetail}
+          onClose={() => setAssessmentDetail(null)}
+          onSaved={() => { setAssessmentDetail(null); onReload(); }}
+        />
       )}
 
       {/* Edit reading modal */}

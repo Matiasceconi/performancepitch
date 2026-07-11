@@ -13,6 +13,7 @@ import {
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import PlayerEvolutionModal from "@/components/nutrition/PlayerEvolutionModal";
 import NutritionAssessmentEditModal from "@/components/nutrition/NutritionAssessmentEditModal";
+import NutritionPlayerPanel from "@/components/nutrition/NutritionPlayerPanel";
 import { exportSkinfoldPdf } from "@/lib/reports/nutritionPdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 
@@ -65,7 +66,7 @@ const POSITIONS = [
   "Mediocampista Central", "Volante Interno", "Extremo", "Delantero Centro",
 ];
 
-export default function SkinfoldTab({ assessments, players, squads, onReload }) {
+export default function SkinfoldTab({ assessments, interpretations = [], referenceRanges = [], players, squads, onReload }) {
   const { can, activeSquad, activeSeasonId } = useWorkspace();
   const canEdit = can("edit");
 
@@ -73,13 +74,16 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
   const [squadFilter, setSquadFilter] = useState("all");
   const [seasonFilter, setSeasonFilter] = useState("all");
   const [positionFilter, setPositionFilter] = useState("all");
+  const [dateExact, setDateExact] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [typeFilter, setTypeFilter] = useState("all");
   const [showFilters, setShowFilters] = useState(false);
   const [sortBy, setSortBy] = useState("fecha");
   const [sortDir, setSortDir] = useState("desc");
   const [page, setPage] = useState(1);
   const [evolutionPlayer, setEvolutionPlayer] = useState(null);
+  const [selectedPlayerId, setSelectedPlayerId] = useState("");
   const [editing, setEditing] = useState(null);
   const [exporting, setExporting] = useState(false);
 
@@ -140,6 +144,10 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
     () => [...new Set(assessments.map((a) => a.season_id).filter(Boolean))].sort().reverse(),
     [assessments]
   );
+  const evaluationTypes = useMemo(
+    () => [...new Set(assessments.map((a) => a.tipo_medicion).filter(Boolean))].sort(),
+    [assessments]
+  );
 
   const filtered = useMemo(() => {
     let rows = enriched.filter((a) => a.linked && a.player_id);
@@ -162,8 +170,10 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
     if (positionFilter !== "all") {
       rows = rows.filter((a) => playerMap[a.player_id]?.position === positionFilter);
     }
+    if (dateExact) rows = rows.filter((a) => a.fecha === dateExact);
     if (dateFrom) rows = rows.filter((a) => a.fecha >= dateFrom);
     if (dateTo) rows = rows.filter((a) => a.fecha <= dateTo);
+    if (typeFilter !== "all") rows = rows.filter((a) => a.tipo_medicion === typeFilter);
 
     rows.sort((a, b) => {
       let va, vb;
@@ -185,7 +195,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
     });
 
     return rows;
-  }, [enriched, q, squadFilter, seasonFilter, positionFilter, dateFrom, dateTo, sortBy, sortDir, playerMap]);
+  }, [enriched, q, squadFilter, seasonFilter, positionFilter, dateExact, dateFrom, dateTo, typeFilter, sortBy, sortDir, playerMap]);
 
   function toggleSort(col) {
     if (sortBy === col) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -214,7 +224,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
 
   // Excel export
   function handleExcelExport() {
-    const headers = ["Jugador", "Posición", "Plantel", "Fecha", "Peso (kg)", "Sum. 6P (mm)", "% Grasa", "Masa Musc. (kg)", "Dif. 6P", "Observaciones"];
+    const headers = ["Jugador", "Posición", "Plantel", "Fecha", "Peso (kg)", "Talla", "Sum. 6P (mm)", "IMO", "% Grasa", "Kg grasa", "Masa Musc. (kg)", "Dif. 6P", "Observaciones"];
     const data = filtered.map((a) => {
       const p = playerMap[a.player_id];
       const pName = playerName(p) || a.player_name_original || "";
@@ -225,8 +235,11 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
         squad,
         a.fecha || "",
         a.peso ?? "",
+        a.talla ?? "",
         a.sumatoria_6p ?? "",
+        a.imo ?? "",
         a.porcentaje_grasa ?? "",
+        a.kg_grasa ?? "",
         a.kg_masa_muscular ?? "",
         a.diff_sumatoria_6p != null ? Number(a.diff_sumatoria_6p).toFixed(1) : "",
         a.observaciones || "",
@@ -321,6 +334,14 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
             </SelectContent>
           </Select>
 
+          <Input
+            type="date"
+            value={dateExact}
+            onChange={(e) => { setDateExact(e.target.value); setPage(1); }}
+            className="bg-zinc-800 border-zinc-700 text-white text-sm h-9 w-full md:w-40"
+            title="Fecha exacta"
+          />
+
           <button
             onClick={() => setShowFilters((v) => !v)}
             className={`inline-flex items-center gap-1.5 px-3 h-9 border rounded-lg text-xs font-medium transition-colors ${showFilters ? "bg-zinc-700 border-zinc-600 text-white" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200"}`}
@@ -347,7 +368,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
 
         {/* Extended filters */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 pt-1 border-t border-zinc-800">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-2 pt-1 border-t border-zinc-800">
             {/* Position */}
             <Select value={positionFilter} onValueChange={(v) => { setPositionFilter(v); setPage(1); }}>
               <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-300 text-sm h-9">
@@ -358,6 +379,16 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
                 {POSITIONS.map((pos) => (
                   <SelectItem key={pos} value={pos} className="text-zinc-300">{pos}</SelectItem>
                 ))}
+              </SelectContent>
+            </Select>
+
+            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+              <SelectTrigger className="bg-zinc-800 border-zinc-700 text-zinc-300 text-sm h-9">
+                <SelectValue placeholder="Tipo de evaluación" />
+              </SelectTrigger>
+              <SelectContent className="bg-zinc-900 border-zinc-700">
+                <SelectItem value="all" className="text-zinc-300">Todos los tipos</SelectItem>
+                {evaluationTypes.map((type) => <SelectItem key={type} value={type} className="text-zinc-300">{type}</SelectItem>)}
               </SelectContent>
             </Select>
 
@@ -389,7 +420,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
       {/* Table */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-xs min-w-[900px]">
+          <table className="w-full text-xs min-w-[1250px]">
             <thead>
               <tr className="border-b border-zinc-800">
                 <th className="w-12 p-3"></th>
@@ -397,8 +428,11 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
                 <Th col="posicion" label="Posición" />
                 <Th col="fecha" label="Fecha" />
                 <Th col="peso" label="Peso" />
+                <th className="p-3 text-[11px] font-semibold text-zinc-500 uppercase whitespace-nowrap">Talla</th>
                 <Th col="sumatoria_6p" label="Sum. 6P" />
+                <th className="p-3 text-[11px] font-semibold text-zinc-500 uppercase whitespace-nowrap">IMO</th>
                 <Th col="porcentaje_grasa" label="% Grasa" />
+                <th className="p-3 text-[11px] font-semibold text-zinc-500 uppercase whitespace-nowrap">Kg grasa</th>
                 <Th col="kg_masa_muscular" label="Masa Musc." />
                 <Th col="diff" label="Dif. Ant." />
                 <th className="p-3 text-[11px] font-semibold text-zinc-500 uppercase">Tendencia</th>
@@ -409,7 +443,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
             <tbody>
               {pageRows.length === 0 && (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-zinc-600 text-sm">
+                  <td colSpan={15} className="py-12 text-center text-zinc-600 text-sm">
                     No se encontraron evaluaciones con los filtros aplicados
                   </td>
                 </tr>
@@ -431,7 +465,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
                     <td className="p-3 text-zinc-200 font-medium whitespace-nowrap">
                       <button
                         className="hover:text-white underline-offset-2 hover:underline text-left"
-                        onClick={() => setEvolutionPlayer(p || { full_name: name })}
+                        onClick={() => setSelectedPlayerId(a.player_id) }
                       >
                         {name}
                       </button>
@@ -441,8 +475,11 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
                       {a.fecha ? moment(a.fecha).format("DD/MM/YYYY") : "—"}
                     </td>
                     <td className="p-3 text-center text-zinc-300">{a.peso != null ? `${fmt(a.peso)} kg` : "—"}</td>
+                    <td className="p-3 text-center text-zinc-400">{a.talla != null ? fmt(a.talla) : "—"}</td>
                     <td className="p-3 text-center text-orange-400 font-semibold">{a.sumatoria_6p != null ? `${fmt(a.sumatoria_6p)} mm` : "—"}</td>
+                    <td className="p-3 text-center text-emerald-400">{a.imo != null ? fmt(a.imo) : "—"}</td>
                     <td className="p-3 text-center text-pink-400">{a.porcentaje_grasa != null ? `${fmt(a.porcentaje_grasa)}%` : "—"}</td>
+                    <td className="p-3 text-center text-amber-400">{a.kg_grasa != null ? `${fmt(a.kg_grasa)} kg` : "—"}</td>
                     <td className="p-3 text-center text-purple-400">{a.kg_masa_muscular != null ? `${fmt(a.kg_masa_muscular)} kg` : "—"}</td>
                     <td className="p-3 text-center">
                       {d6p != null ? (
@@ -458,7 +495,7 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
                     <td className="p-3">
                       <div className="flex items-center gap-1.5">
                         <button
-                          onClick={() => setEvolutionPlayer(p || { id: a.player_id, full_name: name })}
+                          onClick={() => setSelectedPlayerId(a.player_id) }
                           className="w-7 h-7 flex items-center justify-center rounded-md bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
                           title="Ver evolución"
                         >
@@ -521,6 +558,15 @@ export default function SkinfoldTab({ assessments, players, squads, onReload }) 
           )}
         </div>
       </div>
+
+      {selectedPlayerId && (
+        <NutritionPlayerPanel
+          player={playerMap[selectedPlayerId]}
+          assessments={getPlayerAssessments(selectedPlayerId)}
+          interpretations={interpretations.filter((r) => r.player_id === selectedPlayerId)}
+          referenceRanges={referenceRanges}
+        />
+      )}
 
       {/* Player evolution modal */}
       {evolutionPlayer && (

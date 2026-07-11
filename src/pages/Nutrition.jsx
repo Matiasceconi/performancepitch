@@ -18,6 +18,7 @@ export default function Nutrition() {
   const [assessments, setAssessments] = useState([]);
   const [interpretations, setInterpretations] = useState([]);
   const [readingStatuses, setReadingStatuses] = useState([]);
+  const [referenceRanges, setReferenceRanges] = useState([]);
   const [players, setPlayers] = useState([]);
   const [squads, setSquads] = useState([]);
   const [syncState, setSyncState] = useState(null);
@@ -30,10 +31,11 @@ export default function Nutrition() {
   async function load() {
     setLoading(true);
     try {
-      const [rows, interpRows, statusRows, playerRows, squadRows, syncRows] = await Promise.all([
+      const [rows, interpRows, statusRows, referenceRows, playerRows, squadRows, syncRows] = await Promise.all([
         base44.entities.NutritionAssessment.list("-fecha", 3000),
         base44.entities.NutritionInterpretation.list("-fecha", 3000),
         base44.entities.NutritionReadingStatus.list("order", 100).catch(() => []),
+        base44.entities.NutritionReferenceRange.list("order", 200).catch(() => []),
         base44.entities.Player.list("full_name", 3000),
         base44.entities.Squad.filter({ active: true }, "name", 100),
         base44.entities.NutritionSyncState.list("-updated_date", 5),
@@ -41,6 +43,7 @@ export default function Nutrition() {
       setAssessments(rows);
       setInterpretations(interpRows);
       setReadingStatuses(statusRows);
+      setReferenceRanges(referenceRows);
       setPlayers(playerRows);
       setSquads(squadRows);
       setSyncState(syncRows[0] || null);
@@ -158,6 +161,8 @@ export default function Nutrition() {
       {activeTab === "skinfold" && (
         <SkinfoldTab
           assessments={assessments}
+          interpretations={interpretations}
+          referenceRanges={referenceRanges}
           players={players}
           squads={squads}
           onReload={load}
@@ -166,6 +171,7 @@ export default function Nutrition() {
       {activeTab === "reading" && (
         <ReadingTab
           interpretations={interpretations}
+          assessments={assessments}
           players={players}
           readingStatuses={readingStatuses}
           squads={squads}
