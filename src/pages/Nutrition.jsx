@@ -104,6 +104,15 @@ export default function Nutrition() {
             <span>Última sync: <b className="text-zinc-300">{lastSync}</b></span>
           </div>
 
+          {/* Refresh button */}
+          <button
+            onClick={load}
+            title="Actualizar datos"
+            className="inline-flex items-center justify-center px-3 py-2 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-zinc-400 hover:text-zinc-200 rounded-lg transition-colors"
+          >
+            <RefreshCw size={14} />
+          </button>
+
           {/* Import button */}
           <button
             onClick={() => setShowImport(true)}
