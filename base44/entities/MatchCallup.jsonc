@@ -58,7 +58,7 @@
     },
     "source": {
       "type": "string",
-      "description": "Origen de la convocatoria: manual, ai_import"
+      "description": "Origen de la convocatoria: manual, ai_import, excel_import"
     },
     "source_file": {
       "type": "string",
@@ -66,15 +66,15 @@
     },
     "confidence": {
       "type": "number",
-      "description": "Confianza de la coincidencia IA 0-1"
+      "description": "Confianza de la coincidencia IA/importaci\u00f3n 0-1"
     },
     "detected_name": {
       "type": "string",
-      "description": "Nombre le\u00eddo por IA en el archivo"
+      "description": "Nombre le\u00eddo en el archivo"
     },
     "detected_position": {
       "type": "string",
-      "description": "Ubicaci\u00f3n aproximada en campo detectada por IA"
+      "description": "Ubicaci\u00f3n aproximada o texto original detectado"
     },
     "player_name": {
       "type": "string",
@@ -87,6 +87,18 @@
     "player_position": {
       "type": "string",
       "description": "Posici\u00f3n del jugador al momento de la convocatoria"
+    },
+    "import_batch_id": {
+      "type": "string",
+      "description": "ID del lote de importaci\u00f3n para auditor\u00eda y reversi\u00f3n"
+    },
+    "imported_at": {
+      "type": "string",
+      "description": "Fecha/hora en que fue importado"
+    },
+    "import_observation": {
+      "type": "string",
+      "description": "Observaci\u00f3n conservada desde la planilla"
     },
     "created_at": {
       "type": "string",

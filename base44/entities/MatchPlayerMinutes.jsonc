@@ -115,9 +115,29 @@
       "default": "match_minutes_tab",
       "description": "Origen del registro"
     },
+    "source_file": {
+      "type": "string",
+      "description": "Archivo origen utilizado para importar minutos"
+    },
     "data_source": {
       "type": "string",
       "description": "Origen de recuperaci\u00f3n o carga del dato"
+    },
+    "entry_source": {
+      "type": "string",
+      "description": "Origen del minuto de ingreso: excel, inferred_from_minutes o manual"
+    },
+    "import_batch_id": {
+      "type": "string",
+      "description": "ID del lote de importaci\u00f3n para auditor\u00eda y reversi\u00f3n"
+    },
+    "imported_at": {
+      "type": "string",
+      "description": "Fecha/hora en que fue importado"
+    },
+    "import_observation": {
+      "type": "string",
+      "description": "Observaci\u00f3n conservada desde la planilla"
     },
     "updated_at": {
       "type": "string",

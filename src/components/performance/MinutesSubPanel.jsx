@@ -1,9 +1,12 @@
 import React, { useState } from "react";
+import { Upload } from "lucide-react";
 import useMinutesDashboard from "@/components/performance/minutes/useMinutesDashboard";
 import MinutesFiltersRow from "@/components/performance/minutes/MinutesFiltersRow";
 import MinutesSummaryCards from "@/components/performance/minutes/MinutesSummaryCards";
 import MinutesPlayersTab from "@/components/performance/minutes/MinutesPlayersTab";
 import MinutesMatchesTab from "@/components/performance/minutes/MinutesMatchesTab";
+import ExcelMinutesImportModal from "@/components/performance/minutes/ExcelMinutesImportModal";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { generateMinutesPdf } from "@/lib/reports/minutesPdf";
 
 const SUB_TABS = [
@@ -13,7 +16,10 @@ const SUB_TABS = [
 
 export default function MinutesSubPanel() {
   const dashboard = useMinutesDashboard();
+  const { isAdmin, can } = useWorkspace();
   const [pendingOpen, setPendingOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const canImport = isAdmin || can?.("edit", "/performance/minutes") || can?.("admin", "/performance/minutes");
 
   async function handleExport() {
     await generateMinutesPdf(dashboard.exportData);
@@ -29,6 +35,14 @@ export default function MinutesSubPanel() {
 
   return (
     <div className="space-y-5">
+      {canImport && (
+        <div className="flex justify-end">
+          <button onClick={() => setImportOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm font-semibold text-yellow-200 transition hover:bg-yellow-500/20">
+            <Upload size={16} /> Importar minutos desde Excel
+          </button>
+        </div>
+      )}
+
       <MinutesFiltersRow
         filters={dashboard.filters}
         updateFilter={dashboard.updateFilter}
@@ -66,6 +80,8 @@ export default function MinutesSubPanel() {
 
       {dashboard.tab === "summary" && <MinutesPlayersTab rows={dashboard.playerRows} filters={dashboard.filters} updateFilter={dashboard.updateFilter} />}
       {dashboard.tab === "matches" && <MinutesMatchesTab matches={dashboard.filteredMatches} />}
+
+      <ExcelMinutesImportModal open={importOpen} onClose={() => setImportOpen(false)} filters={dashboard.filters} onImported={dashboard.reload} />
     </div>
   );
 }
