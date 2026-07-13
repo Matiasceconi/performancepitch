@@ -273,6 +273,7 @@ export default function MatchDetail() {
   const [editOpen, setEditOpen] = useState(false);
   const [headerSave, setHeaderSave] = useState({ action: null, disabled: true, pending: false, label: "" });
   const [headerSaving, setHeaderSaving] = useState(false);
+  const [callupsVersion, setCallupsVersion] = useState(0);
 
   const loadMatch = useCallback(async () => {
     setLoading(true);
@@ -415,10 +416,10 @@ export default function MatchDetail() {
         </TabsList>
 
         <TabsContent value="convocados" className="mt-0">
-          <ConvocadosTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} />
+          <ConvocadosTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />
         </TabsContent>
         <TabsContent value="minutos" className="mt-0">
-          <MinutosTab match={match} players={players} onRegisterSave={setHeaderSave} />
+          <MinutosTab match={match} players={players} onRegisterSave={setHeaderSave} refreshKey={callupsVersion} />
         </TabsContent>
         <TabsContent value="gps" className="mt-0">
           <GpsTab match={match} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} />

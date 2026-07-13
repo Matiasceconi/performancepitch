@@ -1,0 +1,61 @@
+{
+  "name": "MatchCallup",
+  "type": "object",
+  "properties": {
+    "match_id": {
+      "type": "string",
+      "description": "ID del partido vinculado"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID estable del jugador convocado"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel del partido"
+    },
+    "club_id": {
+      "type": "string",
+      "description": "ID del club propietario"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "convocado",
+        "desconvocado",
+        "pendiente"
+      ],
+      "default": "convocado",
+      "description": "Estado de la convocatoria"
+    },
+    "callup_key": {
+      "type": "string",
+      "description": "Clave l\u00f3gica \u00fanica match_id:player_id para evitar duplicados"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador desnormalizado para auditor\u00eda"
+    },
+    "player_number": {
+      "type": "number",
+      "description": "N\u00famero del jugador al momento de la convocatoria"
+    },
+    "player_position": {
+      "type": "string",
+      "description": "Posici\u00f3n del jugador al momento de la convocatoria"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "match_id",
+    "player_id",
+    "callup_key"
+  ]
+}
