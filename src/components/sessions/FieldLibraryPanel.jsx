@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from "react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { base44 } from "@/api/base44Client";
-import { Star, Search, ChevronDown, ChevronUp, Activity } from "lucide-react";
+import { Star, Search, ChevronDown, ChevronUp, Activity, Play } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import LibraryExerciseGPS from "@/components/sessions/LibraryExerciseGPS";
 import { DEFAULT_FIELD_EXERCISE_TYPES, loadFieldExerciseTypes } from "@/components/sessions/exerciseTypeOptions";
+import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
+import { getVideoThumbnailUrl } from "@/components/sessions/exerciseLibrarySync";
 
 const TYPE_COLORS = {
   "Activación": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
@@ -30,6 +32,7 @@ export default function FieldLibraryPanel() {
   const [typeOptions, setTypeOptions] = useState(DEFAULT_FIELD_EXERCISE_TYPES);
   const [expanded, setExpanded] = useState({});
   const [activeTab, setActiveTab] = useState({}); // per exercise: "info" | "gps"
+  const [videoModalExId, setVideoModalExId] = useState(null);
   const { toast } = useToast();
 
   useEffect(() => {
@@ -138,20 +141,51 @@ export default function FieldLibraryPanel() {
         {filtered.map(ex => {
           const tc = TYPE_COLORS[ex.type] || TYPE_COLORS["Otro"];
           const isExp = expanded[ex.id];
+          const videoThumb = ex.video_url ? getVideoThumbnailUrl(ex.video_url) : null;
           return (
             <div key={ex.id} className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
-              {ex.image_url && <img src={ex.image_url} alt={ex.name} className="w-full max-h-40 object-cover" />}
+              {/* Media: video > image priority */}
+              {ex.video_url ? (
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => setVideoModalExId(ex.id)}
+                >
+                  {videoThumb ? (
+                    <img src={videoThumb} alt={ex.name} className="w-full max-h-40 object-cover" />
+                  ) : (
+                    <div className="w-full h-28 flex items-center justify-center bg-zinc-700">
+                      <Play size={24} className="text-zinc-500" />
+                    </div>
+                  )}
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
+                    <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center backdrop-blur-sm">
+                      <Play size={16} className="text-white fill-white ml-0.5" />
+                    </div>
+                  </div>
+                  <span className="absolute top-2 left-2 bg-blue-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Video</span>
+                </div>
+              ) : ex.image_url ? (
+                <img src={ex.image_url} alt={ex.name} className="w-full max-h-40 object-cover" />
+              ) : null}
               <div className="p-4">
                 <div className="flex items-start justify-between gap-2 mb-2">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                       {ex.type && <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${tc}`}>{ex.type}</span>}
                       {ex.favorite && <Star size={11} className="text-amber-400 fill-amber-400" />}
+                      {ex.video_url && !ex.image_url && (
+                        <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 uppercase">Video</span>
+                      )}
                     </div>
                     <p className="text-sm font-semibold text-white truncate">{ex.name}</p>
                     {ex.objective && <p className="text-[11px] text-zinc-400 truncate">{ex.objective}</p>}
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
+                    {ex.video_url && (
+                      <button onClick={() => setVideoModalExId(ex.id)} className="p-1 text-zinc-500 hover:text-blue-400 transition-colors" title="Reproducir video">
+                        <Play size={13} />
+                      </button>
+                    )}
                     <button onClick={() => toggleFavorite(ex)} className="p-1 text-zinc-500 hover:text-amber-400 transition-colors">
                       <Star size={13} className={ex.favorite ? "fill-amber-400 text-amber-400" : ""} />
                     </button>
@@ -202,8 +236,12 @@ export default function FieldLibraryPanel() {
                         </div>
                         {ex.last_used_at && <p className="text-[10px] text-zinc-600">Último uso: {moment(ex.last_used_at).format("DD/MM/YYYY")}</p>}
                         {ex.video_url && (
-                          <a href={ex.video_url} target="_blank" rel="noreferrer"
-                            className="text-[10px] text-blue-400 hover:text-blue-300">▶ Ver video</a>
+                          <button
+                            onClick={() => setVideoModalExId(ex.id)}
+                            className="flex items-center gap-1.5 text-[10px] text-blue-400 hover:text-blue-300 transition-colors"
+                          >
+                            <Play size={10} className="fill-blue-400" /> Reproducir video
+                          </button>
                         )}
                         {ex.notes && <p className="text-[10px] text-zinc-500 italic">{ex.notes}</p>}
                       </div>
@@ -219,6 +257,12 @@ export default function FieldLibraryPanel() {
           );
         })}
       </div>
+      {videoModalExId && (() => {
+        const ex = exercises.find(e => e.id === videoModalExId);
+        return ex?.video_url ? (
+          <VideoPreviewModal url={ex.video_url} title={ex.name} onClose={() => setVideoModalExId(null)} />
+        ) : null;
+      })()}
     </div>
   );
 }
