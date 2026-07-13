@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { Plus, ChevronDown, ChevronUp, Edit2, Trash2, Youtube, Users, FileText, X, Check, Upload, FileSpreadsheet, ExternalLink, Clock, Save, Trophy, SlidersHorizontal } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
@@ -239,6 +240,7 @@ function saveCompetitionTags(tags) {
 
 // ── MatchCard ─────────────────────────────────────────────────────────────────
 function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, competitions, competitionMap }) {
+  const navigate = useNavigate();
   const [expanded, setExpanded] = useState(false);
   const [matchData, setMatchData] = useState(match);
   const [editingCompetition, setEditingCompetition] = useState(false);
@@ -274,6 +276,13 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
   const rightName = isLocal ? match.rival : "Defensa y Justicia";
   const leftScore = isLocal ? match.our_score : match.rival_score;
   const rightScore = isLocal ? match.rival_score : match.our_score;
+  const detailBadges = [
+    match.squad_called?.length > 0 ? { label: "🟢 Convocatoria cargada", className: "bg-emerald-500/10 border-emerald-500/20 text-emerald-300" } : null,
+    match.match_logistics ? { label: "📋 Logística", className: "bg-blue-500/10 border-blue-500/20 text-blue-300" } : null,
+    match.squad_called?.length > 0 ? { label: "⏱ Minutos", className: "bg-yellow-500/10 border-yellow-500/20 text-yellow-300" } : null,
+    match.csv_url ? { label: "📡 GPS", className: "bg-green-500/10 border-green-500/20 text-green-300" } : null,
+    (match.match_video_url || match.match_plan_pdf_url) ? { label: "📹 Plan/Video", className: "bg-fuchsia-500/10 border-fuchsia-500/20 text-fuchsia-300" } : null,
+  ].filter(Boolean);
 
   return (
     <div className={`bg-gradient-to-r from-zinc-900 to-zinc-900/80 border border-zinc-800 border-l-4 ${borderClass} rounded-xl overflow-hidden shadow-lg shadow-black/20`}>
@@ -340,8 +349,24 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
         </div>
       </div>
 
+      {detailBadges.length > 0 && (
+        <div className="flex flex-wrap gap-2 border-t border-zinc-800/60 px-4 py-3">
+          {detailBadges.map((badge) => (
+            <span key={badge.label} className={`rounded-full border px-2.5 py-1 text-[10px] font-medium ${badge.className}`}>{badge.label}</span>
+          ))}
+        </div>
+      )}
+
       {expanded && (
         <div className="border-t border-zinc-800 p-4 space-y-5">
+          <div className="flex justify-end">
+            <button
+              onClick={(e) => { e.stopPropagation(); navigate(`/matches/${match.id}`); }}
+              className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs font-medium text-yellow-300 transition-colors hover:bg-yellow-500/20"
+            >
+              Ver detalles →
+            </button>
+          </div>
           <div className="bg-zinc-800/60 rounded-xl p-5">
             <div className="flex items-center justify-center gap-8">
               <div className="flex flex-col items-center gap-2">
