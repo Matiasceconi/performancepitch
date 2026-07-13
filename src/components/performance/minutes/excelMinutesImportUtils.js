@@ -89,14 +89,37 @@ function findRow(ws, label, fallback) {
   return fallback;
 }
 
+function closestRole(normalized) {
+  const valid = [
+    { role: "titular", label: "titular" },
+    { role: "suplente", label: "suplente" },
+    { role: "not_called", label: "no citado" },
+    { role: "not_called", label: "lesionado" },
+    { role: "not_called", label: "diferenciado" },
+    { role: "not_called", label: "enfermo" },
+  ];
+  const tokens = normalized.split(" ").filter(Boolean);
+  const candidates = [normalized, ...tokens];
+  let best = null;
+  candidates.forEach((candidate) => {
+    valid.forEach((item) => {
+      const distance = levenshtein(candidate, item.label);
+      if (!best || distance < best.distance) best = { ...item, distance, candidate };
+    });
+  });
+  return best && best.distance <= 2 ? best : null;
+}
+
 function interpretRole(rawRole, minutes) {
   const normalized = normalizeText(rawRole);
   const value = Number(minutes || 0);
   if (!normalized && value > 0) return { role: "pending", reason: "Rol vacío con minutos" };
   if (normalized.includes("expuls")) return { role: "pending", reason: "Expulsado requiere revisión" };
-  if (normalized.includes("titular")) return { role: "titular" };
-  if (normalized.includes("suplente")) return { role: "suplente" };
-  if (["no citado", "nocitado", "lesion", "diferenciado", "enfermo", "primera"].some((key) => normalized.includes(key))) return { role: "not_called" };
+  if (normalized.includes("titular")) return { role: "titular", role_normalized_from_typo: normalized !== "titular" };
+  if (normalized.includes("suplente")) return { role: "suplente", role_normalized_from_typo: normalized !== "suplente" };
+  if (["no citado", "nocitado", "lesion", "diferenciado", "enfermo", "primera"].some((key) => normalized.includes(key))) return { role: "not_called", role_normalized_from_typo: false };
+  const closest = closestRole(normalized);
+  if (closest) return { role: closest.role, role_normalized_from_typo: true, reason: `Normalizado desde ${rawRole}` };
   if (!normalized) return { role: "empty" };
   return { role: "pending", reason: "Estado no reconocido" };
 }
@@ -196,7 +219,7 @@ export async function simulateExcelImport(file, context, filters) {
       const comment = splitComment(rawRole);
       const combined = !!comment || normalizeText(rawRole).includes(" vs ") || normalizeText(rawRole).includes("amistoso");
       if (interpreted.role === "empty" && minutes == null) return;
-      records.push({ row, round: index + 1, excelName, rawRole, minutes, role: interpreted.role, reason: interpreted.reason || "", comment, combined });
+      records.push({ row, round: index + 1, excelName, rawRole, minutes, role: interpreted.role, reason: interpreted.reason || "", role_normalized_from_typo: !!interpreted.role_normalized_from_typo, comment, combined });
     });
   }
 
@@ -288,6 +311,7 @@ export function buildImportPlan(simulation, context, policy, conflictActions = {
       source: "excel_import",
       source_file: simulation.fileName,
       import_observation: record.comment || record.rawRole,
+      role_normalized_from_typo: !!record.role_normalized_from_typo,
     });
     minuteUpserts.push({
       id: existingMinute?.id,
@@ -319,6 +343,7 @@ export function buildImportPlan(simulation, context, policy, conflictActions = {
       source_file: simulation.fileName,
       entry_source: enteredMinute == null ? "excel" : "inferred_from_minutes",
       import_observation: record.comment || "",
+      role_normalized_from_typo: !!record.role_normalized_from_typo,
     });
     selectedByMatch[match.id] = selectedByMatch[match.id] || [];
     selectedByMatch[match.id].push({ player, role: record.role });

@@ -88,6 +88,11 @@
       "type": "string",
       "description": "Posici\u00f3n del jugador al momento de la convocatoria"
     },
+    "role_normalized_from_typo": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el rol fue normalizado desde una variante ortogr\u00e1fica"
+    },
     "import_batch_id": {
       "type": "string",
       "description": "ID del lote de importaci\u00f3n para auditor\u00eda y reversi\u00f3n"
