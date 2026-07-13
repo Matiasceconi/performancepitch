@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { Plus, Trash2, Edit2, X, Video, Image, ChevronDown, ChevronUp, BookOpen, Search, Sparkles, Loader2 } from "lucide-react";
+import { Plus, Trash2, Edit2, X, Image, ChevronDown, ChevronUp, BookOpen, Search, Sparkles, Loader2, Play } from "lucide-react";
 import ExerciseGPS from "@/components/sessions/ExerciseGPS";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
-import { fieldImportantChanged, syncToFieldLibrary } from "@/components/sessions/exerciseLibrarySync";
+import { fieldImportantChanged, syncToFieldLibrary, getVideoThumbnailUrl } from "@/components/sessions/exerciseLibrarySync";
 import ExerciseTypeSelector from "@/components/sessions/ExerciseTypeSelector";
 import { DEFAULT_FIELD_EXERCISE_TYPES, addFieldExerciseType, deleteFieldExerciseType, loadFieldExerciseTypes, renameFieldExerciseType } from "@/components/sessions/exerciseTypeOptions";
+import VideoUploadSection from "@/components/sessions/VideoUploadSection";
+import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
 
 const TYPE_COLORS = {
   "Activación": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
@@ -77,6 +79,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
   const [aiLoading, setAiLoading] = useState({ name: false, description: false, objective: false });
   const [updateLibraryToo, setUpdateLibraryToo] = useState(false);
   const [originalExercise, setOriginalExercise] = useState(null);
+  const [videoModalId, setVideoModalId] = useState(null);
   const { toast } = useToast();
 
   async function handleImageUpload(file) {
@@ -171,7 +174,7 @@ export default function SessionExercises({ session, sessionPlayers }) {
       objective: form.objective || undefined,
       description: form.description || undefined,
       image_url: form.image_url || undefined,
-      video_url: form.video_url || undefined,
+      video_url: form.video_url || null,
       notes: form.notes || undefined,
       tags: String(form.tags || "").split(",").map(t => t.trim()).filter(Boolean),
       library_exercise_id: form.library_exercise_id || undefined,
@@ -344,6 +347,7 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
         const tc = TYPE_COLORS[ex.type] || TYPE_COLORS["Otro"];
         const isExpanded = expanded[ex.id];
         const exEii = eiiInterpretation(ex.eii);
+        const videoThumb = ex.video_url ? getVideoThumbnailUrl(ex.video_url) : null;
         return (
           <div key={ex.id} className="bg-zinc-800/50 border border-zinc-700 rounded-xl overflow-hidden">
             {/* Card header — compacto */}
@@ -363,6 +367,9 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <p className="text-sm font-semibold text-white">{ex.name}</p>
                   <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${tc}`}>{ex.type}</span>
+                  {ex.video_url && (
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 uppercase">Video</span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3 flex-wrap text-[10px] text-zinc-400">
                   {ex.blocks != null && <span>Bloques: <strong className="text-zinc-200">{ex.blocks}</strong></span>}
@@ -378,10 +385,11 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
               {/* Actions */}
               <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
                 {ex.video_url && (
-                  <a href={ex.video_url} target="_blank" rel="noreferrer"
-                    className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-400 transition-colors">
-                    <Video size={13} />
-                  </a>
+                  <button onClick={() => setVideoModalId(ex.id)}
+                    className="p-1.5 rounded-lg text-zinc-500 hover:text-blue-400 transition-colors"
+                    title="Reproducir video">
+                    <Play size={13} />
+                  </button>
                 )}
                 <button onClick={() => toggleExpand(ex.id)}
                   className="p-1.5 rounded-lg text-zinc-500 hover:text-white transition-colors">
@@ -401,9 +409,29 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
             {/* Expanded details — detalle avanzado */}
             {isExpanded && (
               <div className="border-t border-zinc-700 p-4 space-y-3">
-                {ex.image_url && (
+                {/* Media: video > imagen > placeholder */}
+                {ex.video_url ? (
+                  <div
+                    className="relative rounded-lg overflow-hidden border border-zinc-700 group cursor-pointer"
+                    onClick={() => setVideoModalId(ex.id)}
+                  >
+                    {videoThumb ? (
+                      <img src={videoThumb} alt="miniatura de video" className="w-full max-h-48 object-cover" />
+                    ) : (
+                      <div className="w-full h-28 flex items-center justify-center bg-zinc-700">
+                        <Play size={24} className="text-zinc-500" />
+                      </div>
+                    )}
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
+                      <div className="w-11 h-11 rounded-full bg-white/20 border-2 border-white/50 flex items-center justify-center backdrop-blur-sm">
+                        <Play size={18} className="text-white fill-white ml-0.5" />
+                      </div>
+                    </div>
+                    <span className="absolute top-2 left-2 bg-blue-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Video</span>
+                  </div>
+                ) : ex.image_url ? (
                   <img src={ex.image_url} alt={ex.name} className="w-full max-h-56 object-cover rounded-lg" />
-                )}
+                ) : null}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
                   {ex.length_m && <div><p className="text-zinc-500">Largo</p><p className="text-white font-medium">{ex.length_m} m</p></div>}
                   {ex.width_m && <div><p className="text-zinc-500">Ancho</p><p className="text-white font-medium">{ex.width_m} m</p></div>}
@@ -420,6 +448,14 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
           </div>
         );
       })}
+
+      {/* Video modal for exercise cards */}
+      {videoModalId && (() => {
+        const ex = exercises.find(e => e.id === videoModalId);
+        return ex?.video_url ? (
+          <VideoPreviewModal url={ex.video_url} title={ex.name} onClose={() => setVideoModalId(null)} />
+        ) : null;
+      })()}
 
       {/* Form */}
       {showForm ? (
@@ -576,11 +612,10 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
                 </label>
               )}
             </div>
-            <div>
-              <label className="text-[10px] text-zinc-400 mb-1 block">URL video</label>
-              <input value={form.video_url} onChange={e => setF("video_url", e.target.value)} placeholder="https://youtube.com/..."
-                className="w-full bg-zinc-700 border border-zinc-600 rounded-lg px-3 py-2 text-xs text-white focus:outline-none" />
-            </div>
+            <VideoUploadSection
+              videoUrl={form.video_url}
+              onVideoUrl={(url) => setF("video_url", url || "")}
+            />
 
             {/* Observaciones avanzadas — oculto por defecto */}
             <div className="col-span-2">

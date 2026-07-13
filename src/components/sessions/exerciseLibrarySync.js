@@ -79,6 +79,12 @@ export async function syncToFieldLibrary(form, sessionId, squadId, squadName, op
       last_used_at: today,
     };
     if (!match.image_url && payload.image_url) matchUpdate.image_url = payload.image_url;
+    // Propagate video_url: always write if incoming has a value, or clear if explicitly removed
+    if (payload.video_url) {
+      matchUpdate.video_url = payload.video_url;
+    } else if (payload.video_url === undefined && form.video_url === "") {
+      matchUpdate.video_url = null;
+    }
     await base44.entities.FieldExerciseLibrary.update(match.id, matchUpdate);
     return match.id;
   }

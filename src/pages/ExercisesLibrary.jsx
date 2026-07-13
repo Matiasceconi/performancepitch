@@ -1,9 +1,12 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2, FileDown, ImagePlus } from "lucide-react";
+import { ChevronDown, ChevronUp, Upload, FileSpreadsheet, ExternalLink, X, Users, Maximize2, Clock, Target, Trash2, FileDown, ImagePlus, Play } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import moment from "moment";
 import "moment/locale/es";
+import VideoUploadSection from "@/components/sessions/VideoUploadSection";
+import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
+import { getVideoThumbnailUrl } from "@/components/sessions/exerciseLibrarySync";
 
 moment.locale("es");
 
@@ -380,10 +383,25 @@ function ExerciseCard({ exercise, session, onDelete }) {
   const [csvLabel, setCsvLabel] = useState(exercise.external_csv_label || null);
   const [csvRows, setCsvRows] = useState(null);
   const [imageUrl, setImageUrl] = useState(exercise.image_url || null);
+  const [videoUrl, setVideoUrl] = useState(exercise.video_url || null);
   const [category, setCategory] = useState(exercise.category || "");
+  const [showVideoModal, setShowVideoModal] = useState(false);
   const fileRef = useRef();
   const imgRef = useRef();
   const { toast } = useToast();
+
+  const videoThumb = videoUrl ? getVideoThumbnailUrl(videoUrl) : null;
+
+  async function handleVideoChange(newUrl) {
+    const value = newUrl || null;
+    try {
+      await base44.entities.FieldExercise.update(exercise.id, { video_url: value || null });
+      setVideoUrl(value);
+      toast({ title: value ? "Video guardado" : "Video eliminado" });
+    } catch {
+      toast({ title: "Error al actualizar video", variant: "destructive" });
+    }
+  }
 
   async function handleImageUpload(e) {
     const file = e.target.files?.[0];
@@ -455,6 +473,21 @@ function ExerciseCard({ exercise, session, onDelete }) {
         onClick={() => setOpen((v) => !v)}
         className="w-full flex items-center gap-3 p-4 hover:bg-zinc-800/30 transition-colors text-left"
       >
+        {/* Video / image thumbnail preview in header */}
+        {(videoUrl || imageUrl) && (
+          <div className="relative w-12 h-12 rounded-lg overflow-hidden shrink-0 border border-zinc-700 bg-zinc-800">
+            {videoUrl && videoThumb ? (
+              <img src={videoThumb} alt="" className="w-full h-full object-cover" />
+            ) : imageUrl ? (
+              <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+            ) : null}
+            {videoUrl && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <Play size={12} className="text-white fill-white" />
+              </div>
+            )}
+          </div>
+        )}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-white font-semibold text-sm">{exercise.name}</p>
@@ -462,6 +495,9 @@ function ExerciseCard({ exercise, session, onDelete }) {
               <span className={`text-xs px-2 py-0.5 rounded-full border font-medium ${CATEGORY_COLORS[category] || CATEGORY_COLORS["Otro"]}`}>
                 {category}
               </span>
+            )}
+            {videoUrl && (
+              <span className="text-[9px] font-bold px-1.5 py-0.5 rounded-full bg-blue-600/20 border border-blue-500/30 text-blue-300 uppercase">Video</span>
             )}
           </div>
           <div className="flex flex-wrap gap-3 mt-1 text-xs text-zinc-500">
@@ -481,6 +517,15 @@ function ExerciseCard({ exercise, session, onDelete }) {
         <div className="flex items-center gap-2 shrink-0">
           {csvUrl && (
             <span className="text-xs bg-green-900/40 text-green-400 border border-green-800/50 px-2 py-0.5 rounded-full">CSV</span>
+          )}
+          {videoUrl && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowVideoModal(true); }}
+              title="Reproducir video"
+              className="text-zinc-500 hover:text-blue-400 transition-colors p-1 rounded"
+            >
+              <Play size={14} />
+            </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); handleExportPdf(); }}
@@ -507,8 +552,27 @@ function ExerciseCard({ exercise, session, onDelete }) {
       {open && (
         <div className="border-t border-zinc-800 p-4 space-y-4">
 
-          {/* Imagen del ejercicio */}
-          {imageUrl ? (
+          {/* Media: video > imagen > placeholder */}
+          {videoUrl ? (
+            <div
+              className="relative rounded-lg overflow-hidden border border-zinc-800 group cursor-pointer"
+              onClick={() => setShowVideoModal(true)}
+            >
+              {videoThumb ? (
+                <img src={videoThumb} alt="Ejercicio" className="w-full max-h-64 object-cover" />
+              ) : (
+                <div className="w-full h-40 flex items-center justify-center bg-zinc-800">
+                  <Play size={28} className="text-zinc-600" />
+                </div>
+              )}
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
+                <div className="w-12 h-12 rounded-full bg-white/20 border-2 border-white/50 flex items-center justify-center backdrop-blur-sm">
+                  <Play size={20} className="text-white fill-white ml-0.5" />
+                </div>
+              </div>
+              <span className="absolute top-2 left-2 bg-blue-600/90 text-white text-[9px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wide">Video</span>
+            </div>
+          ) : imageUrl ? (
             <div className="relative group">
               <img src={imageUrl} alt="Ejercicio" className="w-full max-h-64 object-cover rounded-lg border border-zinc-800" />
               <label className="absolute bottom-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer">
@@ -528,6 +592,15 @@ function ExerciseCard({ exercise, session, onDelete }) {
               <input ref={imgRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" disabled={uploadingImg} />
             </label>
           )}
+
+          {/* Video management section */}
+          <div className="border border-zinc-800 rounded-lg p-3">
+            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-3">Video del ejercicio</p>
+            <VideoUploadSection
+              videoUrl={videoUrl || ""}
+              onVideoUrl={handleVideoChange}
+            />
+          </div>
 
           {/* Detalles del ejercicio */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -629,6 +702,9 @@ function ExerciseCard({ exercise, session, onDelete }) {
             )}
           </div>
         </div>
+      )}
+      {showVideoModal && videoUrl && (
+        <VideoPreviewModal url={videoUrl} title={exercise.name} onClose={() => setShowVideoModal(false)} />
       )}
     </div>
   );
