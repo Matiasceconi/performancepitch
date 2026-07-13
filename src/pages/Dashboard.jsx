@@ -38,6 +38,14 @@ const STATUS_CARD_COLORS = {
 };
 const DEFAULT_COLOR = { bg: "bg-zinc-800/40", border: "border-zinc-700", dot: "bg-zinc-500", text: "text-zinc-400" };
 function statusColor(s) { return STATUS_CARD_COLORS[s] || DEFAULT_COLOR; }
+function normalizeDashboardText(value) {
+  return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+}
+function latestRecordUpdate(...groups) {
+  const dates = groups.flat().map((row) => row?.updated_at || row?.updated_date || row?.sync_updated_at || row?.created_date).filter(Boolean).map((value) => new Date(value)).filter((date) => !Number.isNaN(date.getTime()));
+  if (!dates.length) return null;
+  return new Date(Math.max(...dates.map((date) => date.getTime())));
+}
 
 // ─── Error Boundary ────────────────────────────────────────────────────────
 class ErrorBoundary extends Component {
@@ -293,15 +301,27 @@ export default function Dashboard() {
 
       const match = squadEvents.find(e => (e.type === "Partido" || e.event_type === "Partido") && e.date >= today);
       setNextMatch(match || null);
-      if (match) setNextMatchReport(squadMatchReports.find(r => r.date === match.date) || null);
+      if (match) {
+        const matchRival = normalizeDashboardText(match.rival || match.title);
+        setNextMatchReport(
+          squadMatchReports.find(r => r.id === match.match_id) ||
+          squadMatchReports.find(r => r.date === match.date && normalizeDashboardText(r.rival).includes(matchRival)) ||
+          squadMatchReports.find(r => r.date === match.date) ||
+          null
+        );
+      } else {
+        setNextMatchReport(null);
+      }
 
       const pastMatches = squadEvents.filter(e => (e.type === "Partido" || e.event_type === "Partido") && e.date < today);
       setLastMatchEvent(pastMatches.length > 0 ? pastMatches[pastMatches.length - 1] : null);
 
-      setTodayEvents(todayEventsRaw.filter(filterBySquad));
-      setTomorrowEvents(tomorrowEventsRaw.filter(filterBySquad));
+      const filteredTodayEvents = todayEventsRaw.filter(filterBySquad);
+      const filteredTomorrowEvents = tomorrowEventsRaw.filter(filterBySquad);
+      setTodayEvents(filteredTodayEvents);
+      setTomorrowEvents(filteredTomorrowEvents);
 
-      setLastSync(new Date());
+      setLastSync(latestRecordUpdate(statuses, squadEvents, squadMatchReports, filteredTodayEvents, filteredTomorrowEvents));
     } catch (err) {
       if (!(err instanceof SyntaxError && err.message === "Unexpected end of input")) {
         console.error("Dashboard loadData error:", err);
@@ -536,6 +556,7 @@ export default function Dashboard() {
         activeSquad={activeSquad}
         mySquads={mySquads}
         setActiveSquad={setActiveSquad}
+        activeSeasonId={activeSeasonId}
         nextMatch={nextMatch}
         nextMatchReport={nextMatchReport}
         microcycleLabel={microcycleLabel}
@@ -547,7 +568,7 @@ export default function Dashboard() {
         {lastSync && (
           <p className="text-zinc-600 text-xs flex items-center gap-1">
             <Clock size={10} />
-            Actualizado: {moment(lastSync).format("HH:mm:ss")}
+            Último cambio registrado: {moment(lastSync).format("HH:mm")}
           </p>
         )}
         <button
@@ -582,9 +603,10 @@ export default function Dashboard() {
         byStatus={byStatus}
         subenA={subenA}
         subenReservaAPrimera={subenReservaAPrimera}
+        bajanA={bajanA}
+        convocadosOtraCategoria={byStatus.convocado || []}
         playerMap={playerMap}
         isGKFn={isGK}
-        squadName={squads.find(s => s.id === selectedSquadId)?.name}
       />
 
       {/* Cronograma del Día (o de mañana si hoy ya finalizó) */}

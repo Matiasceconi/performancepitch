@@ -14,8 +14,15 @@ const MICROCYCLE_COLORS = {
   "Libre": "bg-emerald-500/15 text-emerald-300 border-emerald-500/30",
 };
 
-export default function DashboardHeader({ activeSquad, mySquads, setActiveSquad, nextMatch, nextMatchReport, microcycleLabel }) {
+function seasonLabel(activeSquad, activeSeasonId) {
+  const raw = activeSquad?.season || activeSeasonId || "";
+  const match = String(raw).match(/20\d{2}/);
+  return match ? `Temporada ${match[0]}` : "";
+}
+
+export default function DashboardHeader({ activeSquad, activeSeasonId, mySquads, setActiveSquad, nextMatch, nextMatchReport, microcycleLabel }) {
   const microColor = MICROCYCLE_COLORS[microcycleLabel] || MICROCYCLE_COLORS["Libre"];
+  const season = seasonLabel(activeSquad, activeSeasonId);
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
       <div className="flex items-center gap-4">
@@ -29,14 +36,16 @@ export default function DashboardHeader({ activeSquad, mySquads, setActiveSquad,
         <div>
           <div className="flex items-center gap-2 flex-wrap">
             <h1 className="text-xl font-bold text-white tracking-tight">{activeSquad?.name || "Plantel"}</h1>
-            {activeSquad?.season && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-zinc-800 border border-zinc-700 text-zinc-400">
-                Temporada {activeSquad.season}
+            {season && (
+              <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-300">
+                {season}
               </span>
             )}
-            <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${microColor}`}>
-              {microcycleLabel}
-            </span>
+            {MICROCYCLE_COLORS[microcycleLabel] && (
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${microColor}`}>
+                {microcycleLabel}
+              </span>
+            )}
           </div>
           <p className="text-zinc-500 text-sm mt-1 capitalize">{moment().format("dddd D [de] MMMM, YYYY")}</p>
           {mySquads.length > 1 && (
