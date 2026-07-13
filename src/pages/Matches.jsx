@@ -367,14 +367,10 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
 // ── MatchForm ─────────────────────────────────────────────────────────────────
 const EMPTY = {
   squad_id: "", squad_name: "", season_id: "", calendar_event_id: "", date: "", match_time: "", match_venue: "", rival: "", rival_club_id: "", competition: "", competition_id: "", competition_stage: "", competition_round: "", group_name: "", matchday_number: "", phase_label: "", location: "Local",
-  our_score: "", rival_score: "", rival_formation: "",
-  rival_notes: "", set_pieces_notes: "",
-  video_analysis_url: "", video_set_pieces_url: "", video_extra_url: "",
-  match_video_url: "", match_plan_pdf_url: "",
-  squad_called: [], squad_names: [], notes: "", rival_logo_url: "",
+  our_score: "", rival_score: "", rival_logo_url: "",
 };
 
-function MatchForm({ initial, players, onSave, onCancel, competitions, squads, activeSquad, activeSeasonId, clubs, onClubCreated }) {
+function MatchForm({ initial, onSave, onCancel, competitions, squads, activeSquad, activeSeasonId, clubs, onClubCreated }) {
   const [form, setForm] = useState({ ...EMPTY, ...(initial || {}), squad_id: initial?.squad_id || activeSquad?.id || "", squad_name: initial?.squad_name || activeSquad?.name || "", season_id: initial?.season_id || activeSeasonId || "" });
   useEffect(() => {
     setForm({ ...EMPTY, ...(initial || {}), squad_id: initial?.squad_id || activeSquad?.id || "", squad_name: initial?.squad_name || activeSquad?.name || "", season_id: initial?.season_id || activeSeasonId || "" });
@@ -389,13 +385,6 @@ function MatchForm({ initial, players, onSave, onCancel, competitions, squads, a
     setForm((current) => ({ ...current, competition_id: value, competition: competition?.name || "", competition_stage: current.competition_stage || defaultPhase }));
   }
 
-  function togglePlayer(player) {
-    const already = form.squad_called.includes(player.id);
-    const name = player.full_name || player.name;
-    const newIds = already ? form.squad_called.filter(id => id !== player.id) : [...form.squad_called, player.id];
-    const newNames = already ? form.squad_names.filter(n => n !== name) : [...form.squad_names, name];
-    setForm(f => ({ ...f, squad_called: newIds, squad_names: newNames }));
-  }
 
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-xl p-5 space-y-4">
@@ -407,7 +396,8 @@ function MatchForm({ initial, players, onSave, onCancel, competitions, squads, a
             const squad = squads.find((item) => item.id === e.target.value);
             setForm((current) => ({ ...current, squad_id: squad?.id || "", squad_name: squad?.name || "", season_id: squad?.season || current.season_id || "" }));
           }}>
-            {activeSquad && <option value={activeSquad.id}>{activeSquad.name}</option>}
+            <option value="">Seleccionar plantel</option>
+            {squads.map((squad) => <option key={squad.id} value={squad.id}>{squad.name}</option>)}
           </select>
         </div>
         <div>
@@ -469,48 +459,6 @@ function MatchForm({ initial, players, onSave, onCancel, competitions, squads, a
           <input type="number" min="0" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" placeholder="—" value={form.rival_score} onChange={e => set("rival_score", e.target.value)} />
         </div>
         {form.rival_logo_url && <div className="col-span-2 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400"><img src={form.rival_logo_url} alt="Escudo rival" className="h-8 w-8 object-contain" /> Escudo vinculado desde el club rival</div>}
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-1 block">Formación del rival</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="4-3-3..." value={form.rival_formation} onChange={e => set("rival_formation", e.target.value)} />
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-1 block">Análisis del rival</label>
-          <textarea rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" value={form.rival_notes} onChange={e => set("rival_notes", e.target.value)} />
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-1 block">Pelota parada</label>
-          <textarea rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500 resize-none" value={form.set_pieces_notes} onChange={e => set("set_pieces_notes", e.target.value)} />
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-1 block">YouTube — Análisis</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://youtube.com/..." value={form.video_analysis_url} onChange={e => set("video_analysis_url", e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs text-zinc-400 mb-1 block">YouTube — Pelota parada</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://youtube.com/..." value={form.video_set_pieces_url} onChange={e => set("video_set_pieces_url", e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs text-zinc-400 mb-1 block">YouTube — Video adicional</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://youtube.com/..." value={form.video_extra_url} onChange={e => set("video_extra_url", e.target.value)} />
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-2 block">Convocados</label>
-          <div className="flex flex-wrap gap-2 max-h-48 overflow-y-auto">
-            {players.map(p => {
-              const selected = form.squad_called.includes(p.id);
-              return (
-                <button key={p.id} type="button" onClick={() => togglePlayer(p)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all border ${selected ? "bg-yellow-500/20 border-yellow-500/50 text-yellow-300" : "bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-white"}`}>
-                  #{p.jersey_number || p.number} {p.full_name || p.name}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-1 block">Notas generales</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" value={form.notes} onChange={e => set("notes", e.target.value)} />
-        </div>
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center gap-1"><X size={14} /> Cancelar</button>
@@ -720,7 +668,6 @@ export default function Matches() {
       {showForm && (
         <MatchForm
           initial={editing}
-          players={players}
           onSave={save}
           onCancel={() => { setShowForm(false); setEditing(null); }}
           competitions={competitions}

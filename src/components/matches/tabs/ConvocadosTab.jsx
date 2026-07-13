@@ -7,7 +7,7 @@ import { AlertTriangle, Download, FileText, LayoutGrid, List, RefreshCw, Save, S
 import { base44 } from "@/api/base44Client";
 import TransparentPlayerPhoto from "@/components/player/PlayerPhoto";
 import { useToast } from "@/components/ui/use-toast";
-import { buildNameVariants, getPlayerName, getPlayerNumber, getPositionGroup, isUnavailableStatus, loadMatchCallupState, normalizeText, saveMatchCallups } from "@/lib/matchCallupUtils";
+import { buildNameVariants, getPlayerName, getPlayerNumber, getPlayerSquadLabel, getPositionGroup, isUnavailableStatus, loadMatchCallupState, matchDetectedPlayers, normalizeText, saveMatchCallups } from "@/lib/matchCallupUtils";
 
 const GROUPS = ["Arquero", "Defensor", "Mediocampista", "Delantero", "Sin categoría"];
 const EXPORT_SIZES = {
@@ -43,6 +43,8 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
   const [search, setSearch] = useState("");
   const [positionFilter, setPositionFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [squadFilter, setSquadFilter] = useState("match");
+  const [squadOptions, setSquadOptions] = useState([]);
   const [viewMode, setViewMode] = useState("cards");
   const [saving, setSaving] = useState(false);
   const [dirty, setDirty] = useState(false);
@@ -52,6 +54,9 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
   const [importOpen, setImportOpen] = useState(false);
   const [importText, setImportText] = useState("");
   const [importSummary, setImportSummary] = useState(null);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiReview, setAiReview] = useState(null);
+  const [importMode, setImportMode] = useState("replace");
 
   async function reload() {
     setLoadingPlayers(true);
@@ -66,6 +71,7 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
       setSavedCallups(state.savedCallups);
       setAllCallups(state.allCallups);
       setSelectedPlayerIds(state.selectedPlayerIds);
+      setSquadOptions(state.squadOptions || []);
       setLinkedMinutes(minutesRows || []);
       setDirty(false);
     } catch (error) {
@@ -83,10 +89,12 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
     const status = normalizeText(player.status || "sin estado");
     const position = getPositionGroup(player.position);
     if (search && !name.includes(normalizeText(search))) return false;
+    if (squadFilter === "match" && match.squad_id && player.origin_squad_id !== match.squad_id) return false;
+    if (squadFilter !== "all" && squadFilter !== "match" && player.origin_squad_name !== squadFilter && player.origin_squad_id !== squadFilter) return false;
     if (positionFilter !== "all" && position !== positionFilter) return false;
     if (statusFilter !== "all" && status !== statusFilter) return false;
     return true;
-  }), [availablePlayers, positionFilter, search, statusFilter]);
+  }), [availablePlayers, match.squad_id, positionFilter, search, squadFilter, statusFilter]);
 
   const groupedPlayers = useMemo(() => {
     const groups = Object.fromEntries(GROUPS.map((group) => [group, []]));
@@ -108,7 +116,7 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
     }
     setSaving(true);
     try {
-      const state = await saveMatchCallups({ match, selectedPlayerIds, availablePlayers, allCallups });
+      const state = await saveMatchCallups({ match, selectedPlayerIds, availablePlayers, allCallups, replaceMissing: true });
       setAvailablePlayers(state.availablePlayers);
       setSavedCallups(state.savedCallups);
       setAllCallups(state.allCallups);
@@ -139,8 +147,28 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
   }
 
   function selectAvailable() {
-    setSelectedPlayerIds(availablePlayers.filter((player) => !isUnavailableStatus(player.status)).map((player) => player.id));
+    setSelectedPlayerIds(visiblePlayers.filter((player) => !isUnavailableStatus(player.status)).map((player) => player.id));
     setDirty(true);
+  }
+
+  async function analyzeImportFile(file) {
+    if (!file) return;
+    setAnalyzing(true);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const result = await base44.integrations.Core.InvokeLLM({
+        file_urls: [file_url],
+        prompt: "Analizá esta planilla/imagen/PDF de formación de fútbol. Extraé rival, club, fecha, horario, lugar, sistema táctico, titulares y suplentes. Para cada jugador devolvé número de camiseta, nombre completo leído, rol titular/suplente y ubicación aproximada si aparece. No inventes jugadores.",
+        response_json_schema: { type: "object", properties: { club: { type: "string" }, rival: { type: "string" }, date: { type: "string" }, time: { type: "string" }, venue: { type: "string" }, system: { type: "string" }, players: { type: "array", items: { type: "object", properties: { number: { type: "number" }, name: { type: "string" }, role: { type: "string" }, detected_position: { type: "string" } } } } } },
+      });
+      const rows = matchDetectedPlayers((result.players || []).map((row) => ({ shirt_number: row.number, name: row.name, lineup_role: normalizeText(row.role).includes("titular") ? "titular" : "suplente", detected_position: row.detected_position || "" })), availablePlayers);
+      setAiReview({ metadata: result, rows, source_file: file_url });
+      setImportSummary({ convocados: rows.length, titulares: rows.filter((row) => row.lineup_role === "titular").length, suplentes: rows.filter((row) => row.lineup_role === "suplente").length });
+    } catch (error) {
+      toast({ title: error.message || "No se pudo analizar el archivo", variant: "destructive" });
+    } finally {
+      setAnalyzing(false);
+    }
   }
 
   function loadImportFile(file) {
@@ -152,15 +180,51 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
   function applyAiImport() {
     const normalizedText = normalizeText(importText);
     if (!normalizedText) return toast({ title: "Pegá o cargá un texto para importar", variant: "destructive" });
-    const detected = new Set();
+    const detectedRows = [];
     availablePlayers.forEach((player) => {
-      if (buildNameVariants(player).some((variant) => variant && normalizedText.includes(variant))) detected.add(player.id);
+      if (buildNameVariants(player).some((variant) => variant && normalizedText.includes(variant))) detectedRows.push({ shirt_number: Number(getPlayerNumber(player)) || null, name: getPlayerName(player), lineup_role: "suplente", detected_position: "" });
     });
-    if (!detected.size) return toast({ title: "No se detectaron jugadores en el texto", variant: "destructive" });
-    setSelectedPlayerIds(Array.from(detected));
-    setDirty(true);
-    setImportSummary({ convocados: detected.size });
-    toast({ title: `Importación aplicada: ${detected.size} convocados detectados` });
+    if (!detectedRows.length) return toast({ title: "No se detectaron jugadores en el texto", variant: "destructive" });
+    const rows = matchDetectedPlayers(detectedRows, availablePlayers);
+    setAiReview({ metadata: {}, rows, source_file: "texto pegado" });
+    setImportSummary({ convocados: rows.length, titulares: 0, suplentes: rows.length });
+  }
+
+  function updateReviewMatch(index, playerId) {
+    setAiReview((current) => {
+      const rows = [...(current?.rows || [])];
+      const player = availablePlayers.find((item) => item.id === playerId) || null;
+      rows[index] = { ...rows[index], matchedPlayerId: playerId, matchedPlayer: player, confidence: player ? 1 : 0, group: player ? "matched" : "missing" };
+      return { ...current, rows };
+    });
+  }
+
+  async function confirmAiImport() {
+    const rows = (aiReview?.rows || []).filter((row) => row.matchedPlayerId);
+    if (!rows.length) return toast({ title: "No hay jugadores relacionados para importar", variant: "destructive" });
+    setSaving(true);
+    try {
+      const ids = importMode === "replace" ? rows.map((row) => row.matchedPlayerId) : Array.from(new Set([...selectedPlayerIds, ...rows.map((row) => row.matchedPlayerId)]));
+      const metaByPlayer = {};
+      rows.forEach((row) => { metaByPlayer[row.matchedPlayerId] = { lineup_role: row.lineup_role, shirt_number: row.shirt_number, source: "ai_import", source_file: aiReview.source_file, confidence: row.confidence, detected_name: row.name, detected_position: row.detected_position }; });
+      const state = await saveMatchCallups({ match, selectedPlayerIds: ids, availablePlayers, allCallups, metaByPlayer, replaceMissing: importMode === "replace" });
+      setAvailablePlayers(state.availablePlayers);
+      setSavedCallups(state.savedCallups);
+      setAllCallups(state.allCallups);
+      setSelectedPlayerIds(state.selectedPlayerIds);
+      setDirty(false);
+      setImportOpen(false);
+      setAiReview(null);
+      onMatchUpdated?.({ squad_called: state.selectedPlayerIds, squad_names: state.selectedPlayerIds.map((id) => getPlayerName(state.playerMap.get(id))).filter(Boolean) });
+      onCallupsUpdated?.();
+      const titulares = rows.filter((row) => row.lineup_role === "titular").length;
+      const suplentes = rows.filter((row) => row.lineup_role === "suplente").length;
+      toast({ title: `Importación completada: ${rows.length} convocados, ${titulares} titulares y ${suplentes} suplentes.` });
+    } catch (error) {
+      toast({ title: error.message || "No se pudo confirmar la importación", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function exportImage() {
@@ -215,6 +279,7 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
         <div className="mt-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
             <div className="relative min-w-[220px]"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar jugador" className="w-full rounded-lg border border-zinc-700 bg-zinc-950 py-2 pl-9 pr-3 text-sm text-white outline-none transition focus:border-yellow-500" /></div>
+            <select value={squadFilter} onChange={(e) => setSquadFilter(e.target.value)} className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition focus:border-yellow-500"><option value="match">Plantel del partido</option><option value="all">Todos los planteles</option>{squadOptions.map((option) => <option key={option.id || option.name} value={option.id || option.name}>{option.name}</option>)}</select>
             <select value={positionFilter} onChange={(e) => setPositionFilter(e.target.value)} className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition focus:border-yellow-500"><option value="all">Todas las posiciones</option>{GROUPS.map((group) => <option key={group} value={group}>{group}</option>)}</select>
             <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-white outline-none transition focus:border-yellow-500"><option value="all">Todos los estados</option>{distinctStatuses.map((status) => <option key={status} value={status}>{status}</option>)}</select>
           </div>
@@ -229,13 +294,13 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
         <div className="space-y-4">{Object.entries(groupedPlayers).map(([group, groupPlayers]) => <PlayerGroup key={group} group={group} players={groupPlayers} selectedSet={selectedSet} onToggle={togglePlayer} />)}</div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-          <div className="grid grid-cols-[52px_1.4fr_1fr_80px_150px] gap-3 border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500"><span /><span>Jugador</span><span>Posición</span><span>N°</span><span>Estado</span></div>
+          <div className="grid grid-cols-[52px_1.4fr_1fr_80px_150px] gap-3 border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500"><span /><span>Jugador</span><span>Posición / plantel</span><span>N°</span><span>Estado</span></div>
           {visiblePlayers.length === 0 ? <div className="px-4 py-8 text-center text-sm text-zinc-500">Todavía no seleccionaste convocados o el filtro no tiene resultados.</div> : visiblePlayers.map((player) => <PlayerListRow key={player.id} player={player} checked={selectedSet.has(player.id)} onToggle={() => togglePlayer(player)} />)}
         </div>
       )}
 
       {exportOpen && <ExportModal match={match} exportFormat={exportFormat} setExportFormat={setExportFormat} onClose={() => setExportOpen(false)} onExportImage={exportImage} onExportPdf={exportPdf} previewRef={previewRef} countByGroup={countByGroup} />}
-      {importOpen && <ImportModal importText={importText} setImportText={setImportText} loadImportFile={loadImportFile} importSummary={importSummary} onClose={() => setImportOpen(false)} onApply={applyAiImport} />}
+      {importOpen && <ImportModal importText={importText} setImportText={setImportText} loadImportFile={loadImportFile} analyzeImportFile={analyzeImportFile} analyzing={analyzing} importSummary={importSummary} aiReview={aiReview} clearReview={() => setAiReview(null)} match={match} availablePlayers={availablePlayers} importMode={importMode} setImportMode={setImportMode} updateReviewMatch={updateReviewMatch} onClose={() => setImportOpen(false)} onApply={applyAiImport} onConfirm={confirmAiImport} />}
     </div>
   );
 }
@@ -249,7 +314,7 @@ function PlayerGroup({ group, players, selectedSet, onToggle }) {
 }
 
 function PlayerCard({ player, checked, onToggle }) {
-  return <button onClick={onToggle} className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${checked ? "border-yellow-500/40 bg-yellow-500/10" : "border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900"}`}><input type="checkbox" checked={checked} readOnly className="h-4 w-4 accent-yellow-500" /><TransparentPlayerPhoto player={player} className="h-12 w-12 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-sm font-bold text-zinc-400" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="truncate text-sm font-semibold text-white">{getPlayerName(player)}</p><p className="text-xs text-zinc-500">{player.position || "Sin posición"}</p></div><div className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300">#{getPlayerNumber(player)}</div></div><span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[11px] ${getStatusClass(player.status)}`}>{player.status || "Sin estado"}</span>{isUnavailableStatus(player.status) && <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-orange-300"><AlertTriangle size={11} /> advertencia</span>}</div></button>;
+  return <button onClick={onToggle} className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${checked ? "border-yellow-500/40 bg-yellow-500/10" : "border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900"}`}><input type="checkbox" checked={checked} readOnly className="h-4 w-4 accent-yellow-500" /><TransparentPlayerPhoto player={player} className="h-12 w-12 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-sm font-bold text-zinc-400" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="truncate text-sm font-semibold text-white">{getPlayerName(player)}</p><p className="text-xs text-zinc-500">{player.position || "Sin posición"} · {getPlayerSquadLabel(player)}</p></div><div className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300">#{getPlayerNumber(player)}</div></div><span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[11px] ${getStatusClass(player.status)}`}>{player.status || "Sin estado"}</span>{isUnavailableStatus(player.status) && <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-orange-300"><AlertTriangle size={11} /> advertencia</span>}</div></button>;
 }
 
 function PlayerListRow({ player, checked, onToggle }) {
@@ -260,6 +325,13 @@ function ExportModal({ match, exportFormat, setExportFormat, onClose, onExportIm
   return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="max-h-[92vh] w-full max-w-6xl overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl shadow-black/40"><div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between"><div><h3 className="text-lg font-semibold text-white">Previsualización de convocatoria</h3><p className="text-sm text-zinc-500">Exportá en formato WhatsApp, Story o PDF.</p></div><div className="flex flex-wrap gap-2">{Object.entries(EXPORT_SIZES).map(([key, option]) => <button key={key} onClick={() => setExportFormat(key)} className={`rounded-lg px-3 py-2 text-xs transition ${exportFormat === key ? "bg-yellow-500 text-zinc-950" : "border border-zinc-700 bg-zinc-900 text-zinc-300 hover:bg-zinc-800"}`}>{option.label}</button>)}<button onClick={onExportImage} className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs text-yellow-300 transition hover:bg-yellow-500/20">Descargar imagen</button><button onClick={onExportPdf} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"><FileText size={13} className="mr-1 inline" /> PDF</button><button onClick={onClose} className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800">Cerrar</button></div></div><div className="overflow-auto rounded-2xl border border-zinc-800 bg-black/30 p-4"><div ref={previewRef} className={`mx-auto overflow-hidden rounded-[28px] border border-yellow-500/20 bg-zinc-950 shadow-2xl shadow-black/50 ${exportFormat === "story" ? "w-[360px] min-h-[640px]" : "w-[360px] min-h-[450px]"}`}><div className="border-b border-zinc-800 bg-gradient-to-br from-yellow-500/20 via-zinc-950 to-zinc-950 px-6 py-6"><p className="text-[11px] uppercase tracking-[0.3em] text-yellow-300">PerformancePitch</p><h4 className="mt-2 text-2xl font-black text-white">Convocatoria oficial</h4><div className="mt-4 flex flex-wrap gap-2 text-[11px] text-zinc-300"><span className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1">vs {match.rival}</span><span className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1">{moment(match.date).format("DD/MM/YYYY")}</span>{match.squad_name && <span className="rounded-full border border-zinc-700 bg-zinc-900/80 px-3 py-1">{match.squad_name}</span>}</div></div><div className="space-y-4 px-6 py-6">{Object.entries(countByGroup).filter(([, players]) => players.length > 0).map(([group, players]) => <div key={group} className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4"><div className="mb-3 flex items-center justify-between"><p className="text-sm font-semibold text-white">{group}</p><span className="text-xs text-zinc-500">{players.length}</span></div><div className="grid grid-cols-2 gap-2 text-sm text-zinc-200">{players.map((player) => <div key={player.id} className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/70 px-3 py-2"><span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-yellow-500/10 text-xs font-black text-yellow-300">{getPlayerNumber(player)}</span><span className="truncate">{getPlayerName(player)}</span></div>)}</div></div>)}</div></div></div></div></div>;
 }
 
-function ImportModal({ importText, setImportText, loadImportFile, importSummary, onClose, onApply }) {
-  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl shadow-black/40"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-lg font-semibold text-white">Importar convocatoria con IA</h3><p className="text-sm text-zinc-500">Pegá el texto o subí un archivo para buscar jugadores por nombre.</p></div><button onClick={onClose} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition hover:bg-zinc-900">Cerrar</button></div><div className="space-y-3"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"><Upload size={13} /> Cargar archivo<input type="file" accept=".txt,.csv,.md,.doc,.docx" className="hidden" onChange={(e) => e.target.files?.[0] && loadImportFile(e.target.files[0])} /></label><textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={12} className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-4 text-sm text-white outline-none transition focus:border-yellow-500" />{importSummary && <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-200">Detectados: {importSummary.convocados} convocados.</div>}<div className="flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-900">Cancelar</button><button onClick={onApply} className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-yellow-400">Aplicar importación</button></div></div></div></div>;
+function ImportModal({ importText, setImportText, loadImportFile, analyzeImportFile, analyzing, importSummary, aiReview, clearReview, match, availablePlayers, importMode, setImportMode, updateReviewMatch, onClose, onApply, onConfirm }) {
+  const metadata = aiReview?.metadata || {};
+  const warning = aiReview && ((metadata.rival && match.rival && !normalizeText(metadata.rival).includes(normalizeText(match.rival)) && !normalizeText(match.rival).includes(normalizeText(metadata.rival))) || (metadata.date && match.date && normalizeText(metadata.date) !== normalizeText(match.date)));
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"><div className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl shadow-black/40"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-lg font-semibold text-white">Importar convocatoria con IA</h3><p className="text-sm text-zinc-500">Subí PDF/JPG/PNG o pegá texto. Nada se guarda hasta confirmar.</p></div><button onClick={onClose} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-xs text-zinc-300 transition hover:bg-zinc-900">Cerrar</button></div><div className="space-y-4"><div className="flex flex-wrap gap-2"><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"><Upload size={13} /> {analyzing ? "Analizando…" : "Subir PDF/JPG/PNG"}<input type="file" accept=".pdf,image/png,image/jpeg" className="hidden" disabled={analyzing} onChange={(e) => e.target.files?.[0] && analyzeImportFile(e.target.files[0])} /></label><label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs text-zinc-300 transition hover:bg-zinc-800"><Upload size={13} /> Cargar texto<input type="file" accept=".txt,.csv,.md" className="hidden" onChange={(e) => e.target.files?.[0] && loadImportFile(e.target.files[0])} /></label></div><textarea value={importText} onChange={(e) => setImportText(e.target.value)} rows={5} placeholder="También podés pegar texto de una formación..." className="w-full rounded-xl border border-zinc-700 bg-zinc-900 p-4 text-sm text-white outline-none transition focus:border-yellow-500" />{!aiReview && <div className="flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-900">Cancelar</button><button onClick={onApply} className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-yellow-400">Analizar texto</button></div>}{aiReview && <div className="space-y-4"><div className="grid grid-cols-2 gap-2 rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-xs text-zinc-300 md:grid-cols-5"><span>Rival: <b className="text-white">{metadata.rival || "—"}</b></span><span>Fecha: <b className="text-white">{metadata.date || "—"}</b></span><span>Hora: <b className="text-white">{metadata.time || "—"}</b></span><span>Lugar: <b className="text-white">{metadata.venue || "—"}</b></span><span>Sistema: <b className="text-white">{metadata.system || "—"}</b></span></div>{warning && <div className="rounded-xl border border-orange-500/30 bg-orange-500/10 p-3 text-sm text-orange-200">El archivo corresponde a {metadata.rival || "otro rival"} — {metadata.date || "sin fecha"}, pero el partido abierto es contra {match.rival} — {match.date}. Confirmá explícitamente si querés continuar de todas formas.</div>}{importSummary && <div className="rounded-xl border border-blue-500/20 bg-blue-500/10 px-4 py-3 text-sm text-blue-200">Detectados: {importSummary.convocados} convocados · {importSummary.titulares} titulares · {importSummary.suplentes} suplentes.</div>}<div className="flex gap-2 text-xs"><button onClick={() => setImportMode("replace")} className={`rounded-lg px-3 py-2 ${importMode === "replace" ? "bg-yellow-500 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>Reemplazar convocatoria actual</button><button onClick={() => setImportMode("combine")} className={`rounded-lg px-3 py-2 ${importMode === "combine" ? "bg-yellow-500 text-zinc-950" : "border border-zinc-700 text-zinc-300"}`}>Combinar con actual</button></div><ReviewTable rows={aiReview.rows} players={availablePlayers} updateReviewMatch={updateReviewMatch} /><div className="flex justify-end gap-2"><button onClick={onClose} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-900">Cancelar</button><button onClick={() => { setImportText(""); clearReview?.(); }} className="rounded-lg border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:bg-zinc-900">Volver a analizar</button><button onClick={onConfirm} className="rounded-lg bg-yellow-500 px-4 py-2 text-sm font-semibold text-zinc-950 transition hover:bg-yellow-400">Confirmar importación</button></div></div>}</div></div></div>;
+}
+
+function ReviewTable({ rows, players, updateReviewMatch }) {
+  const sections = [{ key: "matched", title: "Relacionados correctamente", color: "text-emerald-300" }, { key: "review", title: "Coincidencia dudosa", color: "text-yellow-300" }, { key: "missing", title: "No encontrados", color: "text-red-300" }];
+  return <div className="space-y-3">{sections.map((section) => { const items = rows.map((row, index) => ({ ...row, index })).filter((row) => row.group === section.key); return <div key={section.key} className="rounded-xl border border-zinc-800 bg-zinc-900 p-3"><h4 className={`mb-2 text-sm font-semibold ${section.color}`}>{section.title} · {items.length}</h4><div className="space-y-2">{items.length === 0 ? <p className="text-xs text-zinc-500">Sin jugadores en este grupo.</p> : items.map((row) => <div key={`${row.index}-${row.name}`} className="grid grid-cols-1 gap-2 rounded-lg border border-zinc-800 bg-zinc-950 p-2 text-xs md:grid-cols-[70px_1fr_1fr_120px]"><div className="font-bold text-white">#{row.shirt_number || "—"}</div><div><p className="text-white">{row.name}</p><p className="text-zinc-500">{row.lineup_role}</p></div><div className="flex items-center gap-2"><TransparentPlayerPhoto player={row.matchedPlayer} className="h-8 w-8 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-xs text-zinc-400" /><select value={row.matchedPlayerId || ""} onChange={(e) => updateReviewMatch(row.index, e.target.value)} className="min-w-0 flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-white"><option value="">No encontrado</option>{players.map((player) => <option key={player.id} value={player.id}>{getPlayerName(player)} · {getPlayerSquadLabel(player)}</option>)}</select></div><div className="text-zinc-400">Confianza: {Math.round((row.confidence || 0) * 100)}%</div></div>)}</div></div>; })}</div>;
 }

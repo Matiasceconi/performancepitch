@@ -44,13 +44,7 @@ const EMPTY_FORM = {
   location: "Local",
   our_score: "",
   rival_score: "",
-  rival_notes: "",
-  set_pieces_notes: "",
-  video_analysis_url: "",
-  video_set_pieces_url: "",
-  video_extra_url: "",
-  match_video_url: "",
-  notes: "",
+
 };
 
 function LogoAvatar({ src, alt, club = false }) {
@@ -173,9 +167,6 @@ function MatchEditModal({ open, match, competitions, squads, activeSeasonId, onC
           <Field label="Rival *">
             <input className="input-dark" value={form.rival || ""} onChange={(e) => setField("rival", e.target.value)} />
           </Field>
-          <Field label="Escudo rival URL">
-            <input className="input-dark" value={form.rival_logo_url || ""} onChange={(e) => setField("rival_logo_url", e.target.value)} />
-          </Field>
           <Field label="Fecha *">
             <input type="date" className="input-dark" value={form.date || ""} onChange={(e) => setField("date", e.target.value)} />
           </Field>
@@ -226,15 +217,7 @@ function MatchEditModal({ open, match, competitions, squads, activeSeasonId, onC
           <Field label="Etiqueta de fase" className="md:col-span-2">
             <input className="input-dark" value={form.phase_label || ""} onChange={(e) => setField("phase_label", e.target.value)} />
           </Field>
-          <Field label="Análisis del rival" className="md:col-span-2">
-            <textarea rows={4} className="input-dark min-h-[110px] resize-none" value={form.rival_notes || ""} onChange={(e) => setField("rival_notes", e.target.value)} />
-          </Field>
-          <Field label="Pelota parada" className="md:col-span-2">
-            <textarea rows={3} className="input-dark min-h-[88px] resize-none" value={form.set_pieces_notes || ""} onChange={(e) => setField("set_pieces_notes", e.target.value)} />
-          </Field>
-          <Field label="Notas generales" className="md:col-span-2">
-            <textarea rows={3} className="input-dark min-h-[88px] resize-none" value={form.notes || ""} onChange={(e) => setField("notes", e.target.value)} />
-          </Field>
+
         </div>
 
         <div className="flex justify-end gap-2 border-t border-zinc-800 px-5 py-4">

@@ -28,9 +28,53 @@
       "default": "convocado",
       "description": "Estado de la convocatoria"
     },
+    "callup_status": {
+      "type": "string",
+      "enum": [
+        "convocado",
+        "desconvocado",
+        "pendiente"
+      ],
+      "default": "convocado",
+      "description": "Estado expl\u00edcito de convocatoria"
+    },
     "callup_key": {
       "type": "string",
       "description": "Clave l\u00f3gica \u00fanica match_id:player_id para evitar duplicados"
+    },
+    "lineup_role": {
+      "type": "string",
+      "enum": [
+        "titular",
+        "suplente",
+        "pendiente"
+      ],
+      "default": "pendiente",
+      "description": "Rol en la formaci\u00f3n: titular o suplente"
+    },
+    "shirt_number": {
+      "type": "number",
+      "description": "N\u00famero de camiseta detectado o asignado para el partido"
+    },
+    "source": {
+      "type": "string",
+      "description": "Origen de la convocatoria: manual, ai_import"
+    },
+    "source_file": {
+      "type": "string",
+      "description": "Archivo fuente utilizado para importar la convocatoria"
+    },
+    "confidence": {
+      "type": "number",
+      "description": "Confianza de la coincidencia IA 0-1"
+    },
+    "detected_name": {
+      "type": "string",
+      "description": "Nombre le\u00eddo por IA en el archivo"
+    },
+    "detected_position": {
+      "type": "string",
+      "description": "Ubicaci\u00f3n aproximada en campo detectada por IA"
     },
     "player_name": {
       "type": "string",

@@ -2,6 +2,22 @@
   "name": "Player",
   "type": "object",
   "properties": {
+    "club_id": {
+      "type": "string",
+      "description": "ID del club propietario del jugador"
+    },
+    "club_name": {
+      "type": "string",
+      "description": "Nombre del club propietario"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel principal actual"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel principal actual"
+    },
     "dni": {
       "type": "string",
       "description": "DNI \u00fanico del jugador \u2014 identificador estable"
