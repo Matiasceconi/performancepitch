@@ -11,6 +11,8 @@ import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
 import ScheduleExportView from "@/components/schedule/ScheduleExportView";
 import { findPlanDay } from "@/components/planning/microcycleSync";
 import { getLogoForRival } from "@/lib/match-utils";
+import RivalClubSearch from "@/components/clubs/RivalClubSearch";
+import { isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
 
 moment.locale("es");
 
@@ -28,7 +30,7 @@ const COLOR_MAP = {
 const COLORS = ["blue","green","yellow","orange","red","purple","pink","cyan"];
 const COLOR_LABELS = { blue:"Azul", green:"Verde", yellow:"Amarillo", orange:"Naranja", red:"Rojo", purple:"Violeta", pink:"Rosa", cyan:"Celeste" };
 
-const EMPTY_FORM = { date: "", time: "", start_time: "", end_time: "", title: "", type: "", event_type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival: "", home_away: "", rival_logo_url: "" };
+const EMPTY_FORM = { date: "", time: "", start_time: "", end_time: "", title: "", type: "", event_type: "", duration_minutes: "", location: "", notes: "", color: "blue", rival: "", rival_club_id: "", home_away: "", rival_logo_url: "", competition: "", competition_id: "", competition_stage: "", competition_round: "", matchday_number: "", phase_label: "", match_id: "" };
 
 const DAY_NAMES_ES = ["Dom","Lun","Mar","Mié","Jue","Vie","Sáb"];
 const DAY_NAMES_FULL = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -381,7 +383,7 @@ function EventCard({ event, onEdit, onDelete, onCopy, onMoveUp, onMoveDown }) {
 }
 
 // ── EventModal ──
-function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
+function EventModal({ open, onClose, onSave, initial, copyData, defaultDate, clubs, onClubCreated }) {
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [showTemplateManager, setShowTemplateManager] = useState(false);
@@ -495,7 +497,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate }) {
             {((form.event_type || form.type) === "Partido" || form.type === "Jornada de Juveniles") && (
               <div className="col-span-2 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <div><label className="text-xs text-zinc-400 mb-1 block">Rival</label><div className="flex items-center gap-2">{(form.rival_logo_url || getLogoForRival(form.rival)) && <img src={form.rival_logo_url || getLogoForRival(form.rival)} alt="Escudo" className="w-6 h-6 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} />}<input className="flex-1 bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Ej: River" value={form.rival || ""} onChange={(e) => { const val = e.target.value; const autoLogo = getLogoForRival(val); setForm((f) => ({ ...f, rival: val, rival_logo_url: autoLogo || f.rival_logo_url })); }} /></div></div>
+                  <RivalClubSearch clubs={clubs} value={form.rival || ""} selectedClubId={form.rival_club_id || ""} onCreated={onClubCreated} onSelect={(_, patch) => setForm((current) => ({ ...current, ...patch }))} />
                   <div><label className="text-xs text-zinc-400 mb-1 block">Local/Visitante</label><select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.home_away || ""} onChange={(e) => set("home_away", e.target.value)}><option value="">—</option><option>Local</option><option>Visitante</option><option>Neutral</option></select></div>
                 </div>
                 <label className="text-xs text-zinc-400 mb-1 block">URL escudo rival (opcional)</label>
@@ -545,12 +547,14 @@ export default function Schedule() {
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
   const [weeklyPlans, setWeeklyPlans] = useState([]);
   const [exportDays, setExportDays] = useState(null);
+  const [rivalClubs, setRivalClubs] = useState([]);
 
   async function loadEvents() {
     setLoading(true);
-    const [all, allPlans] = await Promise.all([
+    const [all, allPlans, clubRows] = await Promise.all([
       base44.entities.DayEvent.list("-date", 500),
       base44.entities.WeeklyPlan.list("-week_start", 100),
+      base44.entities.RivalClub.list("official_name", 500).catch(() => []),
     ]);
     setWeeklyPlans(activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans);
     // Mostrar únicamente eventos del plantel activo
@@ -558,6 +562,7 @@ export default function Schedule() {
       ? all.filter(e => e.squad_id === activeSquadId && (!e.season_id || e.season_id === activeSeasonId))
       : all;
     setEvents(filtered);
+    setRivalClubs(clubRows);
     setLoading(false);
   }
 
@@ -593,11 +598,30 @@ export default function Schedule() {
   async function handleSave(form) {
     const eventType = form.event_type || form.type || "";
     const startTime = form.start_time || form.time || "";
-    const payload = { ...form, time: startTime, start_time: startTime, type: eventType, event_type: eventType, squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "" };
+    const payload = { ...form, time: startTime, start_time: startTime, type: eventType, event_type: eventType, squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", sync_source: "calendar", sync_updated_at: new Date().toISOString() };
+    let savedEvent = null;
     if (editingEvent) {
       await base44.entities.DayEvent.update(editingEvent.id, payload);
+      savedEvent = { ...editingEvent, ...payload };
     } else {
-      await base44.entities.DayEvent.create(payload);
+      savedEvent = await base44.entities.DayEvent.create(payload);
+    }
+    if (isMatchEvent(savedEvent)) {
+      const matchPayload = matchPayloadFromEvent(savedEvent);
+      let linkedMatch = null;
+      if (savedEvent.match_id) {
+        await base44.entities.MatchReport.update(savedEvent.match_id, matchPayload).catch(() => null);
+        linkedMatch = { id: savedEvent.match_id, ...matchPayload };
+      } else {
+        const existing = await base44.entities.MatchReport.filter({ calendar_event_id: savedEvent.id }, "-date", 1).catch(() => []);
+        if (existing[0]) {
+          await base44.entities.MatchReport.update(existing[0].id, matchPayload);
+          linkedMatch = { ...existing[0], ...matchPayload };
+        } else {
+          linkedMatch = await base44.entities.MatchReport.create(matchPayload);
+        }
+        await base44.entities.DayEvent.update(savedEvent.id, { match_id: linkedMatch.id });
+      }
     }
     await loadEvents();
   }
@@ -889,6 +913,8 @@ export default function Schedule() {
         initial={editingEvent}
         copyData={copyData}
         defaultDate={defaultDate}
+        clubs={rivalClubs}
+        onClubCreated={(club) => setRivalClubs((current) => [...current, club])}
       />
 
       <WeekSettingsModal

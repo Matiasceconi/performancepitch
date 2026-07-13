@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { Settings, ChevronDown, ChevronUp, Plus, Trash2, Save } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import NutritionSettingsPanel from "@/components/nutrition/NutritionSettingsPanel";
+import ClubSettingsPanel from "@/components/clubs/ClubSettingsPanel";
 
 const DEFAULT_SEASONS = ["2024", "2025", "2026", "2025/2026"];
 const DEFAULT_CATEGORIES = ["Sub-14", "Sub-15", "Sub-16", "Sub-17", "Sub-18", "Sub-20", "Reserva", "Primera"];
@@ -86,6 +87,8 @@ export default function AdminConfig() {
   });
   const [nutritionStatuses, setNutritionStatuses] = useState([]);
   const [nutritionReferences, setNutritionReferences] = useState([]);
+  const [rivalClubs, setRivalClubs] = useState([]);
+  const [matches, setMatches] = useState([]);
 
   async function loadNutritionConfig() {
     const [statuses, references] = await Promise.all([
@@ -96,7 +99,16 @@ export default function AdminConfig() {
     setNutritionReferences(references);
   }
 
-  useEffect(() => { loadNutritionConfig(); }, []);
+  async function loadClubConfig() {
+    const [clubRows, matchRows] = await Promise.all([
+      base44.entities.RivalClub.list("official_name", 500).catch(() => []),
+      base44.entities.MatchReport.list("-date", 500).catch(() => []),
+    ]);
+    setRivalClubs(clubRows);
+    setMatches(matchRows);
+  }
+
+  useEffect(() => { loadNutritionConfig(); loadClubConfig(); }, []);
 
   function saveConfig() {
     localStorage.setItem("admin_seasons", JSON.stringify(seasons));
@@ -158,6 +170,10 @@ export default function AdminConfig() {
           ))}
           <p className="text-xs text-zinc-600 mt-2">Las variables GPS son fijas según el esquema de importación Catapult.</p>
         </div>
+      </ConfigBlock>
+
+      <ConfigBlock title="Clubes y rivales" icon={Settings}>
+        <ClubSettingsPanel clubs={rivalClubs} matches={matches} onReload={loadClubConfig} />
       </ConfigBlock>
 
       <ConfigBlock title="Nutrición" icon={Settings}>

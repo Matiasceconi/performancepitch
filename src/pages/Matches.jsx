@@ -12,6 +12,8 @@ import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
 import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
 import MatchFiltersPanel from "@/components/matches/MatchFiltersPanel.jsx";
+import RivalClubSearch from "@/components/clubs/RivalClubSearch";
+import { eventPayloadFromMatch, isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -286,7 +288,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
 
   return (
     <div className={`bg-gradient-to-r from-zinc-900 to-zinc-900/80 border border-zinc-800 border-l-4 ${borderClass} rounded-xl overflow-hidden shadow-lg shadow-black/20`}>
-      <div className="grid grid-cols-1 lg:grid-cols-[88px_1fr_100px_1fr_210px_94px] items-stretch cursor-pointer" onClick={() => setExpanded(!expanded)}>
+      <div className="grid grid-cols-1 lg:grid-cols-[88px_1fr_100px_1fr_210px_94px] items-stretch cursor-pointer" onClick={() => { sessionStorage.setItem("matches_scroll", String(window.scrollY || 0)); navigate(`/matches/${match.id}?tab=convocados`); }}>
         <div className="bg-black/20 border-b lg:border-b-0 lg:border-r border-zinc-800 p-3 flex lg:flex-col items-center justify-between lg:justify-center gap-2">
           <div className="text-center leading-none">
             <p className="text-2xl font-black text-white tracking-tight">{moment(match.date).format("DD")}</p>
@@ -345,7 +347,7 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
           {hasResult && <span className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-black ${resultClass}`}>{resultLetter}</span>}
           <button onClick={e => { e.stopPropagation(); onEdit(match); }} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-500 hover:text-white transition-colors"><Edit2 size={15} /></button>
           <button onClick={e => { e.stopPropagation(); onDelete(match.id); }} className="p-2 rounded-lg hover:bg-red-900/40 text-zinc-500 hover:text-red-400 transition-colors"><Trash2 size={15} /></button>
-          {expanded ? <ChevronUp size={18} className="text-zinc-500" /> : <ChevronDown size={18} className="text-zinc-500" />}
+
         </div>
       </div>
 
@@ -357,56 +359,14 @@ function MatchCard({ match, players, onEdit, onDelete, onMatchUpdated, squadId, 
         </div>
       )}
 
-      {expanded && (
-        <div className="border-t border-zinc-800 p-4 space-y-5">
-          <div className="flex justify-end">
-            <button
-              onClick={(e) => { e.stopPropagation(); navigate(`/matches/${match.id}`); }}
-              className="rounded-lg border border-yellow-500/30 bg-yellow-500/10 px-3 py-2 text-xs font-medium text-yellow-300 transition-colors hover:bg-yellow-500/20"
-            >
-              Ver detalles →
-            </button>
-          </div>
-          <div className="bg-zinc-800/60 rounded-xl p-5">
-            <div className="flex items-center justify-center gap-8">
-              <div className="flex flex-col items-center gap-2">
-                <ClubLogo url={leftLogo} name={leftName} size={16} />
-                <p className="text-xs text-zinc-400 text-center max-w-[90px] leading-tight">{leftName}</p>
-              </div>
-              <div className="text-center">
-                {hasResult ? (
-                  <p className={`text-4xl font-black tracking-tight ${won ? "text-green-400" : drew ? "text-zinc-200" : "text-red-400"}`}>{leftScore} — {rightScore}</p>
-                ) : <p className="text-zinc-600 text-2xl font-bold">vs</p>}
-                <p className="text-xs text-zinc-600 mt-0.5">{moment(match.date).format("dddd DD [de] MMMM YYYY")}</p>
-                <p className="text-xs mt-1"><span className={`px-2 py-0.5 rounded-full text-xs font-medium ${match.location === "Local" ? "bg-green-900/40 text-green-400" : "bg-orange-900/40 text-orange-400"}`}>{match.location}</span></p>
-              </div>
-              <div className="flex flex-col items-center gap-2">
-                <ClubLogo url={rightLogo} name={rightName} size={16} />
-                <p className="text-xs text-zinc-400 text-center max-w-[90px] leading-tight">{rightName}</p>
-              </div>
-            </div>
-          </div>
 
-          <MatchVideoPanel match={matchData} onVideoSaved={(url) => setMatchData(m => ({ ...m, match_video_url: url }))} />
-          <MatchPlanPdfPanel match={matchData} onPdfSaved={(url, label) => setMatchData(m => ({ ...m, match_plan_pdf_url: url, match_plan_pdf_label: label }))} />
-          {matchData.video_set_pieces_url && <YoutubeEmbed url={matchData.video_set_pieces_url} label={"⚽ Pelota parada"} />}
-          {matchData.video_analysis_url && <YoutubeEmbed url={matchData.video_analysis_url} label={"🎥 Análisis del rival"} />}
-          {matchData.video_extra_url && <YoutubeEmbed url={matchData.video_extra_url} label={"📹 Video adicional"} />}
-          <MatchCsvPanel match={matchData} onCsvSaved={(url, label) => setMatchData(m => ({ ...m, csv_url: url, csv_label: label }))} />
-          <MatchGpsReport match={matchData} />
-          <MatchSquadPanel match={matchData} players={players} onMatchUpdated={onMatchUpdated} squadId={squadId} />
-          {match.rival_notes && <div><p className="text-xs font-semibold text-zinc-400 mb-1 flex items-center gap-1.5"><FileText size={12} /> Análisis del rival</p><p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-800/40 rounded-lg p-3">{match.rival_notes}</p></div>}
-          {match.set_pieces_notes && <div><p className="text-xs font-semibold text-zinc-400 mb-1 flex items-center gap-1.5"><FileText size={12} /> Pelota parada</p><p className="text-zinc-300 text-sm whitespace-pre-wrap bg-zinc-800/40 rounded-lg p-3">{match.set_pieces_notes}</p></div>}
-          {match.notes && <div><p className="text-xs font-semibold text-zinc-400 mb-1">Notas generales</p><p className="text-zinc-400 text-sm">{match.notes}</p></div>}
-        </div>
-      )}
     </div>
   );
 }
 
 // ── MatchForm ─────────────────────────────────────────────────────────────────
 const EMPTY = {
-  squad_id: "", squad_name: "", season_id: "", date: "", rival: "", competition: "", competition_id: "", competition_stage: "", competition_round: "", group_name: "", matchday_number: "", phase_label: "", location: "Local",
+  squad_id: "", squad_name: "", season_id: "", calendar_event_id: "", date: "", match_time: "", match_venue: "", rival: "", rival_club_id: "", competition: "", competition_id: "", competition_stage: "", competition_round: "", group_name: "", matchday_number: "", phase_label: "", location: "Local",
   our_score: "", rival_score: "", rival_formation: "",
   rival_notes: "", set_pieces_notes: "",
   video_analysis_url: "", video_set_pieces_url: "", video_extra_url: "",
@@ -414,7 +374,7 @@ const EMPTY = {
   squad_called: [], squad_names: [], notes: "", rival_logo_url: "",
 };
 
-function MatchForm({ initial, players, onSave, onCancel, competitions, squads, activeSquad, activeSeasonId }) {
+function MatchForm({ initial, players, onSave, onCancel, competitions, squads, activeSquad, activeSeasonId, clubs, onClubCreated }) {
   const [form, setForm] = useState({ ...EMPTY, ...(initial || {}), squad_id: initial?.squad_id || activeSquad?.id || "", squad_name: initial?.squad_name || activeSquad?.name || "", season_id: initial?.season_id || activeSeasonId || "" });
   useEffect(() => {
     setForm({ ...EMPTY, ...(initial || {}), squad_id: initial?.squad_id || activeSquad?.id || "", squad_name: initial?.squad_name || activeSquad?.name || "", season_id: initial?.season_id || activeSeasonId || "" });
@@ -455,16 +415,19 @@ function MatchForm({ initial, players, onSave, onCancel, competitions, squads, a
           <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="2026" value={form.season_id || ""} onChange={e => set("season_id", e.target.value)} />
         </div>
         <div>
-          <label className="text-xs text-zinc-400 mb-1 block">Rival *</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Nombre del rival" value={form.rival} onChange={e => {
-            const val = e.target.value;
-            const autoLogo = getLogoForRival(val);
-            setForm(f => ({ ...f, rival: val, rival_logo_url: autoLogo || f.rival_logo_url }));
-          }} />
+          <RivalClubSearch clubs={clubs} value={form.rival} selectedClubId={form.rival_club_id} onCreated={onClubCreated} onSelect={(_, patch) => setForm((current) => ({ ...current, ...patch }))} />
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
           <input type="date" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.date} onChange={e => set("date", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Hora</label>
+          <input type="time" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.match_time || ""} onChange={e => set("match_time", e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs text-zinc-400 mb-1 block">Estadio / lugar</label>
+          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="Estadio" value={form.match_venue || ""} onChange={e => set("match_venue", e.target.value)} />
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Competencia</label>
@@ -505,10 +468,7 @@ function MatchForm({ initial, players, onSave, onCancel, competitions, squads, a
           <label className="text-xs text-zinc-400 mb-1 block">Goles del rival</label>
           <input type="number" min="0" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" placeholder="—" value={form.rival_score} onChange={e => set("rival_score", e.target.value)} />
         </div>
-        <div className="col-span-2">
-          <label className="text-xs text-zinc-400 mb-1 block">URL Escudo del rival</label>
-          <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://..." value={form.rival_logo_url || ""} onChange={e => set("rival_logo_url", e.target.value)} />
-        </div>
+        {form.rival_logo_url && <div className="col-span-2 flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-xs text-zinc-400"><img src={form.rival_logo_url} alt="Escudo rival" className="h-8 w-8 object-contain" /> Escudo vinculado desde el club rival</div>}
         <div className="col-span-2">
           <label className="text-xs text-zinc-400 mb-1 block">Formación del rival</label>
           <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="4-3-3..." value={form.rival_formation} onChange={e => set("rival_formation", e.target.value)} />
@@ -554,7 +514,7 @@ function MatchForm({ initial, players, onSave, onCancel, competitions, squads, a
       </div>
       <div className="flex justify-end gap-2 pt-1">
         <button onClick={onCancel} className="px-4 py-2 rounded-lg text-sm text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center gap-1"><X size={14} /> Cancelar</button>
-        <button onClick={() => onSave(form)} disabled={!form.rival || !form.date} className="px-4 py-2 rounded-lg text-sm bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-semibold disabled:opacity-40 transition-colors flex items-center gap-1"><Check size={14} /> Guardar</button>
+        <button onClick={() => onSave(form)} disabled={!form.rival || !form.date || !form.squad_id} className="px-4 py-2 rounded-lg text-sm bg-yellow-500 hover:bg-yellow-400 text-zinc-900 font-semibold disabled:opacity-40 transition-colors flex items-center gap-1"><Check size={14} /> Guardar</button>
       </div>
     </div>
   );
@@ -566,8 +526,11 @@ export default function Matches() {
   const [matches, setMatches] = useState([]);
   const [players, setPlayers] = useState([]);
   const [competitions, setCompetitions] = useState([]);
+  const [rivalClubs, setRivalClubs] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [newChoiceOpen, setNewChoiceOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // { id, minutesCount }
   const [showFilters, setShowFilters] = useState(true);
@@ -579,6 +542,7 @@ export default function Matches() {
   }
 
   const competitionMap = useMemo(() => Object.fromEntries(competitions.map((competition) => [competition.id, competition])), [competitions]);
+  const availableCalendarMatches = useMemo(() => calendarEvents.filter((event) => isMatchEvent(event) && !event.match_id && !matches.some((match) => match.calendar_event_id === event.id) && (!activeSquadId || event.squad_id === activeSquadId)).sort((a, b) => String(a.date).localeCompare(String(b.date))).slice(0, 20), [calendarEvents, matches, activeSquadId]);
   const hasActiveFilters = Object.entries(filters).some(([key, value]) => key !== "squad_id" && value);
   const visibleMatches = useMemo(() => matches.filter((match) => {
     if ((filters.squad_id || activeSquadId) && match.squad_id !== (filters.squad_id || activeSquadId)) return false;
@@ -592,19 +556,30 @@ export default function Matches() {
   }), [matches, filters, activeSquadId]);
 
   useEffect(() => { setFilters({ squad_id: activeSquadId || "" }); loadAll(); }, [activeSquadId]);
+  useEffect(() => {
+    const savedScroll = sessionStorage.getItem("matches_scroll");
+    if (savedScroll) {
+      setTimeout(() => window.scrollTo(0, Number(savedScroll)), 50);
+      sessionStorage.removeItem("matches_scroll");
+    }
+  }, [loading]);
 
   async function loadAll() {
     setLoading(true);
-    const [all, p, competitionRows] = await Promise.all([
+    const [all, p, competitionRows, clubRows, eventRows] = await Promise.all([
       base44.entities.MatchReport.list("-date", 200),
-      base44.entities.Player.list("-created_date", 100),
+      base44.entities.Player.list("-created_date", 400),
       base44.entities.Competitions.list("name", 200),
+      base44.entities.RivalClub.list("official_name", 500).catch(() => []),
+      base44.entities.DayEvent.list("date", 500).catch(() => []),
     ]);
     // Filtrar estrictamente por plantel activo (sin fallback a registros sin squad_id) y ocultar archivados
     const filtered = all.filter(x => (!activeSquadId || x.squad_id === activeSquadId) && x.status !== "archivado");
     setMatches(filtered);
     setPlayers(p.sort((a, b) => (a.jersey_number || a.number || 0) - (b.jersey_number || b.number || 0)));
     setCompetitions(competitionRows.filter((competition) => competition.active !== false));
+    setRivalClubs(clubRows);
+    setCalendarEvents(eventRows);
     setLoading(false);
   }
 
@@ -614,7 +589,7 @@ export default function Matches() {
     const matchdayNumber = form.matchday_number !== "" && form.matchday_number !== null && form.matchday_number !== undefined ? Number(form.matchday_number) : null;
     const data = {
       ...form,
-      competition: selectedCompetition?.name || "",
+      competition: selectedCompetition?.name || form.competition || "",
       squad_id: selectedSquad?.id || activeSquadId || undefined,
       squad_name: selectedSquad?.name || activeSquad?.name || undefined,
       season_id: form.season_id || selectedSquad?.season || activeSeasonId || undefined,
@@ -623,17 +598,43 @@ export default function Matches() {
       phase_label: form.phase_label || (matchdayNumber ? `Fecha ${matchdayNumber}` : form.competition_stage || ""),
       our_score: form.our_score !== "" ? Number(form.our_score) : null,
       rival_score: form.rival_score !== "" ? Number(form.rival_score) : null,
+      rival_name_backup: form.rival_name_backup || form.rival,
+      status: form.rival && form.date && (form.squad_id || selectedSquad?.id) ? "activo" : "borrador",
+      sync_source: "matches",
+      sync_updated_at: new Date().toISOString(),
     };
+    let savedMatch = null;
     if (editing?.id) {
       await base44.entities.MatchReport.update(editing.id, data);
+      savedMatch = { ...editing, ...data };
       toast({ title: "Partido actualizado" });
     } else {
-      await base44.entities.MatchReport.create(data);
+      savedMatch = await base44.entities.MatchReport.create(data);
       toast({ title: "Partido guardado" });
+    }
+    const eventPayload = eventPayloadFromMatch(savedMatch);
+    if (savedMatch.calendar_event_id) {
+      await base44.entities.DayEvent.update(savedMatch.calendar_event_id, eventPayload).catch(() => null);
+    } else {
+      const createdEvent = await base44.entities.DayEvent.create(eventPayload);
+      await base44.entities.MatchReport.update(savedMatch.id, { calendar_event_id: createdEvent.id });
+      await base44.entities.DayEvent.update(createdEvent.id, { match_id: savedMatch.id });
     }
     setShowForm(false);
     setEditing(null);
     loadAll();
+  }
+
+  function selectCalendarEvent(event) {
+    setEditing({ ...EMPTY, ...matchPayloadFromEvent(event), calendar_event_id: event.id });
+    setNewChoiceOpen(false);
+    setShowForm(true);
+  }
+
+  function createManualMatch() {
+    setEditing(null);
+    setNewChoiceOpen(false);
+    setShowForm(true);
   }
 
   async function remove(id) {
@@ -686,7 +687,7 @@ export default function Matches() {
             <SlidersHorizontal size={15} /> {showFilters ? "Ocultar filtros" : "Mostrar filtros"}
           </button>
           <button
-            onClick={() => { setEditing(null); setShowForm(true); }}
+            onClick={() => setNewChoiceOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 bg-yellow-500/20 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/30 rounded-lg text-sm font-medium transition-colors"
           >
             <Plus size={15} /> Nuevo partido
@@ -696,6 +697,24 @@ export default function Matches() {
 
       {showFilters && (
         <MatchFiltersPanel filters={filters} setFilters={setFilters} activeSquad={activeSquad} activeSeasonId={activeSeasonId} competitions={competitions} matches={matches} />
+      )}
+
+      {newChoiceOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-950 p-5 shadow-2xl">
+            <div className="mb-4 flex items-start justify-between gap-3">
+              <div><h2 className="text-lg font-semibold text-white">Nuevo partido</h2><p className="text-sm text-zinc-500">La opción recomendada es usar un partido ya cargado en Calendario.</p></div>
+              <button onClick={() => setNewChoiceOpen(false)} className="text-zinc-500 hover:text-white"><X size={18} /></button>
+            </div>
+            <div className="space-y-3">
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+                <p className="mb-3 text-sm font-semibold text-yellow-300">Usar partido del Calendario</p>
+                {availableCalendarMatches.length === 0 ? <p className="text-sm text-zinc-500">No hay eventos próximos de tipo Partido sin vincular.</p> : <div className="space-y-2 max-h-72 overflow-y-auto">{availableCalendarMatches.map((event) => <button key={event.id} onClick={() => selectCalendarEvent(event)} className="flex w-full items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 text-left hover:border-yellow-500/40"><div><p className="text-sm font-semibold text-white">{event.rival || event.title || "Partido"}</p><p className="text-xs text-zinc-500">{moment(event.date).format("DD/MM/YYYY")} · {event.time || event.start_time || "Sin horario"} · {event.competition || "Sin competencia"}</p><p className="text-xs text-zinc-600">{event.squad_name || "Sin plantel"} · {event.home_away || "Sin condición"}</p></div>{event.rival_logo_url && <img src={event.rival_logo_url} alt={event.rival} className="h-10 w-10 object-contain" />}</button>)}</div>}
+              </div>
+              <button onClick={createManualMatch} className="w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-left text-sm text-zinc-200 hover:bg-zinc-800">Crear partido manualmente</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showForm && (
@@ -708,6 +727,8 @@ export default function Matches() {
           squads={mySquads}
           activeSquad={activeSquad}
           activeSeasonId={activeSeasonId}
+          clubs={rivalClubs}
+          onClubCreated={(club) => setRivalClubs((current) => [...current, club])}
         />
       )}
 

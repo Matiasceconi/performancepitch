@@ -13,10 +13,17 @@ import MinutosTab from "@/components/matches/tabs/MinutosTab";
 import GpsTab from "@/components/matches/tabs/GpsTab";
 import PlanVideoTab from "@/components/matches/tabs/PlanVideoTab";
 import LogisticaTab from "@/components/matches/tabs/LogisticaTab";
+import { eventPayloadFromMatch } from "@/lib/matchCalendarSync";
 
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
+const TAB_ALIASES = { plan: "plan-video", "plan-video": "plan-video", convocados: "convocados", minutos: "minutos", gps: "gps", logistica: "logistica" };
+
+function formatSpanishDate(date) {
+  const value = moment(date).format("dddd DD [de] MMMM [de] YYYY");
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 const EMPTY_FORM = {
   squad_id: "",
@@ -117,6 +124,16 @@ function MatchEditModal({ open, match, competitions, squads, activeSeasonId, onC
       };
 
       await base44.entities.MatchReport.update(match.id, payload);
+      const syncMatch = { ...match, ...payload, id: match.id };
+      const eventPayload = eventPayloadFromMatch(syncMatch);
+      if (syncMatch.calendar_event_id) {
+        await base44.entities.DayEvent.update(syncMatch.calendar_event_id, eventPayload).catch(() => null);
+      } else {
+        const createdEvent = await base44.entities.DayEvent.create(eventPayload);
+        await base44.entities.MatchReport.update(match.id, { calendar_event_id: createdEvent.id });
+        await base44.entities.DayEvent.update(createdEvent.id, { match_id: match.id });
+        payload.calendar_event_id = createdEvent.id;
+      }
       onSaved?.(payload);
       toast({ title: "Partido actualizado" });
       onClose?.();
@@ -252,7 +269,7 @@ export default function MatchDetail() {
   const [players, setPlayers] = useState([]);
   const [competitions, setCompetitions] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState("convocados");
+  const [activeTab, setActiveTab] = useState(() => TAB_ALIASES[new URLSearchParams(window.location.search).get("tab")] || "convocados");
   const [editOpen, setEditOpen] = useState(false);
   const [headerSave, setHeaderSave] = useState({ action: null, disabled: true, pending: false, label: "" });
   const [headerSaving, setHeaderSaving] = useState(false);
@@ -295,6 +312,12 @@ export default function MatchDetail() {
       setHeaderSaving(false);
     }
   }, [headerSave]);
+
+  function changeTab(tab) {
+    setActiveTab(tab);
+    const publicTab = tab === "plan-video" ? "plan" : tab;
+    navigate(`/matches/${matchId}?tab=${publicTab}`, { replace: true });
+  }
 
   const rivalLogo = match?.rival_logo_url || null;
   const hasResult = match?.our_score != null && match?.rival_score != null;
@@ -355,7 +378,7 @@ export default function MatchDetail() {
             </div>
 
             <div className="flex flex-wrap gap-2.5">
-              <MetaPill icon={CalendarDays}>{moment(match.date).format("dddd DD [de] MMMM YYYY")}</MetaPill>
+              <MetaPill icon={CalendarDays}>{formatSpanishDate(match.date)}</MetaPill>
               {(match.match_time || match.match_logistics) && <MetaPill icon={Clock3}>{match.match_time || "Horario a confirmar"}</MetaPill>}
               {(match.match_venue || match.match_logistics) && <MetaPill icon={MapPin}>{match.match_venue || "Sede a confirmar"}</MetaPill>}
               {match.location && <MetaPill icon={Shield}>{match.location}</MetaPill>}
@@ -382,7 +405,7 @@ export default function MatchDetail() {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={changeTab} className="space-y-4">
         <TabsList className="h-auto flex w-full flex-wrap justify-start gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 p-2">
           <TabsTrigger value="convocados" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">Convocados</TabsTrigger>
           <TabsTrigger value="minutos" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">Minutos jugados</TabsTrigger>

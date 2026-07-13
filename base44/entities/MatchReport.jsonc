@@ -14,23 +14,44 @@
       "type": "string",
       "description": "Temporada vinculada al plantel/competencia"
     },
+    "calendar_event_id": {
+      "type": "string",
+      "description": "ID del evento DayEvent vinculado en Calendario"
+    },
     "status": {
       "type": "string",
       "enum": [
+        "borrador",
         "activo",
         "archivado"
       ],
       "default": "activo",
-      "description": "Estado del partido. 'archivado' = oculto de todas las vistas y reportes pero conserva sus minutos como hist\u00f3rico"
+      "description": "Estado del partido. borrador = creado desde calendario con datos incompletos; archivado = oculto pero conserva hist\u00f3rico"
     },
     "date": {
       "type": "string",
       "format": "date",
       "description": "Fecha calendario del partido"
     },
+    "match_time": {
+      "type": "string",
+      "description": "Horario del partido HH:MM"
+    },
+    "match_venue": {
+      "type": "string",
+      "description": "Estadio o lugar del partido"
+    },
     "rival": {
       "type": "string",
-      "description": "Nombre del rival"
+      "description": "Nombre del rival (respaldo visible)"
+    },
+    "rival_name_backup": {
+      "type": "string",
+      "description": "Nombre legado del rival conservado durante migraci\u00f3n"
+    },
+    "rival_club_id": {
+      "type": "string",
+      "description": "ID del club rival en RivalClub"
     },
     "competition": {
       "type": "string",
@@ -142,6 +163,14 @@
     "rival_logo_url": {
       "type": "string",
       "description": "URL del escudo del rival"
+    },
+    "sync_source": {
+      "type": "string",
+      "description": "\u00daltimo origen de sincronizaci\u00f3n: calendar o matches"
+    },
+    "sync_updated_at": {
+      "type": "string",
+      "description": "\u00daltima sincronizaci\u00f3n calendario/partido"
     }
   },
   "required": [

@@ -14,6 +14,10 @@
       "type": "string",
       "description": "Temporada activa del plantel"
     },
+    "match_id": {
+      "type": "string",
+      "description": "ID del MatchReport vinculado si el evento es Partido"
+    },
     "date": {
       "type": "string",
       "format": "date",
@@ -64,6 +68,10 @@
       "type": "string",
       "description": "Rival detectado si el evento es Partido"
     },
+    "rival_club_id": {
+      "type": "string",
+      "description": "ID del club rival en RivalClub"
+    },
     "home_away": {
       "type": "string",
       "enum": [
@@ -77,6 +85,30 @@
     "rival_logo_url": {
       "type": "string",
       "description": "URL del escudo rival (para eventos de partido)"
+    },
+    "competition": {
+      "type": "string",
+      "description": "Nombre de competencia"
+    },
+    "competition_id": {
+      "type": "string",
+      "description": "ID de competencia"
+    },
+    "competition_stage": {
+      "type": "string",
+      "description": "Fase o instancia"
+    },
+    "competition_round": {
+      "type": "string",
+      "description": "Jornada o instancia textual"
+    },
+    "matchday_number": {
+      "type": "number",
+      "description": "N\u00famero de fecha/jornada"
+    },
+    "phase_label": {
+      "type": "string",
+      "description": "Etiqueta visible de etapa"
     },
     "source_file": {
       "type": "string",
@@ -94,6 +126,14 @@
     "import_key": {
       "type": "string",
       "description": "Clave de upsert: plantel + fecha + hora + tipo"
+    },
+    "sync_source": {
+      "type": "string",
+      "description": "\u00daltimo origen de sincronizaci\u00f3n: calendar o matches"
+    },
+    "sync_updated_at": {
+      "type": "string",
+      "description": "\u00daltima sincronizaci\u00f3n calendario/partido"
     }
   },
   "required": [
