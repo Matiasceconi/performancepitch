@@ -402,7 +402,7 @@ export default function MatchDetail() {
           <ConvocadosTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />
         </TabsContent>
         <TabsContent value="minutos" className="mt-0">
-          <MinutosTab match={match} players={players} onRegisterSave={setHeaderSave} refreshKey={callupsVersion} />
+          <MinutosTab match={match} players={players} onRegisterSave={setHeaderSave} onMatchUpdated={handleMatchUpdated} refreshKey={callupsVersion} />
         </TabsContent>
         <TabsContent value="gps" className="mt-0">
           <GpsTab match={match} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} />

@@ -23,6 +23,8 @@
       "enum": [
         "borrador",
         "activo",
+        "finalizado",
+        "cancelado",
         "archivado"
       ],
       "default": "activo",
@@ -97,6 +99,10 @@
     "rival_score": {
       "type": "number",
       "description": "Goles del rival"
+    },
+    "total_duration_minutes": {
+      "type": "number",
+      "description": "Duraci\u00f3n real total del partido, incluyendo tiempo agregado o alargue"
     },
     "rival_formation": {
       "type": "string",

@@ -3,15 +3,15 @@ import { Search, FileDown, SlidersHorizontal } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
-import { getValidMinuteRecords } from "@/lib/minutesUtils";
+import { getMatchDuration, getRecordMinutes, getValidMinuteRecords, isFinishedMatch } from "@/lib/minutesUtils";
 import { generateMinutesPdf } from "@/lib/reports/minutesPdf";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 const TORNEOS = [
-  { id: "all",                  label: "Todo el semestre",                res_total: 1727, juv_total: 1252 },
-  { id: "Proyección Apertura",  label: "Torneo Proyección Apertura 2026", res_total: 1727, juv_total: null },
-  { id: "Juveniles",            label: "Torneo Juveniles 2026",           res_total: null,  juv_total: 1252 },
-  { id: "Amistosos",            label: "Amistosos",                       res_total: 182,   juv_total: null },
+  { id: "all",                  label: "Todo el semestre" },
+  { id: "Proyección Apertura",  label: "Torneo Proyección Apertura 2026" },
+  { id: "Juveniles",            label: "Torneo Juveniles 2026" },
+  { id: "Amistosos",            label: "Amistosos" },
 ];
 
 function PctBar({ pct, color }) {
@@ -60,7 +60,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      base44.entities.MinutesRecord.list("-created_date", 500),
+      base44.entities.MatchPlayerMinutes.list("-created_date", 800).catch(() => []),
       base44.entities.Player.list("-created_date", 200),
       base44.entities.MatchReport.list("-date", 500),
     ]).then(([recs, plrs, allMatches]) => {
@@ -71,10 +71,10 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
     // Suscripción en tiempo real con debounce para evitar rate limit
     let timer;
-    const unsub = base44.entities.MinutesRecord.subscribe(() => {
+    const unsub = base44.entities.MatchPlayerMinutes.subscribe(() => {
       clearTimeout(timer);
       timer = setTimeout(() => {
-        base44.entities.MinutesRecord.list("-created_date", 500).then(setRecords);
+        base44.entities.MatchPlayerMinutes.list("-created_date", 800).then(setRecords);
       }, 2000);
     });
     return () => { unsub(); clearTimeout(timer); };
@@ -111,8 +111,8 @@ export default function MinutesTracker({ onSelectPlayer }) {
 
     sorted.forEach(r => {
       const playerKey = r.player_id || `name:${norm(r.player_name)}`;
-      const dedupKey = `${playerKey}|${r.match_date}|${(r.tournament || "").toLowerCase()}`;
-      if (seen.has(dedupKey)) return; // ignorar duplicados
+      const dedupKey = `${r.match_id || r.match_date}|${playerKey}`;
+      if (seen.has(dedupKey)) return;
       seen.add(dedupKey);
 
       if (!map[playerKey]) {
@@ -129,7 +129,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
         };
       }
       const t = r.tournament;
-      const mins = r.minutes || 0;
+      const mins = getRecordMinutes(r);
       if (t === "Proyección Apertura" || t === "Clausura") { map[playerKey].reserva += mins; map[playerKey].hasReserva = true; }
       else if (t === "Juveniles") { map[playerKey].juveniles += mins; map[playerKey].hasJuveniles = true; }
       else if (t === "Amistosos") { map[playerKey].amistosos += mins; map[playerKey].hasAmistosos = true; }
@@ -138,9 +138,33 @@ export default function MinutesTracker({ onSelectPlayer }) {
     return Object.values(map);
   }, [validRecords]);
 
-  const torneo = TORNEOS.find(t => t.id === torneoId);
-  const showRes = torneo.res_total !== null && (viewMode === "reserva" || viewMode === "ambos");
-  const showJuv = torneo.juv_total !== null && (viewMode === "juveniles" || viewMode === "ambos");
+  const torneo = TORNEOS.find(t => t.id === torneoId) || TORNEOS[0];
+  const showRes = torneoId !== "Juveniles" && (viewMode === "reserva" || viewMode === "ambos");
+  const showJuv = torneoId !== "Proyección Apertura" && torneoId !== "Amistosos" && (viewMode === "juveniles" || viewMode === "ambos");
+
+  function matchBelongsToBucket(match, bucket) {
+    const comp = match.competition || "";
+    if (bucket === "juv") return comp.includes("Juvenil");
+    if (torneoId === "Amistosos") return comp.includes("Amistoso");
+    if (torneoId === "Proyección Apertura") return comp.includes("Apertura");
+    return !comp.includes("Juvenil") && !comp.includes("Amistoso");
+  }
+
+  const denominator = useMemo(() => {
+    const totals = { res: 0, juv: 0, missingRes: [], missingJuv: [] };
+    matches
+      .filter((m) => isFinishedMatch(m))
+      .filter((m) => !activeSquadId || m.squad_id === activeSquadId)
+      .filter((m) => !activeSeasonId || !m.season_id || m.season_id === activeSeasonId)
+      .forEach((m) => {
+        const bucket = matchBelongsToBucket(m, "juv") ? "juv" : "res";
+        if ((bucket === "juv" && !showJuv) || (bucket === "res" && !showRes)) return;
+        const minutes = getMatchDuration(m);
+        if (minutes > 0) totals[bucket] += minutes;
+        else bucket === "juv" ? totals.missingJuv.push(m) : totals.missingRes.push(m);
+      });
+    return totals;
+  }, [matches, activeSquadId, activeSeasonId, torneoId, showRes, showJuv]);
 
   function getMinutes(p) {
     switch (torneoId) {
@@ -215,15 +239,17 @@ export default function MinutesTracker({ onSelectPlayer }) {
         {showRes && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total disponible — Reserva</p>
-            <p className="text-2xl font-bold text-white">{torneo.res_total.toLocaleString()}'</p>
+            <p className="text-2xl font-bold text-white">{denominator.res.toLocaleString()}'</p>
             <p className="text-xs text-zinc-500 mt-1">{torneo.label}</p>
+            {denominator.missingRes.length > 0 && <a href={`/matches/${denominator.missingRes[0].id}?tab=minutos`} className="mt-2 inline-block text-xs text-yellow-300 hover:text-yellow-200">Falta cargar la duración de {denominator.missingRes.length} partido{denominator.missingRes.length !== 1 ? "s" : ""}</a>}
           </div>
         )}
         {showJuv && (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
             <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Total disponible — Juveniles</p>
-            <p className="text-2xl font-bold text-white">{torneo.juv_total.toLocaleString()}'</p>
+            <p className="text-2xl font-bold text-white">{denominator.juv.toLocaleString()}'</p>
             <p className="text-xs text-zinc-500 mt-1">{torneo.label}</p>
+            {denominator.missingJuv.length > 0 && <a href={`/matches/${denominator.missingJuv[0].id}?tab=minutos`} className="mt-2 inline-block text-xs text-yellow-300 hover:text-yellow-200">Falta cargar la duración de {denominator.missingJuv.length} partido{denominator.missingJuv.length !== 1 ? "s" : ""}</a>}
           </div>
         )}
       </div>
@@ -263,7 +289,7 @@ export default function MinutesTracker({ onSelectPlayer }) {
           <div className="flex flex-wrap gap-2">
             <div className="flex bg-zinc-900 border border-zinc-800 rounded-lg overflow-hidden">
               {TORNEOS.map((t) => (
-                <button key={t.id} onClick={() => { setTorneoId(t.id); if (t.id === "Juveniles") setViewMode("juveniles"); if (t.res_total && t.juv_total === null) setViewMode("reserva"); setSortBy(t.res_total ? "res" : "juv"); }}
+              <button key={t.id} onClick={() => { setTorneoId(t.id); if (t.id === "Juveniles") { setViewMode("juveniles"); setSortBy("juv"); } else { setViewMode("reserva"); setSortBy("res"); } }}
                   className={`px-3 py-1.5 text-xs font-medium transition-all whitespace-nowrap ${torneoId === t.id ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"}`}>
                   {t.label}
                 </button>
@@ -312,9 +338,9 @@ export default function MinutesTracker({ onSelectPlayer }) {
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-white font-semibold text-sm">{p.res ?? 0}'</span>
-                      <span className="text-zinc-500 text-xs">/ {torneo.res_total}'</span>
+                      <span className="text-zinc-500 text-xs">/ {denominator.res}'</span>
                     </div>
-                    <PctBar pct={torneo.res_total > 0 ? (p.res || 0) / torneo.res_total : 0} color={getPctColor((p.res || 0) / torneo.res_total)} />
+                    <PctBar pct={denominator.res > 0 ? (p.res || 0) / denominator.res : 0} color={getPctColor(denominator.res > 0 ? (p.res || 0) / denominator.res : 0)} />
                   </div>
                 )}
 
@@ -322,9 +348,9 @@ export default function MinutesTracker({ onSelectPlayer }) {
                   <div className="space-y-1">
                     <div className="flex items-baseline gap-1.5">
                       <span className="text-white font-semibold text-sm">{p.juv ?? 0}'</span>
-                      <span className="text-zinc-500 text-xs">/ {torneo.juv_total}'</span>
+                      <span className="text-zinc-500 text-xs">/ {denominator.juv}'</span>
                     </div>
-                    <PctBar pct={torneo.juv_total > 0 ? (p.juv || 0) / torneo.juv_total : 0} color={getPctColor((p.juv || 0) / torneo.juv_total)} />
+                    <PctBar pct={denominator.juv > 0 ? (p.juv || 0) / denominator.juv : 0} color={getPctColor(denominator.juv > 0 ? (p.juv || 0) / denominator.juv : 0)} />
                   </div>
                 )}
               </div>

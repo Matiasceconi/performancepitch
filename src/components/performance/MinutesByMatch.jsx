@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { base44 } from "@/api/base44Client";
 import { getRivalLogo } from "@/lib/match-utils";
 import { useWorkspace } from "@/lib/WorkspaceContext";
-import { buildActiveMatchMap } from "@/lib/minutesUtils";
+import { buildActiveMatchMap, getRecordMinutes } from "@/lib/minutesUtils";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import moment from "moment";
 import "moment/locale/es";
@@ -43,7 +43,7 @@ export default function MinutesByMatch({ selectedPlayer }) {
 
   useEffect(() => {
     Promise.all([
-      base44.entities.MinutesRecord.list("-created_date", 500),
+      base44.entities.MatchPlayerMinutes.list("-created_date", 800).catch(() => []),
       base44.entities.MatchReport.list("-date", 100),
       base44.entities.Player.list("-created_date", 200),
     ]).then(([recs, matches, plrs]) => {
@@ -109,7 +109,7 @@ export default function MinutesByMatch({ selectedPlayer }) {
     // Ordenar por created_date desc para que el más reciente gane en caso de duplicado
     const sorted = [...minutesRecords].sort((a, b) => (b.created_date || "").localeCompare(a.created_date || ""));
     for (const r of sorted) {
-      if (!r.minutes || r.minutes <= 0) continue;
+      if (getRecordMinutes(r) <= 0) continue;
       if (!r.match_id || !activeMatchMap[r.match_id]) continue;
       const date = r.match_date;
       const key = r.player_id || `name:${norm(r.player_name)}`;
@@ -119,7 +119,7 @@ export default function MinutesByMatch({ selectedPlayer }) {
       if (!map[date]._byTourney[t]) map[date]._byTourney[t] = {};
       // Solo guardar si no existe ya (el más reciente gana)
       if (!map[date]._byTourney[t][key]) {
-        map[date]._byTourney[t][key] = { id: r.id, minutes: r.minutes, player_name: r.player_name, player_id: r.player_id };
+      map[date]._byTourney[t][key] = { id: r.id, minutes: getRecordMinutes(r), player_name: r.player_name, player_id: r.player_id };
       }
     }
     return map;
