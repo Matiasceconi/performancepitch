@@ -1,6 +1,10 @@
-import React, { useState, useCallback } from "react";
-import MinutesTracker from "@/components/performance/MinutesTracker";
-import MinutesByMatch from "@/components/performance/MinutesByMatch";
+import React, { useState } from "react";
+import useMinutesDashboard from "@/components/performance/minutes/useMinutesDashboard";
+import MinutesFiltersRow from "@/components/performance/minutes/MinutesFiltersRow";
+import MinutesSummaryCards from "@/components/performance/minutes/MinutesSummaryCards";
+import MinutesPlayersTab from "@/components/performance/minutes/MinutesPlayersTab";
+import MinutesMatchesTab from "@/components/performance/minutes/MinutesMatchesTab";
+import { generateMinutesPdf } from "@/lib/reports/minutesPdf";
 
 const SUB_TABS = [
   { id: "summary", label: "Resumen por jugador" },
@@ -8,51 +12,60 @@ const SUB_TABS = [
 ];
 
 export default function MinutesSubPanel() {
-  const [subTab, setSubTab] = useState("summary");
-  const [selectedPlayer, setSelectedPlayer] = useState(null);
+  const dashboard = useMinutesDashboard();
+  const [pendingOpen, setPendingOpen] = useState(false);
 
-  const handleSelectPlayer = useCallback((playerId, playerName) => {
-    setSelectedPlayer({ id: playerId, name: playerName });
-    setSubTab("matches");
-  }, []);
+  async function handleExport() {
+    await generateMinutesPdf(dashboard.exportData);
+  }
 
-  const handleBack = useCallback(() => {
-    setSelectedPlayer(null);
-    setSubTab("summary");
-  }, []);
+  if (dashboard.loading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-zinc-700 border-t-white" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
+      <MinutesFiltersRow
+        filters={dashboard.filters}
+        updateFilter={dashboard.updateFilter}
+        resetFilters={dashboard.resetFilters}
+        squadOptions={dashboard.squadOptions}
+        seasonOptions={dashboard.seasonOptions}
+        competitionOptions={dashboard.competitionOptions}
+      />
+
+      <MinutesSummaryCards
+        availableMinutes={dashboard.availableMinutes}
+        includedMatches={dashboard.filteredFinishedMatches.length}
+        playersWithMinutesCount={dashboard.playersWithMinutesCount}
+        pendingMatches={dashboard.pendingMatches}
+        pendingOpen={pendingOpen}
+        onTogglePending={() => setPendingOpen((current) => !current)}
+        onExport={handleExport}
+      />
+
       <div className="flex gap-0 border-b border-zinc-800">
-        {selectedPlayer && (
+        {SUB_TABS.map((tab) => (
           <button
-            onClick={handleBack}
-            className="px-3 py-2 text-sm font-medium text-zinc-400 hover:text-zinc-200 transition-all flex items-center gap-1"
-          >
-            ← Resumen
-          </button>
-        )}
-        {SUB_TABS.map((t) => (
-          <button
-            key={t.id}
-            onClick={() => setSubTab(t.id)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 transition-all -mb-px ${
-              subTab === t.id
+            key={tab.id}
+            onClick={() => dashboard.setTab(tab.id)}
+            className={`-mb-px border-b-2 px-4 py-2 text-sm font-medium transition-all ${
+              dashboard.tab === tab.id
                 ? "border-yellow-400 text-yellow-300"
                 : "border-transparent text-zinc-500 hover:text-zinc-300"
             }`}
           >
-            {t.label}
+            {tab.label}
           </button>
         ))}
       </div>
 
-      {subTab === "summary" && (
-        <MinutesTracker onSelectPlayer={handleSelectPlayer} />
-      )}
-      {subTab === "matches" && (
-        <MinutesByMatch selectedPlayer={selectedPlayer} />
-      )}
+      {dashboard.tab === "summary" && <MinutesPlayersTab rows={dashboard.playerRows} filters={dashboard.filters} updateFilter={dashboard.updateFilter} />}
+      {dashboard.tab === "matches" && <MinutesMatchesTab matches={dashboard.filteredMatches} />}
     </div>
   );
 }

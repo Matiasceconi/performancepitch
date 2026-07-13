@@ -4,8 +4,8 @@ import { CLUB_BRAND } from "@/lib/clubBrand";
 
 function hexToRgb(hex) {
   const value = String(hex || "#000000").replace("#", "");
-  const normalized = value.length === 3 ? value.split("").map((c) => c + c).join("") : value;
-  return [0, 2, 4].map((i) => parseInt(normalized.slice(i, i + 2), 16));
+  const normalized = value.length === 3 ? value.split("").map((char) => char + char).join("") : value;
+  return [0, 2, 4].map((index) => parseInt(normalized.slice(index, index + 2), 16));
 }
 
 function setColor(doc, method, hex) {
@@ -13,13 +13,12 @@ function setColor(doc, method, hex) {
   doc[method](r, g, b);
 }
 
-function fmtMinutes(value) {
+function formatMinutes(value) {
   return `${Math.round(Number(value || 0)).toLocaleString("es-AR")}'`;
 }
 
-function pct(value, total) {
-  if (!total) return "0%";
-  return `${Math.round((Number(value || 0) / Number(total || 0)) * 100)}%`;
+function formatPercent(value) {
+  return `${Math.round(Number(value || 0) * 100)}%`;
 }
 
 async function imageToDataUrl(url) {
@@ -38,24 +37,27 @@ async function imageToDataUrl(url) {
   }
 }
 
-export async function generateMinutesPdf({ rows, torneo, viewMode, playerMap, activeSquad, activeSeasonId }) {
-  const showRes = torneo?.res_total !== null && (viewMode === "reserva" || viewMode === "ambos");
-  const showJuv = torneo?.juv_total !== null && (viewMode === "juveniles" || viewMode === "ambos");
-  const viewLabel = viewMode === "reserva" ? "Reserva" : viewMode === "juveniles" ? "Juveniles" : "Reserva + Juveniles";
-  const totals = rows.reduce((acc, row) => ({
-    res: acc.res + Number(row.res || 0),
-    juv: acc.juv + Number(row.juv || 0),
-  }), { res: 0, juv: 0 });
-
+export async function generateMinutesPdf({ filters, availableMinutes, includedMatches, playersWithMinutes, pendingMatches, rows }) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
   const logo = await imageToDataUrl(CLUB_BRAND.logoUrl);
   const margin = 12;
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const contentW = pageW - margin * 2;
-  const dateLabel = moment().format("DD/MM/YYYY HH:mm");
+  const generatedAt = moment().format("DD/MM/YYYY HH:mm");
+  const columns = [
+    { label: "#", width: 10 },
+    { label: "Jugador", width: 58 },
+    { label: "Posición", width: 36 },
+    { label: "Partidos", width: 20 },
+    { label: "Titularidades", width: 28 },
+    { label: "Ingresos", width: 22 },
+    { label: "Minutos", width: 24 },
+    { label: "Disponibles", width: 28 },
+    { label: "%", width: 18 },
+  ];
 
-  function drawFirstHeader() {
+  function drawHeader() {
     setColor(doc, "setFillColor", CLUB_BRAND.colors.panel);
     doc.roundedRect(margin, margin, contentW, 34, 4, 4, "F");
     setColor(doc, "setFillColor", CLUB_BRAND.colors.green);
@@ -67,68 +69,35 @@ export async function generateMinutesPdf({ rows, torneo, viewMode, playerMap, ac
     doc.text(CLUB_BRAND.name.toUpperCase(), margin + 32, margin + 9);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFontSize(20);
-    doc.text("Minutos Jugados", margin + 32, margin + 19);
+    doc.text("Minutos jugados", margin + 32, margin + 19);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.muted);
-    doc.text(`${activeSquad?.name || "Plantel"} · ${activeSeasonId || activeSquad?.season || "Temporada"} · ${torneo?.label || "Todo el semestre"} · ${viewLabel}`, margin + 32, margin + 27);
-    doc.text(`Generado: ${dateLabel}`, pageW - margin - 55, margin + 9);
+    doc.text(`Plantel: ${filters.squad} · Temporada: ${filters.season} · Competencia: ${filters.competition}`, margin + 32, margin + 26);
+    doc.text(`Tipo: ${filters.type} · Rango: ${filters.range} · Generado: ${generatedAt}`, margin + 32, margin + 31);
   }
 
-  function drawSmallHeader(page, total) {
-    setColor(doc, "setTextColor", CLUB_BRAND.colors.greenDeep);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    doc.text("Minutos Jugados", margin, margin + 2);
-    doc.setFont("helvetica", "normal");
-    setColor(doc, "setTextColor", CLUB_BRAND.colors.muted);
-    doc.text(`Página ${page} de ${total}`, pageW - margin - 25, margin + 2);
-    setColor(doc, "setDrawColor", CLUB_BRAND.colors.line);
-    doc.line(margin, margin + 6, pageW - margin, margin + 6);
-  }
-
-  function drawStats(y) {
-    const cards = [
-      ["Jugadores", rows.length],
-      ...(showRes ? [["Reserva", fmtMinutes(totals.res)]] : []),
-      ...(showJuv ? [["Juveniles", fmtMinutes(totals.juv)]] : []),
-      ["Total", fmtMinutes((showRes ? totals.res : 0) + (showJuv ? totals.juv : 0))],
+  function drawCards(y) {
+    const items = [
+      ["Minutos disponibles", formatMinutes(availableMinutes)],
+      ["Partidos incluidos", String(includedMatches)],
+      ["Jugadores con minutos", String(playersWithMinutes)],
+      ["Partidos pendientes", String(pendingMatches)],
     ];
     const gap = 4;
-    const w = (contentW - gap * (cards.length - 1)) / cards.length;
-    cards.forEach(([label, value], index) => {
-      const x = margin + index * (w + gap);
-      setColor(doc, "setDrawColor", CLUB_BRAND.colors.line);
-      doc.roundedRect(x, y, w, 16, 3, 3, "S");
+    const width = (contentW - gap * 3) / 4;
+    items.forEach(([label, value], index) => {
+      const x = margin + index * (width + gap);
+      doc.roundedRect(x, y, width, 16, 3, 3, "S");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(7);
       setColor(doc, "setTextColor", CLUB_BRAND.colors.muted);
-      doc.text(String(label).toUpperCase(), x + 4, y + 5);
+      doc.text(label.toUpperCase(), x + 4, y + 5);
       doc.setFontSize(13);
-      setColor(doc, "setTextColor", index === cards.length - 1 ? CLUB_BRAND.colors.ink : CLUB_BRAND.colors.greenDark);
-      doc.text(String(value), x + 4, y + 12);
+      setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+      doc.text(value, x + 4, y + 12);
     });
   }
-
-  function columns() {
-    if (showRes && showJuv) return [
-      { key: "idx", label: "#", w: 12 },
-      { key: "player", label: "Jugador", w: 100 },
-      { key: "position", label: "Posición", w: 44 },
-      { key: "res", label: "Reserva", w: 42 },
-      { key: "juv", label: "Juveniles", w: 42 },
-      { key: "total", label: "Total", w: 33 },
-    ];
-    return [
-      { key: "idx", label: "#", w: 12 },
-      { key: "player", label: "Jugador", w: 120 },
-      { key: "position", label: "Posición", w: 55 },
-      { key: showRes ? "res" : "juv", label: showRes ? "Reserva" : "Juveniles", w: 50 },
-      { key: "total", label: "Total", w: 36 },
-    ];
-  }
-
-  const cols = columns();
 
   function drawTableHeader(y) {
     setColor(doc, "setFillColor", CLUB_BRAND.colors.greenDark);
@@ -137,44 +106,43 @@ export async function generateMinutesPdf({ rows, torneo, viewMode, playerMap, ac
     doc.setFontSize(7);
     doc.setTextColor(255, 255, 255);
     let x = margin;
-    cols.forEach((col) => {
-      doc.text(col.label.toUpperCase(), x + 3, y + 5.3);
-      x += col.w;
+    columns.forEach((column) => {
+      doc.text(column.label.toUpperCase(), x + 3, y + 5.3);
+      x += column.width;
     });
   }
 
-  function rowValue(row, key, index) {
-    const player = row.player_id ? playerMap[row.player_id] : null;
-    if (key === "idx") return String(index + 1);
-    if (key === "player") return row.player_name || "—";
-    if (key === "position") return player?.position || "—";
-    if (key === "res") return `${fmtMinutes(row.res)} · ${pct(row.res, torneo?.res_total)}`;
-    if (key === "juv") return `${fmtMinutes(row.juv)} · ${pct(row.juv, torneo?.juv_total)}`;
-    return fmtMinutes((showRes ? Number(row.res || 0) : 0) + (showJuv ? Number(row.juv || 0) : 0));
-  }
-
   function drawRow(row, index, y) {
-    const rowH = 8;
     if (index % 2 === 0) {
       setColor(doc, "setFillColor", CLUB_BRAND.colors.panel);
-      doc.rect(margin, y, contentW, rowH, "F");
+      doc.rect(margin, y, contentW, 8, "F");
     }
     setColor(doc, "setDrawColor", CLUB_BRAND.colors.line);
-    doc.line(margin, y + rowH, pageW - margin, y + rowH);
+    doc.line(margin, y + 8, pageW - margin, y + 8);
+    const values = [
+      String(row.rank),
+      row.player_name,
+      row.position,
+      String(row.matchesCount),
+      String(row.starts),
+      String(row.subEntries),
+      formatMinutes(row.accumulatedMinutes),
+      formatMinutes(row.availableMinutes),
+      formatPercent(row.percentage),
+    ];
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     let x = margin;
-    cols.forEach((col) => {
-      const value = rowValue(row, col.key, index);
-      const text = doc.splitTextToSize(String(value), col.w - 6)[0] || "";
+    values.forEach((value, indexValue) => {
+      const text = doc.splitTextToSize(String(value || "—"), columns[indexValue].width - 6)[0] || "";
       doc.text(text, x + 3, y + 5.2);
-      x += col.w;
+      x += columns[indexValue].width;
     });
   }
 
-  drawFirstHeader();
-  drawStats(margin + 40);
+  drawHeader();
+  drawCards(margin + 40);
   let y = margin + 62;
   drawTableHeader(y);
   y += 8;
@@ -182,7 +150,7 @@ export async function generateMinutesPdf({ rows, torneo, viewMode, playerMap, ac
   rows.forEach((row, index) => {
     if (y + 8 > pageH - margin - 8) {
       doc.addPage();
-      y = margin + 18;
+      y = margin;
       drawTableHeader(y);
       y += 8;
     }
@@ -193,13 +161,11 @@ export async function generateMinutesPdf({ rows, torneo, viewMode, playerMap, ac
   const totalPages = doc.getNumberOfPages();
   for (let page = 1; page <= totalPages; page += 1) {
     doc.setPage(page);
-    if (page > 1) drawSmallHeader(page, totalPages);
     doc.setFont("helvetica", "normal");
     doc.setFontSize(8);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.muted);
-    doc.text(`Página ${page} de ${totalPages}`, pageW - margin - 25, pageH - 7);
+    doc.text(`Página ${page} de ${totalPages}`, pageW - margin - 24, pageH - 6);
   }
 
-  const safeView = viewLabel.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-  doc.save(`minutos-jugados-${safeView}-${moment().format("YYYYMMDD-HHmm")}.pdf`);
+  doc.save(`minutos-jugados-${moment().format("YYYYMMDD-HHmm")}.pdf`);
 }
