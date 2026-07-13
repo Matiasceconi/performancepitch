@@ -104,6 +104,26 @@
       "type": "number",
       "description": "Duraci\u00f3n real total del partido, incluyendo tiempo agregado o alargue"
     },
+    "duration_source": {
+      "type": "string",
+      "description": "Origen de la duraci\u00f3n: manual, calculated_from_max_player o default_90_requires_review"
+    },
+    "duration_calculated_at": {
+      "type": "string",
+      "description": "Fecha/hora del c\u00e1lculo autom\u00e1tico de duraci\u00f3n"
+    },
+    "duration_confirmed_at": {
+      "type": "string",
+      "description": "Fecha/hora de confirmaci\u00f3n manual de duraci\u00f3n"
+    },
+    "duration_review_status": {
+      "type": "string",
+      "description": "Estado de revisi\u00f3n de la duraci\u00f3n"
+    },
+    "duration_review_note": {
+      "type": "string",
+      "description": "Motivo de revisi\u00f3n de duraci\u00f3n"
+    },
     "rival_formation": {
       "type": "string",
       "description": "Formaci\u00f3n del rival (ej: 4-3-3)"

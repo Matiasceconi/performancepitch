@@ -170,8 +170,14 @@ export default function MinutosTab({ match, players = [], onRegisterSave, onMatc
       const legacyByPlayer = legacyRecords.reduce((acc, row) => ({ ...acc, [row.player_id]: [...(acc[row.player_id] || []), row] }), {});
       const matchLabel = `vs ${match.rival} ${moment(match.date).format("DD/MM/YY")}`;
       const tournament = getTournament(match);
-      await base44.entities.MatchReport.update(match.id, { total_duration_minutes: totalDuration });
-      onMatchUpdated?.({ total_duration_minutes: totalDuration });
+      const durationPatch = {
+        total_duration_minutes: totalDuration,
+        duration_source: "manual",
+        duration_confirmed_at: new Date().toISOString(),
+        duration_review_status: "Duración manual",
+      };
+      await base44.entities.MatchReport.update(match.id, durationPatch);
+      onMatchUpdated?.(durationPatch);
       for (const row of rows) {
         const enteredMinute = row.entry.is_starter ? null : normalizeMinute(row.entry.in_minute);
         const exitMinute = normalizeMinute(row.entry.out_minute);

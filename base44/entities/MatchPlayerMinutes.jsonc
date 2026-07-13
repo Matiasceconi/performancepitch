@@ -115,6 +115,10 @@
       "default": "match_minutes_tab",
       "description": "Origen del registro"
     },
+    "data_source": {
+      "type": "string",
+      "description": "Origen de recuperaci\u00f3n o carga del dato"
+    },
     "updated_at": {
       "type": "string",
       "description": "Fecha/hora l\u00f3gica de \u00faltima actualizaci\u00f3n"
