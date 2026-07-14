@@ -134,7 +134,7 @@ export default function ExternalGpsDashboard() {
       setMedicalEpisodes(allMedicalEpisodes.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
       setMedicalStatuses(allMedicalStatuses.filter((s) => (!selectedSquadId || !s.squad_id || s.squad_id === selectedSquadId)));
       setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
-      setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId) : allWeeklyPlans);
+      setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId && (!selectedSeason || !p.season_id || p.season_id === selectedSeason)) : allWeeklyPlans);
 
       const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId && (!selectedSeason || !s.season_id || s.season_id === selectedSeason));
       setSessions(squadSessions);
@@ -416,7 +416,7 @@ export default function ExternalGpsDashboard() {
       </div>
 
       {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} onReload={load} />
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} onReload={load} />
       )}
 
       {activeTab === "sessions" && (

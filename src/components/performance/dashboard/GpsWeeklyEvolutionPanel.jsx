@@ -8,7 +8,9 @@ import GpsMicrocycleHighlights from "./GpsMicrocycleHighlights";
 import GpsMicrocyclePdfButton from "./GpsMicrocyclePdfButton";
 import GpsMicrocycleFiltersPanel, { getMicrocycleFilterLabels } from "./GpsMicrocycleFiltersPanel";
 import GpsMicrocycleHistoryPanel from "./GpsMicrocycleHistoryPanel";
-import GpsPositionRadar from "./GpsPositionRadar";
+import GpsMicrocycleWeekNavigator from "./GpsMicrocycleWeekNavigator";
+import GpsMicrocycleDayHeader from "./GpsMicrocycleDayHeader";
+import GpsDailyPlayerTable from "./GpsDailyPlayerTable";
 import {
   MICRO_METRICS,
   buildDailySummaries,
@@ -126,12 +128,14 @@ function ObjectiveComparisonTable({ rows }) {
   );
 }
 
-export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [] }) {
+export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], competitionProfiles = [], microcycleProfiles = [] }) {
   const reportCaptureRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [summaries, setSummaries] = useState([]);
   const [cycleMode, setCycleMode] = useState("current");
   const [selectedSummaryId, setSelectedSummaryId] = useState("");
+  const [selectedWeekStart, setSelectedWeekStart] = useState("");
+  const [selectedDate, setSelectedDate] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [savingState, setSavingState] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
@@ -156,7 +160,16 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     if (cycleMode === "lastSaved" && latestSummary && selectedSummaryId !== latestSummary.id) setSelectedSummaryId(latestSummary.id);
   }, [cycleMode, latestSummary, selectedSummaryId]);
 
-  const normalizedCurrentDays = useMemo(() => getCycleDays(cycleDays), [cycleDays]);
+  const selectedPlan = useMemo(() => {
+    if (!weeklyPlans.length) return null;
+    return weeklyPlans.find((plan) => plan.week_start === selectedWeekStart) || weeklyPlans.find((plan) => (plan.days_data || []).some((day) => day.date === moment().format("YYYY-MM-DD"))) || weeklyPlans[0];
+  }, [weeklyPlans, selectedWeekStart]);
+
+  useEffect(() => {
+    if (!selectedWeekStart && selectedPlan?.week_start) setSelectedWeekStart(selectedPlan.week_start);
+  }, [selectedWeekStart, selectedPlan]);
+
+  const normalizedCurrentDays = useMemo(() => getCycleDays(selectedPlan?.days_data?.length ? selectedPlan.days_data : cycleDays), [selectedPlan, cycleDays]);
   const baseCycleDays = useMemo(() => {
     if ((cycleMode === "historical" || cycleMode === "lastSaved") && selectedSummary) return daysFromSummary(selectedSummary);
     if (cycleMode === "previous") return normalizedCurrentDays.map((d) => ({ ...d, date: addDays(d.date, -7) }));
@@ -224,7 +237,17 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     });
   }, [effectiveCycleDays, sessionAverages]);
 
-  const cycleTitle = selectedSummary?.nombre_microciclo || selectedSummary?.microcycle_name || `Microciclo ${nextMicrocycleNumber}`;
+  const cycleTitle = selectedSummary?.nombre_microciclo || selectedSummary?.microcycle_name || `Microciclo ${selectedPlan?.microcycle_number || nextMicrocycleNumber}`;
+  const selectedDay = useMemo(() => baseCycleDays.find((day) => day.date === selectedDate) || baseCycleDays[0] || null, [baseCycleDays, selectedDate]);
+
+  useEffect(() => {
+    if (!baseCycleDays.length) return;
+    const today = moment().format("YYYY-MM-DD");
+    const todayInCycle = baseCycleDays.find((day) => day.date === today);
+    const lastWithGps = [...baseCycleDays].reverse().find((day) => sessions.some((s) => s.date === day.date && (gpsBySession[s.id] || []).length > 0));
+    const nextDate = todayInCycle?.date || lastWithGps?.date || baseCycleDays[0]?.date || "";
+    if (!selectedDate || !baseCycleDays.some((day) => day.date === selectedDate)) setSelectedDate(nextDate);
+  }, [baseCycleDays, sessions, gpsBySession, selectedDate]);
 
   async function saveMicrocycle(nextState, silent = false) {
     if (!squadId || !weekStart || !weekEnd) return;
@@ -292,7 +315,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     await loadSummaries();
     if (!silent) {
       setSavingState("");
-      setSaveMessage(nextState === "finalizado" ? "Microciclo guardado y archivado como snapshot histórico." : "Microciclo guardado en historial.");
+      setSaveMessage(nextState === "finalizado" ? "Informe semanal cerrado y guardado como snapshot histórico." : "Informe semanal guardado.");
     }
   }
 
@@ -312,13 +335,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     setSaveMessage("Microciclo eliminado.");
   }
 
-  useEffect(() => {
-    const hasFilters = Object.keys(filters || {}).some((key) => filters[key] && !(Array.isArray(filters[key]) && filters[key].length === 0));
-    const existing = summaries.find((s) => s.squad_id === squadId && s.fecha_inicio === weekStart && (!season || !s.season_id || s.season_id === season));
-    if (cycleMode !== "current" || hasFilters || !squadId || !weekStart || !weekEnd || !cycleRows.length || existing?.snapshot_locked || ["finalizado", "archivado", "cerrado", "congelado"].includes(existing?.estado)) return;
-    const timer = setTimeout(() => saveMicrocycle("en_curso", true), 2500);
-    return () => clearTimeout(timer);
-  }, [cycleMode, squadId, weekStart, weekEnd, cycleRows.length, summaries.length]);
+  // La semana ahora se encuentra desde WeeklyPlan; el informe cerrado es opcional y no se guarda automáticamente.
 
   return (
     <div className="space-y-5">
@@ -330,23 +347,22 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
             <p className="text-zinc-400 text-sm mt-1">{squadName || "Plantel activo"} · {weekStart ? moment(weekStart).format("DD/MM") : ""} - {weekEnd ? moment(weekEnd).format("DD/MM/YYYY") : ""}</p>
             {saveMessage && <p className="text-emerald-300 text-xs font-semibold mt-2 flex items-center gap-1"><CheckCircle2 size={13} />{saveMessage}</p>}
           </div>
-          <div className="flex gap-2 flex-wrap"><Link to="/performance/microcycle-history" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold"><History size={16} />Historial de Microciclos</Link><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /><button onClick={() => saveMicrocycle("finalizado")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{savingState === "finalizado" ? "Archivando..." : "Guardar y Archivar Microciclo"}</button></div>
-        </div>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-          <label className="space-y-1"><span className="text-xs font-semibold text-zinc-400">Selector de microciclo</span><select value={cycleMode} onChange={(e) => { const value = e.target.value; setCycleMode(value); if (value === "current") setSelectedSummaryId(""); if (value === "lastSaved") setSelectedSummaryId(latestSummary?.id || ""); if (value === "historical") setSelectedSummaryId(""); }} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="current">Microciclo actual</option><option value="lastSaved">Último microciclo guardado</option><option value="historical">Elegir otro microciclo</option></select></label>
-          {cycleMode === "historical" && <label className="space-y-1 lg:col-span-2"><span className="text-xs font-semibold text-zinc-400">Histórico de microciclos</span><select value={selectedSummaryId} onChange={(e) => setSelectedSummaryId(e.target.value)} className="w-full bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white"><option value="">Seleccionar histórico...</option>{summaries.map((s) => <option key={s.id} value={s.id}>{s.nombre_microciclo || s.microcycle_name || s.fecha_inicio} · {s.fecha_inicio} - {s.fecha_fin} · {s.estado || "abierto"}</option>)}</select></label>}
-          {cycleMode === "lastSaved" && <div className="space-y-1 lg:col-span-2"><span className="text-xs font-semibold text-zinc-400">Último guardado</span><div className="bg-zinc-950 border border-zinc-800 rounded-xl px-3 py-2 text-sm text-white">{latestSummary ? `${latestSummary.nombre_microciclo || latestSummary.microcycle_name || latestSummary.fecha_inicio} · ${latestSummary.fecha_inicio} - ${latestSummary.fecha_fin}` : "Sin microciclos guardados"}</div></div>}
+          <div className="flex gap-2 flex-wrap"><Link to="/performance/microcycle-history" className="inline-flex items-center gap-2 px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-bold"><History size={16} />Historial de informes</Link><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /><button onClick={() => saveMicrocycle("finalizado")} disabled={!!savingState} className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-zinc-700 text-white rounded-xl text-sm font-bold"><Archive size={16} />{savingState === "finalizado" ? "Cerrando..." : "Cerrar informe semanal"}</button></div>
         </div>
       </div>
 
       {showHistory && <GpsMicrocycleHistoryPanel summaries={summaries} selectedSummaryId={selectedSummaryId} onSelect={(id) => { setSelectedSummaryId(id); setCycleMode("historical"); setShowHistory(false); }} onUpdate={updateMicrocycleSummary} onDelete={deleteMicrocycleSummary} onClose={() => setShowHistory(false)} />}
+
+      <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedWeekStart={selectedPlan?.week_start || selectedWeekStart} onSelectWeek={(weekStart) => { setSelectedWeekStart(weekStart); setCycleMode("current"); setSelectedSummaryId(""); setFilters((current) => ({ ...current, selectedDates: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
+      <GpsMicrocycleDayHeader days={baseCycleDays} sessions={sessions} gpsBySession={gpsBySession} selectedDate={selectedDate} onSelectDate={setSelectedDate} />
+      <GpsDailyPlayerTable selectedDate={selectedDate} sessions={sessions} gpsBySession={gpsBySession} playerMap={playerMap} microcycleProfiles={microcycleProfiles} competitionProfiles={competitionProfiles} squadId={squadId} season={season} selectedDay={selectedDay} />
+      {selectedDate && <div className="flex justify-end"><button onClick={() => setFilters((current) => ({ ...current, selectedDates: [selectedDate] }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Filtrar gráficos por este día</button></div>}
 
       <div ref={reportCaptureRef} className="space-y-5">
         {filterLabels.length > 0 && <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-4"><p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Filtros aplicados</p><div className="flex flex-wrap gap-2">{filterLabels.map((label) => <span key={label} className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold">{label}</span>)}</div></div>}
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
           {visibleMetrics.map((metric) => <MetricChart key={metric.key} metric={metric} data={shownDailySummaries} />)}
         </div>
-        <GpsPositionRadar rows={cycleRows} />
         <GpsMicrocycleHighlights highlights={shownHighlights} />
         <ObjectiveComparisonTable rows={objectiveTableRows} />
       </div>
