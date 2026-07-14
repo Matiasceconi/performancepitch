@@ -2,15 +2,22 @@ import moment from "moment";
 import { isGoalkeeper, resolvePositionGroup } from "@/components/squad/squadConstants";
 
 export const MICRO_METRICS = [
-  { key: "total_distance", label: "Distancia total", short: "Dist. total", unit: "m", color: "#22c55e", mode: "avg" },
-  { key: "m_min", label: "m/min", short: "m/min", unit: "", color: "#60a5fa", mode: "avg" },
-  { key: "distance_19_8", label: "D >19.8", short: "D >19.8", unit: "m", color: "#f97316", mode: "avg" },
-  { key: "distance_25", label: "D >25", short: "D >25", unit: "m", color: "#ef4444", mode: "avg" },
-  { key: "sprints", label: "Sprints", short: "Sprints", unit: "", color: "#f59e0b", mode: "avg" },
-  { key: "acc_3", label: "ACC +3", short: "ACC +3", unit: "", color: "#a855f7", mode: "avg" },
-  { key: "dec_3", label: "DEC +3", short: "DEC +3", unit: "", color: "#14b8a6", mode: "avg" },
-  { key: "player_load", label: "Player Load", short: "PL", unit: "u", color: "#3b82f6", mode: "avg" },
-  { key: "smax", label: "Vel. máxima", short: "Vel. máx.", unit: "km/h", color: "#eab308", mode: "max" },
+  { key: "total_distance", label: "Distancia total", short: "Dist. total", unit: "m", color: "#22c55e", mode: "avg", rankMode: "sum", group: "Volumen" },
+  { key: "player_load", label: "Player Load", short: "PL", unit: "u", color: "#3b82f6", mode: "avg", rankMode: "sum", group: "Volumen" },
+  { key: "duration_minutes", label: "Minutos", short: "Min.", unit: "min", color: "#84cc16", mode: "sum", rankMode: "sum", group: "Volumen" },
+  { key: "sessions_count", label: "Sesiones", short: "Ses.", unit: "", color: "#10b981", mode: "sum", rankMode: "countSessions", group: "Volumen" },
+  { key: "m_min", label: "m/min", short: "m/min", unit: "", color: "#60a5fa", mode: "avg", rankMode: "weightedDistanceDuration", group: "Intensidad" },
+  { key: "distance_14_19_8", label: "D 14–19,8", short: "D 14–19,8", unit: "m", color: "#38bdf8", mode: "avg", rankMode: "sum", group: "Intensidad" },
+  { key: "distance_19_8", label: "D 19,8–25", short: "D 19,8–25", unit: "m", color: "#f97316", mode: "avg", rankMode: "sum", group: "Intensidad" },
+  { key: "distance_25", label: "D +25", short: "D +25", unit: "m", color: "#ef4444", mode: "avg", rankMode: "sum", group: "Intensidad" },
+  { key: "sprints", label: "Sprints", short: "Sprints", unit: "", color: "#f59e0b", mode: "avg", rankMode: "sum", group: "Intensidad" },
+  { key: "smax", label: "Vel. máxima", short: "Vel. máx.", unit: "km/h", color: "#eab308", mode: "max", rankMode: "max", group: "Intensidad" },
+  { key: "max_vel_percent", label: "% Vel. máxima", short: "% Vel.", unit: "%", color: "#fde047", mode: "max", rankMode: "max", group: "Intensidad" },
+  { key: "acc_3", label: "ACC +3", short: "ACC +3", unit: "", color: "#a855f7", mode: "avg", rankMode: "sum", group: "Neuromuscular" },
+  { key: "dec_3", label: "DEC +3", short: "DEC +3", unit: "", color: "#14b8a6", mode: "avg", rankMode: "sum", group: "Neuromuscular" },
+  { key: "hmld", label: "HMLD", short: "HMLD", unit: "m", color: "#fb7185", mode: "avg", rankMode: "sum", group: "Neuromuscular" },
+  { key: "rhie_bouts", label: "RHIE", short: "RHIE", unit: "", color: "#c084fc", mode: "avg", rankMode: "sum", group: "Neuromuscular" },
+  { key: "player_load_per_min", label: "Player Load/min", short: "PL/min", unit: "u/min", color: "#818cf8", mode: "avg", rankMode: "weightedPlayerLoadDuration", group: "Intensidad" },
 ];
 
 export const HIGHLIGHT_METRICS = [
@@ -28,11 +35,12 @@ export const HIGHLIGHT_METRICS = [
 export function fmt(value, unit = "") {
   if (value == null || Number.isNaN(Number(value))) return "—";
   const n = Number(value);
-  const shown = unit === "km/h" || n < 100 ? n.toFixed(1) : Math.round(n).toLocaleString("es-AR");
+  const shown = unit === "km/h" || unit === "u/min" || unit === "%" || n < 100 ? n.toFixed(1) : Math.round(n).toLocaleString("es-AR");
   return `${shown} ${unit}`.trim();
 }
 
 export function aggregateMetric(rows, key, mode = "avg") {
+  if (key === "sessions_count") return new Set(rows.map((r) => r.session_id).filter(Boolean)).size || null;
   const values = rows.map((r) => Number(r[key])).filter((v) => Number.isFinite(v));
   if (!values.length) return null;
   if (mode === "sum") return values.reduce((a, b) => a + b, 0);
@@ -64,6 +72,10 @@ export function normalizeRows(rows, playerMap) {
       position_group: player?.position_group || resolvePositionGroup(player?.position) || "",
       player_type: isGoalkeeper(player) ? "arqueros" : "campo",
       row_status: rowStatus(r),
+      duration_minutes: Number(r.duration_minutes || r.minutes || r.duration || duration || 0),
+      distance_14_19_8: Number(r.distance_14_19_8 ?? r.distance_14_198 ?? r.distance_14_19 ?? r.dist_14_19_8 ?? 0),
+      hmld: Number(r.hmld ?? r.hml_distance ?? r.high_metabolic_load_distance ?? 0),
+      rhie_bouts: Number(r.rhie_bouts ?? r.rhie ?? 0),
       player_load_per_min: r.player_load_per_min || (duration ? r.player_load / duration : 0),
     };
   });
@@ -160,20 +172,53 @@ export function rowsForCycle({ sessions, gpsBySession, cycleDays, playerMap, fil
   return includeExcluded ? [...split.main, ...split.excluded] : split.main;
 }
 
-export function buildHighlights(rows, playerMap, metrics = HIGHLIGHT_METRICS) {
+function rowDuration(row) {
+  const direct = Number(row.duration_minutes || row.minutes || row.duration || 0);
+  if (direct) return direct;
+  const distance = Number(row.total_distance || 0);
+  const mMin = Number(row.m_min || 0);
+  return distance && mMin ? distance / mMin : 0;
+}
+
+function rankingValue(summary, metric) {
+  if (metric.rankMode === "max" || metric.mode === "max") return summary.max;
+  if (metric.rankMode === "countSessions") return summary.sessions.size;
+  if (metric.rankMode === "weightedDistanceDuration") return summary.duration > 0 ? summary.total_distance / summary.duration : null;
+  if (metric.rankMode === "weightedPlayerLoadDuration") return summary.duration > 0 ? summary.player_load / summary.duration : null;
+  return summary.sum;
+}
+
+export function buildHighlights(rows, playerMap, metrics = HIGHLIGHT_METRICS, options = {}) {
+  const topCount = options.topCount || 3;
   return metrics.map((metric) => {
     const byPlayer = {};
     rows.forEach((row) => {
+      if (!row.player_id) return;
       const value = Number(row[metric.key]);
-      if (!Number.isFinite(value) || value <= 0) return;
-      const player = playerMap[row.player_id];
-      const current = byPlayer[row.player_id] || { player, name: row.player_name || player?.full_name || "Jugador", values: [], value: metric.mode === "max" ? 0 : 0 };
-      current.values.push(value);
-      current.value = metric.mode === "max" ? Math.max(current.value, value) : metric.mode === "avg" ? current.values.reduce((a, b) => a + b, 0) / current.values.length : current.value + value;
+      const duration = rowDuration(row);
+      const player = row.player || playerMap[row.player_id];
+      const current = byPlayer[row.player_id] || { player, player_id: row.player_id, name: row.player_name || player?.full_name || "Jugador", position: player?.position || row.position || "", sum: 0, max: null, duration: 0, total_distance: 0, player_load: 0, sessions: new Set() };
+      if (metric.rankMode === "weightedDistanceDuration") {
+        const distance = Number(row.total_distance || 0);
+        if (distance > 0 && duration > 0) { current.total_distance += distance; current.duration += duration; }
+      } else if (metric.rankMode === "weightedPlayerLoadDuration") {
+        const load = Number(row.player_load || 0);
+        if (load > 0 && duration > 0) { current.player_load += load; current.duration += duration; }
+      } else if (metric.rankMode === "countSessions") {
+        if (row.session_id) current.sessions.add(row.session_id);
+      } else if (Number.isFinite(value) && value > 0) {
+        if (metric.rankMode === "max" || metric.mode === "max") current.max = current.max == null ? value : Math.max(current.max, value);
+        else current.sum += value;
+      }
       byPlayer[row.player_id] = current;
     });
-    const top = Object.values(byPlayer).sort((a, b) => b.value - a.value).slice(0, 3);
-    return { metric, top, best: top[0] || null };
+    const top = Object.values(byPlayer)
+      .map((item) => ({ ...item, value: rankingValue(item, metric) }))
+      .filter((item) => Number.isFinite(Number(item.value)) && Number(item.value) > 0)
+      .sort((a, b) => b.value - a.value)
+      .slice(0, topCount)
+      .map((item, index) => ({ ...item, rank: index + 1, sessions: Array.from(item.sessions || []) }));
+    return { metric, top, best: top[0] || null, topCount, scope: options.scope || "Microciclo completo" };
   });
 }
 

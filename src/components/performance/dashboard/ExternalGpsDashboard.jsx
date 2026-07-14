@@ -70,6 +70,8 @@ export default function ExternalGpsDashboard() {
   const [medicalStatuses, setMedicalStatuses] = useState([]);
   const [memberships, setMemberships] = useState([]);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [calendarEvents, setCalendarEvents] = useState([]);
+  const [matchReports, setMatchReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("");
@@ -144,7 +146,7 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans, allCalendarEvents, allMatchReports] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
@@ -153,6 +155,8 @@ export default function ExternalGpsDashboard() {
         base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
         base44.entities.SquadMembership.list("-created_date", 2000),
         base44.entities.WeeklyPlan.list("-week_start", 100),
+        base44.entities.DayEvent.list("-date", 500),
+        base44.entities.MatchReport.list("-date", 500),
       ]);
       const objectiveRows = await base44.entities.PhysicalObjective.list("order", 100);
       setPhysicalObjectives(objectiveRows.filter((o) => o.active !== false && o.hidden !== true).map((o) => o.name).filter(Boolean));
@@ -164,6 +168,8 @@ export default function ExternalGpsDashboard() {
       setMedicalStatuses(allMedicalStatuses.filter((s) => (!selectedSquadId || !s.squad_id || s.squad_id === selectedSquadId)));
       setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
       setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId && (!selectedSeason || !p.season_id || p.season_id === selectedSeason)) : allWeeklyPlans);
+      setCalendarEvents(allCalendarEvents.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
+      setMatchReports(allMatchReports.filter((m) => (!selectedSquadId || !m.squad_id || m.squad_id === selectedSquadId) && (!selectedSeason || !m.season_id || m.season_id === selectedSeason)));
 
       const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId && (!selectedSeason || !s.season_id || s.season_id === selectedSeason));
       setSessions(squadSessions);
@@ -447,7 +453,7 @@ export default function ExternalGpsDashboard() {
       </div>
 
       {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} onReload={load} />
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} calendarEvents={calendarEvents} matchReports={matchReports} onReload={load} />
       )}
 
       {activeTab === "sessions" && (
