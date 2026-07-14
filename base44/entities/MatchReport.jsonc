@@ -128,6 +128,22 @@
       "type": "string",
       "description": "Formaci\u00f3n del rival (ej: 4-3-3)"
     },
+    "tactical_system": {
+      "type": "string",
+      "description": "Sistema t\u00e1ctico propio de la formaci\u00f3n, por ejemplo 4-2-3-1"
+    },
+    "formation_positions": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Ubicaciones de titulares en el campo: player_id, x, y"
+    },
+    "formation_updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima actualizaci\u00f3n de la formaci\u00f3n"
+    },
     "rival_notes": {
       "type": "string",
       "description": "An\u00e1lisis general del rival"

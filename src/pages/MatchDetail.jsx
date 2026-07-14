@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import ConvocadosTab from "@/components/matches/tabs/ConvocadosTab";
+import FormacionTab from "@/components/matches/tabs/FormacionTab";
 import MinutosTab from "@/components/matches/tabs/MinutosTab";
 import GpsTab from "@/components/matches/tabs/GpsTab";
 import PlanVideoTab from "@/components/matches/tabs/PlanVideoTab";
@@ -18,7 +19,7 @@ import { eventPayloadFromMatch } from "@/lib/matchCalendarSync";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
-const TAB_ALIASES = { plan: "plan-video", "plan-video": "plan-video", convocados: "convocados", minutos: "minutos", gps: "gps", logistica: "logistica" };
+const TAB_ALIASES = { plan: "plan-video", "plan-video": "plan-video", convocados: "convocados", formacion: "formacion", formation: "formacion", minutos: "minutos", gps: "gps", logistica: "logistica" };
 
 function formatSpanishDate(date) {
   const value = moment(date).format("dddd DD [de] MMMM [de] YYYY");
@@ -392,6 +393,7 @@ export default function MatchDetail() {
       <Tabs value={activeTab} onValueChange={changeTab} className="space-y-4">
         <TabsList className="h-auto flex w-full flex-wrap justify-start gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 p-2">
           <TabsTrigger value="convocados" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">Convocados</TabsTrigger>
+          <TabsTrigger value="formacion" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">Formación del equipo</TabsTrigger>
           <TabsTrigger value="minutos" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">Minutos jugados</TabsTrigger>
           <TabsTrigger value="gps" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">GPS</TabsTrigger>
           <TabsTrigger value="plan-video" className="rounded-xl px-4 py-2 text-sm data-[state=active]:bg-yellow-500 data-[state=active]:text-zinc-950">Plan y video</TabsTrigger>
@@ -400,6 +402,9 @@ export default function MatchDetail() {
 
         <TabsContent value="convocados" className="mt-0">
           <ConvocadosTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />
+        </TabsContent>
+        <TabsContent value="formacion" className="mt-0">
+          <FormacionTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />
         </TabsContent>
         <TabsContent value="minutos" className="mt-0">
           <MinutosTab match={match} players={players} onRegisterSave={setHeaderSave} onMatchUpdated={handleMatchUpdated} refreshKey={callupsVersion} />

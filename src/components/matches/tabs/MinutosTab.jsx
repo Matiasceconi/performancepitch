@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import moment from "moment";
-import { AlertTriangle, Clock3, RefreshCw, Save, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { AlertTriangle, Clock3, RefreshCw, Save, ShieldCheck, UserPlus } from "lucide-react";
 
 import { base44 } from "@/api/base44Client";
 import TransparentPlayerPhoto from "@/components/player/PlayerPhoto";
@@ -137,13 +137,6 @@ export default function MinutosTab({ match, players = [], onRegisterSave, onMatc
     patchEntry(playerId, { is_starter: value, entered: value ? true : entries[playerId]?.entered ?? false, in_minute: value ? "" : entries[playerId]?.in_minute || "" });
   }
 
-  function markStartingXI() {
-    const next = {};
-    calledPlayers.forEach((player, index) => { next[player.id] = { ...(entries[player.id] || {}), is_starter: index < 11, entered: index < 11, in_minute: index < 11 ? "" : entries[player.id]?.in_minute || "" }; });
-    setEntries(next);
-    setDirty(true);
-  }
-
   function setFullDurationToStarters() {
     const next = { ...entries };
     calledPlayers.forEach((player) => {
@@ -260,7 +253,7 @@ export default function MinutosTab({ match, players = [], onRegisterSave, onMatc
               <span className="text-[11px] text-yellow-100/80">Ingresá la duración real del partido, incluyendo el tiempo agregado.</span>
             </label>
           </div>
-          <div className="flex flex-wrap gap-2"><button onClick={markStartingXI} className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-200 transition hover:bg-zinc-700"><Users size={13} className="mr-1 inline" /> Marcar XI titulares</button><button onClick={setFullDurationToStarters} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 transition hover:bg-emerald-500/20"><ShieldCheck size={13} className="mr-1 inline" /> Duración completa a titulares</button><button onClick={markSubsWithoutEntry} className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-300 transition hover:bg-blue-500/20"><UserPlus size={13} className="mr-1 inline" /> Marcar suplentes sin ingreso</button><button onClick={saveAll} disabled={!dirty || saving} className="rounded-lg bg-yellow-500 px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"><Save size={13} className="mr-1 inline" /> {saving ? "Guardando..." : "Guardar todo"}</button></div>
+          <div className="flex flex-wrap gap-2"><button onClick={setFullDurationToStarters} className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-300 transition hover:bg-emerald-500/20"><ShieldCheck size={13} className="mr-1 inline" /> Duración completa a titulares</button><button onClick={markSubsWithoutEntry} className="rounded-lg border border-blue-500/30 bg-blue-500/10 px-3 py-2 text-xs text-blue-300 transition hover:bg-blue-500/20"><UserPlus size={13} className="mr-1 inline" /> Marcar suplentes sin ingreso</button><button onClick={saveAll} disabled={!dirty || saving} className="rounded-lg bg-yellow-500 px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-yellow-400 disabled:cursor-not-allowed disabled:opacity-50"><Save size={13} className="mr-1 inline" /> {saving ? "Guardando..." : "Guardar todo"}</button></div>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-500"><span className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1">{calledPlayers.length} convocados</span><span className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1">{starterCount} titulares</span><span className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1">{enteredSubs} suplentes ingresaron</span><span className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1">{noEntrySubs} no ingresaron</span><span className="rounded-full border border-zinc-700 bg-zinc-950 px-3 py-1">Estado: {statusText}</span></div>
         {validation.errors.length > 0 && <div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200"><AlertTriangle size={14} className="mr-1 inline" /> {validation.errors[0]}</div>}

@@ -216,7 +216,9 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
       setDirty(false);
       setImportOpen(false);
       setAiReview(null);
-      onMatchUpdated?.({ squad_called: state.selectedPlayerIds, squad_names: state.selectedPlayerIds.map((id) => getPlayerName(state.playerMap.get(id))).filter(Boolean) });
+      const tacticalPatch = aiReview?.metadata?.system ? { tactical_system: aiReview.metadata.system } : {};
+      if (tacticalPatch.tactical_system) await base44.entities.MatchReport.update(match.id, tacticalPatch);
+      onMatchUpdated?.({ squad_called: state.selectedPlayerIds, squad_names: state.selectedPlayerIds.map((id) => getPlayerName(state.playerMap.get(id))).filter(Boolean), ...tacticalPatch });
       onCallupsUpdated?.();
       const titulares = rows.filter((row) => row.lineup_role === "titular").length;
       const suplentes = rows.filter((row) => row.lineup_role === "suplente").length;
