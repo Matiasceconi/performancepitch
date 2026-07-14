@@ -80,13 +80,13 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
             </button>
           </div>
         </div>
-        <div className={`${collapsed ? "hidden lg:flex" : "hidden"} h-full flex-col items-center justify-between py-4`}>
-          <div className="flex flex-col items-center gap-3">
+        <div className={`${collapsed ? "hidden lg:flex" : "hidden"} h-full flex-col items-center py-4`}>
+          <div className="flex shrink-0 flex-col items-center gap-3">
             <button
               type="button"
               onClick={() => onCollapsedChange?.(false)}
-              aria-label="Abrir menú"
-              title="Abrir menú"
+              aria-label="PerformancePitch"
+              title="PerformancePitch"
               className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-sm font-black text-yellow-400 transition-colors hover:border-yellow-400/40 hover:bg-zinc-800"
             >
               PP
@@ -96,19 +96,32 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
               onClick={() => onCollapsedChange?.(false)}
               aria-label="Abrir menú"
               title="Abrir menú"
-              className="flex h-9 w-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
+              className="flex h-10 w-10 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-zinc-700 hover:text-white"
             >
               <PanelLeftOpen size={16} />
             </button>
+            <div className="h-px w-9 bg-zinc-800" />
           </div>
-          <button
-            onClick={() => setShowProfile(true)}
-            aria-label="Abrir perfil de usuario"
-            title={user?.full_name || user?.email || "Usuario"}
-            className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-700 hover:bg-zinc-800"
-          >
-            <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">{user?.photo_url ? <img src={user.photo_url} className="w-7 h-7 rounded-full object-cover" alt="" /> : <User size={13} className="text-zinc-400" />}</div>
-          </button>
+          <nav className="mt-3 flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 [scrollbar-width:thin] [scrollbar-color:#3f3f46_transparent]">
+            {visibleItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return <Link key={item.path} to={item.path} title={item.label} aria-label={item.label} aria-current={isActive ? "page" : undefined} className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${isActive ? "border-yellow-400/50 text-zinc-950" : "border-transparent text-zinc-500 hover:bg-zinc-900 hover:text-white"}`} style={isActive ? { backgroundColor: "#F0C800", color: "#1a1a1a" } : {}}>
+                {isActive && <span className="absolute -left-2 top-2 h-6 w-1 rounded-r-full bg-yellow-400" />}
+                <item.icon size={18} />
+              </Link>;
+            })}
+          </nav>
+          <div className="flex shrink-0 flex-col items-center gap-3 pt-3">
+            {myAreas.length > 1 && <button type="button" onClick={requestAreaChange} aria-label="Cambiar área de trabajo" title="Cambiar área de trabajo" className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 text-zinc-400 transition-colors hover:border-zinc-700 hover:bg-zinc-800 hover:text-white"><Repeat size={16} /></button>}
+            <button
+              onClick={() => setShowProfile(true)}
+              aria-label="Abrir perfil de usuario"
+              title={user?.full_name || user?.email || "Usuario"}
+              className="flex h-10 w-10 items-center justify-center rounded-xl border border-zinc-800 bg-zinc-900 transition-colors hover:border-zinc-700 hover:bg-zinc-800"
+            >
+              <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">{user?.photo_url ? <img src={user.photo_url} className="w-7 h-7 rounded-full object-cover" alt="" /> : <User size={13} className="text-zinc-400" />}</div>
+            </button>
+          </div>
         </div>
         <button onClick={() => setOpen(false)} className="lg:hidden absolute top-4 right-4 text-zinc-500"><X size={18} /></button>
       </aside>

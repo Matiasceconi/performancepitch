@@ -482,7 +482,7 @@ export default function WeeklyPlannerBoard() {
   if (exportMode) return <MicrocycleExportView days={days} meta={meta} dayLoads={dayLoads} summary={autoText} sessionDetails={sessionDetails} sessionsById={sessionsById} sessionLibrary={sessionLibrary} calendarEvents={calendarEvents} physicalObjectives={physicalObjectives} showChart={exportWithChart} onExit={() => setExportMode(false)} />;
   if (loading) return <div className="h-64 flex items-center justify-center"><div className="w-7 h-7 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
 
-  return <div className="min-h-screen text-zinc-950 -m-6 p-6 space-y-3" style={{ background: CLUB_BRAND.colors.panel }}>
+  return <div className="min-h-screen w-full min-w-0 text-zinc-950 space-y-3" style={{ background: CLUB_BRAND.colors.panel }}>
     <input ref={aiInputRef} type="file" className="hidden" accept=".pdf,.xlsx,.xls,.doc,.docx,.csv,.png,.jpg,.jpeg" onChange={e => handleAiFile(e.target.files?.[0])} />
     <PlannerSettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} physicalObjectives={physicalObjectives} onRefreshObjectives={refreshPhysicalObjectives} cooldownOptions={cooldownOptions} onRefreshCooldown={refreshCooldownOptions} />
     {exportPromptOpen && <div className="fixed inset-0 z-50 bg-zinc-950/40 backdrop-blur-sm flex items-center justify-center p-4"><div className="w-full max-w-md rounded-3xl bg-white border border-zinc-200 shadow-2xl p-5"><p className="text-xs font-black uppercase tracking-widest text-emerald-700">Exportar microciclo</p><h3 className="text-xl font-black text-zinc-950 mt-1">Elegí el formato</h3><p className="text-sm text-zinc-500 mt-1">La vista de exportación se abrirá lista para imprimir o guardar como PDF.</p><div className="grid grid-cols-1 gap-2 mt-5"><button onClick={() => { setExportWithChart(true); setExportPromptOpen(false); setExportMode(true); }} className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-left"><b className="text-sm text-emerald-900">Exportar con gráfico de carga</b><p className="text-xs text-emerald-700 mt-1">Incluye distribución de carga externa.</p></button><button onClick={() => { setExportWithChart(false); setExportPromptOpen(false); setExportMode(true); }} className="rounded-2xl border border-zinc-200 bg-zinc-50 px-4 py-3 text-left"><b className="text-sm text-zinc-900">Exportar sin gráfico de carga</b><p className="text-xs text-zinc-500 mt-1">Versión más limpia y compacta.</p></button></div><button onClick={() => setExportPromptOpen(false)} className="mt-4 w-full rounded-xl bg-zinc-100 px-4 py-2 text-xs font-black text-zinc-600">Cancelar</button></div></div>}
@@ -508,10 +508,12 @@ export default function WeeklyPlannerBoard() {
 
     <MicrocycleTopSummary meta={meta} activeSquad={activeSquad} activeSeasonId={activeSeasonId} startDateLabel={meta.range_label} nextMatch={nextMatch} dayCount={days.length} />
 
-    <section className="grid grid-cols-1 xl:grid-cols-[190px_1fr] gap-4 items-start">
+    <section className="grid min-w-0 grid-cols-1 gap-4 items-start xl:grid-cols-[180px_minmax(0,1fr)]">
       <MicrocycleAreaLegend objectives={physicalObjectives} />
-      <div className="grid gap-3 overflow-x-auto" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(185px, 1fr))` }}>
-        {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={syncSessionFromDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
+      <div className="min-w-0 overflow-x-auto">
+        <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(170px, 1fr))` }}>
+          {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={syncSessionFromDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
+        </div>
       </div>
 
     </section>

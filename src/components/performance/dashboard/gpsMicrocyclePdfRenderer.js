@@ -75,14 +75,23 @@ function drawCycleDays(doc, logo, meta, days = []) {
   });
 }
 
-function drawBarChart(doc, metric, data, x, y, w, h) {
+function drawChart(doc, metric, data, x, y, w, h, type = "bar") {
   doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, w, h, 3, 3, "F"); doc.setDrawColor(220, 226, 220); doc.roundedRect(x, y, w, h, 3, 3, "S");
   setText(doc, [20, 20, 20], 10, "bold"); doc.text(metric.label, x + 5, y + 8);
-  const plot = { x: x + 12, y: y + 22, w: w - 20, h: h - 38 };
+  setText(doc, [95, 95, 95], 6.5); doc.text(`${metric.group || "Métrica"} · ${metric.unit || "sin unidad"}`, x + 5, y + 14);
+  const plot = { x: x + 12, y: y + 24, w: w - 20, h: h - 42 };
   const values = data.map((d) => Number(d[metric.key])).filter(Number.isFinite); const max = Math.max(...values, 1) * 1.18; const gap = 3; const barW = Math.max(5, (plot.w - gap * (data.length + 1)) / Math.max(data.length, 1));
-  data.forEach((d, i) => { const value = Number(d[metric.key]) || 0; const bh = Math.max(1.5, (value / max) * plot.h); const bx = plot.x + gap + i * (barW + gap); const by = plot.y + plot.h - bh; doc.setFillColor(...hexToRgb(metric.color)); doc.roundedRect(bx, by, barW, bh, 1.5, 1.5, "F"); setText(doc, [40, 40, 40], 6.5, "bold"); doc.text(fmt(value, metric.unit), bx + barW / 2, by - 2, { align: "center" }); setText(doc, [90, 90, 90], 6); doc.text(String(d.md || "—"), bx + barW / 2, plot.y + plot.h + 5, { align: "center" }); });
+  const points = data.map((d, i) => { const value = Number(d[metric.key]) || 0; const px = plot.x + gap + i * (barW + gap) + barW / 2; const py = plot.y + plot.h - (value / max) * plot.h; return { x: px, y: py, value, label: d.md || "—" }; });
+  if (type === "line" || type === "area") {
+    doc.setDrawColor(...hexToRgb(metric.color)); doc.setLineWidth(1.2);
+    points.slice(1).forEach((p, i) => doc.line(points[i].x, points[i].y, p.x, p.y));
+    points.forEach((p) => { doc.setFillColor(...hexToRgb(metric.color)); doc.circle(p.x, p.y, 1.8, "F"); });
+  } else {
+    data.forEach((d, i) => { const value = Number(d[metric.key]) || 0; const bh = Math.max(1.5, (value / max) * plot.h); const bx = plot.x + gap + i * (barW + gap); const by = plot.y + plot.h - bh; doc.setFillColor(...hexToRgb(metric.color)); doc.roundedRect(bx, by, barW, bh, 1.5, 1.5, "F"); });
+  }
+  points.forEach((p) => { setText(doc, [40, 40, 40], 6.5, "bold"); doc.text(fmt(p.value, metric.unit), p.x, Math.max(plot.y - 2, p.y - 2), { align: "center" }); setText(doc, [90, 90, 90], 6); doc.text(String(p.label), p.x, plot.y + plot.h + 5, { align: "center" }); });
 }
-function drawCharts(doc, logo, meta, metrics, dailySummaries) { chunks(metrics.flatMap((metric) => chunks(dailySummaries, 8).map((data) => ({ metric, data }))), 2).forEach((pair) => { addPage(doc, logo, meta); pair.forEach((job, i) => drawBarChart(doc, job.metric, job.data, i === 0 ? 12 : 153.5, 46, 131.5, 132)); }); }
+function drawCharts(doc, logo, meta, metrics, dailySummaries, chartConfig = {}) { chunks(metrics.flatMap((metric) => chunks(dailySummaries, 8).map((data) => ({ metric, data, type: chartConfig.chartTypes?.[metric.key] || "bar" }))), 2).forEach((pair) => { addPage(doc, logo, meta); pair.forEach((job, i) => drawChart(doc, job.metric, job.data, i === 0 ? 12 : 153.5, 46, 131.5, 132, job.type)); }); }
 
 function rowDuration(row) { const direct = Number(row.duration_minutes || row.minutes || row.duration || 0); if (direct) return direct; const distance = Number(row.total_distance || 0); const mMin = Number(row.m_min || 0); return distance && mMin ? distance / mMin : 0; }
 function aggregatePlayerRows(rows, metrics) {
@@ -101,7 +110,7 @@ async function drawRankings(doc, logo, meta, highlights) {
 function drawComparison(doc, logo, meta, comparison) { addPage(doc, logo, meta); setText(doc, [20, 20, 20], 12, "bold"); doc.text("Comparación con la semana anterior", 12, 48); (comparison || []).slice(0, 10).forEach((c, i) => { const x = 12 + (i % 5) * 55; const y = 60 + Math.floor(i / 5) * 52; doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, 50, 42, 3, 3, "F"); setText(doc, [25, 25, 25], 7, "bold"); doc.text(c.metric.label, x + 4, y + 7, { maxWidth: 42 }); setText(doc, [0, 114, 54], 10, "bold"); doc.text(fmt(c.current, c.metric.unit), x + 4, y + 19); setText(doc, [95, 95, 95], 6.5); doc.text(`Prev.: ${fmt(c.previous, c.metric.unit)}`, x + 4, y + 29); }); }
 function drawAiAnalysis(doc, logo, meta, aiText) { if (!aiText) return; addPage(doc, logo, meta); setText(doc, [20, 20, 20], 12, "bold"); doc.text("Conclusiones", 12, 48); setText(doc, [35, 35, 35], 9); doc.text(doc.splitTextToSize(aiText, 265), 12, 60); }
 
-export async function generateMicrocyclePdf({ squadName, season, dailySummaries = [], highlights = [], comparison = [], metrics = [], cycleDays = [], matchContext = {}, cycleRows = [], options = {}, aiText = "" }) {
+export async function generateMicrocyclePdf({ squadName, season, dailySummaries = [], highlights = [], comparison = [], metrics = [], cycleDays = [], matchContext = {}, cycleRows = [], options = {}, chartConfig = {}, aiText = "" }) {
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
   const logo = await imageToDataUrl(CLUB_LOGO_URL);
   const rivalLogo = await imageToDataUrl(matchContext?.rival_logo_url);
@@ -110,7 +119,7 @@ export async function generateMicrocyclePdf({ squadName, season, dailySummaries 
   if (options.includeCover) drawCover(doc, logo, rivalLogo, meta);
   if (options.includeCycleDays) drawCycleDays(doc, logo, meta, dailySummaries.map((d) => ({ ...d, ...(cycleDays.find((day) => day.date === d.date) || {}) })));
   if (options.includePlayerTable) drawPlayerTable(doc, logo, meta, cycleRows, metrics);
-  if (options.includeCharts) drawCharts(doc, logo, meta, metrics, dailySummaries);
+  if (options.includeCharts) drawCharts(doc, logo, meta, metrics, dailySummaries, chartConfig);
   if (options.includeRankings) await drawRankings(doc, logo, meta, highlights);
   if (options.includeHighlightedPlayers) await drawRankings(doc, logo, meta, highlights.slice(0, 3));
   if (options.includeWeeklyComparison) drawComparison(doc, logo, meta, comparison);

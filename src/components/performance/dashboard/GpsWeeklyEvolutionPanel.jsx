@@ -10,6 +10,7 @@ import GpsMicrocycleHistoryPanel from "./GpsMicrocycleHistoryPanel";
 import GpsMicrocycleWeekNavigator from "./GpsMicrocycleWeekNavigator";
 import GpsMicrocycleDayHeader from "./GpsMicrocycleDayHeader";
 import GpsDailyPlayerTable from "./GpsDailyPlayerTable";
+import GpsMicrocycleCharts, { DEFAULT_CHART_CONFIG } from "./GpsMicrocycleCharts";
 import {
   MICRO_METRICS,
   buildDailySummaries,
@@ -21,6 +22,7 @@ import {
 import { resolveMicrocycleMatch } from "./gpsMatchResolver";
 
 const RANKING_STORAGE_KEY = "gps_microcycle_ranking_metrics_v1";
+const CHART_STORAGE_KEY = "gps_microcycle_chart_config_v1";
 const DEFAULT_RANKING_CONFIG = {
   metricKeys: ["total_distance", "player_load", "sprints"],
   topCount: 3,
@@ -81,6 +83,15 @@ function loadRankingConfig() {
   }
 }
 
+function loadChartConfig() {
+  if (typeof window === "undefined") return DEFAULT_CHART_CONFIG;
+  try {
+    return { ...DEFAULT_CHART_CONFIG, ...(JSON.parse(window.localStorage.getItem(CHART_STORAGE_KEY) || "{}")) };
+  } catch {
+    return DEFAULT_CHART_CONFIG;
+  }
+}
+
 export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], competitionProfiles = [], microcycleProfiles = [], calendarEvents = [], matchReports = [] }) {
   const reportCaptureRef = useRef(null);
   const [filters, setFilters] = useState({});
@@ -94,11 +105,16 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
   const [savingState, setSavingState] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
   const [rankingConfig, setRankingConfig] = useState(loadRankingConfig);
+  const [chartConfig, setChartConfig] = useState(loadChartConfig);
   const players = useMemo(() => Object.values(playerMap || {}).filter(Boolean), [playerMap]);
 
   useEffect(() => {
     window.localStorage.setItem(RANKING_STORAGE_KEY, JSON.stringify(rankingConfig));
   }, [rankingConfig]);
+
+  useEffect(() => {
+    window.localStorage.setItem(CHART_STORAGE_KEY, JSON.stringify(chartConfig));
+  }, [chartConfig]);
 
   async function loadSummaries() {
     if (!squadId) { setSummaries([]); return; }
@@ -158,8 +174,15 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
   }, [baseCycleDays, normalizedCurrentDays, filters.rangePreset, filters.dateFrom, filters.dateTo, filters.selectedDates]);
 
   const visibleMetrics = useMemo(() => filters.metricKey ? MICRO_METRICS.filter((m) => m.key === filters.metricKey) : MICRO_METRICS, [filters.metricKey]);
+  const displayedChartConfig = ((cycleMode === "historical" || cycleMode === "lastSaved") && selectedSummary) ? (selectedSummary?.charts_snapshot?.config || DEFAULT_CHART_CONFIG) : chartConfig;
+  const selectedChartMetrics = useMemo(() => (displayedChartConfig.metricKeys || []).map((key) => MICRO_METRICS.find((metric) => metric.key === key)).filter(Boolean), [displayedChartConfig.metricKeys]);
+  const reportMetrics = useMemo(() => {
+    const map = new Map();
+    [...visibleMetrics, ...selectedChartMetrics].forEach((metric) => { if (metric) map.set(metric.key, metric); });
+    return Array.from(map.values());
+  }, [visibleMetrics, selectedChartMetrics]);
   const rankingMetrics = useMemo(() => (rankingConfig.metricKeys || []).map((key) => MICRO_METRICS.find((metric) => metric.key === key)).filter(Boolean), [rankingConfig.metricKeys]);
-  const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters, visibleMetrics]);
+  const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, metrics: reportMetrics }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters, reportMetrics]);
   const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters]);
   const allCycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, includeExcluded: true }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters]);
   const rankingRows = useMemo(() => rankingConfig.scope === "selected" && selectedDates.length ? rowsForCycle({ sessions, gpsBySession, cycleDays: baseCycleDays, playerMap, filters: { ...filters, selectedDates } }) : cycleRows, [rankingConfig.scope, selectedDates, sessions, gpsBySession, baseCycleDays, playerMap, filters, cycleRows]);
@@ -248,7 +271,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       ai_analysis_snapshot: selectedSummary?.ai_analysis_snapshot || existing?.ai_analysis_snapshot || {},
       reports_snapshot: { gps_rows_included: cycleRows.length, gps_rows_excluded: Math.max(0, allCycleRows.length - cycleRows.length), pdf_url: selectedSummary?.pdf_url || existing?.pdf_url || "" },
       summary_snapshot: { daily: dailySummaries, gps_rows_included: cycleRows.length, gps_rows_excluded: Math.max(0, allCycleRows.length - cycleRows.length) },
-      charts_snapshot: { daily: dailySummaries, metrics: visibleMetrics },
+      charts_snapshot: { daily: dailySummaries, metrics: selectedChartMetrics, config: chartConfig },
       rankings_snapshot: rankings,
       ranking_config_snapshot: rankingConfig,
       match_snapshot: matchContext || {},
@@ -257,7 +280,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       highlighted_players_snapshot: { items: highlights },
       weekly_comparison_snapshot: { items: comparison },
       filters_snapshot: filters,
-      snapshot: { days: daysSnapshot, sessions: sessionsSnapshot, dailySummaries, highlights, comparison, filters, metrics: visibleMetrics, loadSummary: gpsVariables, rankingConfig, match: matchContext || {} },
+      snapshot: { days: daysSnapshot, sessions: sessionsSnapshot, dailySummaries, highlights, comparison, filters, metrics: visibleMetrics, chartMetrics: selectedChartMetrics, chartConfig, loadSummary: gpsVariables, rankingConfig, match: matchContext || {} },
     };
     if (existing) await base44.entities.MicrocycleSummary.update(existing.id, payload);
     else await base44.entities.MicrocycleSummary.create(payload);
@@ -308,7 +331,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
           <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
             <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedWeekStart={selectedPlan?.week_start || selectedWeekStart} onSelectWeek={(weekStart) => { setSelectedWeekStart(weekStart); setCycleMode("current"); setSelectedSummaryId(""); setSelectedDates([]); setFilters((current) => ({ ...current, selectedDates: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
             <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} />
-            <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} selectedDates={selectedDates} visibleMetrics={visibleMetrics} rankingConfig={rankingConfig} matchContext={matchContext} cycleRows={rankingRows} />
+            <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} selectedDates={selectedDates} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={displayedChartConfig} rankingConfig={rankingConfig} matchContext={matchContext} cycleRows={rankingRows} />
           </div>
         </div>
         {saveMessage && <p className="mt-3 flex items-center gap-1 text-xs font-semibold text-emerald-300"><CheckCircle2 size={13} />{saveMessage}</p>}
@@ -322,9 +345,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
 
       <div ref={reportCaptureRef} className="space-y-5">
         {filterLabels.length > 0 && <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-4"><p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Filtros aplicados</p><div className="flex flex-wrap gap-2">{filterLabels.map((label) => <span key={label} className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold">{label}</span>)}</div></div>}
-        <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-          {visibleMetrics.map((metric) => <MetricChart key={metric.key} metric={metric} data={shownDailySummaries} />)}
-        </div>
+        <GpsMicrocycleCharts data={shownDailySummaries} metrics={MICRO_METRICS} config={displayedChartConfig} onConfigChange={setChartConfig} />
         <GpsMicrocycleHighlights highlights={shownHighlights} metrics={MICRO_METRICS} config={rankingConfig} onConfigChange={setRankingConfig} />
       </div>
     </div>

@@ -40,7 +40,16 @@ export function fmt(value, unit = "") {
 }
 
 export function aggregateMetric(rows, key, mode = "avg") {
+  const metric = MICRO_METRICS.find((item) => item.key === key);
   if (key === "sessions_count") return new Set(rows.map((r) => r.session_id).filter(Boolean)).size || null;
+  if (metric?.rankMode === "weightedDistanceDuration") {
+    const totals = rows.reduce((acc, row) => { const duration = rowDuration(row); const distance = Number(row.total_distance || 0); return duration && distance ? { distance: acc.distance + distance, duration: acc.duration + duration } : acc; }, { distance: 0, duration: 0 });
+    return totals.duration ? totals.distance / totals.duration : null;
+  }
+  if (metric?.rankMode === "weightedPlayerLoadDuration") {
+    const totals = rows.reduce((acc, row) => { const duration = rowDuration(row); const load = Number(row.player_load || 0); return duration && load ? { load: acc.load + load, duration: acc.duration + duration } : acc; }, { load: 0, duration: 0 });
+    return totals.duration ? totals.load / totals.duration : null;
+  }
   const values = rows.map((r) => Number(r[key])).filter((v) => Number.isFinite(v));
   if (!values.length) return null;
   if (mode === "sum") return values.reduce((a, b) => a + b, 0);

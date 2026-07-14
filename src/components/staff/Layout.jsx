@@ -50,13 +50,6 @@ export default function Layout() {
     return () => clearTimeout(timeout);
   }, [sidebarCollapsed]);
 
-  const widePage =
-    location.pathname.startsWith("/performance/external-load") ||
-    location.pathname.startsWith("/performance/minutes") ||
-    location.pathname.includes("comparison") ||
-    location.pathname.includes("report") ||
-    location.pathname.includes("informe");
-
   // Seguridad: si la página actual no corresponde al área/rol activo, no se renderiza (redirige al dashboard).
   if (!canSeePath(location.pathname)) {
     return <Navigate to="/" replace />;
@@ -68,8 +61,8 @@ export default function Layout() {
         <SessionTimeoutWatcher />
         <SessionExpiryBanner />
         <Sidebar collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
-        <main className={`min-h-screen transition-[margin] duration-200 ease-out ${sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-64"}`}>
-          <div className={`p-4 pt-16 lg:p-8 lg:pt-8 ${widePage ? "max-w-none" : "max-w-7xl mx-auto"}`}>
+        <main className={`min-h-screen w-full min-w-0 transition-[margin] duration-200 ease-out ${sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-64"}`}>
+          <div className="w-full min-w-0 max-w-[1920px] mx-auto p-4 pt-16 lg:p-6 lg:pt-6 2xl:p-8">
             <PageErrorBoundary>
               <Outlet />
             </PageErrorBoundary>
