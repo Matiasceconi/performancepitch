@@ -1,21 +1,12 @@
 import React, { useMemo, useState } from "react";
-import { Calendar, Users, Clock, Trash2, Dumbbell, Goal, LocateFixed, Zap, Video, Eye, Heart, Activity, RotateCcw, BarChart3, PlaySquare, Footprints } from "lucide-react";
+import { Calendar, Users, Clock, Trash2, Dumbbell, Goal, LocateFixed, Video, Eye, PlaySquare } from "lucide-react";
 import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
 import moment from "moment";
 import { effectiveSessionMeta, findPlanDay } from "@/components/planning/microcycleSync";
+import { getSessionVisual } from "@/components/sessions/SessionObjectiveIcon";
 
 const DEFAULT_OBJECTIVE = { color: "#22c55e", text_color: "#ffffff", border_color: "#22c55e" };
 const actionBtn = "flex flex-col items-center justify-center gap-1 min-w-[70px] px-3 py-2 rounded-xl text-[11px] font-semibold border transition-colors whitespace-nowrap";
-
-function iconForObjective(name) {
-  const value = String(name || "").toLowerCase();
-  if (value.includes("tensión") || value.includes("neuromuscular")) return Zap;
-  if (value.includes("duración") || value.includes("metab")) return Heart;
-  if (value.includes("recuper") || value.includes("readapt")) return RotateCcw;
-  if (value.includes("velocidad")) return Footprints;
-  if (value.includes("volumen")) return BarChart3;
-  return Activity;
-}
 
 function statusText(ok, yes, no) {
   return <span className={ok ? "text-emerald-400" : "text-red-400"}>{ok ? `✓ ${yes}` : `✕ ${no}`}</span>;
@@ -43,49 +34,41 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
         const effectiveMeta = effectiveSessionMeta(session, findPlanDay(weeklyPlans, { date: session.date, squadId: session.squad_id, seasonId: session.season_id }));
         const objectiveName = effectiveMeta.session_objective || session.session_objective || "Sesión";
         const objective = objectiveMap[String(objectiveName).toLowerCase()] || DEFAULT_OBJECTIVE;
-        const Icon = iconForObjective(objectiveName);
-        const sessionNumber = session.session_number || sessions.length - index;
+        const visual = getSessionVisual(objectiveName, objective);
+        const Icon = visual.Icon;
         const period = session.period || "Competencia";
 
         return (
-          <div key={session.id} className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-r from-zinc-950 via-zinc-950 to-zinc-900/95 hover:border-zinc-700 transition-colors">
-            <div className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: objective.color || DEFAULT_OBJECTIVE.color }} />
-            <div className="flex flex-col xl:flex-row xl:items-stretch">
-              <button onClick={() => onSelect(session, "players")} className="flex flex-1 items-stretch text-left min-w-0">
-                <div className="w-14 sm:w-16 shrink-0 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${objective.color || DEFAULT_OBJECTIVE.color}33, transparent)` }}>
-                  <Icon size={27} style={{ color: objective.color || DEFAULT_OBJECTIVE.color }} />
-                </div>
-                <div className="flex-1 min-w-0 px-4 py-4">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <h3 className="text-white font-extrabold tracking-wide text-lg">SESIÓN {sessionNumber}</h3>
-                    <span className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">{period}</span>
-                    {effectiveMeta.match_day_code && <span className="px-3 py-1 rounded-lg text-xs font-bold" style={{ color: objective.text_color || "#fff", backgroundColor: `${objective.color || DEFAULT_OBJECTIVE.color}55` }}>{effectiveMeta.match_day_code}</span>}
-                  </div>
-                  <p className="text-sm font-semibold mt-0.5" style={{ color: objective.color || DEFAULT_OBJECTIVE.color }}>{objectiveName}</p>
-                  <div className="flex items-center gap-4 mt-2 text-xs text-zinc-400 flex-wrap">
-                    <span className="flex items-center gap-1"><Calendar size={12} />{moment(session.date).format("DD/MM/YYYY")}</span>
-                    {session.duration_minutes && <span className="flex items-center gap-1"><Clock size={12} />{session.duration_minutes} min</span>}
-                    {session.squad_name && <span>{session.squad_name}</span>}
-                  </div>
-                </div>
-              </button>
-
-              <div className="flex flex-wrap xl:flex-nowrap items-center gap-0 border-t xl:border-t-0 xl:border-l border-zinc-800/80 px-3 py-3 xl:py-0" onClick={(e) => e.stopPropagation()}>
-                <div className="grid grid-cols-2 sm:grid-cols-4 xl:flex gap-0 w-full xl:w-auto">
-                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><Users size={13} />{session.players_selected || 0}</p><p className="text-[11px] text-zinc-500">Jugadores</p></div>
-                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><Goal size={13} />{exercisesCount}</p><p className="text-[11px] text-zinc-500">Ejercicios</p></div>
-                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-white font-bold flex items-center justify-center gap-1"><LocateFixed size={13} />GPS</p><p className="text-[11px] font-semibold">{statusText(hasGPS, "Cargado", "Sin GPS")}</p></div>
-                  <div className="px-4 py-2 border-r border-zinc-800/80 text-center"><p className="text-xs font-bold text-zinc-300">Video</p><p className="text-[11px] font-semibold">{statusText(hasVideo, "Cargado", "Sin video")}</p></div>
-                </div>
-                <div className="flex gap-2 flex-wrap justify-end ml-auto pt-3 xl:pt-0">
-                  <button onClick={() => onSelect(session, "players")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800`}><Eye size={16} className="text-sky-400" />Ver sesión</button>
-                  <button onClick={() => onSelect(session, "exercises")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-300 hover:bg-zinc-800`}><Goal size={16} />Ejercicios</button>
-                  <button onClick={() => onSelect(session, "strength")} className={`${actionBtn} bg-orange-500/10 border-orange-500/30 text-orange-300 hover:bg-orange-500/20`}><Dumbbell size={16} />Fuerza</button>
-                  <button onClick={() => onSelect(session, "gps")} className={`${actionBtn} ${hasGPS ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-300" : "bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800"}`}><LocateFixed size={16} />GPS</button>
-                  {hasVideo ? <button onClick={() => setPreview({ url: session.video_url || sessionVideoLinks[0].video_url, title: session.video_url ? session.title : sessionVideoLinks[0].title })} className={`${actionBtn} bg-violet-500/10 border-violet-500/30 text-violet-300 hover:bg-violet-500/20`}><PlaySquare size={16} />Video</button> : <button onClick={() => onSelect(session, "video")} className={`${actionBtn} bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800`}><Video size={16} />Video</button>}
-                  <button onClick={() => onDelete(session.id)} className="self-center p-2 rounded-lg text-zinc-700 hover:text-red-400 hover:bg-red-500/10 transition-colors opacity-100 xl:opacity-0 xl:group-hover:opacity-100"><Trash2 size={15} /></button>
+          <div key={session.id} className="group relative overflow-hidden rounded-[22px] border border-zinc-900/80 bg-[#111113] shadow-[0_18px_42px_rgba(0,0,0,0.35)] transition-all hover:border-zinc-700">
+            <div className="absolute inset-y-0 left-0 w-3 sm:w-4" style={{ backgroundColor: visual.accent }} />
+            <button onClick={() => onSelect(session, "players")} className="relative flex min-h-[142px] w-full items-center gap-6 overflow-hidden pl-8 pr-5 text-left sm:min-h-[158px] sm:gap-9 sm:pl-12">
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_30%_35%,rgba(255,255,255,0.045),transparent_34%),linear-gradient(90deg,rgba(255,255,255,0.035),rgba(255,255,255,0.01))]" />
+              <div className="relative flex w-[118px] shrink-0 items-center justify-center sm:w-[150px]">
+                <Icon size={92} color={visual.accent} className="drop-shadow-[0_6px_14px_rgba(0,0,0,0.4)] sm:h-[112px] sm:w-[112px]" />
+              </div>
+              <div className="relative min-w-0 flex-1 py-6">
+                <p className="text-[18px] font-black uppercase leading-none tracking-tight text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.75)]">SESIÓN</p>
+                <h3 className="mt-2 max-w-[520px] text-[38px] font-black leading-[0.95] tracking-[-0.05em] text-white drop-shadow-[0_3px_8px_rgba(0,0,0,0.75)] sm:text-[56px]">
+                  {visual.text}
+                </h3>
+                <div className="mt-4 flex flex-wrap items-center gap-3 text-[11px] font-semibold text-zinc-500 opacity-0 transition-opacity group-hover:opacity-100">
+                  <span className="flex items-center gap-1"><Calendar size={12} />{moment(session.date).format("DD/MM/YYYY")}</span>
+                  {session.duration_minutes && <span className="flex items-center gap-1"><Clock size={12} />{session.duration_minutes} min</span>}
+                  <span>{period}</span>
+                  {effectiveMeta.match_day_code && <span style={{ color: visual.accent }}>{effectiveMeta.match_day_code}</span>}
                 </div>
               </div>
+            </button>
+
+            <div className="absolute bottom-3 right-3 flex max-w-[92%] flex-wrap justify-end gap-1.5 opacity-0 transition-opacity group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
+              <span className="rounded-full bg-black/35 px-2 py-1 text-[10px] font-bold text-zinc-400">{session.players_selected || 0} jugadores</span>
+              <span className="rounded-full bg-black/35 px-2 py-1 text-[10px] font-bold text-zinc-400">{exercisesCount} ejercicios</span>
+              <button onClick={() => onSelect(session, "players")} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-200 hover:text-white"><Eye size={11} className="mr-1 inline" />Ver</button>
+              <button onClick={() => onSelect(session, "exercises")} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-200 hover:text-white"><Goal size={11} className="mr-1 inline" />Ejercicios</button>
+              <button onClick={() => onSelect(session, "strength")} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-200 hover:text-white"><Dumbbell size={11} className="mr-1 inline" />Fuerza</button>
+              <button onClick={() => onSelect(session, "gps")} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-200 hover:text-white"><LocateFixed size={11} className="mr-1 inline" />GPS</button>
+              {hasVideo ? <button onClick={() => setPreview({ url: session.video_url || sessionVideoLinks[0].video_url, title: session.video_url ? session.title : sessionVideoLinks[0].title })} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-200 hover:text-white"><PlaySquare size={11} className="mr-1 inline" />Video</button> : <button onClick={() => onSelect(session, "video")} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-200 hover:text-white"><Video size={11} className="mr-1 inline" />Video</button>}
+              <button onClick={() => onDelete(session.id)} className="rounded-full bg-black/50 px-2 py-1 text-[10px] font-bold text-zinc-500 hover:text-red-400"><Trash2 size={11} /></button>
             </div>
           </div>
         );
