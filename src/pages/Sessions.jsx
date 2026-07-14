@@ -144,11 +144,14 @@ export default function Sessions() {
     <div className="space-y-6">
       {/* Header */}
       {view === "list" && (
-        <div className="flex items-start justify-between gap-3 flex-wrap">
-          <div>
-            <h1 className="text-4xl font-black text-white tracking-tight drop-shadow-[0_2px_8px_rgba(0,0,0,0.45)]">Sesiones</h1>
-            <div className="mt-3 inline-flex rounded-lg bg-white px-5 py-3 text-base font-bold text-zinc-950 shadow-sm">
-              {activeSquad ? activeSquad.name : "Todos los planteles"}
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-4">
+            <ClipboardList size={22} className="text-zinc-400" />
+            <div>
+              <h1 className="text-2xl font-bold text-white tracking-tight">Sesiones</h1>
+              <p className="text-zinc-500 text-sm mt-0.5">
+                {activeSquad ? activeSquad.name : "Todos los planteles"}
+              </p>
             </div>
           </div>
           <button

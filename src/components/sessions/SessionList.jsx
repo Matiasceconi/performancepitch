@@ -1,12 +1,21 @@
 import React, { useMemo, useState } from "react";
-import { Calendar, Users, Clock, Trash2, Dumbbell, Goal, LocateFixed, Video, Eye, PlaySquare } from "lucide-react";
+import { Calendar, Users, Clock, Trash2, Dumbbell, Goal, LocateFixed, Zap, Video, Eye, Heart, Activity, RotateCcw, BarChart3, PlaySquare, Footprints } from "lucide-react";
 import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
 import moment from "moment";
 import { effectiveSessionMeta, findPlanDay } from "@/components/planning/microcycleSync";
-import { getSessionVisual } from "@/components/sessions/SessionObjectiveIcon";
 
 const DEFAULT_OBJECTIVE = { color: "#22c55e", text_color: "#ffffff", border_color: "#22c55e" };
 const actionBtn = "flex flex-col items-center justify-center gap-1 min-w-[70px] px-3 py-2 rounded-xl text-[11px] font-semibold border transition-colors whitespace-nowrap";
+
+function iconForObjective(name) {
+  const value = String(name || "").toLowerCase();
+  if (value.includes("tensión") || value.includes("neuromuscular")) return Zap;
+  if (value.includes("duración") || value.includes("metab")) return Heart;
+  if (value.includes("recuper") || value.includes("readapt")) return RotateCcw;
+  if (value.includes("velocidad")) return Footprints;
+  if (value.includes("volumen")) return BarChart3;
+  return Activity;
+}
 
 function statusText(ok, yes, no) {
   return <span className={ok ? "text-emerald-400" : "text-red-400"}>{ok ? `✓ ${yes}` : `✕ ${no}`}</span>;
@@ -34,27 +43,25 @@ export default function SessionList({ sessions, onSelect, onDelete, hasFilters =
         const effectiveMeta = effectiveSessionMeta(session, findPlanDay(weeklyPlans, { date: session.date, squadId: session.squad_id, seasonId: session.season_id }));
         const objectiveName = effectiveMeta.session_objective || session.session_objective || "Sesión";
         const objective = objectiveMap[String(objectiveName).toLowerCase()] || DEFAULT_OBJECTIVE;
-        const visual = getSessionVisual(objectiveName, objective);
-        const Icon = visual.Icon;
+        const Icon = iconForObjective(objectiveName);
         const sessionNumber = session.session_number || sessions.length - index;
         const period = session.period || "Competencia";
 
         return (
           <div key={session.id} className="group relative overflow-hidden rounded-2xl border border-zinc-800 bg-gradient-to-r from-zinc-950 via-zinc-950 to-zinc-900/95 hover:border-zinc-700 transition-colors">
-            <div className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: visual.accent }} />
+            <div className="absolute inset-y-0 left-0 w-1.5" style={{ backgroundColor: objective.color || DEFAULT_OBJECTIVE.color }} />
             <div className="flex flex-col xl:flex-row xl:items-stretch">
               <button onClick={() => onSelect(session, "players")} className="flex flex-1 items-stretch text-left min-w-0">
-                <div className="relative w-20 sm:w-24 shrink-0 overflow-hidden flex items-center justify-center border-r border-zinc-800/80" style={{ background: `linear-gradient(135deg, ${visual.accent}24, rgba(24,24,27,0.15))` }}>
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_45%_35%,rgba(255,255,255,0.08),transparent_38%)]" />
-                  <Icon size={46} color={visual.accent} className="relative drop-shadow-[0_4px_10px_rgba(0,0,0,0.45)]" />
+                <div className="w-14 sm:w-16 shrink-0 flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${objective.color || DEFAULT_OBJECTIVE.color}33, transparent)` }}>
+                  <Icon size={27} style={{ color: objective.color || DEFAULT_OBJECTIVE.color }} />
                 </div>
                 <div className="flex-1 min-w-0 px-4 py-4">
                   <div className="flex items-center gap-3 flex-wrap">
                     <h3 className="text-white font-extrabold tracking-wide text-lg">SESIÓN {sessionNumber}</h3>
                     <span className="px-3 py-1 rounded-lg text-xs font-bold bg-zinc-800 text-zinc-300 border border-zinc-700">{period}</span>
-                    {effectiveMeta.match_day_code && <span className="px-3 py-1 rounded-lg text-xs font-bold" style={{ color: objective.text_color || "#fff", backgroundColor: `${visual.accent}55` }}>{effectiveMeta.match_day_code}</span>}
+                    {effectiveMeta.match_day_code && <span className="px-3 py-1 rounded-lg text-xs font-bold" style={{ color: objective.text_color || "#fff", backgroundColor: `${objective.color || DEFAULT_OBJECTIVE.color}55` }}>{effectiveMeta.match_day_code}</span>}
                   </div>
-                  <p className="text-sm font-semibold mt-0.5" style={{ color: visual.accent }}>{objectiveName}</p>
+                  <p className="text-sm font-semibold mt-0.5" style={{ color: objective.color || DEFAULT_OBJECTIVE.color }}>{objectiveName}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-zinc-400 flex-wrap">
                     <span className="flex items-center gap-1"><Calendar size={12} />{moment(session.date).format("DD/MM/YYYY")}</span>
                     {session.duration_minutes && <span className="flex items-center gap-1"><Clock size={12} />{session.duration_minutes} min</span>}
