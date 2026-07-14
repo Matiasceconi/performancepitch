@@ -57,11 +57,20 @@ export default function Layout() {
 
   return (
     <SidebarCollapseContext.Provider value={{ collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed }}>
-      <div className="min-h-screen bg-zinc-950">
+      <div className="min-h-screen w-full min-w-0 overflow-x-clip bg-zinc-950">
         <SessionTimeoutWatcher />
         <SessionExpiryBanner />
-        <Sidebar collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
-        <main className={`min-h-screen w-full min-w-0 transition-[margin] duration-200 ease-out ${sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-64"}`}>
+
+        <Sidebar
+          collapsed={sidebarCollapsed}
+          onCollapsedChange={setSidebarCollapsed}
+        />
+
+        <main
+          className={`min-h-screen w-full min-w-0 overflow-x-clip bg-zinc-950 transition-[padding] duration-200 ease-out ${
+            sidebarCollapsed ? "lg:pl-[72px]" : "lg:pl-64"
+          }`}
+        >
           <div className="w-full min-w-0 max-w-[1920px] mx-auto p-4 pt-16 lg:p-6 lg:pt-6 2xl:p-8">
             <PageErrorBoundary>
               <Outlet />
