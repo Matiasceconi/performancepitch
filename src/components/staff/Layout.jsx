@@ -1,9 +1,16 @@
-import React, { Component } from "react";
+import React, { Component, createContext, useContext, useEffect, useState } from "react";
 import { Outlet, Navigate, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import SessionTimeoutWatcher from "@/components/workspace/SessionTimeoutWatcher";
 import SessionExpiryBanner from "@/components/workspace/SessionExpiryBanner";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+
+const SIDEBAR_STORAGE_KEY = "performancepitch_sidebar_collapsed_v1";
+const SidebarCollapseContext = createContext({ collapsed: false, setCollapsed: () => {} });
+
+export function useSidebarCollapse() {
+  return useContext(SidebarCollapseContext);
+}
 
 class PageErrorBoundary extends Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -30,6 +37,25 @@ class PageErrorBoundary extends Component {
 export default function Layout() {
   const { canSeePath } = useWorkspace();
   const location = useLocation();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "true";
+  });
+
+  useEffect(() => {
+    window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
+    const timeout = setTimeout(() => {
+      window.dispatchEvent(new Event("resize"));
+    }, 220);
+    return () => clearTimeout(timeout);
+  }, [sidebarCollapsed]);
+
+  const widePage =
+    location.pathname.startsWith("/performance/external-load") ||
+    location.pathname.startsWith("/performance/minutes") ||
+    location.pathname.includes("comparison") ||
+    location.pathname.includes("report") ||
+    location.pathname.includes("informe");
 
   // Seguridad: si la página actual no corresponde al área/rol activo, no se renderiza (redirige al dashboard).
   if (!canSeePath(location.pathname)) {
@@ -37,17 +63,19 @@ export default function Layout() {
   }
 
   return (
-    <div className="min-h-screen bg-zinc-950">
-      <SessionTimeoutWatcher />
-      <SessionExpiryBanner />
-      <Sidebar />
-      <main className="lg:ml-64 min-h-screen">
-        <div className="p-4 pt-16 lg:p-8 lg:pt-8 max-w-7xl mx-auto">
-          <PageErrorBoundary>
-            <Outlet />
-          </PageErrorBoundary>
-        </div>
-      </main>
-    </div>
+    <SidebarCollapseContext.Provider value={{ collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed }}>
+      <div className="min-h-screen bg-zinc-950">
+        <SessionTimeoutWatcher />
+        <SessionExpiryBanner />
+        <Sidebar collapsed={sidebarCollapsed} onCollapsedChange={setSidebarCollapsed} />
+        <main className={`min-h-screen transition-[margin] duration-200 ease-out ${sidebarCollapsed ? "lg:ml-[72px]" : "lg:ml-64"}`}>
+          <div className={`p-4 pt-16 lg:p-8 lg:pt-8 ${widePage ? "max-w-none" : "max-w-7xl mx-auto"}`}>
+            <PageErrorBoundary>
+              <Outlet />
+            </PageErrorBoundary>
+          </div>
+        </main>
+      </div>
+    </SidebarCollapseContext.Provider>
   );
 }

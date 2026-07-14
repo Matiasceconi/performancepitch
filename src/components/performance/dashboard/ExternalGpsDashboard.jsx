@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { useSidebarCollapse } from "@/components/staff/Layout";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { avg, withRetry } from "../externalGpsLoadUtils";
 import ImportHistoricalGPSModal from "../ImportHistoricalGPSModal";
@@ -49,7 +50,10 @@ function minutesMatch(value, filters) {
 
 export default function ExternalGpsDashboard() {
   const { activeSquadId } = useWorkspace();
+  const { collapsed: sidebarCollapsed, setCollapsed: setSidebarCollapsed } = useSidebarCollapse();
   const dashboardRef = useRef(null);
+  const previousSidebarCollapsedRef = useRef(null);
+  const [wideMode, setWideMode] = useState(false);
 
   const [squads, setSquads] = useState([]);
   const [selectedSquadId, setSelectedSquadId] = useState(activeSquadId || "");
@@ -86,6 +90,31 @@ export default function ExternalGpsDashboard() {
     minutesMin: "",
     minutesMax: "",
   });
+
+  useEffect(() => {
+    if (!wideMode && previousSidebarCollapsedRef.current !== null) {
+      setSidebarCollapsed(previousSidebarCollapsedRef.current);
+      previousSidebarCollapsedRef.current = null;
+    }
+  }, [wideMode, setSidebarCollapsed]);
+
+  useEffect(() => {
+    return () => {
+      if (previousSidebarCollapsedRef.current !== null) {
+        setSidebarCollapsed(previousSidebarCollapsedRef.current);
+      }
+    };
+  }, [setSidebarCollapsed]);
+
+  function handleWideModeChange(nextWideMode) {
+    if (nextWideMode) {
+      previousSidebarCollapsedRef.current = sidebarCollapsed;
+      setSidebarCollapsed(true);
+      setWideMode(true);
+      return;
+    }
+    setWideMode(false);
+  }
 
   useEffect(() => {
     if (activeSquadId) {
@@ -399,6 +428,8 @@ export default function ExternalGpsDashboard() {
         seasons={seasons}
         selectedSeason={selectedSeason}
         onSeasonChange={setSelectedSeason}
+        wideMode={wideMode}
+        onWideModeChange={handleWideModeChange}
       />
 
       {showImportModal && <ImportHistoricalGPSModal onClose={() => { setShowImportModal(false); load(); }} />}

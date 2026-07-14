@@ -1,9 +1,11 @@
 import React from "react";
-import { Activity, ChevronDown } from "lucide-react";
+import { Activity, ChevronDown, Maximize2, Minimize2 } from "lucide-react";
 
 export default function GpsDashboardHeader({
   squads, selectedSquadId, onSquadChange,
   seasons, selectedSeason, onSeasonChange,
+  wideMode = false,
+  onWideModeChange,
 }) {
   return (
     <div className="flex items-center justify-between gap-4">
@@ -18,6 +20,16 @@ export default function GpsDashboardHeader({
       </div>
 
       <div className="flex items-center gap-3">
+        {onWideModeChange && (
+          <button
+            type="button"
+            onClick={() => onWideModeChange(!wideMode)}
+            className={`inline-flex h-10 items-center gap-2 rounded-xl border px-3 text-sm font-semibold transition-colors ${wideMode ? "border-lime-400/50 bg-lime-500/10 text-lime-300" : "border-zinc-700/80 bg-zinc-900/90 text-zinc-300 hover:border-zinc-600 hover:text-white"}`}
+          >
+            {wideMode ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
+            {wideMode ? "Salir vista amplia" : "Vista amplia"}
+          </button>
+        )}
         <div className="relative">
           <select
             value={selectedSquadId || ""}
