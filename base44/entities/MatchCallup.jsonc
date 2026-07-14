@@ -77,11 +77,17 @@
       "description": "Ubicaci\u00f3n aproximada o texto original detectado"
     },
     "formation_x": {
-      "type": "number",
+      "type": [
+        "number",
+        "null"
+      ],
       "description": "Posici\u00f3n horizontal del jugador en el campo de formaci\u00f3n, en porcentaje"
     },
     "formation_y": {
-      "type": "number",
+      "type": [
+        "number",
+        "null"
+      ],
       "description": "Posici\u00f3n vertical del jugador en el campo de formaci\u00f3n, en porcentaje"
     },
     "player_name": {

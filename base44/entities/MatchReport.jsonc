@@ -138,11 +138,15 @@
         "type": "object"
       },
       "default": [],
-      "description": "Ubicaciones de titulares en el campo: player_id, x, y"
+      "description": "Ubicaciones de titulares en el campo: player_id, x, y, slot_key, position_group, preferred_positions"
     },
     "formation_updated_at": {
       "type": "string",
       "description": "Fecha/hora de \u00faltima actualizaci\u00f3n de la formaci\u00f3n"
+    },
+    "captain_player_id": {
+      "type": "string",
+      "description": "ID del jugador capit\u00e1n definido en la formaci\u00f3n"
     },
     "rival_notes": {
       "type": "string",

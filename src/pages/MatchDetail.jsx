@@ -401,7 +401,7 @@ export default function MatchDetail() {
         </TabsList>
 
         <TabsContent value="convocados" className="mt-0">
-          <ConvocadosTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />
+          <ConvocadosTab match={match} players={players} refreshKey={callupsVersion} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />
         </TabsContent>
         <TabsContent value="formacion" className="mt-0">
           <FormacionTab match={match} players={players} onMatchUpdated={handleMatchUpdated} onRegisterSave={setHeaderSave} onCallupsUpdated={() => setCallupsVersion((value) => value + 1)} />

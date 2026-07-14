@@ -30,7 +30,13 @@ function downloadBlob(dataUrl, filename) {
   link.click();
 }
 
-export default function ConvocadosTab({ match, players = [], onMatchUpdated, onRegisterSave, onCallupsUpdated }) {
+function RoleBadges({ callup, isCaptain }) {
+  const role = callup?.lineup_role;
+  if (!role && !isCaptain) return null;
+  return <div className="mt-2 flex flex-wrap gap-1.5">{role && role !== "pendiente" && <span className={`rounded-full border px-2 py-0.5 text-[10px] font-black uppercase ${role === "titular" ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300" : "border-blue-500/30 bg-blue-500/10 text-blue-300"}`}>{role === "titular" ? "Titular" : "Suplente"}</span>}{isCaptain && <span className="rounded-full bg-yellow-400 px-2 py-0.5 text-[10px] font-black uppercase text-zinc-950">Capitán</span>}</div>;
+}
+
+export default function ConvocadosTab({ match, players = [], refreshKey = 0, onMatchUpdated, onRegisterSave, onCallupsUpdated }) {
   const { toast } = useToast();
   const previewRef = useRef(null);
   const [availablePlayers, setAvailablePlayers] = useState([]);
@@ -82,7 +88,7 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
     }
   }
 
-  useEffect(() => { reload(); }, [match.id, match.squad_id]);
+  useEffect(() => { reload(); }, [match.id, match.squad_id, refreshKey]);
 
   const visiblePlayers = useMemo(() => availablePlayers.filter((player) => {
     const name = normalizeText(getPlayerName(player));
@@ -104,6 +110,8 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
   }, [visiblePlayers]);
 
   const selectedSet = useMemo(() => new Set(selectedPlayerIds), [selectedPlayerIds]);
+  const callupByPlayerId = useMemo(() => Object.fromEntries(savedCallups.map((callup) => [callup.player_id, callup])), [savedCallups]);
+  const captainPlayerId = match.captain_player_id || "";
   const selectedPlayers = useMemo(() => availablePlayers.filter((player) => selectedSet.has(player.id)), [availablePlayers, selectedSet]);
   const linkedPlayersMap = useMemo(() => Object.fromEntries(linkedMinutes.map((row) => [row.player_id, row])), [linkedMinutes]);
   const distinctStatuses = useMemo(() => Array.from(new Set(availablePlayers.map((player) => normalizeText(player.status || "sin estado")))).filter(Boolean), [availablePlayers]);
@@ -294,11 +302,11 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
       </div>
 
       {!availablePlayers.length ? <StateCard title="Este plantel todavía no tiene jugadores" description="Asigná jugadores al plantel del partido para poder convocarlos." /> : viewMode === "cards" ? (
-        <div className="space-y-4">{Object.entries(groupedPlayers).map(([group, groupPlayers]) => <PlayerGroup key={group} group={group} players={groupPlayers} selectedSet={selectedSet} onToggle={togglePlayer} />)}</div>
+        <div className="space-y-4">{Object.entries(groupedPlayers).map(([group, groupPlayers]) => <PlayerGroup key={group} group={group} players={groupPlayers} selectedSet={selectedSet} callupByPlayerId={callupByPlayerId} captainPlayerId={captainPlayerId} onToggle={togglePlayer} />)}</div>
       ) : (
         <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
-          <div className="grid grid-cols-[52px_1.4fr_1fr_80px_150px] gap-3 border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500"><span /><span>Jugador</span><span>Posición / plantel</span><span>N°</span><span>Estado</span></div>
-          {visiblePlayers.length === 0 ? <div className="px-4 py-8 text-center text-sm text-zinc-500">Todavía no seleccionaste convocados o el filtro no tiene resultados.</div> : visiblePlayers.map((player) => <PlayerListRow key={player.id} player={player} checked={selectedSet.has(player.id)} onToggle={() => togglePlayer(player)} />)}
+          <div className="grid grid-cols-[52px_1.4fr_1fr_80px_150px_130px] gap-3 border-b border-zinc-800 bg-zinc-950/60 px-4 py-3 text-xs font-semibold uppercase tracking-wide text-zinc-500"><span /><span>Jugador</span><span>Posición / plantel</span><span>N°</span><span>Estado</span><span>Rol</span></div>
+          {visiblePlayers.length === 0 ? <div className="px-4 py-8 text-center text-sm text-zinc-500">Todavía no seleccionaste convocados o el filtro no tiene resultados.</div> : visiblePlayers.map((player) => <PlayerListRow key={player.id} player={player} checked={selectedSet.has(player.id)} callup={callupByPlayerId[player.id]} isCaptain={captainPlayerId === player.id} onToggle={() => togglePlayer(player)} />)}
         </div>
       )}
 
@@ -312,16 +320,16 @@ function StateCard({ title, description, action }) {
   return <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-8 text-center"><h2 className="text-lg font-semibold text-white">{title}</h2>{description && <p className="mt-2 text-sm text-zinc-500">{description}</p>}{action && <div className="mt-4">{action}</div>}</div>;
 }
 
-function PlayerGroup({ group, players, selectedSet, onToggle }) {
-  return <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">{group}</h3><span className="text-xs text-zinc-500">{players.length} jugadores</span></div>{players.length === 0 ? <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 px-4 py-6 text-center text-sm text-zinc-500">Sin jugadores en esta categoría.</div> : <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">{players.map((player) => <PlayerCard key={player.id} player={player} checked={selectedSet.has(player.id)} onToggle={() => onToggle(player)} />)}</div>}</div>;
+function PlayerGroup({ group, players, selectedSet, callupByPlayerId = {}, captainPlayerId = "", onToggle }) {
+  return <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold text-white">{group}</h3><span className="text-xs text-zinc-500">{players.length} jugadores</span></div>{players.length === 0 ? <div className="rounded-xl border border-dashed border-zinc-800 bg-zinc-950/40 px-4 py-6 text-center text-sm text-zinc-500">Sin jugadores en esta categoría.</div> : <div className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">{players.map((player) => <PlayerCard key={player.id} player={player} checked={selectedSet.has(player.id)} callup={callupByPlayerId[player.id]} isCaptain={captainPlayerId === player.id} onToggle={() => onToggle(player)} />)}</div>}</div>;
 }
 
-function PlayerCard({ player, checked, onToggle }) {
-  return <button onClick={onToggle} className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${checked ? "border-yellow-500/40 bg-yellow-500/10" : "border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900"}`}><input type="checkbox" checked={checked} readOnly className="h-4 w-4 accent-yellow-500" /><TransparentPlayerPhoto player={player} className="h-12 w-12 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-sm font-bold text-zinc-400" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="truncate text-sm font-semibold text-white">{getPlayerName(player)}</p><p className="text-xs text-zinc-500">{player.position || "Sin posición"} · {getPlayerSquadLabel(player)}</p></div><div className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300">#{getPlayerNumber(player)}</div></div><span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[11px] ${getStatusClass(player.status)}`}>{player.status || "Sin estado"}</span>{isUnavailableStatus(player.status) && <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-orange-300"><AlertTriangle size={11} /> advertencia</span>}</div></button>;
+function PlayerCard({ player, checked, callup, isCaptain, onToggle }) {
+  return <button onClick={onToggle} className={`flex items-center gap-3 rounded-xl border p-3 text-left transition ${checked ? "border-yellow-500/40 bg-yellow-500/10" : "border-zinc-800 bg-zinc-950 hover:border-zinc-700 hover:bg-zinc-900"}`}><input type="checkbox" checked={checked} readOnly className="h-4 w-4 accent-yellow-500" /><TransparentPlayerPhoto player={player} className="h-12 w-12 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-12 w-12 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-sm font-bold text-zinc-400" /><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-2"><div><p className="truncate text-sm font-semibold text-white">{getPlayerName(player)}</p><p className="text-xs text-zinc-500">{player.position || "Sin posición"} · {getPlayerSquadLabel(player)}</p></div><div className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-xs font-semibold text-zinc-300">#{getPlayerNumber(player)}</div></div><span className={`mt-2 inline-flex rounded-full border px-2 py-1 text-[11px] ${getStatusClass(player.status)}`}>{player.status || "Sin estado"}</span>{isUnavailableStatus(player.status) && <span className="ml-2 inline-flex items-center gap-1 text-[11px] text-orange-300"><AlertTriangle size={11} /> advertencia</span>}<RoleBadges callup={callup} isCaptain={isCaptain} /></div></button>;
 }
 
-function PlayerListRow({ player, checked, onToggle }) {
-  return <button onClick={onToggle} className={`grid w-full grid-cols-[52px_1.4fr_1fr_80px_150px] items-center gap-3 border-b border-zinc-800 px-4 py-3 text-left transition last:border-b-0 ${checked ? "bg-yellow-500/10" : "hover:bg-zinc-950/50"}`}><input type="checkbox" checked={checked} readOnly className="h-4 w-4 accent-yellow-500" /><div className="flex min-w-0 items-center gap-3"><TransparentPlayerPhoto player={player} className="h-10 w-10 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-xs font-bold text-zinc-400" /><span className="truncate text-sm font-medium text-white">{getPlayerName(player)}</span></div><span className="text-sm text-zinc-400">{player.position || "—"}</span><span className="text-sm text-zinc-300">#{getPlayerNumber(player)}</span><span className={`inline-flex w-fit rounded-full border px-2 py-1 text-[11px] ${getStatusClass(player.status)}`}>{player.status || "Sin estado"}</span></button>;
+function PlayerListRow({ player, checked, callup, isCaptain, onToggle }) {
+  return <button onClick={onToggle} className={`grid w-full grid-cols-[52px_1.4fr_1fr_80px_150px_130px] items-center gap-3 border-b border-zinc-800 px-4 py-3 text-left transition last:border-b-0 ${checked ? "bg-yellow-500/10" : "hover:bg-zinc-950/50"}`}><input type="checkbox" checked={checked} readOnly className="h-4 w-4 accent-yellow-500" /><div className="flex min-w-0 items-center gap-3"><TransparentPlayerPhoto player={player} className="h-10 w-10 rounded-full border border-zinc-700 object-cover" fallbackClassName="flex h-10 w-10 items-center justify-center rounded-full border border-zinc-700 bg-zinc-800" textClassName="text-xs font-bold text-zinc-400" /><span className="truncate text-sm font-medium text-white">{getPlayerName(player)}</span></div><span className="text-sm text-zinc-400">{player.position || "—"}</span><span className="text-sm text-zinc-300">#{getPlayerNumber(player)}</span><span className={`inline-flex w-fit rounded-full border px-2 py-1 text-[11px] ${getStatusClass(player.status)}`}>{player.status || "Sin estado"}</span><RoleBadges callup={callup} isCaptain={isCaptain} /></button>;
 }
 
 function ExportModal({ match, exportFormat, setExportFormat, onClose, onExportImage, onExportPdf, previewRef, countByGroup }) {
