@@ -88,13 +88,14 @@ export default function ConvocadosTab({ match, players = [], onMatchUpdated, onR
     const name = normalizeText(getPlayerName(player));
     const status = normalizeText(player.status || "sin estado");
     const position = getPositionGroup(player.position);
+    const isSelected = selectedPlayerIds.includes(player.id);
     if (search && !name.includes(normalizeText(search))) return false;
-    if (squadFilter === "match" && match.squad_id && player.origin_squad_id !== match.squad_id) return false;
-    if (squadFilter !== "all" && squadFilter !== "match" && player.origin_squad_name !== squadFilter && player.origin_squad_id !== squadFilter) return false;
+    if (!isSelected && squadFilter === "match" && match.squad_id && player.origin_squad_id !== match.squad_id) return false;
+    if (!isSelected && squadFilter !== "all" && squadFilter !== "match" && player.origin_squad_name !== squadFilter && player.origin_squad_id !== squadFilter) return false;
     if (positionFilter !== "all" && position !== positionFilter) return false;
     if (statusFilter !== "all" && status !== statusFilter) return false;
     return true;
-  }), [availablePlayers, match.squad_id, positionFilter, search, squadFilter, statusFilter]);
+  }), [availablePlayers, match.squad_id, positionFilter, search, selectedPlayerIds, squadFilter, statusFilter]);
 
   const groupedPlayers = useMemo(() => {
     const groups = Object.fromEntries(GROUPS.map((group) => [group, []]));
