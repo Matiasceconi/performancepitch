@@ -5,7 +5,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, Search } from "lucide-react";
 function weekLabel(plan) {
   const start = plan?.week_start || plan?.fecha_inicio || plan?.days_data?.[0]?.date;
   const end = plan?.week_end || plan?.fecha_fin || plan?.days_data?.[plan?.days_data?.length - 1]?.date;
-  return start ? `${moment(start).format("DD/MM")} - ${moment(end || start).format("DD/MM/YYYY")}` : "Semana";
+  return start ? `${moment(start).format("D")}–${moment(end || start).format("D MMMM YYYY")}` : "Semana";
 }
 
 function planStatus(plan, sessions, gpsBySession) {
@@ -18,27 +18,21 @@ function planStatus(plan, sessions, gpsBySession) {
   return { label: "GPS pendiente", className: "bg-zinc-800 text-zinc-300 border-zinc-700" };
 }
 
-export default function GpsMicrocycleWeekNavigator({ weeklyPlans = [], selectedWeekStart, onSelectWeek, sessions = [], gpsBySession = [] }) {
+export default function GpsMicrocycleWeekNavigator({ weeklyPlans = [], selectedWeekStart, onSelectWeek, sessions = [], gpsBySession = {} }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
   const sorted = useMemo(() => [...weeklyPlans].sort((a, b) => String(a.week_start || "").localeCompare(String(b.week_start || ""))), [weeklyPlans]);
   const currentIndex = Math.max(0, sorted.findIndex((p) => p.week_start === selectedWeekStart));
   const selected = sorted[currentIndex] || sorted[0];
   const todayStart = moment().startOf("isoWeek").format("YYYY-MM-DD");
-  const visible = sorted.filter((p) => {
-    const haystack = `${p.microcycle_number || ""} ${weekLabel(p)} ${(p.days_data || []).map((d) => `${d.rival || ""} ${d.competition || ""}`).join(" ")}`.toLowerCase();
-    return haystack.includes(search.toLowerCase());
-  });
+  const visible = sorted.filter((p) => `${p.microcycle_number || ""} ${weekLabel(p)} ${(p.days_data || []).map((d) => `${d.rival || ""} ${d.competition || ""}`).join(" ")}`.toLowerCase().includes(search.toLowerCase()));
 
-  return <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-      <div className="flex items-center gap-2">
-        <button onClick={() => sorted[currentIndex - 1] && onSelectWeek(sorted[currentIndex - 1].week_start)} className="rounded-xl border border-zinc-700 bg-zinc-950 p-2 text-zinc-300 hover:text-white"><ChevronLeft size={16} /></button>
-        <div className="min-w-[240px] text-center"><p className="text-[11px] uppercase tracking-wider text-zinc-500">Semana seleccionada</p><p className="font-bold text-white">{weekLabel(selected)}</p></div>
-        <button onClick={() => sorted[currentIndex + 1] && onSelectWeek(sorted[currentIndex + 1].week_start)} className="rounded-xl border border-zinc-700 bg-zinc-950 p-2 text-zinc-300 hover:text-white"><ChevronRight size={16} /></button>
-      </div>
-      <div className="flex flex-wrap gap-2"><button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm font-semibold text-emerald-300"><CalendarDays size={15} /> Seleccionar semana</button><button onClick={() => onSelectWeek(todayStart)} className="rounded-xl border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-300 hover:text-white">Ir a semana actual</button></div>
-    </div>
-    {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><div className="max-h-[86vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-950 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-lg font-bold text-white">Seleccionar semana</h3><p className="text-sm text-zinc-500">Cada bloque semanal representa un microciclo desde la planificación.</p></div><button onClick={() => setOpen(false)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300">Cerrar</button></div><div className="relative mb-4"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por rival, fecha, microciclo o competencia" className="w-full rounded-xl border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-white outline-none" /></div><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map((plan) => { const status = planStatus(plan, sessions, gpsBySession); const selectedPlan = plan.week_start === selectedWeekStart; const isCurrent = plan.week_start === todayStart; return <button key={plan.id || plan.week_start} onClick={() => { onSelectWeek(plan.week_start); setOpen(false); }} className={`rounded-2xl border p-4 text-left transition ${selectedPlan ? "border-emerald-400 bg-emerald-500/10" : isCurrent ? "border-blue-500/50 bg-blue-500/10" : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}><p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Microciclo {plan.microcycle_number || "—"}</p><p className="mt-1 font-bold text-white">{weekLabel(plan)}</p><p className="mt-1 text-xs text-zinc-400">{(plan.days_data || []).find((d) => d.rival)?.rival || "Sin rival"}</p><span className={`mt-3 inline-flex rounded-full border px-2 py-1 text-[11px] ${status.className}`}>{status.label}</span></button>; })}</div></div></div>}
+  return <div className="flex flex-wrap items-center gap-2">
+    <button onClick={() => sorted[currentIndex - 1] && onSelectWeek(sorted[currentIndex - 1].week_start)} className="rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-zinc-300 hover:text-white"><ChevronLeft size={16} /></button>
+    <div className="min-w-[170px] rounded-lg border border-zinc-800 bg-zinc-950 px-3 py-2 text-center text-sm font-bold text-white">{weekLabel(selected)}</div>
+    <button onClick={() => sorted[currentIndex + 1] && onSelectWeek(sorted[currentIndex + 1].week_start)} className="rounded-lg border border-zinc-700 bg-zinc-950 p-2 text-zinc-300 hover:text-white"><ChevronRight size={16} /></button>
+    <button onClick={() => setOpen(true)} className="inline-flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm font-semibold text-zinc-300 hover:text-white"><CalendarDays size={15} /> Seleccionar semana</button>
+    <button onClick={() => onSelectWeek(todayStart)} className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm text-zinc-300 hover:text-white">Ir a semana actual</button>
+    {open && <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"><div className="max-h-[86vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-700 bg-zinc-950 p-5"><div className="mb-4 flex items-center justify-between"><div><h3 className="text-lg font-bold text-white">Seleccionar semana</h3><p className="text-sm text-zinc-500">Los microciclos anteriores se buscan desde este calendario semanal.</p></div><button onClick={() => setOpen(false)} className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300">Cerrar</button></div><div className="relative mb-4"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" /><input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar por rival, fecha, microciclo o competencia" className="w-full rounded-xl border border-zinc-700 bg-zinc-900 py-2 pl-9 pr-3 text-sm text-white outline-none" /></div><div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">{visible.map((plan) => { const status = planStatus(plan, sessions, gpsBySession); const selectedPlan = plan.week_start === selectedWeekStart; const isCurrent = plan.week_start === todayStart; return <button key={plan.id || plan.week_start} onClick={() => { onSelectWeek(plan.week_start); setOpen(false); }} className={`rounded-2xl border p-4 text-left transition ${selectedPlan ? "border-lime-400 bg-lime-500/10" : isCurrent ? "border-blue-500/50 bg-blue-500/10" : "border-zinc-800 bg-zinc-900 hover:border-zinc-600"}`}><p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">Microciclo {plan.microcycle_number || "—"}</p><p className="mt-1 font-bold text-white">{weekLabel(plan)}</p><p className="mt-1 text-xs text-zinc-400">{(plan.days_data || []).find((d) => d.rival)?.rival || "Sin rival"}</p><span className={`mt-3 inline-flex rounded-full border px-2 py-1 text-[11px] ${status.className}`}>{status.label}</span></button>; })}</div></div></div>}
   </div>;
 }

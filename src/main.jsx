@@ -1,7 +1,11 @@
 import React from 'react'
 import ReactDOM from 'react-dom/client'
+import moment from 'moment'
+import 'moment/locale/es'
 import App from '@/App.jsx'
 import '@/index.css'
+
+moment.locale('es')
 
 const JSON_STORAGE_KEYS = [
   'admin_seasons',
