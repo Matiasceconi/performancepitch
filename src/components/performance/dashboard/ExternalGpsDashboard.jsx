@@ -403,12 +403,12 @@ export default function ExternalGpsDashboard() {
 
       {showImportModal && <ImportHistoricalGPSModal onClose={() => { setShowImportModal(false); load(); }} />}
 
-      <div className="flex flex-wrap gap-2 bg-zinc-950 border border-zinc-800 rounded-2xl p-2">
-        {tabs.map((tab) => (
+      <div className="flex overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/70 p-2 shadow-[0_16px_42px_rgba(0,0,0,0.22)]">
+        {tabs.map((tab, index) => (
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${activeTab === tab.id ? "bg-emerald-600 text-white" : "text-zinc-400 hover:text-white hover:bg-zinc-900"}`}
+            className={`relative px-5 py-2.5 text-sm font-semibold transition-colors ${activeTab === tab.id ? "rounded-xl bg-emerald-500 text-white shadow-lg shadow-emerald-950/30" : "text-zinc-400 hover:text-white"} ${index > 0 ? "before:absolute before:left-0 before:top-1/2 before:h-5 before:w-px before:-translate-y-1/2 before:bg-zinc-800" : ""}`}
           >
             {tab.label}
           </button>

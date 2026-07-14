@@ -359,13 +359,16 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
 
   return (
     <div className="space-y-5">
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <h2 className="text-2xl font-bold text-white">Carga del Microciclo</h2>
-          <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedWeekStart={selectedPlan?.week_start || selectedWeekStart} onSelectWeek={(weekStart) => { setSelectedWeekStart(weekStart); setCycleMode("current"); setSelectedSummaryId(""); setSelectedDates([]); setFilters((current) => ({ ...current, selectedDates: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
-          <div className="flex gap-2 flex-wrap"><GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} /><GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} /></div>
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.25)]">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+          <h2 className="text-xl font-black tracking-tight text-white">Carga del Microciclo</h2>
+          <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
+            <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedWeekStart={selectedPlan?.week_start || selectedWeekStart} onSelectWeek={(weekStart) => { setSelectedWeekStart(weekStart); setCycleMode("current"); setSelectedSummaryId(""); setSelectedDates([]); setFilters((current) => ({ ...current, selectedDates: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
+            <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} />
+            <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} />
+          </div>
         </div>
-        {saveMessage && <p className="text-emerald-300 text-xs font-semibold mt-3 flex items-center gap-1"><CheckCircle2 size={13} />{saveMessage}</p>}
+        {saveMessage && <p className="mt-3 flex items-center gap-1 text-xs font-semibold text-emerald-300"><CheckCircle2 size={13} />{saveMessage}</p>}
       </div>
 
       {showHistory && <GpsMicrocycleHistoryPanel summaries={summaries} selectedSummaryId={selectedSummaryId} onSelect={(id) => { setSelectedSummaryId(id); setCycleMode("historical"); setShowHistory(false); }} onUpdate={updateMicrocycleSummary} onDelete={deleteMicrocycleSummary} onClose={() => setShowHistory(false)} />}
