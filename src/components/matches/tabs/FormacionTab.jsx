@@ -5,6 +5,7 @@ import { Download, Eraser, Move, RefreshCw, Save, Shield, Trash2, Users } from "
 
 import { base44 } from "@/api/base44Client";
 import TransparentPlayerPhoto from "@/components/player/PlayerPhoto";
+import FormationPoster from "@/components/matches/tabs/FormationPoster";
 import { useToast } from "@/components/ui/use-toast";
 import { getPlayerName, getPlayerNumber, loadMatchCallupState } from "@/lib/matchCallupUtils";
 
@@ -223,19 +224,7 @@ export default function FormacionTab({ match, players = [], onRegisterSave, onMa
       </div>
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div ref={exportRef} className="rounded-2xl border border-zinc-800 bg-zinc-950 p-4">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-zinc-800 pb-4">
-            <div className="flex items-center gap-3"><MatchBadge src={DYJ_LOGO} label="DYJ" /><div><p className="text-xs uppercase tracking-[0.25em] text-yellow-300">Defensa y Justicia</p><p className="text-lg font-black text-white">vs {match.rival || "Rival"}</p></div><MatchBadge src={match.rival_logo_url} label={match.rival} /></div>
-            <div className="text-right text-xs text-zinc-400"><p>{match.competition || "Competencia"}</p><p>{[match.date, match.match_time, match.match_venue].filter(Boolean).join(" · ")}</p><p className="font-bold text-yellow-300">Sistema {system}</p></div>
-          </div>
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-            <Field refEl={fieldRef} positions={positions} playerMap={playerMap} onDrop={dropOnField} onRemove={removeFromField} />
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3">
-              <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-white"><Users size={14} className="text-yellow-400" /> Suplentes</h3>
-              <div className="space-y-2">{suplentes.length === 0 ? <p className="rounded-xl border border-dashed border-zinc-800 p-4 text-center text-xs text-zinc-500">Sin suplentes.</p> : suplentes.map(({ player }) => <CompactPlayer key={player.id} player={player} onDragStart={() => null} />)}</div>
-            </div>
-          </div>
-        </div>
+        <FormationPoster containerRef={exportRef} fieldRef={fieldRef} match={match} system={system} positions={positions} playerMap={playerMap} suplentes={suplentes} onDrop={dropOnField} onRemove={removeFromField} />
 
         <div className="space-y-3">
           <Panel title="Sin asignar" items={sinAsignar} onAdd={addToField} />
