@@ -70,6 +70,7 @@ export default function ExternalGpsDashboard() {
   const [medicalStatuses, setMedicalStatuses] = useState([]);
   const [memberships, setMemberships] = useState([]);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [selectedWeeklyPlanId, setSelectedWeeklyPlanId] = useState("");
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [matchReports, setMatchReports] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -202,6 +203,11 @@ export default function ExternalGpsDashboard() {
   }, [selectedSquadId, selectedSeason]);
 
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    const unsubscribe = base44.entities.WeeklyPlan.subscribe(load);
+    return () => unsubscribe?.();
+  }, [load]);
 
   const playerMap = useMemo(() => {
     const map = {};
@@ -341,10 +347,16 @@ export default function ExternalGpsDashboard() {
   const today = moment().format("YYYY-MM-DD");
   const currentCycle = useMemo(() => {
     if (!weeklyPlans.length) return null;
-    const withToday = weeklyPlans.find((p) => (p.days_data || []).some((d) => d.date === today));
-    if (withToday) return withToday;
-    return weeklyPlans.find((p) => p.week_start && p.week_start <= today) || weeklyPlans[0];
-  }, [weeklyPlans, today]);
+    const selected = weeklyPlans.find((p) => p.id === selectedWeeklyPlanId);
+    if (selected) return selected;
+    const monday = moment(today).startOf("isoWeek").format("YYYY-MM-DD");
+    const withToday = weeklyPlans.filter((p) => (p.days_data || []).some((d) => d.date === today));
+    return withToday.find((p) => p.week_start === monday) || withToday.sort((a, b) => String(a.week_start || "").localeCompare(String(b.week_start || "")))[0] || weeklyPlans[0];
+  }, [weeklyPlans, selectedWeeklyPlanId, today]);
+
+  useEffect(() => {
+    if (currentCycle?.id && currentCycle.id !== selectedWeeklyPlanId) setSelectedWeeklyPlanId(currentCycle.id);
+  }, [currentCycle, selectedWeeklyPlanId]);
 
   const cycleDays = currentCycle?.days_data || [];
 
@@ -453,7 +465,7 @@ export default function ExternalGpsDashboard() {
       </div>
 
       {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} calendarEvents={calendarEvents} matchReports={matchReports} onReload={load} />
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} selectedWeeklyPlanId={selectedWeeklyPlanId} onSelectWeeklyPlan={setSelectedWeeklyPlanId} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} calendarEvents={calendarEvents} matchReports={matchReports} onReload={load} />
       )}
 
       {activeTab === "sessions" && (

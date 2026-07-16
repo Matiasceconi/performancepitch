@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import moment from "moment";
+import "moment/locale/es";
 import { CheckCircle2 } from "lucide-react";
 import { BarChart as ReBarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList } from "recharts";
 import GpsMicrocycleHighlights from "./GpsMicrocycleHighlights";
@@ -92,13 +93,13 @@ function loadChartConfig() {
   }
 }
 
-export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], competitionProfiles = [], microcycleProfiles = [], calendarEvents = [], matchReports = [] }) {
+export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], selectedWeeklyPlanId = "", onSelectWeeklyPlan, competitionProfiles = [], microcycleProfiles = [], calendarEvents = [], matchReports = [] }) {
   const reportCaptureRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [summaries, setSummaries] = useState([]);
   const [cycleMode, setCycleMode] = useState("current");
   const [selectedSummaryId, setSelectedSummaryId] = useState("");
-  const [selectedWeekStart, setSelectedWeekStart] = useState("");
+  const [selectedPlanId, setSelectedPlanId] = useState(selectedWeeklyPlanId || "");
   const [selectedDate, setSelectedDate] = useState("");
   const [selectedDates, setSelectedDates] = useState([]);
   const [showHistory, setShowHistory] = useState(false);
@@ -135,14 +136,21 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     if (cycleMode === "lastSaved" && latestSummary && selectedSummaryId !== latestSummary.id) setSelectedSummaryId(latestSummary.id);
   }, [cycleMode, latestSummary, selectedSummaryId]);
 
+  useEffect(() => {
+    if (selectedWeeklyPlanId && selectedWeeklyPlanId !== selectedPlanId) setSelectedPlanId(selectedWeeklyPlanId);
+  }, [selectedWeeklyPlanId, selectedPlanId]);
+
   const selectedPlan = useMemo(() => {
     if (!weeklyPlans.length) return null;
-    return weeklyPlans.find((plan) => plan.week_start === selectedWeekStart) || weeklyPlans.find((plan) => (plan.days_data || []).some((day) => day.date === moment().format("YYYY-MM-DD"))) || weeklyPlans[0];
-  }, [weeklyPlans, selectedWeekStart]);
+    const today = moment().format("YYYY-MM-DD");
+    const monday = moment(today).startOf("isoWeek").format("YYYY-MM-DD");
+    return weeklyPlans.find((plan) => plan.id === selectedPlanId) || weeklyPlans.find((plan) => plan.week_start === monday && (plan.days_data || []).some((day) => day.date === today)) || weeklyPlans.find((plan) => (plan.days_data || []).some((day) => day.date === today)) || null;
+  }, [weeklyPlans, selectedPlanId]);
 
   useEffect(() => {
-    if (!selectedWeekStart && selectedPlan?.week_start) setSelectedWeekStart(selectedPlan.week_start);
-  }, [selectedWeekStart, selectedPlan]);
+    if (selectedPlan?.id && selectedPlan.id !== selectedPlanId) setSelectedPlanId(selectedPlan.id);
+    if (selectedPlan?.id && selectedPlan.id !== selectedWeeklyPlanId) onSelectWeeklyPlan?.(selectedPlan.id);
+  }, [selectedPlan, selectedPlanId, selectedWeeklyPlanId, onSelectWeeklyPlan]);
 
   const normalizedCurrentDays = useMemo(() => getCycleDays(selectedPlan?.days_data?.length ? selectedPlan.days_data : cycleDays), [selectedPlan, cycleDays]);
   const baseCycleDays = useMemo(() => {
@@ -329,7 +337,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <h2 className="text-xl font-black tracking-tight text-white">Carga del Microciclo</h2>
           <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-            <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedWeekStart={selectedPlan?.week_start || selectedWeekStart} onSelectWeek={(weekStart) => { setSelectedWeekStart(weekStart); setCycleMode("current"); setSelectedSummaryId(""); setSelectedDates([]); setFilters((current) => ({ ...current, selectedDates: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
+            <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedPlanId={selectedPlan?.id || selectedPlanId} onSelectPlan={(planId) => { setSelectedPlanId(planId); onSelectWeeklyPlan?.(planId); setCycleMode("current"); setSelectedSummaryId(""); setSelectedDates([]); setFilters((current) => ({ ...current, selectedDates: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
             <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} sessions={sessions} cycleDays={effectiveCycleDays} metrics={MICRO_METRICS} />
             <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={effectiveCycleDays} selectedDates={selectedDates} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={displayedChartConfig} rankingConfig={rankingConfig} matchContext={matchContext} cycleRows={rankingRows} />
           </div>
@@ -339,15 +347,15 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
 
       {showHistory && <GpsMicrocycleHistoryPanel summaries={summaries} selectedSummaryId={selectedSummaryId} onSelect={(id) => { setSelectedSummaryId(id); setCycleMode("historical"); setShowHistory(false); }} onUpdate={updateMicrocycleSummary} onDelete={deleteMicrocycleSummary} onClose={() => setShowHistory(false)} />}
 
-      <GpsMicrocycleDayHeader days={baseCycleDays} sessions={sessions} gpsBySession={gpsBySession} selectedDates={selectedDates} onToggleDate={toggleSelectedDate} onSelectAll={selectWholeWeek} onClear={clearSelectedDays} calendarEvents={cycleCalendarEvents} matchReports={cycleMatchReports} />
-      <GpsDailyPlayerTable selectedDates={selectedDates} selectedDays={selectedDays} totalDays={baseCycleDays.length} sessions={sessions} gpsBySession={gpsBySession} playerMap={playerMap} microcycleProfiles={microcycleProfiles} competitionProfiles={competitionProfiles} squadId={squadId} season={season} selectedDay={selectedDay} />
-      {selectedDates.length > 0 && <div className="flex justify-end"><button onClick={() => setFilters((current) => ({ ...current, selectedDates }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Filtrar gráficos por días seleccionados</button></div>}
+      {!selectedPlan && cycleMode === "current" ? <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-8 text-center"><h3 className="text-lg font-black text-white">No existe un Plan semanal para este periodo</h3><p className="mt-2 text-sm text-zinc-500">Carga externa no genera días automáticamente: primero creá o abrí el plan oficial.</p><button onClick={() => { window.location.href = "/weekly-planner"; }} className="mt-5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white">Crear o abrir Plan semanal</button></div> : <GpsMicrocycleDayHeader days={baseCycleDays} sessions={sessions} gpsBySession={gpsBySession} selectedDates={selectedDates} onToggleDate={toggleSelectedDate} onSelectAll={selectWholeWeek} onClear={clearSelectedDays} calendarEvents={cycleCalendarEvents} matchReports={cycleMatchReports} />}
+      {selectedPlan && <GpsDailyPlayerTable selectedDates={selectedDates} selectedDays={selectedDays} totalDays={baseCycleDays.length} sessions={sessions} gpsBySession={gpsBySession} playerMap={playerMap} microcycleProfiles={microcycleProfiles} competitionProfiles={competitionProfiles} squadId={squadId} season={season} selectedDay={selectedDay} />}
+      {selectedPlan && selectedDates.length > 0 && <div className="flex justify-end"><button onClick={() => setFilters((current) => ({ ...current, selectedDates }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Filtrar gráficos por días seleccionados</button></div>}
 
-      <div ref={reportCaptureRef} className="space-y-5">
+      {selectedPlan && <div ref={reportCaptureRef} className="space-y-5">
         {filterLabels.length > 0 && <div className="bg-zinc-900 border border-emerald-500/30 rounded-2xl p-4"><p className="text-xs font-semibold text-emerald-400 uppercase tracking-wider mb-2">Filtros aplicados</p><div className="flex flex-wrap gap-2">{filterLabels.map((label) => <span key={label} className="px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-200 text-xs font-semibold">{label}</span>)}</div></div>}
         <GpsMicrocycleCharts data={shownDailySummaries} metrics={MICRO_METRICS} config={displayedChartConfig} onConfigChange={setChartConfig} />
         <GpsMicrocycleHighlights highlights={shownHighlights} metrics={MICRO_METRICS} config={rankingConfig} onConfigChange={setRankingConfig} />
-      </div>
+      </div>}
     </div>
   );
 }

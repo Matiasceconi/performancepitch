@@ -13,7 +13,7 @@ import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
 import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
 import PlannerSettingsModal from "@/components/planning/PlannerSettingsModal";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
-import { syncSessionsWithWeeklyPlan } from "@/components/planning/microcycleSync";
+import { buildPlanKey, normalizePlanDays, planDateRange, syncSessionsWithWeeklyPlan } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -47,17 +47,17 @@ function emptyBlock(type = "Campo", content = "") {
   return { id: uid(), type, title: WORK_BLOCKS.find((item) => item.type === type)?.label || type, content, color: BLOCK_COLORS[type] || BLOCK_COLORS.Personalizado, session_id: "", auto_sync: true };
 }
 function emptyDay(date, index = 0) {
-  return { date, md: MD_OPTIONS[Math.min(index, 7)] || "MD-5", physical_objective: "Mixto", blocks: WORK_BLOCKS.map((item) => emptyBlock(item.type)) };
+  return { day_id: `day-${index + 1}`, date, order: index, md: MD_OPTIONS[Math.min(index, 7)] || "MD-5", physical_objective: "Mixto", is_rest_day: false, match_id: "", calendar_event_id: "", linked_session_ids: [], blocks: WORK_BLOCKS.map((item) => emptyBlock(item.type)) };
 }
 function normalizeDay(day, fallbackDate, index) {
-  if (Array.isArray(day?.blocks)) return { ...emptyDay(fallbackDate, index), ...day, md: MD_OPTIONS.includes(day?.md) ? day.md : emptyDay(fallbackDate, index).md, blocks: day.blocks.map(b => ({ ...emptyBlock(b.type || "Personalizado"), ...b, id: b.id || uid() })) };
+  if (Array.isArray(day?.blocks)) return { ...emptyDay(fallbackDate, index), ...day, day_id: day?.day_id || `day-${index + 1}`, order: Number.isFinite(Number(day?.order)) ? Number(day.order) : index, md: MD_OPTIONS.includes(day?.md) ? day.md : emptyDay(fallbackDate, index).md, linked_session_ids: Array.isArray(day?.linked_session_ids) ? day.linked_session_ids : [], blocks: day.blocks.map(b => ({ ...emptyBlock(b.type || "Personalizado"), ...b, id: b.id || uid() })) };
   const blocks = [];
   if (day?.objetivo && day.objetivo !== "—") blocks.push(emptyBlock("Objetivo físico", day.objetivo));
   if (day?.sesionGimnasio) blocks.push(emptyBlock("Gimnasio", day.sesionGimnasio));
   if (day?.trabajoCompensatorio && day.trabajoCompensatorio !== "—") blocks.push(emptyBlock("Compensatorio", day.trabajoCompensatorio));
   if ((day?.vueltaCalma || []).length) blocks.push(emptyBlock("Vuelta a la calma", day.vueltaCalma.join("\n")));
   if ((day?.tareasTecnico || []).some(Boolean)) blocks.push(emptyBlock("Objetivo táctico", day.tareasTecnico.filter(Boolean).join("\n")));
-  return { ...emptyDay(fallbackDate, index), ...day, physical_objective: day?.physical_objective || day?.objetivo_fisico || day?.objetivo || "Mixto", blocks: blocks.length ? blocks : emptyDay(fallbackDate, index).blocks };
+  return { ...emptyDay(fallbackDate, index), ...day, day_id: day?.day_id || `day-${index + 1}`, order: Number.isFinite(Number(day?.order)) ? Number(day.order) : index, physical_objective: day?.physical_objective || day?.objetivo_fisico || day?.objetivo || "Mixto", linked_session_ids: Array.isArray(day?.linked_session_ids) ? day.linked_session_ids : [], blocks: blocks.length ? blocks : emptyDay(fallbackDate, index).blocks };
 }
 function normalizeText(value) { return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, ""); }
 function sessionSignature(session) { return [session?.session_type, session?.session_objective || session?.objective, session?.microcycle_day].map(v => normalizeText(v)).join("|"); }
@@ -390,7 +390,14 @@ export default function WeeklyPlannerBoard() {
 
   const autoText = `La semana queda estructurada como ${meta.week_type}. El pico principal aparece el ${summary.peak?.day || "—"}. Se planifican ${summary.field} bloques de campo y ${summary.gym} bloques de gimnasio. El día de recuperación queda ubicado en ${summary.recovery?.date ? dayName(summary.recovery.date) : "—"}. Estado general: ${summary.status}.`;
 
-  function updateDay(idx, patch) { setDays(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d)); }
+  function updateDay(idx, patch) {
+    if (patch.date && patch.date !== days[idx]?.date) {
+      const linkedIds = new Set([...(days[idx]?.linked_session_ids || []), ...((days[idx]?.blocks || []).map((block) => block.session_id).filter(Boolean))]);
+      const hasGps = gpsRows.some((row) => linkedIds.has(row.session_id));
+      if (hasGps && !window.confirm("Este día tiene sesiones vinculadas con GPS cargado. ¿Confirmás cambiar la fecha del día del Plan semanal sin mover silenciosamente esos datos GPS?")) return;
+    }
+    setDays(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d));
+  }
   function updateBlock(dayIdx, blockId, patch) {
     setDays(prev => prev.map((d, i) => i !== dayIdx ? d : { ...d, blocks: d.blocks.map(b => b.id === blockId ? { ...b, ...patch } : b) }));
   }
@@ -410,7 +417,7 @@ export default function WeeklyPlannerBoard() {
     const session = sessionsById[sessionId];
     const day = days[dayIdx];
     if (session && day) {
-      const patch = {};
+      const patch = recordId ? { weekly_plan_id: recordId, weekly_plan_day_id: day.day_id || `day-${dayIdx + 1}`, plan_sync_updated_at: new Date().toISOString() } : {};
       if (!session.md_manual_override && day.md && session.match_day_code !== day.md) {
         patch.match_day_code = day.md;
         patch.microcycle_day = day.md;
@@ -453,9 +460,17 @@ export default function WeeklyPlannerBoard() {
   }
   async function save() {
     setSaving(true);
-    const payload = { week_start: startDate, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", microcycle_meta: meta, graph_type: graphType, template_type: meta.week_type, days_data: days, notes: autoText };
-    const savedPlan = recordId ? await base44.entities.WeeklyPlan.update(recordId, payload) : await base44.entities.WeeklyPlan.create(payload);
-    if (!recordId) setRecordId(savedPlan.id);
+    const normalizedDays = normalizePlanDays(days);
+    const range = planDateRange(normalizedDays);
+    const weekStart = range.week_start || startDate;
+    const weekEnd = range.week_end || moment(weekStart).add(normalizedDays.length - 1, "days").format("YYYY-MM-DD");
+    const payloadBase = { week_start: weekStart, week_end: weekEnd, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", microcycle_meta: { ...meta, range_label: `${moment(weekStart).format("DD/MM/YYYY")} - ${moment(weekEnd).format("DD/MM/YYYY")}` }, graph_type: graphType, template_type: meta.week_type, days_data: normalizedDays, notes: autoText, updated_at: new Date().toISOString() };
+    const payload = { ...payloadBase, plan_key: buildPlanKey(payloadBase), version: (savedPlans.find((plan) => plan.id === recordId)?.version || 0) + 1 };
+    const existing = recordId ? null : savedPlans.find((plan) => (plan.plan_key && plan.plan_key === payload.plan_key) || (plan.squad_id === payload.squad_id && (plan.season_id || "") === (payload.season_id || "") && plan.week_start === payload.week_start));
+    const targetId = recordId || existing?.id;
+    const savedPlan = targetId ? await base44.entities.WeeklyPlan.update(targetId, payload) : await base44.entities.WeeklyPlan.create(payload);
+    setRecordId(savedPlan.id);
+    setStartDate(savedPlan.week_start || weekStart);
     const syncedCount = await syncSessionsWithWeeklyPlan({ ...payload, id: savedPlan.id });
     setSaving(false);
     toast({ title: syncedCount ? `Microciclo guardado · ${syncedCount} sesiones sincronizadas` : "Microciclo guardado correctamente" });
@@ -512,7 +527,7 @@ export default function WeeklyPlannerBoard() {
       <MicrocycleAreaLegend objectives={physicalObjectives} />
       <div className="min-w-0 overflow-x-auto">
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(170px, 1fr))` }}>
-          {days.map((day, dayIdx) => <MicrocycleDayColumn key={dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={syncSessionFromDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
+          {days.map((day, dayIdx) => <MicrocycleDayColumn key={day.day_id || dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={syncSessionFromDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
         </div>
       </div>
 

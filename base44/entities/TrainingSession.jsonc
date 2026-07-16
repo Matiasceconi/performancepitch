@@ -27,6 +27,18 @@
       "type": "string",
       "description": "Temporada del plantel"
     },
+    "weekly_plan_id": {
+      "type": "string",
+      "description": "ID del WeeklyPlan al que est\u00e1 vinculada la sesi\u00f3n"
+    },
+    "weekly_plan_day_id": {
+      "type": "string",
+      "description": "ID estable del d\u00eda dentro del WeeklyPlan"
+    },
+    "plan_sync_updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima sincronizaci\u00f3n con Plan semanal"
+    },
     "period": {
       "type": "string",
       "enum": [

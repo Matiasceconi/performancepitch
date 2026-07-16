@@ -2,6 +2,14 @@
   "name": "WeeklyPlan",
   "type": "object",
   "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n para construir la clave estable del plan"
+    },
+    "plan_key": {
+      "type": "string",
+      "description": "Clave \u00fanica l\u00f3gica: organization_id + squad_id + season_id + week_start"
+    },
     "squad_id": {
       "type": "string",
       "description": "ID del plantel al que pertenece el plan"
@@ -17,7 +25,21 @@
     "week_start": {
       "type": "string",
       "format": "date",
-      "description": "Fecha del lunes de la semana (YYYY-MM-DD)"
+      "description": "Fecha inicial del plan semanal (YYYY-MM-DD)"
+    },
+    "week_end": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha final calculada desde days_data"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n del plan semanal"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de \u00faltima actualizaci\u00f3n"
     },
     "microcycle_meta": {
       "type": "object",
@@ -43,7 +65,7 @@
       "items": {
         "type": "object"
       },
-      "description": "Array de d\u00edas con planificaci\u00f3n flexible, bloques editables, sesiones vinculadas, indicadores de calendario y datos del microciclo"
+      "description": "D\u00edas oficiales del plan: day_id, date, order, md, physical_objective, is_rest_day, match_id, calendar_event_id y linked_session_ids"
     },
     "notes": {
       "type": "string",

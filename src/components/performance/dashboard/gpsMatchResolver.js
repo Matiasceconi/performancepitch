@@ -65,23 +65,22 @@ export function resolveDayMatch(day = {}, calendarEvents = [], matchReports = []
   const date = day.date;
   const safeEvents = (calendarEvents || []).filter(Boolean);
   const safeReports = (matchReports || []).filter(Boolean);
-  const event = safeEvents.find((item) => item.date === date && [item.event_type, item.type].some((value) => normalizeText(value) === "partido"));
-  const eventMatchId = event?.match_id || day.match_id;
-  const linkedReport = eventMatchId ? safeReports.find((report) => report.id === eventMatchId) : null;
-  const sameDateReport = safeReports.find((report) => report.date === date);
+  const linkedEvent = day.calendar_event_id ? safeEvents.find((item) => item.id === day.calendar_event_id) : null;
+  const linkedReport = day.match_id ? safeReports.find((report) => report.id === day.match_id) : null;
+  const eventReport = linkedEvent?.match_id ? safeReports.find((report) => report.id === linkedEvent.match_id) : null;
   const isMd = (day.md || day.match_day_code) === "MD";
-  const hasMatch = isMd || Boolean(event || linkedReport || sameDateReport || day.rival || day.match_id);
+  const hasMatch = isMd || Boolean(linkedEvent || linkedReport || eventReport || day.rival || day.match_id || day.calendar_event_id);
   if (!hasMatch) return null;
   const merged = mergeMatches(
     toMatchFromDay(day),
-    toMatchFromReport(sameDateReport),
+    toMatchFromReport(eventReport),
     toMatchFromReport(linkedReport),
-    toMatchFromEvent(event)
+    toMatchFromEvent(linkedEvent)
   );
   return {
     ...merged,
     isMatch: true,
-    rival: merged.rival || merged.title || "Rival no definido",
+    rival: merged.rival || merged.title || (isMd ? "Partido sin vincular" : "Rival no definido"),
     home_away: merged.home_away || "",
     time: merged.time || "",
     competition: merged.competition || "",
