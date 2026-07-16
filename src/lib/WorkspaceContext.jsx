@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
@@ -30,8 +31,32 @@ const LEGACY_MODULE_PATHS = {
   squad_manager: ["/squad-manager"],
 };
 
+const PATH_AREA_MAP = {
+  "/performance/external-load": "rendimiento_fisico",
+  "/gps": "rendimiento_fisico",
+  "/performance/internal-load": "rendimiento_fisico",
+  "/performance/minutes": "rendimiento_fisico",
+  "/performance/microcycle-history": "rendimiento_fisico",
+  "/performance/medical": "area_medica",
+  "/performance/nutrition": "nutricion",
+  "/sessions": "cuerpo_tecnico",
+  "/matches": "cuerpo_tecnico",
+  "/tactical": "cuerpo_tecnico",
+  "/team": "cuerpo_tecnico",
+  "/schedule": "cuerpo_tecnico",
+  "/weekly-planner": "cuerpo_tecnico",
+  "/daily-squad": "cuerpo_tecnico",
+  "/players": "cuerpo_tecnico",
+  "/field-library": "cuerpo_tecnico",
+  "/strength-library": "cuerpo_tecnico",
+  "/admin": "administracion",
+  "/squad-manager": "administracion",
+  "/users-access": "administracion",
+};
+
 export function WorkspaceProvider({ children }) {
   const { user, isAuthenticated } = useAuth();
+  const location = useLocation();
   const [squads, setSquads] = useState([]);
   const [activeSquad, setActiveSquadState] = useState(null);
   const [userAccess, setUserAccess] = useState(null);
@@ -166,8 +191,16 @@ export function WorkspaceProvider({ children }) {
       }
       const validSavedAreaId = savedAreaUser === user.id && resolvedAreaIds.includes(savedAreaId) ? savedAreaId : null;
 
+      const routeAreaId = PATH_AREA_MAP[location.pathname];
+      const canUseRouteArea = routeAreaId && resolvedAreaIds.includes(routeAreaId) && (adminLockRef.current || allowedPageSet.has(location.pathname));
+
       if (validSavedAreaId) {
         setActiveAreaIdState(validSavedAreaId);
+        setNeedAreaSelection(false);
+      } else if (canUseRouteArea) {
+        setActiveAreaIdState(routeAreaId);
+        localStorage.setItem("activeAreaId", routeAreaId);
+        localStorage.setItem("activeAreaUserId", user.id);
         setNeedAreaSelection(false);
       } else if (resolvedAreaIds.length === 1) {
         setActiveAreaIdState(resolvedAreaIds[0]);
@@ -231,7 +264,7 @@ export function WorkspaceProvider({ children }) {
       hasLoadedOnceRef.current = true;
       setLoadingWorkspace(false);
     }
-  }, [isAuthenticated, user]);
+  }, [isAuthenticated, user, location.pathname]);
 
   useEffect(() => { loadWorkspace(); }, [loadWorkspace]);
 
@@ -284,6 +317,7 @@ export function WorkspaceProvider({ children }) {
   // Administradores tienen acceso total; ya no depende del área activa ni de un módulo padre.
   function canSeePath(path) {
     if (effectiveAdminAccess) return true;
+    if (path === "/gps" && allowedPages.includes("/performance/external-load")) return true;
     return allowedPages.includes(path);
   }
 
