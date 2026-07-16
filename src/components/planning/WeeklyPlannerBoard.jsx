@@ -13,7 +13,7 @@ import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
 import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
 import PlannerSettingsModal from "@/components/planning/PlannerSettingsModal";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
-import { buildPlanKey, normalizePlanDays, planDateRange, syncSessionsWithWeeklyPlan } from "@/components/planning/microcycleSync";
+import { buildPlanKey, daysForPlan, normalizePlanDays, operationalPlans, planDateRange, syncSessionsWithWeeklyPlan } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -181,6 +181,7 @@ export default function WeeklyPlannerBoard() {
   const [cooldownOptions, setCooldownOptions] = useState([]);
   const [gpsRows, setGpsRows] = useState([]);
   const [savedPlans, setSavedPlans] = useState([]);
+  const [weeklyPlanDays, setWeeklyPlanDays] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -204,8 +205,13 @@ export default function WeeklyPlannerBoard() {
 
   useEffect(() => {
     async function loadPlans() {
-      const all = await base44.entities.WeeklyPlan.list("-week_start", 100);
-      setSavedPlans(activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all);
+      const [all, dayRows] = await Promise.all([
+        base44.entities.WeeklyPlan.list("-week_start", 100),
+        base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
+      ]);
+      const scoped = activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all;
+      setWeeklyPlanDays(dayRows);
+      setSavedPlans(operationalPlans(scoped).map((plan) => ({ ...plan, operational_days: daysForPlan(plan, dayRows) })));
     }
     loadPlans();
   }, [activeSquadId, activeSeasonId, recordId]);
@@ -213,21 +219,27 @@ export default function WeeklyPlannerBoard() {
   useEffect(() => {
     async function loadPlan() {
       setLoading(true);
-      const all = await base44.entities.WeeklyPlan.filter({ week_start: startDate });
-      const records = activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all;
-      const rec = records[0];
+      const [all, dayRows] = await Promise.all([
+        base44.entities.WeeklyPlan.list("-week_start", 100),
+        base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
+      ]);
+      const records = operationalPlans(activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all);
+      const today = moment().format("YYYY-MM-DD");
+      const rec = records.find((plan) => plan.id === recordId) || records.find((plan) => daysForPlan(plan, dayRows).some((day) => day.date === today)) || records.find((plan) => plan.week_start === startDate) || null;
+      setWeeklyPlanDays(dayRows);
       if (rec) {
+        const loaded = daysForPlan(rec, dayRows).map((d, i) => normalizeDay(d, d.date || moment(rec.week_start || startDate).add(i, "days").format("YYYY-MM-DD"), i));
         setRecordId(rec.id);
-        setMeta({ ...defaultMeta(startDate), ...(rec.microcycle_meta || {}) });
+        setStartDate(loaded[0]?.date || rec.week_start || startDate);
+        setMeta({ ...defaultMeta(loaded[0]?.date || rec.week_start || startDate), ...(rec.microcycle_meta || {}), range_label: `${moment(loaded[0]?.date || rec.week_start).format("DD/MM/YYYY")} - ${moment(loaded[loaded.length - 1]?.date || rec.week_end || rec.week_start).format("DD/MM/YYYY")}` });
         setGraphType(rec.graph_type || "barras");
-        const loaded = (rec.days_data || []).map((d, i) => normalizeDay(d, moment(startDate).add(i, "days").format("YYYY-MM-DD"), i));
-        setDayCount(loaded.length || dayCount);
-        setDays(loaded.length ? loaded : Array.from({ length: dayCount }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
+        setDayCount(loaded.length || 7);
+        setDays(loaded.length ? loaded : Array.from({ length: 7 }, (_, i) => emptyDay(moment(rec.week_start || startDate).add(i, "days").format("YYYY-MM-DD"), i)));
       } else {
         setRecordId(null);
         setMeta(defaultMeta(startDate));
         setGraphType("barras");
-        setDays(Array.from({ length: dayCount }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
+        setDays(Array.from({ length: 7 }, (_, i) => emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i)));
       }
       setLoading(false);
     }
@@ -417,7 +429,7 @@ export default function WeeklyPlannerBoard() {
     const session = sessionsById[sessionId];
     const day = days[dayIdx];
     if (session && day) {
-      const patch = recordId ? { weekly_plan_id: recordId, weekly_plan_day_id: day.day_id || `day-${dayIdx + 1}`, plan_sync_updated_at: new Date().toISOString() } : {};
+      const patch = recordId ? { weekly_plan_id: recordId, weekly_plan_day_id: day.weekly_plan_day_id || day.id || day.day_id, plan_sync_updated_at: new Date().toISOString() } : {};
       if (!session.md_manual_override && day.md && session.match_day_code !== day.md) {
         patch.match_day_code = day.md;
         patch.microcycle_day = day.md;
@@ -450,13 +462,23 @@ export default function WeeklyPlannerBoard() {
   function applyTemplate(id) {
     const tpl = MICROCycle_TEMPLATES.find(t => t.id === id);
     if (!tpl) return;
-    setDayCount(tpl.days.length);
-    setMeta(prev => ({ ...prev, week_type: tpl.type, range_label: `${moment(startDate).format("DD/MM/YYYY")} - ${moment(startDate).add(tpl.days.length - 1, "days").format("DD/MM/YYYY")}` }));
-    setDays(tpl.days.map((md, i) => {
-      const rawObjective = tpl.objectives[i] || "Mixto";
+    setMeta(prev => ({ ...prev, week_type: tpl.type }));
+    setDays(prev => prev.map((day, i) => {
+      const rawObjective = tpl.objectives[i] || day.physical_objective || "Mixto";
       const physicalObjective = rawObjective === "Volumen" ? "Duración metabólica" : rawObjective === "Táctica" || rawObjective === "Partido" ? "Mixto" : rawObjective;
-      return { ...emptyDay(moment(startDate).add(i, "days").format("YYYY-MM-DD"), i), md, physical_objective: physicalObjective };
+      return { ...day, physical_objective: physicalObjective };
     }));
+  }
+  function selectSavedPlan(planId) {
+    const plan = savedPlans.find((item) => item.id === planId);
+    if (!plan) return;
+    const loaded = daysForPlan(plan, weeklyPlanDays).map((d, i) => normalizeDay(d, d.date || moment(plan.week_start).add(i, "days").format("YYYY-MM-DD"), i));
+    setRecordId(plan.id);
+    setStartDate(loaded[0]?.date || plan.week_start || startDate);
+    setMeta({ ...defaultMeta(loaded[0]?.date || plan.week_start || startDate), ...(plan.microcycle_meta || {}), range_label: `${moment(loaded[0]?.date || plan.week_start).format("DD/MM/YYYY")} - ${moment(loaded[loaded.length - 1]?.date || plan.week_end || plan.week_start).format("DD/MM/YYYY")}` });
+    setGraphType(plan.graph_type || "barras");
+    setDayCount(loaded.length || 7);
+    setDays(loaded);
   }
   async function save() {
     setSaving(true);
@@ -464,14 +486,17 @@ export default function WeeklyPlannerBoard() {
     const range = planDateRange(normalizedDays);
     const weekStart = range.week_start || startDate;
     const weekEnd = range.week_end || moment(weekStart).add(normalizedDays.length - 1, "days").format("YYYY-MM-DD");
-    const payloadBase = { week_start: weekStart, week_end: weekEnd, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", microcycle_meta: { ...meta, range_label: `${moment(weekStart).format("DD/MM/YYYY")} - ${moment(weekEnd).format("DD/MM/YYYY")}` }, graph_type: graphType, template_type: meta.week_type, days_data: normalizedDays, notes: autoText, updated_at: new Date().toISOString() };
+    const payloadBase = { week_start: weekStart, week_end: weekEnd, squad_id: activeSquadId || null, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", microcycle_meta: { ...meta, range_label: `${moment(weekStart).format("DD/MM/YYYY")} - ${moment(weekEnd).format("DD/MM/YYYY")}` }, graph_type: graphType, template_type: meta.week_type, active_day_source: "weekly_plan_day", notes: autoText, updated_at: new Date().toISOString() };
     const payload = { ...payloadBase, plan_key: buildPlanKey(payloadBase), version: (savedPlans.find((plan) => plan.id === recordId)?.version || 0) + 1 };
     const existing = recordId ? null : savedPlans.find((plan) => (plan.plan_key && plan.plan_key === payload.plan_key) || (plan.squad_id === payload.squad_id && (plan.season_id || "") === (payload.season_id || "") && plan.week_start === payload.week_start));
     const targetId = recordId || existing?.id;
     const savedPlan = targetId ? await base44.entities.WeeklyPlan.update(targetId, payload) : await base44.entities.WeeklyPlan.create(payload);
+    await Promise.all(normalizedDays.filter((day) => day.weekly_plan_day_id || day.id).map((day, index) => base44.entities.WeeklyPlanDay.update(day.weekly_plan_day_id || day.id, { order: index, md_code: day.md, physical_objective: day.physical_objective, blocks: day.blocks || [], notes: day.notes || "" })));
     setRecordId(savedPlan.id);
     setStartDate(savedPlan.week_start || weekStart);
-    const syncedCount = await syncSessionsWithWeeklyPlan({ ...payload, id: savedPlan.id });
+    const refreshedDays = await base44.entities.WeeklyPlanDay.filter({ weekly_plan_id: savedPlan.id }, "order", 50).catch(() => []);
+    setWeeklyPlanDays((current) => [...current.filter((day) => day.weekly_plan_id !== savedPlan.id), ...refreshedDays]);
+    const syncedCount = await syncSessionsWithWeeklyPlan(savedPlan, refreshedDays);
     setSaving(false);
     toast({ title: syncedCount ? `Microciclo guardado · ${syncedCount} sesiones sincronizadas` : "Microciclo guardado correctamente" });
   }
@@ -510,9 +535,8 @@ export default function WeeklyPlannerBoard() {
       <div className="flex gap-2 flex-wrap items-center">
         <button onClick={() => shiftWeek(-1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronLeft size={16} /></button>
         <button onClick={() => shiftWeek(1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-500 hover:bg-zinc-50"><ChevronRight size={16} /></button>
-        <select value={days.length} onChange={e => setMicrocycleLength(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold">{Array.from({ length: 10 }, (_, i) => i + 1).map(n => <option key={n} value={n}>{n} días</option>)}</select>
         <select value="" onChange={e => { if (e.target.value) applyTemplate(e.target.value); e.target.value = ""; }} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Plantillas de microciclo</option>{MICROCycle_TEMPLATES.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</select>
-        {savedPlans.length > 0 && <select value="" onChange={e => e.target.value && setStartDate(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Planes guardados</option>{savedPlans.map(plan => <option key={plan.id} value={plan.week_start}>{moment(plan.week_start).format("DD/MM/YYYY")}</option>)}</select>}
+        {savedPlans.length > 0 && <select value={recordId || ""} onChange={e => e.target.value && selectSavedPlan(e.target.value)} className="bg-white border border-zinc-200 rounded-lg px-3 py-2 text-zinc-600 text-xs font-bold"><option value="">Microciclo / partido</option>{savedPlans.map(plan => <option key={plan.id} value={plan.id}>{moment(plan.operational_days?.[0]?.date || plan.week_start).format("DD/MM")}–{moment(plan.operational_days?.[plan.operational_days?.length - 1]?.date || plan.week_end || plan.week_start).format("DD/MM")} · {plan.microcycle_meta?.next_match || "Sin partido"}</option>)}</select>}
         <button onClick={() => setSettingsOpen(true)} className="px-3 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-black flex items-center gap-2 shadow-sm"><Settings size={14} /> Configuración</button>
         <button onClick={() => setShowLoadChart(prev => !prev)} className="px-3 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-black flex items-center gap-2 shadow-sm"><BarChart3 size={14} /> {showLoadChart ? "Ocultar carga" : "Mostrar carga"}</button>
         <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-lg text-white text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.green }}><Sparkles size={14} /> {aiLoading ? "Creando..." : "Crear con IA"}</button>

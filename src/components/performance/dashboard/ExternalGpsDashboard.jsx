@@ -14,6 +14,7 @@ import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import GpsSessionAnalyticsFilters from "./GpsSessionAnalyticsFilters";
 import GpsSessionsAdvancedTable from "./GpsSessionsAdvancedTable";
 import moment from "moment";
+import { daysForPlan, operationalPlans } from "@/components/planning/microcycleSync";
 
 function positionGroup(position, player) {
   if (isGoalkeeper(player || { position })) return "Arquero";
@@ -70,6 +71,7 @@ export default function ExternalGpsDashboard() {
   const [medicalStatuses, setMedicalStatuses] = useState([]);
   const [memberships, setMemberships] = useState([]);
   const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [weeklyPlanDays, setWeeklyPlanDays] = useState([]);
   const [selectedWeeklyPlanId, setSelectedWeeklyPlanId] = useState("");
   const [calendarEvents, setCalendarEvents] = useState([]);
   const [matchReports, setMatchReports] = useState([]);
@@ -147,7 +149,7 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans, allCalendarEvents, allMatchReports] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans, allWeeklyPlanDays, allCalendarEvents, allMatchReports] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
@@ -156,6 +158,7 @@ export default function ExternalGpsDashboard() {
         base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
         base44.entities.SquadMembership.list("-created_date", 2000),
         base44.entities.WeeklyPlan.list("-week_start", 100),
+        base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
         base44.entities.DayEvent.list("-date", 500),
         base44.entities.MatchReport.list("-date", 500),
       ]);
@@ -168,7 +171,9 @@ export default function ExternalGpsDashboard() {
       setMedicalEpisodes(allMedicalEpisodes.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
       setMedicalStatuses(allMedicalStatuses.filter((s) => (!selectedSquadId || !s.squad_id || s.squad_id === selectedSquadId)));
       setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
-      setWeeklyPlans(selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId && (!selectedSeason || !p.season_id || p.season_id === selectedSeason)) : allWeeklyPlans);
+      const scopedPlans = selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId && (!selectedSeason || !p.season_id || p.season_id === selectedSeason)) : allWeeklyPlans;
+      setWeeklyPlanDays(allWeeklyPlanDays);
+      setWeeklyPlans(operationalPlans(scopedPlans).map((plan) => ({ ...plan, operational_days: daysForPlan(plan, allWeeklyPlanDays) })).filter((plan) => (plan.operational_days || []).length));
       setCalendarEvents(allCalendarEvents.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
       setMatchReports(allMatchReports.filter((m) => (!selectedSquadId || !m.squad_id || m.squad_id === selectedSquadId) && (!selectedSeason || !m.season_id || m.season_id === selectedSeason)));
 
@@ -349,16 +354,16 @@ export default function ExternalGpsDashboard() {
     if (!weeklyPlans.length) return null;
     const selected = weeklyPlans.find((p) => p.id === selectedWeeklyPlanId);
     if (selected) return selected;
-    const monday = moment(today).startOf("isoWeek").format("YYYY-MM-DD");
-    const withToday = weeklyPlans.filter((p) => (p.days_data || []).some((d) => d.date === today));
-    return withToday.find((p) => p.week_start === monday) || withToday.sort((a, b) => String(a.week_start || "").localeCompare(String(b.week_start || "")))[0] || weeklyPlans[0];
-  }, [weeklyPlans, selectedWeeklyPlanId, today]);
+    const withToday = weeklyPlans.filter((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === today));
+    const withTarget = weeklyPlans.filter((p) => p.target_match_id).sort((a, b) => String(b.week_start || "").localeCompare(String(a.week_start || "")));
+    return withToday[0] || withTarget[0] || weeklyPlans[0];
+  }, [weeklyPlans, weeklyPlanDays, selectedWeeklyPlanId, today]);
 
   useEffect(() => {
     if (currentCycle?.id && currentCycle.id !== selectedWeeklyPlanId) setSelectedWeeklyPlanId(currentCycle.id);
   }, [currentCycle, selectedWeeklyPlanId]);
 
-  const cycleDays = currentCycle?.days_data || [];
+  const cycleDays = currentCycle ? daysForPlan(currentCycle, weeklyPlanDays) : [];
 
   const rosterPlayerIds = useMemo(() => new Set(memberships.map((m) => m.player_id)), [memberships]);
   const rosterPlayers = useMemo(() => players.filter((p) => rosterPlayerIds.has(p.id)), [players, rosterPlayerIds]);

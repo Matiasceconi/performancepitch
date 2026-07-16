@@ -9,7 +9,7 @@ import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
 import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professionalSchedulePdf";
 import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
 import ScheduleExportView from "@/components/schedule/ScheduleExportView";
-import { findPlanDay } from "@/components/planning/microcycleSync";
+import { daysForPlan, findPlanDay, operationalPlans } from "@/components/planning/microcycleSync";
 import { getLogoForRival } from "@/lib/match-utils";
 import RivalClubSearch from "@/components/clubs/RivalClubSearch";
 import { isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
@@ -546,17 +546,21 @@ export default function Schedule() {
   const [copyingEvent, setCopyingEvent] = useState(null); // event being copied
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
   const [weeklyPlans, setWeeklyPlans] = useState([]);
+  const [weeklyPlanDays, setWeeklyPlanDays] = useState([]);
   const [exportDays, setExportDays] = useState(null);
   const [rivalClubs, setRivalClubs] = useState([]);
 
   async function loadEvents() {
     setLoading(true);
-    const [all, allPlans, clubRows] = await Promise.all([
+    const [all, allPlans, allPlanDays, clubRows] = await Promise.all([
       base44.entities.DayEvent.list("-date", 500),
       base44.entities.WeeklyPlan.list("-week_start", 100),
+      base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
       base44.entities.RivalClub.list("official_name", 500).catch(() => []),
     ]);
-    setWeeklyPlans(activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans);
+    const scopedPlans = activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans;
+    setWeeklyPlanDays(allPlanDays);
+    setWeeklyPlans(operationalPlans(scopedPlans).map((plan) => ({ ...plan, operational_days: daysForPlan(plan, allPlanDays) })));
     // Mostrar únicamente eventos del plantel activo
     const filtered = activeSquadId
       ? all.filter(e => e.squad_id === activeSquadId && (!e.season_id || e.season_id === activeSeasonId))
@@ -688,7 +692,7 @@ export default function Schedule() {
   }
 
   function getPlanMetaForDate(date) {
-    return findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values || null;
+    return findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values || null;
   }
 
   async function downloadWeekPDF() {
@@ -737,7 +741,7 @@ export default function Schedule() {
             const dateStr = d.format("YYYY-MM-DD");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
-            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values;
+            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values;
 
             return (
               <div key={dateStr} style={{ minWidth: "200px", scrollSnapAlign: "start" }} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
@@ -803,7 +807,7 @@ export default function Schedule() {
             const isCurrentMonth = d.isSame(currentMonth, "month");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
-            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season })?.values;
+            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values;
             return (
               <div key={dateStr} className={`bg-zinc-900 min-h-[90px] p-1.5 ${!isCurrentMonth ? "opacity-25" : ""}`}>
                 <div className="flex items-center justify-between mb-1">

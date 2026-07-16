@@ -139,7 +139,7 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
       <div className={`bg-white border-2 rounded-2xl shadow-lg overflow-hidden min-w-0 flex flex-col min-h-[520px] ${matchEvent ? "border-emerald-700" : "border-indigo-700"}`}>
         <div className={`px-3 pt-3 pb-2 text-center border-b ${matchEvent ? "bg-emerald-50 border-emerald-100" : "bg-indigo-50 border-indigo-100"}`}>
           <p className="text-[11px] font-black text-zinc-600 tracking-[0.22em]">{dayNameEs(day.date)}</p>
-          <input type="date" value={day.date} onChange={(e) => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-center text-[11px] font-semibold text-zinc-500 focus:outline-none mt-1" />
+          <p className="mt-1 text-[11px] font-semibold text-zinc-500">{moment(day.date).format("DD/MM/YYYY")}</p>
           <p className={`mt-2 text-2xl font-black ${matchEvent ? "text-emerald-900" : "text-indigo-900"}`}>{day.md || "MD"}</p>
         </div>
         <EventFocusCard event={specialEvent} type={matchEvent ? "match" : "travel"} />
@@ -152,7 +152,7 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
       <div className="min-w-0 rounded-2xl border-2 border-blue-200 bg-blue-50 p-4 shadow-md flex flex-col items-center justify-center min-h-[520px] text-center">
         <Moon size={44} className="text-blue-500 mb-4" />
         <p className="text-[11px] font-black text-blue-600 tracking-[0.25em]">{dayNameEs(day.date)}</p>
-        <input type="date" value={day.date} onChange={(e) => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-center text-xs font-bold text-blue-600 focus:outline-none mt-1" />
+        <p className="mt-1 text-xs font-bold text-blue-600">{moment(day.date).format("DD/MM/YYYY")}</p>
         <select value="Libre" onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : WORK_BLOCKS.map((item) => ({ id: `${item.type}-${dayIdx}`, type: item.type, title: item.label, content: "", session_id: "", auto_sync: true })) })} className="mt-8 bg-transparent text-3xl font-black text-blue-800 text-center focus:outline-none">
           {MD_OPTIONS.map((item) => <option key={item}>{item}</option>)}
         </select>
@@ -165,8 +165,8 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
     <div className="bg-white border border-zinc-200 rounded-3xl shadow-sm overflow-hidden min-w-0 flex flex-col min-h-[520px]">
       <div className="px-3 pt-3 pb-2 text-center border-b" style={{ backgroundColor: objStyle.bg, borderColor: objStyle.border }}>
         <p className="text-[11px] font-black tracking-[0.22em]" style={{ color: objStyle.text }}>{dayNameEs(day.date)}</p>
-        <input type="date" value={day.date} onChange={(e) => updateDay(dayIdx, { date: e.target.value })} className="bg-transparent text-center text-[11px] font-semibold focus:outline-none mt-1" style={{ color: objStyle.text }} />
-        <select value={day.md || "MD-5"} onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : blocks })} className="mt-2 w-full bg-transparent text-center text-2xl font-black focus:outline-none" style={{ color: objStyle.text }}>
+        <p className="mt-1 text-[11px] font-semibold" style={{ color: objStyle.text }}>{moment(day.date).format("DD/MM/YYYY")}</p>
+        <select value={day.md || "MD-5"} title="Modificación avanzada manual de MD" onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : blocks })} className="mt-2 w-full bg-transparent text-center text-2xl font-black focus:outline-none" style={{ color: objStyle.text }}>
           {MD_OPTIONS.map((item) => <option key={item}>{item}</option>)}
         </select>
         <select value={objective || objectiveOptions[0]} onChange={(e) => updateDay(dayIdx, { physical_objective: e.target.value })} className="mt-2 w-full rounded-xl border px-2 py-2 text-[11px] font-black text-center focus:outline-none" style={{ backgroundColor: "rgba(255,255,255,0.45)", color: objStyle.text, borderColor: objStyle.border }}>

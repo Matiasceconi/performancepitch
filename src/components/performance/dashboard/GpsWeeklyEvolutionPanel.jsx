@@ -144,7 +144,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     if (!weeklyPlans.length) return null;
     const today = moment().format("YYYY-MM-DD");
     const monday = moment(today).startOf("isoWeek").format("YYYY-MM-DD");
-    return weeklyPlans.find((plan) => plan.id === selectedPlanId) || weeklyPlans.find((plan) => plan.week_start === monday && (plan.days_data || []).some((day) => day.date === today)) || weeklyPlans.find((plan) => (plan.days_data || []).some((day) => day.date === today)) || null;
+    return weeklyPlans.find((plan) => plan.id === selectedPlanId) || weeklyPlans.find((plan) => plan.week_start === monday && (plan.operational_days || plan.days_data || []).some((day) => day.date === today)) || weeklyPlans.find((plan) => (plan.operational_days || plan.days_data || []).some((day) => day.date === today)) || null;
   }, [weeklyPlans, selectedPlanId]);
 
   useEffect(() => {
@@ -152,7 +152,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     if (selectedPlan?.id && selectedPlan.id !== selectedWeeklyPlanId) onSelectWeeklyPlan?.(selectedPlan.id);
   }, [selectedPlan, selectedPlanId, selectedWeeklyPlanId, onSelectWeeklyPlan]);
 
-  const normalizedCurrentDays = useMemo(() => getCycleDays(selectedPlan?.days_data?.length ? selectedPlan.days_data : cycleDays), [selectedPlan, cycleDays]);
+  const normalizedCurrentDays = useMemo(() => getCycleDays(cycleDays?.length ? cycleDays : selectedPlan?.days_data || []), [selectedPlan, cycleDays]);
   const baseCycleDays = useMemo(() => {
     if ((cycleMode === "historical" || cycleMode === "lastSaved") && selectedSummary) return daysFromSummary(selectedSummary);
     if (cycleMode === "previous") return normalizedCurrentDays.map((d) => ({ ...d, date: addDays(d.date, -7) }));
