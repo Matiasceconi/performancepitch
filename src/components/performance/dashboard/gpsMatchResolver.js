@@ -7,6 +7,7 @@ function firstValue(...values) {
 }
 
 function toMatchFromDay(day = {}) {
+  if (!day) return {};
   return {
     date: day.date,
     md: day.md || day.match_day_code || "",
@@ -21,6 +22,7 @@ function toMatchFromDay(day = {}) {
 }
 
 function toMatchFromEvent(event = {}) {
+  if (!event) return {};
   return {
     date: event.date,
     rival: firstValue(event.rival),
@@ -35,6 +37,7 @@ function toMatchFromEvent(event = {}) {
 }
 
 function toMatchFromReport(report = {}) {
+  if (!report) return {};
   return {
     date: report.date,
     rival: firstValue(report.rival, report.rival_name_backup),
@@ -58,11 +61,14 @@ function mergeMatches(...parts) {
 }
 
 export function resolveDayMatch(day = {}, calendarEvents = [], matchReports = []) {
+  if (!day) return null;
   const date = day.date;
-  const event = calendarEvents.find((item) => item.date === date && [item.event_type, item.type].some((value) => normalizeText(value) === "partido"));
+  const safeEvents = (calendarEvents || []).filter(Boolean);
+  const safeReports = (matchReports || []).filter(Boolean);
+  const event = safeEvents.find((item) => item.date === date && [item.event_type, item.type].some((value) => normalizeText(value) === "partido"));
   const eventMatchId = event?.match_id || day.match_id;
-  const linkedReport = eventMatchId ? matchReports.find((report) => report.id === eventMatchId) : null;
-  const sameDateReport = matchReports.find((report) => report.date === date);
+  const linkedReport = eventMatchId ? safeReports.find((report) => report.id === eventMatchId) : null;
+  const sameDateReport = safeReports.find((report) => report.date === date);
   const isMd = (day.md || day.match_day_code) === "MD";
   const hasMatch = isMd || Boolean(event || linkedReport || sameDateReport || day.rival || day.match_id);
   if (!hasMatch) return null;
@@ -84,5 +90,5 @@ export function resolveDayMatch(day = {}, calendarEvents = [], matchReports = []
 }
 
 export function resolveMicrocycleMatch(days = [], calendarEvents = [], matchReports = []) {
-  return days.map((day) => resolveDayMatch(day, calendarEvents, matchReports)).find(Boolean) || null;
+  return (days || []).filter(Boolean).map((day) => resolveDayMatch(day, calendarEvents, matchReports)).find(Boolean) || null;
 }
