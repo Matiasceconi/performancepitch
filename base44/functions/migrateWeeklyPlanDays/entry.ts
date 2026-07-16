@@ -205,27 +205,24 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
     let created = 0;
-    let skippedExisting = 0;
+    let updated = 0;
     let plansUpdated = 0;
     for (const analysis of analyses) {
       const plan = plans.find((item) => item.id === analysis.plan.id);
       if (!plan) continue;
-      if (!Array.isArray(plan.legacy_days_data_snapshot) || plan.legacy_days_data_snapshot.length === 0) {
-        await base44.asServiceRole.entities.WeeklyPlan.update(plan.id, {
-          legacy_days_data_snapshot: plan.days_data || [],
-          planning_mode: plan.planning_mode || 'match_to_match',
-          period_start: plan.period_start || plan.week_start || '',
-          period_end: plan.period_end || plan.week_end || '',
-          migration_status: analysis.conflicts.length ? 'conflict' : 'migrated',
-          active_day_source: plan.active_day_source || 'days_data',
-          updated_at: now
-        });
-        plansUpdated += 1;
-      }
+      await base44.asServiceRole.entities.WeeklyPlan.update(plan.id, {
+        legacy_days_data_snapshot: Array.isArray(plan.legacy_days_data_snapshot) && plan.legacy_days_data_snapshot.length ? plan.legacy_days_data_snapshot : (plan.days_data || []),
+        planning_mode: plan.planning_mode || 'match_to_match',
+        period_start: plan.period_start || plan.week_start || '',
+        period_end: plan.period_end || plan.week_end || '',
+        migration_status: analysis.conflicts.length ? 'conflict' : 'migrated',
+        active_day_source: plan.active_day_source || 'days_data',
+        updated_at: now
+      });
+      plansUpdated += 1;
       const rows = [...analysis.can_migrate_without_conflict, ...analysis.conflicts];
       for (const row of rows) {
-        if (row.already_exists) { skippedExisting += 1; continue; }
-        await base44.asServiceRole.entities.WeeklyPlanDay.create({
+        const data = {
           organization_id: plan.organization_id || '',
           weekly_plan_id: plan.id,
           squad_id: plan.squad_id || '',
@@ -244,12 +241,19 @@ Deno.serve(async (req) => {
           migration_conflict_reason: row.migration_conflict_reason,
           active: row.active,
           created_from_days_data: true
-        });
-        created += 1;
+        };
+        const existing = existingDays.find((item) => item.weekly_plan_id === plan.id && item.legacy_day_id === row.legacy_day_id && Number(item.source_days_data_index) === Number(row.source_days_data_index));
+        if (existing) {
+          await base44.asServiceRole.entities.WeeklyPlanDay.update(existing.id, data);
+          updated += 1;
+        } else {
+          await base44.asServiceRole.entities.WeeklyPlanDay.create(data);
+          created += 1;
+        }
       }
     }
 
-    return Response.json({ success: true, dry_run: false, created_weekly_plan_days: created, skipped_existing: skippedExisting, plans_updated: plansUpdated, ...summary });
+    return Response.json({ success: true, dry_run: false, created_weekly_plan_days: created, updated_weekly_plan_days: updated, plans_updated: plansUpdated, ...summary });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }
