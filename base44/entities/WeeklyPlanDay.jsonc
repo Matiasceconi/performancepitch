@@ -1,0 +1,99 @@
+{
+  "name": "WeeklyPlanDay",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n si corresponde"
+    },
+    "weekly_plan_id": {
+      "type": "string",
+      "description": "ID del WeeklyPlan padre"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada vinculada"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha operativa del d\u00eda del microciclo"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden visual/cronol\u00f3gico dentro del microciclo"
+    },
+    "day_type": {
+      "type": "string",
+      "enum": [
+        "training",
+        "match",
+        "rest",
+        "travel"
+      ],
+      "default": "training",
+      "description": "Tipo operativo del d\u00eda"
+    },
+    "md_code": {
+      "type": "string",
+      "description": "C\u00f3digo MD del d\u00eda: MD+1, MD-4, MD, etc. No determina por s\u00ed solo si es partido"
+    },
+    "physical_objective": {
+      "type": "string",
+      "description": "Objetivo f\u00edsico planificado"
+    },
+    "calendar_event_id": {
+      "type": "string",
+      "description": "ID del DayEvent vinculado si existe"
+    },
+    "match_id": {
+      "type": "string",
+      "description": "ID del MatchReport vinculado si existe"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas del d\u00eda"
+    },
+    "legacy_day_id": {
+      "type": "string",
+      "description": "ID legado embebido en days_data, por ejemplo day-1"
+    },
+    "source_days_data_index": {
+      "type": "number",
+      "description": "\u00cdndice original dentro de days_data para reversibilidad"
+    },
+    "migration_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "migrated",
+        "conflict",
+        "ignored"
+      ],
+      "default": "pending",
+      "description": "Estado de migraci\u00f3n del d\u00eda"
+    },
+    "migration_conflict_reason": {
+      "type": "string",
+      "description": "Motivo de conflicto si no puede activarse autom\u00e1ticamente"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el d\u00eda queda activo para uso operativo futuro"
+    },
+    "created_from_days_data": {
+      "type": "boolean",
+      "default": true,
+      "description": "Indica si fue creado desde days_data legado"
+    }
+  },
+  "required": [
+    "weekly_plan_id",
+    "date"
+  ]
+}

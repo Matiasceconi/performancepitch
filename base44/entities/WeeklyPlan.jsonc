@@ -25,12 +25,60 @@
     "week_start": {
       "type": "string",
       "format": "date",
-      "description": "Fecha inicial del plan semanal (YYYY-MM-DD)"
+      "description": "Fecha inicial hist\u00f3rica del plan semanal (YYYY-MM-DD)"
     },
     "week_end": {
       "type": "string",
       "format": "date",
-      "description": "Fecha final calculada desde days_data"
+      "description": "Fecha final hist\u00f3rica calculada desde days_data"
+    },
+    "planning_mode": {
+      "type": "string",
+      "enum": [
+        "match_to_match",
+        "calendar_week"
+      ],
+      "default": "match_to_match",
+      "description": "Modo de planificaci\u00f3n: entre partidos o semana calendario"
+    },
+    "period_start": {
+      "type": "string",
+      "format": "date",
+      "description": "Inicio operativo del microciclo"
+    },
+    "period_end": {
+      "type": "string",
+      "format": "date",
+      "description": "Fin operativo del microciclo"
+    },
+    "previous_match_id": {
+      "type": "string",
+      "description": "ID del partido anterior usado como referencia"
+    },
+    "target_match_id": {
+      "type": "string",
+      "description": "ID del pr\u00f3ximo partido objetivo del microciclo"
+    },
+    "migration_status": {
+      "type": "string",
+      "description": "Estado de migraci\u00f3n hacia WeeklyPlanDay"
+    },
+    "legacy_days_data_snapshot": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Copia inmutable de days_data antes de migrar"
+    },
+    "active_day_source": {
+      "type": "string",
+      "enum": [
+        "days_data",
+        "weekly_plan_day"
+      ],
+      "default": "days_data",
+      "description": "Fuente activa de d\u00edas para compatibilidad progresiva"
     },
     "version": {
       "type": "number",
@@ -65,7 +113,7 @@
       "items": {
         "type": "object"
       },
-      "description": "D\u00edas oficiales del plan: day_id, date, order, md, physical_objective, is_rest_day, match_id, calendar_event_id y linked_session_ids"
+      "description": "D\u00edas hist\u00f3ricos del plan. Se conserva por compatibilidad y respaldo"
     },
     "notes": {
       "type": "string",

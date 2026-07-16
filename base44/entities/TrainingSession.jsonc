@@ -33,7 +33,11 @@
     },
     "weekly_plan_day_id": {
       "type": "string",
-      "description": "ID estable del d\u00eda dentro del WeeklyPlan"
+      "description": "ID real del registro WeeklyPlanDay vinculado. No debe guardar IDs legados tipo day-1"
+    },
+    "legacy_weekly_plan_day_id": {
+      "type": "string",
+      "description": "ID legado del d\u00eda dentro de days_data conservado solo para auditor\u00eda"
     },
     "plan_sync_updated_at": {
       "type": "string",
