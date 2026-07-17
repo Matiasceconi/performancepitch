@@ -287,6 +287,13 @@ Deno.serve(async (req) => {
       const existingReports = await base44.asServiceRole.entities.CatapultReport.filter({ session_id: match_id });
       const existingByPlayerId = Object.fromEntries(existingReports.map(r => [r.player_id, r]));
 
+      const incomingPlayerIds = new Set(toUpsert.map((item) => item.playerId));
+      for (const existing of existingReports) {
+        if (existing.player_id && !incomingPlayerIds.has(existing.player_id)) {
+          await base44.asServiceRole.entities.CatapultReport.delete(existing.id);
+        }
+      }
+
       for (const { row, playerId, officialName } of toUpsert) {
         const reportData = {
           player_id: playerId,

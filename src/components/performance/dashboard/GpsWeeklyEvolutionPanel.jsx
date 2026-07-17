@@ -93,7 +93,7 @@ function loadChartConfig() {
   }
 }
 
-export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], selectedWeeklyPlanId = "", onSelectWeeklyPlan, competitionProfiles = [], microcycleProfiles = [], calendarEvents = [], matchReports = [] }) {
+export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchGpsByMatch = {}, cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], selectedWeeklyPlanId = "", onSelectWeeklyPlan, competitionProfiles = [], microcycleProfiles = [], calendarEvents = [], matchReports = [] }) {
   const reportCaptureRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [summaries, setSummaries] = useState([]);
@@ -190,12 +190,12 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     return Array.from(map.values());
   }, [visibleMetrics, selectedChartMetrics]);
   const rankingMetrics = useMemo(() => (rankingConfig.metricKeys || []).map((key) => MICRO_METRICS.find((metric) => metric.key === key)).filter(Boolean), [rankingConfig.metricKeys]);
-  const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, metrics: reportMetrics }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters, reportMetrics]);
-  const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters]);
-  const allCycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, includeExcluded: true }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters]);
-  const rankingRows = useMemo(() => rankingConfig.scope === "selected" && selectedDates.length ? rowsForCycle({ sessions, gpsBySession, cycleDays: baseCycleDays, playerMap, filters: { ...filters, selectedDates } }) : cycleRows, [rankingConfig.scope, selectedDates, sessions, gpsBySession, baseCycleDays, playerMap, filters, cycleRows]);
+  const dailySummaries = useMemo(() => buildDailySummaries({ sessions, gpsBySession, matchReports, matchGpsByMatch, cycleDays: effectiveCycleDays, playerMap, filters, metrics: reportMetrics }), [sessions, gpsBySession, matchReports, matchGpsByMatch, effectiveCycleDays, playerMap, filters, reportMetrics]);
+  const cycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, matchReports, matchGpsByMatch, cycleDays: effectiveCycleDays, playerMap, filters }), [sessions, gpsBySession, matchReports, matchGpsByMatch, effectiveCycleDays, playerMap, filters]);
+  const allCycleRows = useMemo(() => rowsForCycle({ sessions, gpsBySession, matchReports, matchGpsByMatch, cycleDays: effectiveCycleDays, playerMap, filters, includeExcluded: true }), [sessions, gpsBySession, matchReports, matchGpsByMatch, effectiveCycleDays, playerMap, filters]);
+  const rankingRows = useMemo(() => rankingConfig.scope === "selected" && selectedDates.length ? rowsForCycle({ sessions, gpsBySession, matchReports, matchGpsByMatch, cycleDays: baseCycleDays, playerMap, filters: { ...filters, selectedDates } }) : cycleRows, [rankingConfig.scope, selectedDates, sessions, gpsBySession, matchReports, matchGpsByMatch, baseCycleDays, playerMap, filters, cycleRows]);
   const highlights = useMemo(() => buildHighlights(rankingRows, playerMap, rankingMetrics, { topCount: rankingConfig.topCount || 3, scope: rankingConfig.scope === "selected" ? "Días seleccionados" : "Microciclo completo" }), [rankingRows, playerMap, rankingMetrics, rankingConfig.topCount, rankingConfig.scope]);
-  const comparison = useMemo(() => buildComparison({ sessions, gpsBySession, cycleDays: effectiveCycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, effectiveCycleDays, playerMap, filters, visibleMetrics]);
+  const comparison = useMemo(() => buildComparison({ sessions, gpsBySession, matchReports, matchGpsByMatch, cycleDays: effectiveCycleDays, playerMap, filters, metrics: visibleMetrics }), [sessions, gpsBySession, matchReports, matchGpsByMatch, effectiveCycleDays, playerMap, filters, visibleMetrics]);
   const isSavedMicrocycleView = (cycleMode === "historical" || cycleMode === "lastSaved") && selectedSummary;
   const shownDailySummaries = (isSavedMicrocycleView && selectedSummary?.snapshot?.dailySummaries) || (isSavedMicrocycleView && selectedSummary?.summary_snapshot?.daily) || dailySummaries;
   const shownHighlights = highlights;
@@ -216,7 +216,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     if (!baseCycleDays.length) return;
     const today = moment().format("YYYY-MM-DD");
     const todayInCycle = baseCycleDays.find((day) => day.date === today);
-    const lastWithGps = [...baseCycleDays].reverse().find((day) => sessions.some((s) => s.date === day.date && (gpsBySession[s.id] || []).length > 0));
+    const lastWithGps = [...baseCycleDays].reverse().find((day) => sessions.some((s) => s.date === day.date && (gpsBySession[s.id] || []).length > 0) || (day.day_type === "match" && day.match_id && (matchGpsByMatch[day.match_id] || []).length > 0));
     const nextDate = todayInCycle?.date || lastWithGps?.date || baseCycleDays[0]?.date || "";
     if (!selectedDate || !baseCycleDays.some((day) => day.date === selectedDate)) setSelectedDate(nextDate);
     setSelectedDates((current) => {
@@ -224,7 +224,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       if (valid.length && valid.length === current.length) return current;
       return valid.length ? valid : nextDate ? [nextDate] : [];
     });
-  }, [baseCycleDays, sessions, gpsBySession, selectedDate]);
+  }, [baseCycleDays, sessions, gpsBySession, matchGpsByMatch, selectedDate]);
 
   async function saveMicrocycle(nextState, silent = false) {
     if (!squadId || !weekStart || !weekEnd) return;
@@ -241,7 +241,8 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
     const gpsVariables = Object.fromEntries(MICRO_METRICS.map((metric) => [metric.key, { label: metric.label, value: aggregateRows(cycleRows, metric), mode: metric.mode, unit: metric.unit }]));
     const rankings = Object.fromEntries(highlights.map((item) => [item.metric.key, { label: item.metric.label, top: item.top.map((p) => ({ player_id: p.player?.id || p.player_id || "", name: p.name, value: p.value, rank: p.rank })), top_count: rankingConfig.topCount, scope: rankingConfig.scope }]));
     const sessionsInCycle = sessions.filter((s) => s.date >= weekStart && s.date <= weekEnd && (!squadId || !s.squad_id || s.squad_id === squadId));
-    const sessionsWithGps = new Set(cycleRows.map((row) => row.session_id).filter(Boolean));
+    const sessionsWithGps = new Set(cycleRows.filter((row) => row.source_type !== "match").map((row) => row.session_id).filter(Boolean));
+    const matchesWithGps = new Set(cycleRows.filter((row) => row.source_type === "match").map((row) => row.match_id).filter(Boolean));
     const daysSnapshot = effectiveCycleDays.map((day) => ({ date: day.date, md: day.md || "—", objective: day.objetivo || day.physical_objective || day.objetivo_fisico || "—", sessions: sessionsInCycle.filter((s) => s.date === day.date).map((s) => s.id) }));
     const sessionsSnapshot = sessionsInCycle.map((s) => ({ id: s.id, title: s.title, date: s.date, session_type: s.session_type, duration_minutes: s.duration_minutes, session_objective: s.session_objective, objective: s.objective, match_day_code: s.match_day_code, microcycle_day: s.microcycle_day, squad_id: s.squad_id, squad_name: s.squad_name, season_id: s.season_id, csv_url: s.csv_url, pdf_exported: s.pdf_exported, notes: s.notes }));
     const payload = {
@@ -261,7 +262,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
       competencia: selectedSummary?.competencia || existing?.competencia || "",
       tags: selectedSummary?.tags || existing?.tags || [],
       cantidad_sesiones: sessionsWithGps.size || sessionsInCycle.length,
-      cantidad_partidos: selectedSummary?.cantidad_partidos || existing?.cantidad_partidos || 0,
+      cantidad_partidos: matchesWithGps.size,
       estado: nextState,
       created_at: selectedSummary?.created_at || existing?.created_at || now,
       updated_at: now,
@@ -347,8 +348,8 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, cycleD
 
       {showHistory && <GpsMicrocycleHistoryPanel summaries={summaries} selectedSummaryId={selectedSummaryId} onSelect={(id) => { setSelectedSummaryId(id); setCycleMode("historical"); setShowHistory(false); }} onUpdate={updateMicrocycleSummary} onDelete={deleteMicrocycleSummary} onClose={() => setShowHistory(false)} />}
 
-      {!selectedPlan && cycleMode === "current" ? <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-8 text-center"><h3 className="text-lg font-black text-white">No existe un Plan semanal para este periodo</h3><p className="mt-2 text-sm text-zinc-500">Carga externa no genera días automáticamente: primero creá o abrí el plan oficial.</p><button onClick={() => { window.location.href = "/weekly-planner"; }} className="mt-5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white">Crear o abrir Plan semanal</button></div> : <GpsMicrocycleDayHeader days={baseCycleDays} sessions={sessions} gpsBySession={gpsBySession} selectedDates={selectedDates} onToggleDate={toggleSelectedDate} onSelectAll={selectWholeWeek} onClear={clearSelectedDays} calendarEvents={cycleCalendarEvents} matchReports={cycleMatchReports} />}
-      {selectedPlan && <GpsDailyPlayerTable selectedDates={selectedDates} selectedDays={selectedDays} totalDays={baseCycleDays.length} sessions={sessions} gpsBySession={gpsBySession} playerMap={playerMap} microcycleProfiles={microcycleProfiles} competitionProfiles={competitionProfiles} squadId={squadId} season={season} selectedDay={selectedDay} />}
+      {!selectedPlan && cycleMode === "current" ? <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-8 text-center"><h3 className="text-lg font-black text-white">No existe un Plan semanal para este periodo</h3><p className="mt-2 text-sm text-zinc-500">Carga externa no genera días automáticamente: primero creá o abrí el plan oficial.</p><button onClick={() => { window.location.href = "/weekly-planner"; }} className="mt-5 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-black text-white">Crear o abrir Plan semanal</button></div> : <GpsMicrocycleDayHeader days={baseCycleDays} sessions={sessions} gpsBySession={gpsBySession} matchGpsByMatch={matchGpsByMatch} selectedDates={selectedDates} onToggleDate={toggleSelectedDate} onSelectAll={selectWholeWeek} onClear={clearSelectedDays} calendarEvents={cycleCalendarEvents} matchReports={cycleMatchReports} />}
+      {selectedPlan && <GpsDailyPlayerTable selectedDates={selectedDates} selectedDays={selectedDays} totalDays={baseCycleDays.length} sessions={sessions} gpsBySession={gpsBySession} matchReports={cycleMatchReports} matchGpsByMatch={matchGpsByMatch} playerMap={playerMap} microcycleProfiles={microcycleProfiles} competitionProfiles={competitionProfiles} squadId={squadId} season={season} selectedDay={selectedDay} />}
       {selectedPlan && selectedDates.length > 0 && <div className="flex justify-end"><button onClick={() => setFilters((current) => ({ ...current, selectedDates }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Filtrar gráficos por días seleccionados</button></div>}
 
       {selectedPlan && <div ref={reportCaptureRef} className="space-y-5">

@@ -3,6 +3,7 @@ import moment from "moment";
 import "moment/locale/es";
 import { Activity, CalendarDays, CheckCircle2, Trash2, Trophy } from "lucide-react";
 import { resolveDayMatch } from "./gpsMatchResolver";
+import { getMatchRowsForDay, matchGpsStatus } from "./matchGpsAdapter";
 
 moment.locale("es");
 
@@ -18,12 +19,12 @@ function linkedSessionsForDay(day, sessions) {
   return sessions.filter((s) => s.date === day.date);
 }
 
-function dayStatus(day, linked, gpsBySession, match) {
+function dayStatus(day, linked, gpsBySession, match, matchRows = []) {
+  if (match) return matchGpsStatus(match, matchRows);
   const withGps = linked.filter((s) => (gpsBySession[s.id] || []).length > 0).length;
   const withoutGps = Math.max(0, linked.length - withGps);
   if (linked.length && withGps === linked.length) return { label: `GPS completo ${withGps}/${linked.length}`, state: "complete", withGps, withoutGps };
   if (linked.length && withGps) return { label: `GPS parcial ${withGps}/${linked.length}`, state: "partial", withGps, withoutGps };
-  if (match) return { label: linked.length ? `GPS pendiente ${withoutGps}/${linked.length}` : "Partido", state: "match", withGps, withoutGps };
   if (isRestDay(day)) return { label: "Día libre — sin carga planificada", state: "rest", withGps: 0, withoutGps: 0 };
   if (!linked.length) return { label: "Sin sesión", state: "empty", withGps, withoutGps };
   return { label: `GPS pendiente ${withoutGps}/${linked.length}`, state: "pending", withGps, withoutGps };
@@ -50,7 +51,7 @@ function RivalShield({ match }) {
   return <div title="Escudo no cargado" className="flex h-20 w-20 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-800/80 text-zinc-300">{match?.rival ? <span className="text-lg font-black">{initials(match.rival)}</span> : <Trophy size={30} />}</div>;
 }
 
-function MatchCard({ day, match, status, linked, active, onClick }) {
+function MatchCard({ day, match, status, active, onClick }) {
   return <button onClick={onClick} className={`relative min-h-[230px] min-w-[242px] rounded-xl border bg-gradient-to-br from-emerald-950 via-zinc-950 to-zinc-950 p-4 text-left transition ${active ? "border-lime-400 shadow-[0_0_0_1px_rgba(163,230,53,0.35),0_18px_42px_rgba(0,0,0,0.35)]" : "border-emerald-500/30 hover:border-emerald-400/60"}`}>
     {active && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime-400 text-[11px] font-black text-zinc-950">✓</span>}
     <div className="flex items-center justify-between gap-3">
@@ -68,11 +69,11 @@ function MatchCard({ day, match, status, linked, active, onClick }) {
         <p className="mt-1 text-xs leading-relaxed text-zinc-400">{[match?.time, match?.competition, match?.home_away].filter(Boolean).join(" · ") || "Sin datos del partido"}</p>
       </div>
     </div>
-    <div className="mt-4 flex items-center justify-between gap-2 border-t border-emerald-500/20 pt-3"><span className="inline-flex items-center gap-2 text-xs font-semibold text-lime-300"><Activity size={13} />{status.label}</span><span className="text-[11px] text-zinc-500">{linked.length} {linked.length === 1 ? "sesión" : "sesiones"}</span></div>
+    <div className="mt-4 flex items-center justify-between gap-2 border-t border-emerald-500/20 pt-3"><span className="inline-flex items-center gap-2 text-xs font-semibold text-lime-300"><Activity size={13} />{status.label}</span><span className="text-[11px] text-zinc-500">Partido</span></div>
   </button>;
 }
 
-export default function GpsMicrocycleDayHeader({ days = [], sessions = [], gpsBySession = {}, selectedDates = [], onToggleDate, onSelectAll, onClear, calendarEvents = [], matchReports = [] }) {
+export default function GpsMicrocycleDayHeader({ days = [], sessions = [], gpsBySession = {}, matchGpsByMatch = {}, selectedDates = [], onToggleDate, onSelectAll, onClear, calendarEvents = [], matchReports = [] }) {
   const planDates = new Set(days.map((day) => day.date).filter(Boolean));
   const validDayIds = new Set(days.map((day) => day.day_id || day.weekly_plan_day_id || day.id).filter(Boolean));
   const planStart = days[0]?.date;
@@ -84,7 +85,7 @@ export default function GpsMicrocycleDayHeader({ days = [], sessions = [], gpsBy
       <div className="flex gap-2"><button onClick={onSelectAll} className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-300 hover:text-white"><CalendarDays size={13} /> Toda la semana</button><button onClick={onClear} className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-300 hover:text-white"><Trash2 size={13} /> Limpiar</button></div>
     </div>
     {outsidePlan.length > 0 && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200">Sesión fuera del Plan semanal: {outsidePlan.length} con GPS cargado</div>}
-    <div className="flex gap-3 overflow-x-auto pb-1">{days.map((day) => { const match = resolveDayMatch(day, calendarEvents, matchReports); const linked = linkedSessionsForDay(day, sessions); const status = dayStatus(day, linked, gpsBySession, match); const active = selectedDates.includes(day.date); const isEmpty = status.state === "empty"; if (match) return <MatchCard key={day.day_id || day.date} day={day} match={match} status={status} linked={linked} active={active} onClick={() => onToggleDate(day.date)} />; return <button key={day.day_id || day.date} onClick={() => onToggleDate(day.date)} className={`relative min-h-[206px] min-w-[132px] rounded-lg border bg-gradient-to-b from-zinc-900 to-zinc-950 p-4 text-left transition ${active ? "border-lime-400 shadow-[0_0_0_1px_rgba(163,230,53,0.35),0_18px_42px_rgba(0,0,0,0.35)]" : "border-zinc-800 hover:border-zinc-700"}`}>
+    <div className="flex gap-3 overflow-x-auto pb-1">{days.map((day) => { const match = resolveDayMatch(day, calendarEvents, matchReports); const linked = linkedSessionsForDay(day, sessions); const matchRows = getMatchRowsForDay(day, matchReports, matchGpsByMatch); const status = dayStatus(day, linked, gpsBySession, match, matchRows); const active = selectedDates.includes(day.date); const isEmpty = status.state === "empty"; if (match) return <MatchCard key={day.day_id || day.date} day={day} match={match} status={status} active={active} onClick={() => onToggleDate(day.date)} />; return <button key={day.day_id || day.date} onClick={() => onToggleDate(day.date)} className={`relative min-h-[206px] min-w-[132px] rounded-lg border bg-gradient-to-b from-zinc-900 to-zinc-950 p-4 text-left transition ${active ? "border-lime-400 shadow-[0_0_0_1px_rgba(163,230,53,0.35),0_18px_42px_rgba(0,0,0,0.35)]" : "border-zinc-800 hover:border-zinc-700"}`}>
       <div className={`mb-5 h-1 w-9 rounded-full ${isEmpty ? "bg-zinc-700" : "bg-emerald-400"}`} />
       {active && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime-400 text-[11px] font-black text-zinc-950">✓</span>}
       <p className="text-lg font-black leading-none text-white">{day.md || day.match_day_code || "—"}</p>
