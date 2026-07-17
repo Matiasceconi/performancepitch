@@ -4,7 +4,11 @@ import "moment/locale/es";
 import { Activity, CalendarDays, CheckCircle2, Trash2, Trophy } from "lucide-react";
 import { resolveDayMatch } from "./gpsMatchResolver";
 
+moment.locale("es");
+
+function isRestDay(day) { return day?.day_type === "rest" || day?.is_rest_day === true; }
 function linkedSessionsForDay(day, sessions) {
+  if (isRestDay(day)) return [];
   const linkedIds = Array.isArray(day.linked_session_ids) ? day.linked_session_ids : [];
   if (day.day_id) {
     const byDayId = sessions.filter((s) => s.weekly_plan_day_id === day.day_id);
@@ -20,7 +24,8 @@ function dayStatus(day, linked, gpsBySession, match) {
   if (linked.length && withGps === linked.length) return { label: `GPS completo ${withGps}/${linked.length}`, state: "complete", withGps, withoutGps };
   if (linked.length && withGps) return { label: `GPS parcial ${withGps}/${linked.length}`, state: "partial", withGps, withoutGps };
   if (match) return { label: linked.length ? `GPS pendiente ${withoutGps}/${linked.length}` : "Partido", state: "match", withGps, withoutGps };
-  if (!linked.length) return { label: (day.is_rest_day || day.type === "Descanso") ? "Día libre" : "Sin sesión", state: "empty", withGps, withoutGps };
+  if (isRestDay(day)) return { label: "Día libre — sin carga planificada", state: "rest", withGps: 0, withoutGps: 0 };
+  if (!linked.length) return { label: "Sin sesión", state: "empty", withGps, withoutGps };
   return { label: `GPS pendiente ${withoutGps}/${linked.length}`, state: "pending", withGps, withoutGps };
 }
 
@@ -69,7 +74,10 @@ function MatchCard({ day, match, status, linked, active, onClick }) {
 
 export default function GpsMicrocycleDayHeader({ days = [], sessions = [], gpsBySession = {}, selectedDates = [], onToggleDate, onSelectAll, onClear, calendarEvents = [], matchReports = [] }) {
   const planDates = new Set(days.map((day) => day.date).filter(Boolean));
-  const outsidePlan = sessions.filter((session) => session.date && !planDates.has(session.date) && (gpsBySession[session.id] || []).length > 0);
+  const validDayIds = new Set(days.map((day) => day.day_id || day.weekly_plan_day_id || day.id).filter(Boolean));
+  const planStart = days[0]?.date;
+  const planEnd = days[days.length - 1]?.date;
+  const outsidePlan = sessions.filter((session) => session.date && (!planStart || session.date >= planStart) && (!planEnd || session.date <= planEnd) && (!session.weekly_plan_day_id || !validDayIds.has(session.weekly_plan_day_id)) && (gpsBySession[session.id] || []).length > 0);
   return <div className="space-y-4">
     <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950/60 px-4 py-2.5">
       <div className="flex items-center gap-2 text-sm text-zinc-400"><CheckCircle2 size={16} className="text-zinc-500" />{selectionLabel(days, selectedDates)}</div>
@@ -83,8 +91,9 @@ export default function GpsMicrocycleDayHeader({ days = [], sessions = [], gpsBy
       <p className="mt-1 text-xs font-bold text-zinc-400">{moment(day.date).format("dddd")}</p>
       <p className="text-xs text-zinc-500">{moment(day.date).format("DD/MM")}</p>
       <div className="my-3 border-t border-dashed border-zinc-800" />
-      <p className="min-h-[34px] text-xs leading-snug text-zinc-200">{day.physical_objective || day.objetivo_fisico || day.objetivo || "Sin objetivo"}</p>
-      <div className="mt-5 flex items-center gap-2"><span className={`flex h-6 w-6 items-center justify-center rounded-full ${isEmpty ? "bg-zinc-800 text-zinc-500" : "bg-lime-500/10 text-lime-400"}`}><Activity size={13} /></span><span className={`text-xs font-semibold ${isEmpty ? "text-zinc-500" : "text-lime-400"}`}>{status.label}</span></div>
+      {!isRestDay(day) && <p className="min-h-[34px] text-xs leading-snug text-zinc-200">{day.physical_objective || day.objetivo_fisico || day.objetivo || "Sin objetivo"}</p>}
+      {isRestDay(day) && <p className="min-h-[34px] text-xs font-semibold leading-snug text-blue-200">Día libre — sin carga planificada</p>}
+      <div className="mt-5 flex items-center gap-2"><span className={`flex h-6 w-6 items-center justify-center rounded-full ${isEmpty || isRestDay(day) ? "bg-zinc-800 text-zinc-500" : "bg-lime-500/10 text-lime-400"}`}><Activity size={13} /></span><span className={`text-xs font-semibold ${isEmpty || isRestDay(day) ? "text-zinc-500" : "text-lime-400"}`}>{status.label}</span></div>
       <p className="mt-2 text-[11px] text-zinc-500">{linked.length} {linked.length === 1 ? "sesión" : "sesiones"}</p>
     </button>; })}</div>
   </div>;

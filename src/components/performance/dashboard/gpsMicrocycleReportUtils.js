@@ -1,6 +1,8 @@
 import moment from "moment";
 import { isGoalkeeper, resolvePositionGroup } from "@/components/squad/squadConstants";
 
+moment.locale("es");
+
 export const MICRO_METRICS = [
   { key: "total_distance", label: "Distancia total", short: "Dist. total", unit: "m", color: "#22c55e", mode: "avg", rankMode: "sum", group: "Volumen" },
   { key: "player_load", label: "Player Load", short: "PL", unit: "u", color: "#3b82f6", mode: "avg", rankMode: "sum", group: "Volumen" },
@@ -58,13 +60,18 @@ export function aggregateMetric(rows, key, mode = "avg") {
 }
 
 export function getCycleDays(cycleDays) {
-  return (cycleDays || []).filter(Boolean).map((day, index) => ({
-    ...day,
-    order: Number.isFinite(Number(day.order)) ? Number(day.order) : index,
-    md: day.md || day.match_day_code || "—",
-    physical_objective: day.physical_objective || day.objetivo_fisico || day.objetivo || "—",
-    objetivo: day.physical_objective || day.objetivo_fisico || day.objetivo || "—",
-  })).sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
+  return (cycleDays || []).filter(Boolean).map((day, index) => {
+    const rest = day.day_type === "rest" || day.is_rest_day === true;
+    const objective = rest ? "" : day.physical_objective || day.objetivo_fisico || day.objetivo || "—";
+    return {
+      ...day,
+      order: Number.isFinite(Number(day.order)) ? Number(day.order) : index,
+      md: day.md || day.md_code || day.match_day_code || "—",
+      day_type: rest ? "rest" : day.day_type || "training",
+      physical_objective: objective,
+      objetivo: objective,
+    };
+  }).sort((a, b) => Number(a.order || 0) - Number(b.order || 0));
 }
 
 function rowStatus(row) {
@@ -145,7 +152,9 @@ export function splitRows(rows, playerMap, filters = {}) {
   return { main, excluded };
 }
 
+function isRestDay(day) { return day?.day_type === "rest" || day?.is_rest_day === true; }
 function sessionBelongsToDay(session, day) {
+  if (isRestDay(day)) return false;
   const linked = Array.isArray(day.linked_session_ids) ? day.linked_session_ids : [];
   if (day.day_id && session.weekly_plan_day_id) return session.weekly_plan_day_id === day.day_id;
   if (linked.length) return linked.includes(session.id);
@@ -154,6 +163,7 @@ function sessionBelongsToDay(session, day) {
 
 export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerMap, filters = {}, metrics = MICRO_METRICS }) {
   return applyMicrocycleDayFilters(getCycleDays(cycleDays), filters).map((day) => {
+    if (isRestDay(day)) return { date: day.date, label: day.date ? moment(day.date).locale("es").format("ddd DD/MM") : "—", md: day.md || "—", objetivo: "", observations: "Día libre — sin carga planificada", sessions: [], mainRows: [], excludedRows: [], gpsPlayers: 0, excludedCount: 0, ...Object.fromEntries(metrics.map((m) => [m.key, null])) };
     const daySessions = sessions.filter((s) => {
       if (!sessionBelongsToDay(s, day)) return false;
       if (filters.sessionId && s.id !== filters.sessionId) return false;
@@ -174,7 +184,7 @@ export function buildDailySummaries({ sessions, gpsBySession, cycleDays, playerM
     });
     const { main, excluded } = splitRows(rawRows, playerMap, filters);
     const metricValues = Object.fromEntries(metrics.map((m) => [m.key, aggregateMetric(main, m.key, m.mode)]));
-    return { date: day.date, label: day.date ? moment(day.date).format("ddd DD/MM") : "—", md: day.md || "—", objetivo: day.physical_objective || day.objetivo_fisico || day.objetivo || "—", observations: day.observaciones || "", sessions: daySessions, mainRows: main, excludedRows: excluded, gpsPlayers: new Set(main.map((r) => r.player_id)).size, excludedCount: new Set(excluded.map((r) => r.player_id)).size, ...metricValues };
+    return { date: day.date, label: day.date ? moment(day.date).locale("es").format("ddd DD/MM") : "—", md: day.md || "—", objetivo: day.physical_objective || day.objetivo_fisico || day.objetivo || "—", observations: day.observaciones || "", sessions: daySessions, mainRows: main, excludedRows: excluded, gpsPlayers: new Set(main.map((r) => r.player_id)).size, excludedCount: new Set(excluded.map((r) => r.player_id)).size, ...metricValues };
   });
 }
 
@@ -269,8 +279,10 @@ export function loadColorClass(value, average) {
 }
 
 function findPlanDay(session, weeklyPlans = []) {
-  const plan = (session.weekly_plan_id ? weeklyPlans.find((p) => p.id === session.weekly_plan_id) : null) || weeklyPlans.find((p) => (!session.squad_id || !p.squad_id || p.squad_id === session.squad_id) && (!session.season_id || !p.season_id || p.season_id === session.season_id) && (p.days_data || []).some((d) => d.date === session.date));
-  const day = (plan?.days_data || []).find((d) => d.day_id && d.day_id === session.weekly_plan_day_id) || (plan?.days_data || []).find((d) => d.date === session.date) || {};
+  const planDays = (plan) => plan?.operational_days || plan?.days_data || [];
+  const plan = (session.weekly_plan_id ? weeklyPlans.find((p) => p.id === session.weekly_plan_id) : null) || weeklyPlans.find((p) => (!session.squad_id || !p.squad_id || p.squad_id === session.squad_id) && (!session.season_id || !p.season_id || p.season_id === session.season_id) && planDays(p).some((d) => d.date === session.date));
+  const days = planDays(plan);
+  const day = days.find((d) => d.day_id && d.day_id === session.weekly_plan_day_id) || days.find((d) => d.weekly_plan_day_id && d.weekly_plan_day_id === session.weekly_plan_day_id) || days.find((d) => d.date === session.date) || {};
   const meta = plan?.microcycle_meta || {};
   return { plan, day, meta };
 }

@@ -151,13 +151,13 @@ export default function ExternalGpsDashboard() {
     try {
       const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans, allWeeklyPlanDays, allCalendarEvents, allMatchReports] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
-        base44.entities.TrainingSession.list("-date", 500),
+        selectedSquadId ? base44.entities.TrainingSession.filter({ squad_id: selectedSquadId }, "-date", 500) : base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
         base44.entities.PlayerMicrocycleGPSProfile.list("-updated_at", 2000),
         base44.entities.MedicalEpisode.list("-fecha_inicio_tto", 2000),
         base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
         base44.entities.SquadMembership.list("-created_date", 2000),
-        base44.entities.WeeklyPlan.list("-week_start", 100),
+        selectedSquadId ? base44.entities.WeeklyPlan.filter({ squad_id: selectedSquadId }, "-week_start", 100) : base44.entities.WeeklyPlan.list("-week_start", 100),
         base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
         base44.entities.DayEvent.list("-date", 500),
         base44.entities.MatchReport.list("-date", 500),
@@ -424,8 +424,15 @@ export default function ExternalGpsDashboard() {
   }, [sessionRows, allEnrichedRows, selectedPlayerId]);
 
   if (loading) return (
-    <div className="flex items-center justify-center h-64">
-      <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
+    <div className="space-y-5">
+      <div className="h-20 rounded-2xl border border-zinc-800 bg-zinc-900/70 animate-pulse" />
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 6 }).map((_, i) => <div key={i} className="h-44 min-w-[150px] rounded-xl border border-zinc-800 bg-zinc-900/70 animate-pulse" />)}
+      </div>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="h-72 rounded-2xl border border-zinc-800 bg-zinc-900/70 animate-pulse xl:col-span-2" />
+        <div className="h-72 rounded-2xl border border-zinc-800 bg-zinc-900/70 animate-pulse" />
+      </div>
     </div>
   );
 

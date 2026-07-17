@@ -153,10 +153,9 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
         <Moon size={44} className="text-blue-500 mb-4" />
         <p className="text-[11px] font-black text-blue-600 tracking-[0.25em]">{dayNameEs(day.date)}</p>
         <p className="mt-1 text-xs font-bold text-blue-600">{moment(day.date).format("DD/MM/YYYY")}</p>
-        <select value="Libre" onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : WORK_BLOCKS.map((item) => ({ id: `${item.type}-${dayIdx}`, type: item.type, title: item.label, content: "", session_id: "", auto_sync: true })) })} className="mt-8 bg-transparent text-3xl font-black text-blue-800 text-center focus:outline-none">
-          {MD_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-        </select>
+        <p className="mt-8 text-3xl font-black text-blue-800">{day.md || day.md_code || "MD+1"}</p>
         <p className="mt-3 text-2xl font-black text-blue-800">DÍA LIBRE</p>
+        <p className="mt-2 max-w-[180px] text-xs font-semibold text-blue-600">Sin objetivo físico, sesiones ni carga planificada.</p>
       </div>
     );
   }

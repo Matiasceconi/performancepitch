@@ -23,7 +23,7 @@ export default function MicrocycleTopSummary({ meta, activeSquad, activeSeasonId
   return (
     <div className="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-zinc-200">
-        <SummaryCell label={`Semana ${meta.week_number || "—"}`} value={startDateLabel} sub={activeSeasonId || activeSquad?.season || "Temporada"} icon={Calendar} />
+        <SummaryCell label="Microciclo" value={meta.next_match || (nextMatch?.rival ? `vs ${nextMatch.rival}` : "Sin partido")} sub={startDateLabel || activeSeasonId || activeSquad?.season || "Temporada"} icon={Calendar} />
         <SummaryCell label="Día actual" value={meta.current_md || "—"} sub={`${dayCount} días de microciclo`} icon={Zap} accent="text-blue-600" />
         <SummaryCell label="Próximo partido" icon={Trophy} accent="text-red-600">
           {nextMatch ? <div className="flex items-center gap-2 min-w-0">

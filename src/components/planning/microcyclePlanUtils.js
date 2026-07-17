@@ -1,6 +1,6 @@
 export const WEEKDAY_NAMES_ES = ["DOMINGO", "LUNES", "MARTES", "MIÉRCOLES", "JUEVES", "VIERNES", "SÁBADO"];
 
-export const MD_OPTIONS = ["MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2", "Libre"];
+export const MD_OPTIONS = ["MD-6", "MD-5", "MD-4", "MD-3", "MD-2", "MD-1", "MD", "MD+1", "MD+2"];
 
 export const PHYSICAL_OBJECTIVES = [
   "Recuperación + Readaptación",
@@ -37,7 +37,7 @@ export function dayNameEs(date) {
 }
 
 export function isFreeDay(day) {
-  return day?.auto_free || String(day?.md || "").toLowerCase() === "libre";
+  return day?.day_type === "rest" || day?.is_rest_day === true || day?.auto_free === true;
 }
 
 export function objectiveStyle(objective, objectives = []) {

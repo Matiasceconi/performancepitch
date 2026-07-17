@@ -208,17 +208,19 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">MD</label>
-                  <select value={editForm.match_day_code || ""} onChange={e => { setEditManualMeta(prev => ({ ...prev, md: true })); setEditForm(f => ({ ...f, match_day_code: e.target.value, microcycle_day: e.target.value })); }}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
+                  <select value={editForm.match_day_code || ""} disabled={planDefaults?.match_day_code && !editManualMeta.md} onChange={e => { setEditManualMeta(prev => ({ ...prev, md: true })); setEditForm(f => ({ ...f, match_day_code: e.target.value, microcycle_day: e.target.value })); }}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 disabled:opacity-60">
                     {MD_CODES.map(m => <option key={m}>{m}</option>)}
                   </select>
+                  <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[10px] text-zinc-500">{planDefaults?.match_day_code && !editManualMeta.md ? "Sincronizado con Plan semanal" : "Excepción manual"}</p>{planDefaults?.match_day_code && !editManualMeta.md && <button type="button" onClick={() => setEditManualMeta(prev => ({ ...prev, md: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>}</div>
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Objetivo físico</label>
-                  <select value={editForm.session_objective || ""} onChange={e => { setEditManualMeta(prev => ({ ...prev, objective: true })); setEditForm(f => ({ ...f, session_objective: e.target.value })); }}
-                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
+                  <select value={editForm.session_objective || ""} disabled={planDefaults?.session_objective && !editManualMeta.objective} onChange={e => { setEditManualMeta(prev => ({ ...prev, objective: true })); setEditForm(f => ({ ...f, session_objective: e.target.value })); }}
+                    className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 disabled:opacity-60">
                     {objectiveOptions.map(o => <option key={o}>{o}</option>)}
                   </select>
+                  <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[10px] text-zinc-500">{planDefaults?.session_objective && !editManualMeta.objective ? "Sincronizado con Plan semanal" : "Excepción manual"}</p>{planDefaults?.session_objective && !editManualMeta.objective && <button type="button" onClick={() => setEditManualMeta(prev => ({ ...prev, objective: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>}</div>
                 </div>
                 <div>
                   <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>

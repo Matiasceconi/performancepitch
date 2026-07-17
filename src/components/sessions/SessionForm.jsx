@@ -298,11 +298,11 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">MD</label>
-            <select value={form.match_day_code} onChange={e => setManualMd(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
+            <select value={form.match_day_code} disabled={planDefaults?.match_day_code && !manualMeta.md} onChange={e => setManualMd(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 disabled:opacity-60">
               {MD_CODES.map(m => <option key={m}>{m}</option>)}
             </select>
-            <p className="mt-1 text-[10px] text-zinc-500">{planDefaults?.match_day_code && !manualMeta.md ? "Desde Plan Semanal" : "Excepción manual"}</p>
+            <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[10px] text-zinc-500">{planDefaults?.match_day_code && !manualMeta.md ? "Sincronizado con Plan semanal" : "Excepción manual"}</p>{planDefaults?.match_day_code && !manualMeta.md && <button type="button" onClick={() => setManualMeta(prev => ({ ...prev, md: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>}</div>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
@@ -311,11 +311,11 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Objetivo físico</label>
-            <select value={form.session_objective} onChange={e => setManualObjective(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
+            <select value={form.session_objective || ""} disabled={planDefaults?.session_objective && !manualMeta.objective} onChange={e => setManualObjective(e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 disabled:opacity-60">
               {objectiveOptions.map(i => <option key={i}>{i}</option>)}
             </select>
-            <p className="mt-1 text-[10px] text-zinc-500">{planDefaults?.session_objective && !manualMeta.objective ? "Desde Plan Semanal" : "Excepción manual"}</p>
+            <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[10px] text-zinc-500">{planDefaults?.session_objective && !manualMeta.objective ? "Sincronizado con Plan semanal" : "Excepción manual"}</p>{planDefaults?.session_objective && !manualMeta.objective && <button type="button" onClick={() => setManualMeta(prev => ({ ...prev, objective: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>}</div>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Lugar</label>

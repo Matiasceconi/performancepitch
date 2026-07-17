@@ -403,11 +403,11 @@ export default function WeeklyPlannerBoard() {
   const autoText = `La semana queda estructurada como ${meta.week_type}. El pico principal aparece el ${summary.peak?.day || "—"}. Se planifican ${summary.field} bloques de campo y ${summary.gym} bloques de gimnasio. El día de recuperación queda ubicado en ${summary.recovery?.date ? dayName(summary.recovery.date) : "—"}. Estado general: ${summary.status}.`;
 
   function updateDay(idx, patch) {
-    if (patch.date && patch.date !== days[idx]?.date) {
-      const linkedIds = new Set([...(days[idx]?.linked_session_ids || []), ...((days[idx]?.blocks || []).map((block) => block.session_id).filter(Boolean))]);
-      const hasGps = gpsRows.some((row) => linkedIds.has(row.session_id));
-      if (hasGps && !window.confirm("Este día tiene sesiones vinculadas con GPS cargado. ¿Confirmás cambiar la fecha del día del Plan semanal sin mover silenciosamente esos datos GPS?")) return;
-    }
+    const linkedIds = new Set([...(days[idx]?.linked_session_ids || []), ...((days[idx]?.blocks || []).map((block) => block.session_id).filter(Boolean))]);
+    const hasGps = gpsRows.some((row) => linkedIds.has(row.session_id));
+    const convertingToRest = patch.day_type === "rest" || patch.auto_free === true;
+    if (patch.date && patch.date !== days[idx]?.date && hasGps && !window.confirm("Este día tiene sesiones vinculadas con GPS cargado. ¿Confirmás cambiar la fecha del día del Plan semanal sin mover silenciosamente esos datos GPS?")) return;
+    if (convertingToRest && (linkedIds.size || hasGps) && !window.confirm("Este día tiene sesiones o GPS vinculados. Para convertirlo en día libre no se borrarán datos; solo se quitará la planificación del día. ¿Confirmás?")) return;
     setDays(prev => prev.map((d, i) => i === idx ? { ...d, ...patch } : d));
   }
   function updateBlock(dayIdx, blockId, patch) {
@@ -491,7 +491,10 @@ export default function WeeklyPlannerBoard() {
     const existing = recordId ? null : savedPlans.find((plan) => (plan.plan_key && plan.plan_key === payload.plan_key) || (plan.squad_id === payload.squad_id && (plan.season_id || "") === (payload.season_id || "") && plan.week_start === payload.week_start));
     const targetId = recordId || existing?.id;
     const savedPlan = targetId ? await base44.entities.WeeklyPlan.update(targetId, payload) : await base44.entities.WeeklyPlan.create(payload);
-    await Promise.all(normalizedDays.filter((day) => day.weekly_plan_day_id || day.id).map((day, index) => base44.entities.WeeklyPlanDay.update(day.weekly_plan_day_id || day.id, { order: index, md_code: day.md, physical_objective: day.physical_objective, blocks: day.blocks || [], notes: day.notes || "" })));
+    await Promise.all(normalizedDays.filter((day) => day.weekly_plan_day_id || day.id).map((day, index) => {
+      const rest = day.day_type === "rest" || day.is_rest_day === true;
+      return base44.entities.WeeklyPlanDay.update(day.weekly_plan_day_id || day.id, { order: index, day_type: rest ? "rest" : day.day_type || "training", md_code: day.md, physical_objective: rest ? null : day.physical_objective, blocks: rest ? [] : day.blocks || [], linked_session_ids: rest ? [] : day.linked_session_ids || [], notes: day.notes || "" });
+    }));
     setRecordId(savedPlan.id);
     setStartDate(savedPlan.week_start || weekStart);
     const refreshedDays = await base44.entities.WeeklyPlanDay.filter({ weekly_plan_id: savedPlan.id }, "order", 50).catch(() => []);

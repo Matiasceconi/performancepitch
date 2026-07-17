@@ -695,6 +695,13 @@ export default function Schedule() {
     return findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values || null;
   }
 
+  function planLabelForDate(date, dayEvents = []) {
+    const meta = getPlanMetaForDate(date);
+    if (!meta) return "";
+    const hasMatch = dayEvents.some(isMatchEvent);
+    return [meta.match_day_code, meta.day_type === "rest" ? "Libre" : hasMatch ? "Partido" : ""].filter(Boolean).join(" · ");
+  }
+
   async function downloadWeekPDF() {
     const days = getWeekDays();
     const doc = await buildProfessionalWeekSchedulePDF({
@@ -741,7 +748,7 @@ export default function Schedule() {
             const dateStr = d.format("YYYY-MM-DD");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
-            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values;
+            const planLabel = planLabelForDate(dateStr, dayEvents);
 
             return (
               <div key={dateStr} style={{ minWidth: "200px", scrollSnapAlign: "start" }} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
@@ -749,7 +756,7 @@ export default function Schedule() {
                   <div>
                     <p className="text-xs text-zinc-500 uppercase font-medium">{DAY_NAMES_FULL[d.day()]}</p>
                     <p className={`text-lg font-bold ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()}</p>
-                    {planMeta && <p className="text-[10px] font-bold text-emerald-300 mt-0.5">{planMeta.match_day_code} · {planMeta.session_objective}</p>}
+                    {planLabel && <p className="text-[10px] font-bold text-emerald-300 mt-0.5">{planLabel}</p>}
                   </div>
                   <div className="flex items-center gap-1">
                     <button onClick={() => downloadDayPDF(d)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-600 hover:text-zinc-300 transition-colors" title="Descargar PDF del día">
@@ -807,13 +814,13 @@ export default function Schedule() {
             const isCurrentMonth = d.isSame(currentMonth, "month");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
-            const planMeta = findPlanDay(weeklyPlans, { date: dateStr, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values;
+            const planLabel = planLabelForDate(dateStr, dayEvents);
             return (
               <div key={dateStr} className={`bg-zinc-900 min-h-[90px] p-1.5 ${!isCurrentMonth ? "opacity-25" : ""}`}>
                 <div className="flex items-center justify-between mb-1">
                   <div>
                     <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-white text-zinc-900" : "text-zinc-400"}`}>{d.date()}</div>
-                    {planMeta && <p className="text-[9px] text-emerald-300 font-bold leading-none mt-0.5">{planMeta.match_day_code}</p>}
+                    {planLabel && <p className="text-[9px] text-emerald-300 font-bold leading-none mt-0.5">{planLabel}</p>}
                   </div>
                   {isCurrentMonth && (
                     <button onClick={() => openNew(dateStr)} className="p-0.5 rounded hover:bg-zinc-700 text-zinc-700 hover:text-zinc-400 transition-colors">
