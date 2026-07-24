@@ -1,0 +1,216 @@
+{
+  "name": "InstitutionProfile",
+  "type": "object",
+  "properties": {
+    "official_name": {
+      "type": "string",
+      "description": "Nombre oficial de la instituci\u00f3n"
+    },
+    "short_name": {
+      "type": "string",
+      "description": "Nombre corto visible"
+    },
+    "abbreviation": {
+      "type": "string",
+      "description": "Abreviatura (ej: DYJ)"
+    },
+    "shield_url": {
+      "type": "string",
+      "description": "URL del escudo institucional"
+    },
+    "horizontal_logo_url": {
+      "type": "string",
+      "description": "URL del logo horizontal alternativo"
+    },
+    "country": {
+      "type": "string",
+      "description": "Pa\u00eds"
+    },
+    "province": {
+      "type": "string",
+      "description": "Provincia"
+    },
+    "city": {
+      "type": "string",
+      "description": "Ciudad"
+    },
+    "address": {
+      "type": "string",
+      "description": "Domicio institucional"
+    },
+    "website": {
+      "type": "string",
+      "description": "Sitio web"
+    },
+    "institutional_email": {
+      "type": "string",
+      "description": "Email institucional"
+    },
+    "phone": {
+      "type": "string",
+      "description": "Tel\u00e9fono de contacto"
+    },
+    "instagram": {
+      "type": "string",
+      "description": "Usuario de Instagram"
+    },
+    "other_social_links": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Otros enlaces o redes sociales"
+    },
+    "founded_year": {
+      "type": "number",
+      "description": "A\u00f1o de fundaci\u00f3n"
+    },
+    "stadium": {
+      "type": "string",
+      "description": "Estadio"
+    },
+    "training_ground": {
+      "type": "string",
+      "description": "Predio de entrenamiento"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n institucional"
+    },
+    "brand_primary": {
+      "type": "string",
+      "description": "Color principal (hex #RRGGBB)"
+    },
+    "brand_secondary": {
+      "type": "string",
+      "description": "Color secundario (hex #RRGGBB)"
+    },
+    "brand_accent": {
+      "type": "string",
+      "description": "Color de acento (hex #RRGGBB)"
+    },
+    "brand_background": {
+      "type": "string",
+      "description": "Color de fondo (hex #RRGGBB)"
+    },
+    "brand_surface": {
+      "type": "string",
+      "description": "Color de superficie (hex #RRGGBB)"
+    },
+    "brand_text_primary": {
+      "type": "string",
+      "description": "Color de texto principal (hex #RRGGBB)"
+    },
+    "brand_text_secondary": {
+      "type": "string",
+      "description": "Color de texto secundario (hex #RRGGBB)"
+    },
+    "default_squad_id": {
+      "type": "string",
+      "description": "ID del plantel predeterminado"
+    },
+    "default_season": {
+      "type": "string",
+      "description": "Temporada predeterminada"
+    },
+    "default_competition_id": {
+      "type": "string",
+      "description": "Competencia predeterminada"
+    },
+    "language": {
+      "type": "string",
+      "default": "Espa\u00f1ol",
+      "description": "Idioma de la plataforma"
+    },
+    "timezone": {
+      "type": "string",
+      "default": "America/Argentina/Buenos_Aires",
+      "description": "Zona horaria"
+    },
+    "date_format": {
+      "type": "string",
+      "default": "DD/MM/YYYY",
+      "description": "Formato de fecha"
+    },
+    "time_format": {
+      "type": "string",
+      "default": "24h",
+      "description": "Formato de hora"
+    },
+    "week_starts_on": {
+      "type": "string",
+      "default": "lunes",
+      "description": "Primer d\u00eda de la semana"
+    },
+    "unit_system": {
+      "type": "string",
+      "default": "metrico",
+      "description": "Sistema de unidades"
+    },
+    "currency": {
+      "type": "string",
+      "default": "ARS",
+      "description": "Moneda"
+    },
+    "default_export_format": {
+      "type": "string",
+      "default": "PDF",
+      "description": "Formato de exportaci\u00f3n predeterminado"
+    },
+    "default_paper_size": {
+      "type": "string",
+      "default": "A4",
+      "description": "Tama\u00f1o de papel predeterminado"
+    },
+    "default_orientation": {
+      "type": "string",
+      "default": "portrait",
+      "description": "Orientaci\u00f3n predeterminada de exportaci\u00f3n"
+    },
+    "show_performancepitch_brand": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar marca PerformancePitch en exportaciones"
+    },
+    "export_footer_text": {
+      "type": "string",
+      "description": "Texto de pie de exportaciones"
+    },
+    "sponsor_logo_url": {
+      "type": "string",
+      "description": "URL del logo del sponsor para exportaciones"
+    },
+    "watermark_url": {
+      "type": "string",
+      "description": "URL de marca de agua para exportaciones"
+    },
+    "show_squad_name": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar nombre del plantel en exportaciones"
+    },
+    "show_season": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar temporada en exportaciones"
+    },
+    "show_export_date": {
+      "type": "boolean",
+      "default": true,
+      "description": "Mostrar fecha de exportaci\u00f3n"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Perfil institucional activo (debe existir uno solo)"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de \u00faltima actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "official_name"
+  ]
+}

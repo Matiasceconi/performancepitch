@@ -1,6 +1,7 @@
 // Resolvedor de marca dinámico para exportaciones multiclub.
-// Reemplaza al CLUB_BRAND hardcodeado por una paleta que se obtiene
-// del plantel activo (Squad) o, en su defecto, de una paleta neutra elegante.
+// Orden de respaldo: InstitutionProfile → Squad (plantel activo) → paleta neutra.
+// Mantiene compatibilidad con nombres legacy (green, greenDark, yellow, gold, etc.)
+// para no romper los PDF existentes mientras se migran.
 
 const NEUTRAL = {
   primary: "#1E293B",
@@ -11,6 +12,17 @@ const NEUTRAL = {
   panel: "#F8FAFC",
   line: "#E2E8F0",
   white: "#FFFFFF",
+};
+
+// Paleta legada de Defensa y Justicia (clubBrand.js) usada solo como respaldo
+// de migración cuando no existe InstitutionProfile ni datos en Squad.
+const LEGACY_FALLBACK = {
+  name: "Defensa y Justicia",
+  shortName: "DyJ",
+  logoUrl: "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png",
+  primary: "#00843D",
+  secondary: "#005A34",
+  accent: "#FFD400",
 };
 
 function hexToRgb(hex) {
@@ -54,18 +66,44 @@ export function lighten(hex, factor = 0.18) {
   return rgbToHex(r + (255 - r) * factor, g + (255 - g) * factor, b + (255 - b) * factor);
 }
 
-// Construye el objeto de marca desde el plantel activo.
-// Si el plantel no tiene colores configurados, usa paleta neutra.
-export function resolveBrand(squad = {}) {
-  const primary = squad.brand_primary || NEUTRAL.primary;
-  const secondary = squad.brand_secondary || NEUTRAL.secondary;
-  const accent = squad.brand_accent || NEUTRAL.accent;
+// Detecta si el primer argumento es un InstitutionProfile (tiene official_name)
+// o un Squad (tiene name/season pero no official_name). Permite que
+// resolveBrand(squad) siga funcionando como antes (compatibilidad hacia atrás).
+function looksLikeInstitution(obj) {
+  return !!obj && typeof obj === "object" && !!obj.official_name;
+}
+
+// Resolvedor principal: recibe InstitutionProfile y Squad (respaldo).
+// Si se llama con un solo argumento que es un Squad, lo trata como squad-only.
+export function resolveInstitutionBrand(institution = null, squad = {}) {
+  // Compatibilidad hacia atrás: resolveInstitutionBrand(squad)
+  if (!institution && squad) { /* ok, institution null */ }
+  if (institution && !looksLikeInstitution(institution) && !squad?.name) {
+    // Se llamó como resolveInstitutionBrand(squad) sin segundo arg
+    squad = institution;
+    institution = null;
+  }
+
+  const instPrimary = institution?.brand_primary || squad?.brand_primary || LEGACY_FALLBACK.primary;
+  const instSecondary = institution?.brand_secondary || squad?.brand_secondary || LEGACY_FALLBACK.secondary;
+  const instAccent = institution?.brand_accent || squad?.brand_accent || LEGACY_FALLBACK.accent;
+
+  const primary = instPrimary || NEUTRAL.primary;
+  const secondary = instSecondary || NEUTRAL.secondary;
+  const accent = instAccent || NEUTRAL.accent;
+
+  const name = institution?.official_name || squad?.club_name || squad?.name || LEGACY_FALLBACK.name;
+  const shortName = institution?.short_name || institution?.abbreviation || squad?.club_short_name || (name).slice(0, 3).toUpperCase() || LEGACY_FALLBACK.shortName;
+  const logoUrl = institution?.shield_url || institution?.horizontal_logo_url || squad?.club_logo_url || LEGACY_FALLBACK.logoUrl;
+  const season = institution?.default_season || squad?.season || "";
+  const squadName = squad?.name || "Plantel";
+
   return {
-    name: squad.club_name || squad.name || "Club",
-    shortName: squad.club_short_name || (squad.club_name || squad.name || "CLUB").slice(0, 3).toUpperCase(),
-    logoUrl: squad.club_logo_url || "",
-    season: squad.season || "",
-    squadName: squad.name || "Plantel",
+    name,
+    shortName,
+    logoUrl,
+    season,
+    squadName,
     colors: {
       primary,
       primaryDark: darken(primary, 0.22),
@@ -83,26 +121,29 @@ export function resolveBrand(squad = {}) {
       onPrimary: contrastText(primary),
       onSecondary: contrastText(secondary),
       onAccent: contrastText(accent),
+      // Alias legacy para compatibilidad con PDFs existentes
+      green: primary,
+      greenDark: darken(primary, 0.22),
+      greenDeep: darken(primary, 0.4),
+      yellow: accent,
+      yellowDark: darken(accent, 0.22),
+      gold: accent,
+      black: "#000000",
     },
   };
 }
 
-// Versión simplificada para usar en componentes que antes importaban CLUB_BRAND directamente.
-// Mantiene compatibilidad con nombres legacy (green, greenDark, yellow, etc.) mapeados a la paleta dinámica.
+// Wrapper de compatibilidad: resolveBrand(squad) sigue funcionando como antes.
+// Si se pasa un InstitutionProfile como primer arg, se usa como institución.
+export function resolveBrand(institutionOrSquad = {}, squad = {}) {
+  if (looksLikeInstitution(institutionOrSquad)) {
+    return resolveInstitutionBrand(institutionOrSquad, squad);
+  }
+  // Comportamiento legacy: primer arg es un squad
+  return resolveInstitutionBrand(null, institutionOrSquad);
+}
+
+// Versión simplificada para componentes que antes importaban CLUB_BRAND directamente.
 export function resolveBrandLegacy(squad = {}) {
-  const brand = resolveBrand(squad);
-  return {
-    ...brand,
-    colors: {
-      ...brand.colors,
-      // Alias legacy para compatibilidad con PDFs existentes
-      green: brand.colors.primary,
-      greenDark: brand.colors.primaryDark,
-      greenDeep: brand.colors.primaryDeep,
-      yellow: brand.colors.accent,
-      yellowDark: brand.colors.accentDark,
-      gold: brand.colors.accent,
-      black: "#000000",
-    },
-  };
+  return resolveInstitutionBrand(null, squad);
 }

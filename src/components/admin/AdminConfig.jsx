@@ -4,6 +4,8 @@ import { Settings, ChevronDown, ChevronUp, Plus, Trash2, Save } from "lucide-rea
 import { useToast } from "@/components/ui/use-toast";
 import NutritionSettingsPanel from "@/components/nutrition/NutritionSettingsPanel";
 import ClubSettingsPanel from "@/components/clubs/ClubSettingsPanel";
+import InstitutionSettingsPanel from "@/components/admin/InstitutionSettingsPanel";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 const DEFAULT_SEASONS = ["2024", "2025", "2026", "2025/2026"];
 const DEFAULT_CATEGORIES = ["Sub-14", "Sub-15", "Sub-16", "Sub-17", "Sub-18", "Sub-20", "Reserva", "Primera"];
@@ -76,6 +78,7 @@ function ListEditor({ items, placeholder, onAdd, onRemove }) {
 
 export default function AdminConfig() {
   const { toast } = useToast();
+  const { isAdmin, squads, institutionError, institutionProfile } = useWorkspace();
   const [seasons, setSeasons] = useState(() => {
     try { return JSON.parse(localStorage.getItem("admin_seasons") || "null") || DEFAULT_SEASONS; } catch { return DEFAULT_SEASONS; }
   });
@@ -131,6 +134,15 @@ export default function AdminConfig() {
           <Save size={13} /> Guardar configuración
         </button>
       </div>
+
+      <ConfigBlock title="Institución e identidad visual" icon={Settings} defaultOpen>
+        {institutionError && (
+          <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+            {institutionError}
+          </div>
+        )}
+        <InstitutionSettingsPanel isAdmin={isAdmin} squads={squads} />
+      </ConfigBlock>
 
       <ConfigBlock title="Temporadas" icon={Settings} defaultOpen>
         <ListEditor
@@ -190,7 +202,7 @@ export default function AdminConfig() {
         </h3>
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {[
-            { label: "Club", value: "Defensa y Justicia" },
+            { label: "Institución", value: institutionProfile?.official_name || "—" },
             { label: "Temporada activa", value: seasons[seasons.length - 1] || "—" },
             { label: "Plataforma", value: "PerformancePitch" },
           ].map(p => (

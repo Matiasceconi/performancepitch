@@ -2,8 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import { CalendarDays, Clock, MapPin, Shield, Trophy } from "lucide-react";
 import moment from "moment";
-
-const OWN_SHIELD = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/a8608f7d3_defensa.png";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 function dayLabel(date) {
   const daysLeft = moment(date).diff(moment().startOf("day"), "days");
@@ -14,6 +13,9 @@ function dayLabel(date) {
 
 export default function NextMatchHeaderCard({ match, matchReport }) {
   const [logoError, setLogoError] = useState(false);
+  const { clubBrand } = useWorkspace();
+  const ownShield = clubBrand?.logoUrl || "";
+  const ownName = clubBrand?.name || "Club";
   const rivalName = matchReport?.rival || match.rival || match.title;
   const logoUrl = matchReport?.rival_logo_url || match.rival_logo_url;
   const condition = matchReport?.location || match.home_away || "";
@@ -30,10 +32,10 @@ export default function NextMatchHeaderCard({ match, matchReport }) {
 
       <div className="flex items-center justify-center gap-4">
         <div className="flex flex-col items-center gap-1">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-yellow-500/20 bg-zinc-950 p-2">
-            <img src={OWN_SHIELD} alt="Defensa y Justicia" className="h-full w-full object-contain" />
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-950 p-2">
+            {ownShield ? <img src={ownShield} alt={ownName} className="h-full w-full object-contain" /> : <Shield size={24} className="text-zinc-500" />}
           </div>
-          <span className="max-w-[95px] truncate text-[10px] font-medium text-zinc-400">Defensa y Justicia</span>
+          <span className="max-w-[95px] truncate text-[10px] font-medium text-zinc-400">{ownName}</span>
         </div>
         <div className="text-center">
           <p className="text-[10px] uppercase tracking-[0.2em] text-zinc-600">vs</p>

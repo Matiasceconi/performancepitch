@@ -36,12 +36,14 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
   const [open, setOpen] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
-  const { activeAreaName, canSeePath, requestAreaChange, myAreas } = useWorkspace();
+  const { activeAreaName, canSeePath, requestAreaChange, myAreas, clubBrand } = useWorkspace();
   const visibleItems = NAV_ITEMS.filter((item) => canSeePath(item.path));
+  const accent = clubBrand?.colors?.accent || "#F0C800";
+  const onAccent = clubBrand?.colors?.onAccent || "#1a1a1a";
 
   function NavLink({ item }) {
     const isActive = location.pathname === item.path;
-    return <Link to={item.path} onClick={() => setOpen(false)} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? "text-zinc-900 font-semibold" : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"}`} style={isActive ? { backgroundColor: "#F0C800", color: "#1a1a1a" } : {}}><item.icon size={18} />{item.label}</Link>;
+    return <Link to={item.path} onClick={() => setOpen(false)} className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${isActive ? "font-semibold" : "text-zinc-400 hover:text-white hover:bg-zinc-800/60"}`} style={isActive ? { backgroundColor: accent, color: onAccent } : {}}><item.icon size={18} />{item.label}</Link>;
   }
 
   return (
@@ -52,9 +54,12 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
         <div className={`${collapsed ? "lg:hidden" : ""}`}>
           <div className="p-4 border-b border-zinc-800 space-y-3">
             <div className="flex items-start justify-between gap-3">
-              <div>
-                <h1 className="text-sm font-bold text-white tracking-tight leading-tight">Defensa y Justicia</h1>
-                <p className="text-xs mt-0.5" style={{ color: "#F0C800" }}>PerformancePitch</p>
+              <div className="flex items-center gap-2.5 min-w-0">
+                {clubBrand?.logoUrl ? <img src={clubBrand.logoUrl} alt={clubBrand.name} className="w-8 h-8 object-contain shrink-0" /> : null}
+                <div className="min-w-0">
+                  <h1 className="text-sm font-bold text-white tracking-tight leading-tight truncate">{clubBrand?.name || "PerformancePitch"}</h1>
+                  <p className="text-xs mt-0.5" style={{ color: accent }}>PerformancePitch</p>
+                </div>
               </div>
               <button
                 type="button"
@@ -105,8 +110,8 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
           <nav className="mt-3 flex min-h-0 w-full flex-1 flex-col items-center gap-1 overflow-y-auto px-2 [scrollbar-width:thin] [scrollbar-color:#3f3f46_transparent]">
             {visibleItems.map((item) => {
               const isActive = location.pathname === item.path;
-              return <Link key={item.path} to={item.path} title={item.label} aria-label={item.label} aria-current={isActive ? "page" : undefined} className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${isActive ? "border-yellow-400/50 text-zinc-950" : "border-transparent text-zinc-500 hover:bg-zinc-900 hover:text-white"}`} style={isActive ? { backgroundColor: "#F0C800", color: "#1a1a1a" } : {}}>
-                {isActive && <span className="absolute -left-2 top-2 h-6 w-1 rounded-r-full bg-yellow-400" />}
+              return <Link key={item.path} to={item.path} title={item.label} aria-label={item.label} aria-current={isActive ? "page" : undefined} className={`relative flex h-10 w-10 items-center justify-center rounded-xl border transition-colors ${isActive ? "text-zinc-950" : "border-transparent text-zinc-500 hover:bg-zinc-900 hover:text-white"}`} style={isActive ? { backgroundColor: accent, color: onAccent, borderColor: accent } : {}}>
+                {isActive && <span className="absolute -left-2 top-2 h-6 w-1 rounded-r-full" style={{ backgroundColor: accent }} />}
                 <item.icon size={18} />
               </Link>;
             })}

@@ -5,6 +5,8 @@ import { useAuth } from "@/lib/AuthContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
 import AreaSelectScreen from "@/components/workspace/AreaSelectScreen";
 import { AREAS, PAGES, MODULE_ACTIONS } from "@/lib/areasConfig";
+import { loadOrSeedInstitutionProfile } from "@/lib/institutionProfile";
+import { resolveInstitutionBrand } from "@/lib/clubBrandResolver";
 
 const WorkspaceContext = createContext(null);
 
@@ -72,6 +74,24 @@ export function WorkspaceProvider({ children }) {
   const [myAreas, setMyAreas] = useState([]);
   const [activeAreaId, setActiveAreaIdState] = useState(null);
   const [needAreaSelection, setNeedAreaSelection] = useState(false);
+  const [institutionProfile, setInstitutionProfile] = useState(null);
+  const [institutionError, setInstitutionError] = useState(null);
+
+  const loadInstitutionProfile = useCallback(async () => {
+    try {
+      const p = await loadOrSeedInstitutionProfile();
+      setInstitutionProfile(p);
+      setInstitutionError(p ? null : "No se pudo cargar el perfil institucional.");
+    } catch (err) {
+      console.warn("[Workspace] Falla al cargar InstitutionProfile — se usa respaldo:", err?.message);
+      setInstitutionError(err?.message || "Error al cargar el perfil institucional.");
+    }
+  }, []);
+
+  // Carga el perfil institucional en paralelo, sin bloquear el ingreso.
+  useEffect(() => {
+    if (isAuthenticated && user) loadInstitutionProfile();
+  }, [isAuthenticated, user, loadInstitutionProfile]);
 
   // Solo la primera carga bloquea toda la pantalla. Recargas posteriores (reloadWorkspace)
   // no deben desmontar el Sidebar ni ocultar módulos globales como Administración.
@@ -476,6 +496,11 @@ export function WorkspaceProvider({ children }) {
       canManageUsers: effectiveAdminAccess,
       roleNames,
       permissions,
+      // Identidad institucional (fuente única, independiente del plantel activo)
+      institutionProfile,
+      institutionError,
+      reloadInstitutionProfile: loadInstitutionProfile,
+      clubBrand: resolveInstitutionBrand(institutionProfile, activeSquad),
       debugInfo: {
         user_email: user?.email || null,
         platform_role: user?.role || null,
