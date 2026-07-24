@@ -40,11 +40,19 @@
     },
     "md_code": {
       "type": "string",
-      "description": "C\u00f3digo MD del d\u00eda: MD+1, MD-4, MD, etc. No determina por s\u00ed solo si es partido"
+      "description": "C\u00f3digo MD anal\u00edtico: distancia al partido objetivo (MD-7, MD-2, MD, etc.). No determina por s\u00ed solo si es partido"
+    },
+    "previous_md_code": {
+      "type": "string",
+      "description": "C\u00f3digo MD respecto al partido anterior cuando existe (MD+1, MD+2, etc.)"
+    },
+    "display_md_label": {
+      "type": "string",
+      "description": "Etiqueta visual combinada opcional, por ejemplo 'MD+1 / MD-7'. Solo para presentaci\u00f3n, no usar para GPS ni filtros"
     },
     "physical_objective": {
       "type": "string",
-      "description": "Objetivo f\u00edsico planificado"
+      "description": "Objetivo f\u00edsico planificado (respaldo; la fuente oficial es TrainingSession.session_objective)"
     },
     "calendar_event_id": {
       "type": "string",
@@ -53,6 +61,22 @@
     "match_id": {
       "type": "string",
       "description": "ID del MatchReport vinculado si existe"
+    },
+    "linked_session_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs reales de TrainingSession vinculadas a este d\u00eda"
+    },
+    "blocks": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Bloques legados para compatibilidad. La fuente de tareas es TrainingSession y sus entidades vinculadas"
     },
     "notes": {
       "type": "string",
@@ -90,6 +114,32 @@
       "type": "boolean",
       "default": true,
       "description": "Indica si fue creado desde days_data legado"
+    },
+    "generated_source": {
+      "type": "string",
+      "description": "Origen de la generaci\u00f3n del d\u00eda: motor, legacy_migration, manual"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de la \u00faltima generaci\u00f3n autom\u00e1tica"
+    },
+    "needs_review": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el d\u00eda requiere revisi\u00f3n manual por conflictos detectados"
+    },
+    "review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Motivos por los que el d\u00eda requiere revisi\u00f3n"
+    },
+    "source_revision": {
+      "type": "number",
+      "default": 1,
+      "description": "Revisi\u00f3n del documento para control de concurrencia y auditor\u00eda de regeneraciones"
     }
   },
   "required": [

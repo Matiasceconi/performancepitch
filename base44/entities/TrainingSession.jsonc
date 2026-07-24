@@ -60,7 +60,7 @@
     "md_manual_override": {
       "type": "boolean",
       "default": false,
-      "description": "Si true, el MD fue modificado manualmente en la sesi\u00f3n y no se pisa desde el Plan Semanal"
+      "description": "Si true, el MD fue modificado manualmente en la sesi\u00f3n y no se pisa desde el motor de planificaci\u00f3n"
     },
     "microcycle_day": {
       "type": "string",
@@ -68,12 +68,12 @@
     },
     "session_objective": {
       "type": "string",
-      "description": "Objetivo f\u00edsico heredado del Plan Semanal, editable como excepci\u00f3n"
+      "description": "Objetivo f\u00edsico oficial de la sesi\u00f3n. El Plan semanal no debe sobrescribirlo"
     },
     "physical_objective_manual_override": {
       "type": "boolean",
       "default": false,
-      "description": "Si true, el objetivo f\u00edsico fue modificado manualmente en la sesi\u00f3n y no se pisa desde el Plan Semanal"
+      "description": "Compatibilidad hist\u00f3rica. Dejar de utilizarlo como consecuencia de una edici\u00f3n en el Plan"
     },
     "duration_minutes": {
       "type": "number",
@@ -82,6 +82,62 @@
     "location": {
       "type": "string",
       "description": "Lugar del entrenamiento"
+    },
+    "start_time": {
+      "type": "string",
+      "description": "Hora de inicio de la sesi\u00f3n (HH:MM)"
+    },
+    "end_time": {
+      "type": "string",
+      "description": "Hora de fin de la sesi\u00f3n (HH:MM)"
+    },
+    "session_type": {
+      "type": "string",
+      "description": "Tipo de sesi\u00f3n: Campo, Gimnasio, Compensatorio, Video, Activaci\u00f3n, etc."
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "planned",
+        "completed",
+        "cancelled"
+      ],
+      "default": "planned",
+      "description": "Estado operativo de la sesi\u00f3n"
+    },
+    "md_source": {
+      "type": "string",
+      "enum": [
+        "calculated",
+        "manual_override",
+        "no_reference_match"
+      ],
+      "description": "Origen del MD de la sesi\u00f3n: calculado desde el partido objetivo, excepci\u00f3n manual o sin partido de referencia"
+    },
+    "md_reference_match_id": {
+      "type": "string",
+      "description": "ID del MatchReport usado como referencia para calcular el MD"
+    },
+    "md_calculated_at": {
+      "type": "string",
+      "description": "Fecha/hora del \u00faltimo c\u00e1lculo autom\u00e1tico del MD"
+    },
+    "md_override_reason": {
+      "type": "string",
+      "description": "Motivo obligatorio cuando el MD se edita manualmente como excepci\u00f3n"
+    },
+    "planning_review_status": {
+      "type": "string",
+      "description": "Estado de revisi\u00f3n de planificaci\u00f3n: pending, reviewed, conflict"
+    },
+    "planning_review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Motivos por los que la sesi\u00f3n requiere revisi\u00f3n de planificaci\u00f3n"
     },
     "intensity_goal": {
       "type": "string",

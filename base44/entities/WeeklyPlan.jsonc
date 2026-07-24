@@ -8,7 +8,7 @@
     },
     "plan_key": {
       "type": "string",
-      "description": "Clave \u00fanica l\u00f3gica: organization_id + squad_id + season_id + week_start"
+      "description": "Clave \u00fanica l\u00f3gica: organization_id + squad_id + season_id + week_start (o target_match_id en planes autom\u00e1ticos match_to_match)"
     },
     "squad_id": {
       "type": "string",
@@ -118,6 +118,62 @@
     "notes": {
       "type": "string",
       "description": "Notas generales de la semana"
+    },
+    "auto_generated": {
+      "type": "boolean",
+      "default": false,
+      "description": "Indica si el plan fue generado autom\u00e1ticamente por el motor de planificaci\u00f3n"
+    },
+    "generation_source": {
+      "type": "string",
+      "enum": [
+        "matches_and_sessions",
+        "calendar_week_fallback",
+        "legacy"
+      ],
+      "description": "Origen de la generaci\u00f3n autom\u00e1tica del plan"
+    },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "synced",
+        "rebuilding",
+        "needs_review",
+        "error"
+      ],
+      "default": "synced",
+      "description": "Estado de sincronizaci\u00f3n con las fuentes reales (partidos y sesiones)"
+    },
+    "needs_review": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el plan requiere revisi\u00f3n manual por conflictos detectados"
+    },
+    "review_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Motivos por los que el plan requiere revisi\u00f3n"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de la \u00faltima generaci\u00f3n autom\u00e1tica"
+    },
+    "last_source_change_at": {
+      "type": "string",
+      "description": "Fecha/hora del \u00faltimo cambio detectado en las fuentes (partidos/sesiones)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "superseded",
+        "archived"
+      ],
+      "default": "active",
+      "description": "Estado operativo del plan: active, superseded (reemplazado por otro microciclo) o archived"
     }
   },
   "required": [
