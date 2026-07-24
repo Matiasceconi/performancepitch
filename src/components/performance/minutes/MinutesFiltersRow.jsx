@@ -1,8 +1,17 @@
 import React from "react";
-import { Search, RotateCcw } from "lucide-react";
+import { Pin, RotateCcw, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
-export default function MinutesFiltersRow({ filters, updateFilter, resetFilters, squadOptions, seasonOptions, competitionOptions }) {
+export default function MinutesFiltersRow({
+  filters,
+  filtersPinned,
+  updateFilter,
+  toggleFiltersPinned,
+  resetFilters,
+  squadOptions,
+  seasonOptions,
+  competitionOptions,
+}) {
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4">
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-6">
@@ -23,20 +32,40 @@ export default function MinutesFiltersRow({ filters, updateFilter, resetFilters,
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
           <DateInput label="Desde" value={filters.dateFrom} onChange={(value) => updateFilter("dateFrom", value)} />
           <DateInput label="Hasta" value={filters.dateTo} onChange={(value) => updateFilter("dateTo", value)} />
-          <div className="flex items-end justify-start md:justify-end">
-            <button onClick={resetFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
-              <RotateCcw size={14} /> Limpiar filtros
-            </button>
-          </div>
+          <FilterActions filtersPinned={filtersPinned} onTogglePinned={toggleFiltersPinned} onReset={resetFilters} className="items-end justify-start md:justify-end" />
         </div>
       )}
       {filters.dateRange !== "custom" && (
-        <div className="mt-3 flex justify-end">
-          <button onClick={resetFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-white">
-            <RotateCcw size={14} /> Limpiar filtros
-          </button>
-        </div>
+        <FilterActions filtersPinned={filtersPinned} onTogglePinned={toggleFiltersPinned} onReset={resetFilters} className="mt-3 justify-end" />
       )}
+    </div>
+  );
+}
+
+function FilterActions({ filtersPinned, onTogglePinned, onReset, className = "" }) {
+  return (
+    <div className={`flex flex-wrap gap-2 ${className}`}>
+      <button
+        type="button"
+        onClick={onTogglePinned}
+        aria-pressed={filtersPinned}
+        title={filtersPinned ? "Dejar de recordar estos filtros" : "Recordar estos filtros al volver a la página"}
+        className={`inline-flex h-10 items-center gap-2 rounded-xl border px-4 text-sm font-medium transition ${
+          filtersPinned
+            ? "border-yellow-500/40 bg-yellow-500/15 text-yellow-200 hover:bg-yellow-500/25"
+            : "border-zinc-700 bg-zinc-950 text-zinc-300 hover:bg-zinc-800 hover:text-white"
+        }`}
+      >
+        <Pin size={14} className={filtersPinned ? "fill-current" : ""} />
+        {filtersPinned ? "Filtros fijados" : "Fijar filtros"}
+      </button>
+      <button
+        type="button"
+        onClick={onReset}
+        className="inline-flex h-10 items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 px-4 text-sm text-zinc-300 transition hover:bg-zinc-800 hover:text-white"
+      >
+        <RotateCcw size={14} /> Limpiar filtros
+      </button>
     </div>
   );
 }
