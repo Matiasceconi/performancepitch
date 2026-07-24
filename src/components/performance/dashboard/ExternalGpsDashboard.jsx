@@ -222,7 +222,10 @@ export default function ExternalGpsDashboard() {
   useEffect(() => {
     const unsubscribePlan = base44.entities.WeeklyPlan.subscribe(load);
     const unsubscribeCatapult = base44.entities.CatapultReport.subscribe(load);
-    return () => { unsubscribePlan?.(); unsubscribeCatapult?.(); };
+    const unsubscribeSession = base44.entities.TrainingSession.subscribe(load);
+    const unsubscribeGps = base44.entities.SessionGPSData.subscribe(load);
+    const unsubscribeMatch = base44.entities.MatchReport.subscribe(load);
+    return () => { unsubscribePlan?.(); unsubscribeCatapult?.(); unsubscribeSession?.(); unsubscribeGps?.(); unsubscribeMatch?.(); };
   }, [load]);
 
   const playerMap = useMemo(() => {

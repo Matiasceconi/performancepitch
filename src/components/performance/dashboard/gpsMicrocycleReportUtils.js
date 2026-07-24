@@ -357,3 +357,5 @@ export function buildMdBlocks(sessionAverages, md, season) {
   const previous = mdSessions.slice(1);
   return { current, last4: previous.slice(0, 4), last8: previous.slice(0, 8), historical: previous, season: mdSessions.filter((s) => !season || s.season_id === season) };
 }
+
+// ── Source-based functions live in externalGpsSources.js to avoid circular imports ──

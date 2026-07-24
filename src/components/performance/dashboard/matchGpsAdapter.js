@@ -64,7 +64,6 @@ export function getMatchRowsForDay(day, matchReports = [], matchGpsByMatch = {})
 
 export function matchGpsStatus(match, rows = []) {
   if (!match) return { label: "Partido", state: "match", players: 0 };
-  if (rows.length > 0) return { label: `GPS completo — ${rows.length} jugadores`, state: "complete", players: rows.length };
-  if (match.csv_url) return { label: "GPS parcial", state: "partial", players: 0 };
-  return { label: "GPS pendiente", state: "pending", players: 0 };
+  if (rows.length > 0) return { label: `Datos procesados — ${rows.length} jugadores`, state: "complete", players: rows.length };
+  return { label: "Sin GPS procesado", state: "pending", players: 0 };
 }

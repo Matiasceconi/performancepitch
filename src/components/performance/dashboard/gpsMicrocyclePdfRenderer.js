@@ -64,11 +64,11 @@ function drawCover(doc, logo, rivalLogo, meta) {
 }
 
 function drawCycleDays(doc, logo, meta, days = []) {
-  addPage(doc, logo, meta); setText(doc, [20, 20, 20], 12, "bold"); doc.text("Días del microciclo", 12, 48);
+  addPage(doc, logo, meta); setText(doc, [20, 20, 20], 12, "bold"); doc.text("Cargas del microciclo", 12, 48);
   let y = 58;
   days.forEach((d, idx) => {
     doc.setFillColor(idx % 2 ? 248 : 238, idx % 2 ? 250 : 244, idx % 2 ? 248 : 240); doc.roundedRect(12, y, PAGE.w - 24, 12, 2, 2, "F");
-    const cells = [d.md || "—", moment(d.date).format("dddd DD/MM"), d.objetivo || d.objective || "—", `${d.sessions?.length || 0} sesiones`, d.rival ? `Partido vs. ${d.rival}` : "", d.gpsPlayers ? `GPS ${d.gpsPlayers}` : ""];
+    const cells = [d.md || "—", moment(d.date).format("dddd DD/MM"), d.objetivo || d.objective || "—", `${d.sessions?.length || 0} cargas`, d.rival ? `Partido vs. ${d.rival}` : "", d.gpsPlayers ? `GPS ${d.gpsPlayers}` : ""];
     const widths = [18, 42, 56, 34, 78, 40]; let x = 14;
     cells.forEach((cell, i) => { setText(doc, [35, 35, 35], 7.2, i === 0 ? "bold" : "normal"); doc.text(String(cell), x, y + 8, { maxWidth: widths[i] - 2 }); x += widths[i]; });
     y += 14; if (y > 184) { addPage(doc, logo, meta); y = 48; }
