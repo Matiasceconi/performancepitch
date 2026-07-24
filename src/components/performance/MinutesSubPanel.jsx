@@ -45,9 +45,7 @@ export default function MinutesSubPanel() {
 
       <MinutesFiltersRow
         filters={dashboard.filters}
-        filtersPinned={dashboard.filtersPinned}
         updateFilter={dashboard.updateFilter}
-        toggleFiltersPinned={dashboard.toggleFiltersPinned}
         resetFilters={dashboard.resetFilters}
         squadOptions={dashboard.squadOptions}
         seasonOptions={dashboard.seasonOptions}

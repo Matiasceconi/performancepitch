@@ -36,47 +36,35 @@ function getFiltersStorageKey(userId) {
   return `${FILTERS_STORAGE_PREFIX}:${userId || "current_user"}`;
 }
 
-function loadPinnedFilters(storageKey, defaults) {
-  if (typeof window === "undefined") return { filters: defaults, pinned: false };
+function loadStoredFilters(storageKey, defaults) {
+  if (typeof window === "undefined") return defaults;
   try {
     const saved = JSON.parse(window.localStorage.getItem(storageKey) || "null");
-    if (saved?.version !== FILTERS_STORAGE_VERSION || saved?.pinned !== true || !saved.filters) {
-      return { filters: defaults, pinned: false };
-    }
+    if (saved?.version !== FILTERS_STORAGE_VERSION || !saved.filters) return defaults;
     const storedFilters = FILTER_KEYS.reduce((acc, key) => {
       if (typeof saved.filters[key] === "string") acc[key] = saved.filters[key];
       return acc;
     }, {});
-    return { filters: { ...defaults, ...storedFilters }, pinned: true };
+    return { ...defaults, ...storedFilters };
   } catch {
     try {
       window.localStorage.removeItem(storageKey);
     } catch {
       // El almacenamiento puede estar bloqueado por el navegador.
     }
-    return { filters: defaults, pinned: false };
+    return defaults;
   }
 }
 
-function savePinnedFilters(storageKey, filters) {
+function saveStoredFilters(storageKey, filters) {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(storageKey, JSON.stringify({
       version: FILTERS_STORAGE_VERSION,
-      pinned: true,
       filters,
     }));
   } catch {
     // Los filtros siguen funcionando durante la sesión aunque el navegador bloquee el almacenamiento.
-  }
-}
-
-function removePinnedFilters(storageKey) {
-  if (typeof window === "undefined") return;
-  try {
-    window.localStorage.removeItem(storageKey);
-  } catch {
-    // No hace falta interrumpir la página si el navegador bloquea el almacenamiento.
   }
 }
 
@@ -196,8 +184,7 @@ export default function useMinutesDashboard() {
   const { activeSquadId, activeSeasonId, mySquads } = useWorkspace();
   const filtersStorageKey = getFiltersStorageKey(user?.id);
   const defaultFilters = getDefaultFilters(activeSquadId, activeSeasonId);
-  const [filters, setFilters] = useState(() => loadPinnedFilters(filtersStorageKey, defaultFilters).filters);
-  const [filtersPinned, setFiltersPinned] = useState(() => loadPinnedFilters(filtersStorageKey, defaultFilters).pinned);
+  const [filters, setFilters] = useState(() => loadStoredFilters(filtersStorageKey, defaultFilters));
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({ players: [], memberships: [], matches: [], minuteRows: [], competitions: [], aliases: [] });
@@ -248,8 +235,8 @@ export default function useMinutesDashboard() {
   }, [activeSquadId, activeSeasonId]);
 
   useEffect(() => {
-    if (filtersPinned) savePinnedFilters(filtersStorageKey, filters);
-  }, [filters, filtersPinned, filtersStorageKey]);
+    saveStoredFilters(filtersStorageKey, filters);
+  }, [filters, filtersStorageKey]);
 
   const competitionsById = useMemo(() => Object.fromEntries((data.competitions || []).map((competition) => [competition.id, competition])), [data.competitions]);
   const aliasMap = useMemo(() => buildAliasMap(data.aliases), [data.aliases]);
@@ -475,28 +462,16 @@ export default function useMinutesDashboard() {
   }), [filterLabels, availableMinutes, filteredFinishedMatches.length, playersWithMinutesCount, pendingMatches.length, playerRows]);
 
   const updateFilter = useCallback((key, value) => setFilters((current) => ({ ...current, [key]: value })), []);
-  const toggleFiltersPinned = useCallback(() => {
-    setFiltersPinned((current) => {
-      const next = !current;
-      if (next) savePinnedFilters(filtersStorageKey, filters);
-      else removePinnedFilters(filtersStorageKey);
-      return next;
-    });
-  }, [filters, filtersStorageKey]);
   const resetFilters = useCallback(() => {
     setFilters(getDefaultFilters(activeSquadId, activeSeasonId));
-    setFiltersPinned(false);
-    removePinnedFilters(filtersStorageKey);
-  }, [activeSquadId, activeSeasonId, filtersStorageKey]);
+  }, [activeSquadId, activeSeasonId]);
 
   return {
     loading,
     tab,
     setTab,
     filters,
-    filtersPinned,
     updateFilter,
-    toggleFiltersPinned,
     resetFilters,
     reload: loadData,
     squadOptions,
