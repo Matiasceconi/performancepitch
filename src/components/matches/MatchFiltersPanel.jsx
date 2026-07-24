@@ -1,9 +1,9 @@
 import React from "react";
-import { Search } from "lucide-react";
+import RivalClubPicker from "@/components/clubs/RivalClubPicker";
 
 const STAGES = ["Fase regular", "Fase de grupos", "Octavos de final", "Cuartos de final", "Semifinal", "Final", "Tercer puesto", "Amistoso"];
 
-export default function MatchFiltersPanel({ filters, setFilters, activeSquad, activeSeasonId, competitions, matches }) {
+export default function MatchFiltersPanel({ filters, setFilters, activeSquad, activeSeasonId, competitions, matches, clubs }) {
   const set = (key, value) => setFilters((current) => ({ ...current, [key]: value }));
   const matchdays = Array.from(new Set(matches.map((m) => m.matchday_number).filter((value) => value !== undefined && value !== null))).sort((a, b) => Number(a) - Number(b));
   const stages = Array.from(new Set([...STAGES, ...matches.map((m) => m.competition_stage).filter(Boolean)]));
@@ -53,10 +53,15 @@ export default function MatchFiltersPanel({ filters, setFilters, activeSquad, ac
       </div>
       <div className="md:col-span-2 xl:col-span-1">
         <label className="text-[10px] uppercase tracking-wider text-zinc-500 mb-1 block">Rival</label>
-        <div className="relative">
-          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input value={filters.rival || ""} onChange={(e) => set("rival", e.target.value)} placeholder="Buscar rival..." className="w-full bg-zinc-900/80 border border-zinc-800 rounded-lg pl-8 pr-3 py-2 text-sm font-semibold text-white placeholder-zinc-600 shadow-inner shadow-black/30" />
-        </div>
+        <RivalClubPicker
+          clubs={clubs}
+          filterMode
+          allowClear
+          placeholder="Todos los rivales"
+          selectedClubId={filters.rival_club_id || ""}
+          onSelect={(_, patch) => setFilters((current) => ({ ...current, rival: patch.rival, rival_club_id: patch.rival_club_id }))}
+          onClear={() => setFilters((current) => ({ ...current, rival: "", rival_club_id: "" }))}
+        />
       </div>
       <div className="flex items-end">
         <button onClick={() => setFilters({ squad_id: activeSquad?.id || "" })} className="w-full h-[38px] rounded-lg border border-zinc-800 bg-zinc-950/60 text-xs text-zinc-400 hover:text-white hover:bg-zinc-900">Limpiar filtros</button>

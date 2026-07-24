@@ -3,6 +3,7 @@ export function normalizeClubText(value = "") {
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[\u0027\u2018\u2019\u0060\u00b4\u02bc]/g, "")
     .replace(/[^a-z0-9\s]/g, " ")
     .replace(/\bclub\b|\batletico\b|\bdeportivo\b/g, " ")
     .replace(/\s+/g, " ")
@@ -13,6 +14,10 @@ export function clubDisplayName(club) {
   return club?.official_name || club?.short_name || "";
 }
 
+export function clubShortName(club) {
+  return club?.short_name || "";
+}
+
 export function clubLogo(club) {
   return club?.shield_url || "";
 }
@@ -20,14 +25,18 @@ export function clubLogo(club) {
 export function clubMatchesQuery(club, query) {
   const q = normalizeClubText(query);
   if (!q) return false;
-  const values = [club?.official_name, club?.short_name, ...(club?.aliases || [])].map(normalizeClubText);
+  const values = [club?.official_name, club?.short_name, ...(club?.aliases || [])]
+    .map(normalizeClubText)
+    .filter((v) => v && v.length > 0);
   return values.some((value) => value.includes(q) || q.includes(value));
 }
 
 export function findSimilarClubs(clubs = [], name = "") {
   const n = normalizeClubText(name);
   if (!n) return [];
-  return clubs.filter((club) => clubMatchesQuery(club, n) || normalizeClubText(club.official_name).split(" ").some((part) => part.length > 3 && n.includes(part))).slice(0, 5);
+  return clubs
+    .filter((club) => clubMatchesQuery(club, n) || normalizeClubText(club.official_name).split(" ").some((part) => part.length > 3 && n.includes(part)))
+    .slice(0, 5);
 }
 
 export function patchFromClub(club) {

@@ -12,7 +12,7 @@ import MatchVideoPanel from "@/components/matches/MatchVideoPanel.jsx";
 import MatchPlanPdfPanel from "@/components/matches/MatchPlanPdfPanel.jsx";
 import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
 import MatchFiltersPanel from "@/components/matches/MatchFiltersPanel.jsx";
-import RivalClubSearch from "@/components/clubs/RivalClubSearch";
+import RivalClubPicker from "@/components/clubs/RivalClubPicker";
 import { eventPayloadFromMatch, isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
 moment.locale("es");
 
@@ -405,7 +405,7 @@ function MatchForm({ initial, onSave, onCancel, competitions, squads, activeSqua
           <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="2026" value={form.season_id || ""} onChange={e => set("season_id", e.target.value)} />
         </div>
         <div>
-          <RivalClubSearch clubs={clubs} value={form.rival} selectedClubId={form.rival_club_id} onCreated={onClubCreated} onSelect={(_, patch) => setForm((current) => ({ ...current, ...patch }))} />
+          <RivalClubPicker clubs={clubs} selectedClubId={form.rival_club_id} onCreated={onClubCreated} onSelect={(_, patch) => setForm((current) => ({ ...current, ...patch }))} />
         </div>
         <div>
           <label className="text-xs text-zinc-400 mb-1 block">Fecha *</label>
@@ -499,7 +499,9 @@ export default function Matches() {
     if (filters.competition_stage && match.competition_stage !== filters.competition_stage) return false;
     if (filters.matchday_number && Number(match.matchday_number) !== Number(filters.matchday_number)) return false;
     if (filters.location && match.location !== filters.location) return false;
-    if (filters.rival && !normalizeStr(match.rival || "").includes(normalizeStr(filters.rival))) return false;
+    if (filters.rival_club_id) {
+      if (match.rival_club_id !== filters.rival_club_id) return false;
+    } else if (filters.rival && !normalizeStr(match.rival || "").includes(normalizeStr(filters.rival))) return false;
     return true;
   }), [matches, filters, activeSquadId]);
 
@@ -644,7 +646,7 @@ export default function Matches() {
       </div>
 
       {showFilters && (
-        <MatchFiltersPanel filters={filters} setFilters={setFilters} activeSquad={activeSquad} activeSeasonId={activeSeasonId} competitions={competitions} matches={matches} />
+        <MatchFiltersPanel filters={filters} setFilters={setFilters} activeSquad={activeSquad} activeSeasonId={activeSeasonId} competitions={competitions} matches={matches} clubs={rivalClubs} />
       )}
 
       {newChoiceOpen && (

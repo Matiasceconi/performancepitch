@@ -11,7 +11,7 @@ import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
 import ScheduleExportView from "@/components/schedule/ScheduleExportView";
 import { daysForPlan, findPlanDay, operationalPlans } from "@/components/planning/microcycleSync";
 import { getLogoForRival } from "@/lib/match-utils";
-import RivalClubSearch from "@/components/clubs/RivalClubSearch";
+import RivalClubPicker from "@/components/clubs/RivalClubPicker";
 import { isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
 
 moment.locale("es");
@@ -497,14 +497,12 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate, clu
             {((form.event_type || form.type) === "Partido" || form.type === "Jornada de Juveniles") && (
               <div className="col-span-2 space-y-3">
                 <div className="grid grid-cols-2 gap-3">
-                  <RivalClubSearch clubs={clubs} value={form.rival || ""} selectedClubId={form.rival_club_id || ""} onCreated={onClubCreated} onSelect={(_, patch) => setForm((current) => ({ ...current, ...patch }))} />
+                  <RivalClubPicker clubs={clubs} selectedClubId={form.rival_club_id || ""} onCreated={onClubCreated} onSelect={(_, patch) => setForm((current) => ({ ...current, ...patch }))} />
                   <div><label className="text-xs text-zinc-400 mb-1 block">Local/Visitante</label><select className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" value={form.home_away || ""} onChange={(e) => set("home_away", e.target.value)}><option value="">—</option><option>Local</option><option>Visitante</option><option>Neutral</option></select></div>
                 </div>
-                <label className="text-xs text-zinc-400 mb-1 block">URL escudo rival (opcional)</label>
-                <input className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-500" placeholder="https://..." value={form.rival_logo_url || ""} onChange={(e) => set("rival_logo_url", e.target.value)} />
-                {form.rival_logo_url && (
-                  <img src={form.rival_logo_url} alt="Escudo" className="mt-2 w-12 h-12 object-contain rounded" onError={(e) => e.target.style.display="none"} />
-                )}
+
+
+
               </div>
             )}
             <div className="col-span-2">
