@@ -7,6 +7,7 @@ import moment from "moment";
 import LibraryExerciseGPS from "@/components/sessions/LibraryExerciseGPS";
 import { DEFAULT_FIELD_EXERCISE_TYPES, loadFieldExerciseTypes } from "@/components/sessions/exerciseTypeOptions";
 import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
+import VideoThumbnail from "@/components/sessions/VideoThumbnail";
 import { getVideoThumbnailUrl } from "@/components/sessions/exerciseLibrarySync";
 
 const TYPE_COLORS = {
@@ -150,13 +151,7 @@ export default function FieldLibraryPanel() {
                   className="relative group cursor-pointer"
                   onClick={() => setVideoModalExId(ex.id)}
                 >
-                  {videoThumb ? (
-                    <img src={videoThumb} alt={ex.name} className="w-full max-h-40 object-cover" />
-                  ) : (
-                    <div className="w-full h-28 flex items-center justify-center bg-zinc-700">
-                      <Play size={24} className="text-zinc-500" />
-                    </div>
-                  )}
+                  <VideoThumbnail url={ex.video_url} alt={ex.name} className="w-full max-h-40 object-cover" />
                   <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
                     <div className="w-10 h-10 rounded-full bg-white/20 border-2 border-white/40 flex items-center justify-center backdrop-blur-sm">
                       <Play size={16} className="text-white fill-white ml-0.5" />

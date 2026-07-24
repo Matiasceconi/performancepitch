@@ -9,6 +9,7 @@ import ExerciseTypeSelector from "@/components/sessions/ExerciseTypeSelector";
 import { DEFAULT_FIELD_EXERCISE_TYPES, addFieldExerciseType, deleteFieldExerciseType, loadFieldExerciseTypes, renameFieldExerciseType } from "@/components/sessions/exerciseTypeOptions";
 import VideoUploadSection from "@/components/sessions/VideoUploadSection";
 import VideoPreviewModal from "@/components/sessions/VideoPreviewModal";
+import VideoThumbnail from "@/components/sessions/VideoThumbnail";
 
 const TYPE_COLORS = {
   "Activación": "bg-yellow-500/15 text-yellow-300 border-yellow-500/30",
@@ -415,13 +416,7 @@ Formato de respuesta: "Objetivo táctico · Objetivo físico · Intensidad: Baja
                     className="relative rounded-lg overflow-hidden border border-zinc-700 group cursor-pointer"
                     onClick={() => setVideoModalId(ex.id)}
                   >
-                    {videoThumb ? (
-                      <img src={videoThumb} alt="miniatura de video" className="w-full max-h-48 object-cover" />
-                    ) : (
-                      <div className="w-full h-28 flex items-center justify-center bg-zinc-700">
-                        <Play size={24} className="text-zinc-500" />
-                      </div>
-                    )}
+                    <VideoThumbnail url={ex.video_url} alt="miniatura de video" className="w-full max-h-48 object-cover" />
                     <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/50 transition-colors">
                       <div className="w-11 h-11 rounded-full bg-white/20 border-2 border-white/50 flex items-center justify-center backdrop-blur-sm">
                         <Play size={18} className="text-white fill-white ml-0.5" />
