@@ -165,9 +165,8 @@ export default function MicrocycleDayColumn({ day, dayIdx, sessionLibrary, sessi
       <div className="px-3 pt-3 pb-2 text-center border-b" style={{ backgroundColor: objStyle.bg, borderColor: objStyle.border }}>
         <p className="text-[11px] font-black tracking-[0.22em]" style={{ color: objStyle.text }}>{dayNameEs(day.date)}</p>
         <p className="mt-1 text-[11px] font-semibold" style={{ color: objStyle.text }}>{moment(day.date).format("DD/MM/YYYY")}</p>
-        <select value={day.md || "MD-5"} title="Modificación avanzada manual de MD" onChange={(e) => updateDay(dayIdx, { md: e.target.value, auto_free: e.target.value === "Libre", blocks: e.target.value === "Libre" ? [] : blocks })} className="mt-2 w-full bg-transparent text-center text-2xl font-black focus:outline-none" style={{ color: objStyle.text }}>
-          {MD_OPTIONS.map((item) => <option key={item}>{item}</option>)}
-        </select>
+        <p className="mt-2 text-center text-2xl font-black" style={{ color: objStyle.text }}>{day.md || day.md_code || "—"}</p>
+        {day.display_md_label && day.display_md_label !== (day.md || day.md_code) && <p className="text-[10px] font-semibold text-center" style={{ color: objStyle.text }}>{day.display_md_label}</p>}
         <select value={objective || objectiveOptions[0]} onChange={(e) => updateDay(dayIdx, { physical_objective: e.target.value })} className="mt-2 w-full rounded-xl border px-2 py-2 text-[11px] font-black text-center focus:outline-none" style={{ backgroundColor: "rgba(255,255,255,0.45)", color: objStyle.text, borderColor: objStyle.border }}>
           {objectiveOptions.map((item) => <option key={item}>{item}</option>)}
         </select>

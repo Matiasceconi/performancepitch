@@ -14,6 +14,7 @@ import MatchSquadPanel from "@/components/matches/MatchSquadPanel.jsx";
 import MatchFiltersPanel from "@/components/matches/MatchFiltersPanel.jsx";
 import RivalClubPicker from "@/components/clubs/RivalClubPicker";
 import { eventPayloadFromMatch, isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
+import { invokeRebuildPlanning } from "@/components/planning/microcycleSync";
 moment.locale("es");
 
 const DYJ_LOGO = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png";
@@ -570,6 +571,7 @@ export default function Matches() {
       await base44.entities.MatchReport.update(savedMatch.id, { calendar_event_id: createdEvent.id });
       await base44.entities.DayEvent.update(createdEvent.id, { match_id: savedMatch.id });
     }
+    invokeRebuildPlanning({ squadId: data.squad_id, seasonId: data.season_id, mode: "execute" }).catch(() => {});
     setShowForm(false);
     setEditing(null);
     loadAll();
@@ -591,8 +593,10 @@ export default function Matches() {
     const linkedMinutes = await base44.entities.MinutesRecord.filter({ match_id: id }, "-created_date", 500);
     if (linkedMinutes.length === 0) {
       if (!confirm("¿Eliminar este partido?")) return;
+      const deletedMatch = matches.find(m => m.id === id);
       await base44.entities.MatchReport.delete(id);
       toast({ title: "Partido eliminado" });
+      invokeRebuildPlanning({ squadId: deletedMatch?.squad_id, seasonId: deletedMatch?.season_id, mode: "execute" }).catch(() => {});
       loadAll();
       return;
     }
@@ -613,6 +617,8 @@ export default function Matches() {
       await base44.entities.MatchReport.update(target.id, { status: "archivado" });
       toast({ title: "Partido archivado, minutos conservados como histórico" });
     }
+    const targetMatch = matches.find(m => m.id === target.id);
+    invokeRebuildPlanning({ squadId: targetMatch?.squad_id, seasonId: targetMatch?.season_id, mode: "execute" }).catch(() => {});
     loadAll();
   }
 

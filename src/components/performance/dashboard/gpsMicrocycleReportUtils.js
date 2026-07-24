@@ -295,8 +295,8 @@ function findPlanDay(session, weeklyPlans = []) {
 export function sessionMeta(session, weeklyPlans = []) {
   const { day, meta } = findPlanDay(session, weeklyPlans);
   return {
-    md: day.md || session.match_day_code || session.microcycle_day || "—",
-    objective: day.physical_objective || day.objetivo_fisico || day.objetivo || session.session_objective || "—",
+    md: session.match_day_code || session.microcycle_day || day.md || day.md_code || "—",
+    objective: session.session_objective || day.physical_objective || day.objetivo_fisico || day.objetivo || "—",
     rival: session.rival || day.rival || meta.rival || meta.proximo_rival || meta.proximo_partido || "",
     season_id: session.season_id || "",
     squad_id: session.squad_id || "",

@@ -16,16 +16,7 @@
     },
     "microcycle_day": {
       "type": "string",
-      "enum": [
-        "MD-4",
-        "MD-3",
-        "MD-2",
-        "MD-1",
-        "MD",
-        "MD+1",
-        "MD+2"
-      ],
-      "description": "D\u00eda del microciclo"
+      "description": "D\u00eda del microciclo (MD calculado desde el partido objetivo)"
     },
     "sessions_used": {
       "type": "number",

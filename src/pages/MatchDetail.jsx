@@ -15,6 +15,7 @@ import GpsTab from "@/components/matches/tabs/GpsTab";
 import PlanVideoTab from "@/components/matches/tabs/PlanVideoTab";
 import LogisticaTab from "@/components/matches/tabs/LogisticaTab";
 import { eventPayloadFromMatch } from "@/lib/matchCalendarSync";
+import { invokeRebuildPlanning } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -130,6 +131,7 @@ function MatchEditModal({ open, match, competitions, squads, activeSeasonId, onC
         payload.calendar_event_id = createdEvent.id;
       }
       onSaved?.(payload);
+      invokeRebuildPlanning({ squadId: match.squad_id, seasonId: match.season_id, mode: "execute" }).catch(() => {});
       toast({ title: "Partido actualizado" });
       onClose?.();
     } catch {

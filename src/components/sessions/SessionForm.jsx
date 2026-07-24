@@ -27,7 +27,7 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
   const [form, setForm] = useState({
     title: "", session_number: nextSessionNumber || "", date: moment().format("YYYY-MM-DD"),
     squad_id: activeSquadId || "", period: "Competencia", match_day_code: "MD-1",
-    duration_minutes: 60, location: "", session_objective: "Volumen",
+    duration_minutes: 60, location: "", session_objective: "Volumen", md_override_reason: "",
   });
   const [squadPlayers, setSquadPlayers] = useState([]); // {player, ds}
   const [selectedIds, setSelectedIds] = useState(new Set());
@@ -75,7 +75,6 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
           ...prev,
           match_day_code: manualMeta.md ? prev.match_day_code : (defaults.match_day_code || prev.match_day_code),
           microcycle_day: manualMeta.md ? prev.microcycle_day : (defaults.microcycle_day || defaults.match_day_code || prev.microcycle_day),
-          session_objective: manualMeta.objective ? prev.session_objective : (defaults.session_objective || prev.session_objective),
         }));
       }
     }
@@ -187,7 +186,10 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
       session_number: sessionNumber,
       microcycle_day: form.match_day_code,
       md_manual_override: manualMeta.md,
-      physical_objective_manual_override: manualMeta.objective,
+      md_source: manualMeta.md ? "manual_override" : (planDefaults?.md_source || "calculated"),
+      md_override_reason: manualMeta.md ? (form.md_override_reason || "") : "",
+      md_reference_match_id: planDefaults?.target_match_id || "",
+      md_calculated_at: new Date().toISOString(),
       squad_name: squad?.name || "",
       season_id: activeSeasonId || squad?.season || "",
       players_available: available.length,
@@ -259,9 +261,8 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
     setManualMeta(prev => ({ ...prev, md: true }));
     setForm(f => ({ ...f, match_day_code: value, microcycle_day: value }));
   }
-  function setManualObjective(value) {
-    setManualMeta(prev => ({ ...prev, objective: true }));
-    setF("session_objective", value);
+  function setMdOverrideReason(value) {
+    setForm(f => ({ ...f, md_override_reason: value }));
   }
 
   return (
@@ -297,12 +298,24 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
             </select>
           </div>
           <div>
-            <label className="text-xs text-zinc-400 mb-1 block">MD</label>
-            <select value={form.match_day_code} disabled={planDefaults?.match_day_code && !manualMeta.md} onChange={e => setManualMd(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 disabled:opacity-60">
-              {MD_CODES.map(m => <option key={m}>{m}</option>)}
-            </select>
-            <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[10px] text-zinc-500">{planDefaults?.match_day_code && !manualMeta.md ? "Sincronizado con Plan semanal" : "Excepción manual"}</p>{planDefaults?.match_day_code && !manualMeta.md && <button type="button" onClick={() => setManualMeta(prev => ({ ...prev, md: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>}</div>
+            <label className="text-xs text-zinc-400 mb-1 block">MD {manualMeta.md ? "(excepción manual)" : "(calculado)"}</label>
+            {manualMeta.md ? (
+              <>
+                <select value={form.match_day_code} onChange={e => setManualMd(e.target.value)}
+                  className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
+                  {MD_CODES.map(m => <option key={m}>{m}</option>)}
+                </select>
+                <input value={form.md_override_reason || ""} onChange={e => setMdOverrideReason(e.target.value)} placeholder="Motivo de la excepción (obligatorio)"
+                  className="mt-2 w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500" />
+                <button type="button" onClick={() => { setManualMeta(prev => ({ ...prev, md: false })); setForm(f => ({ ...f, match_day_code: planDefaults?.match_day_code || f.match_day_code, md_override_reason: "" })); }} className="mt-1 text-[10px] font-semibold text-zinc-400 hover:text-zinc-200">Volver al MD calculado</button>
+              </>
+            ) : (
+              <div className="w-full bg-zinc-800/50 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white flex items-center justify-between">
+                <span>{planDefaults?.match_day_code || form.match_day_code || "Sin partido de referencia"}</span>
+                <button type="button" onClick={() => setManualMeta(prev => ({ ...prev, md: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>
+              </div>
+            )}
+            <p className="mt-1 text-[10px] text-zinc-500">{planDefaults?.target_match_id ? "Calculado desde el partido objetivo" : "Sin partido de referencia en el microciclo"}</p>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Duración (min)</label>
@@ -311,11 +324,11 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Objetivo físico</label>
-            <select value={form.session_objective || ""} disabled={planDefaults?.session_objective && !manualMeta.objective} onChange={e => setManualObjective(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500 disabled:opacity-60">
+            <select value={form.session_objective || ""} onChange={e => setF("session_objective", e.target.value)}
+              className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-zinc-500">
               {objectiveOptions.map(i => <option key={i}>{i}</option>)}
             </select>
-            <div className="mt-1 flex items-center justify-between gap-2"><p className="text-[10px] text-zinc-500">{planDefaults?.session_objective && !manualMeta.objective ? "Sincronizado con Plan semanal" : "Excepción manual"}</p>{planDefaults?.session_objective && !manualMeta.objective && <button type="button" onClick={() => setManualMeta(prev => ({ ...prev, objective: true }))} className="text-[10px] font-semibold text-amber-300 hover:text-amber-200">Editar como excepción</button>}</div>
+            <p className="mt-1 text-[10px] text-zinc-500">Definido en la sesión (fuente oficial)</p>
           </div>
           <div>
             <label className="text-xs text-zinc-400 mb-1 block">Lugar</label>

@@ -24,8 +24,8 @@ function buildDaily(days, sessions, gpsBySession) {
     return { date: day.date, md: day.md || day.match_day_code || '', sessions: daySessions.map((s) => s.title), players: new Set(rows.map((r) => r.player_id)).size, metrics: buildMetricSet(rows) };
   });
 }
-function buildSnapshot({ plan, squad, sessions, matches, rows, teamProfile, previousSummary }) {
-  const days = Array.isArray(plan.days_data) && plan.days_data.length ? plan.days_data : Array.from({ length: 7 }, (_, i) => ({ date: addDays(plan.week_start, i), md: '' }));
+function buildSnapshot({ plan, planDays, squad, sessions, matches, rows, teamProfile, previousSummary }) {
+  const days = (planDays && planDays.length) ? planDays : (Array.isArray(plan.days_data) && plan.days_data.length ? plan.days_data : Array.from({ length: 7 }, (_, i) => ({ date: addDays(plan.period_start || plan.week_start, i), md: '' })));
   const gpsBySession = {};
   rows.forEach((r) => { (gpsBySession[r.session_id] ||= []).push(r); });
   const variables = buildMetricSet(rows.filter((r) => r.include_in_session_average !== false && (!r.gps_group || r.gps_group === 'principal')));
@@ -53,17 +53,21 @@ Deno.serve(async (req) => {
     const sessions = await base44.asServiceRole.entities.TrainingSession.list('-date', 5000);
     const matches = await base44.asServiceRole.entities.MatchReport.list('-date', 1000).catch(() => []);
     const gpsRows = await base44.asServiceRole.entities.SessionGPSData.list('-created_date', 10000);
+    const weeklyPlanDays = await base44.asServiceRole.entities.WeeklyPlanDay.list('date', 10000).catch(() => []);
     const teamProfiles = await base44.asServiceRole.entities.TeamGPSProfile.list('-updated_at', 1000).catch(() => []);
 
     const squadMap = Object.fromEntries(squads.map((s) => [s.id, s]));
-    const plans = weeklyPlans.filter((p) => p.week_start && addDays(p.week_start, 6) < today)
+    const plans = weeklyPlans.filter((p) => {
+      const end = p.period_end || (p.week_start ? addDays(p.week_start, 6) : '');
+      return end && end < today;
+    })
       .filter((p) => !body.squad_id || p.squad_id === body.squad_id)
       .filter((p) => !body.weekly_plan_id || p.id === body.weekly_plan_id);
     const created = [], updated = [], skipped = [];
 
     for (const plan of plans) {
-      const start = plan.week_start;
-      const end = addDays(start, 6);
+      const start = plan.period_start || plan.week_start;
+      const end = plan.period_end || (start ? addDays(start, 6) : '');
       const existing = summaries.find((s) => s.source_weekly_plan_id === plan.id || (s.squad_id === plan.squad_id && s.fecha_inicio === start));
       if (existing && existing.snapshot_locked !== false && !force) { skipped.push(existing.id); continue; }
       const squad = squadMap[plan.squad_id] || {};
@@ -74,7 +78,8 @@ Deno.serve(async (req) => {
       const mainMatch = weekMatches[0] || {};
       const teamProfile = teamProfiles.find((p) => p.squad_id === plan.squad_id && (!squad.season || p.season_id === squad.season) && p.player_type === 'campo');
       const previousSummary = summaries.filter((s) => s.squad_id === plan.squad_id && s.fecha_inicio < start).sort((a, b) => (b.fecha_inicio || '').localeCompare(a.fecha_inicio || ''))[0];
-      const snapshot = buildSnapshot({ plan, squad, sessions: weekSessions, matches: weekMatches, rows: weekRows, teamProfile, previousSummary });
+      const planDays = weeklyPlanDays.filter((d) => d.weekly_plan_id === plan.id && d.active !== false).sort((a, b) => (a.order || 0) - (b.order || 0));
+      const snapshot = buildSnapshot({ plan, planDays, squad, sessions: weekSessions, matches: weekMatches, rows: weekRows, teamProfile, previousSummary });
       const data = {
         squad_id: plan.squad_id, squad_name: plan.squad_name || squad.name || '', season_id: squad.season || plan.season_id || '',
         microcycle_name: plan.microcycle_name || `Microciclo ${start}`, nombre_microciclo: plan.microcycle_name || `Microciclo ${start}`, fecha_inicio: start, fecha_fin: end,

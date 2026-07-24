@@ -1,6 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 
-const MICRO_DAYS = ['MD-4', 'MD-3', 'MD-2', 'MD-1', 'MD', 'MD+1', 'MD+2'];
 const EXCLUDED_GROUPS = new Set(['diferenciado', 'kinesiologia', 'reintegro', 'individual']);
 const EXCLUDED_REASONS = new Set(['diferenciado', 'kinesiologia', 'reintegro', 'carga_parcial', 'lesion', 'error_gps']);
 const BAD_ATTENDANCE = new Set(['ausente', 'diferenciado', 'kinesiologia', 'no_entrena']);
@@ -103,12 +102,19 @@ Deno.serve(async (req) => {
         competitionProfilesUpdated++;
       }
 
-      for (const day of MICRO_DAYS) {
-        const rows = sessionGpsRows.filter((r) => {
+      const playerSessionRows = sessionGpsRows.filter((r) => r.player_id === playerId);
+      const daysSet = new Set();
+      playerSessionRows.forEach((r) => {
+        const session = sessionMap[r.session_id];
+        const microDay = session?.microcycle_day || session?.match_day_code;
+        if (microDay) daysSet.add(microDay);
+      });
+      for (const day of daysSet) {
+        const rows = playerSessionRows.filter((r) => {
           const session = sessionMap[r.session_id];
           const microDay = session?.microcycle_day || session?.match_day_code;
           const sessionPlayer = sessionPlayerMap[`${r.session_id}:${playerId}`];
-          return r.player_id === playerId && session && microDay === day && isNormalGpsRow(r, sessionPlayer);
+          return session && microDay === day && isNormalGpsRow(r, sessionPlayer);
         });
         if (!rows.length) continue;
         await upsert(base44, 'PlayerMicrocycleGPSProfile', { player_id: playerId, squad_id: squadId, season_id: seasonId, microcycle_day: day }, {

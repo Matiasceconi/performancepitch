@@ -9,6 +9,7 @@ import ScheduleExportModal from "@/components/schedule/ScheduleExportModal";
 import { getLogoForRival } from "@/lib/match-utils";
 import RivalClubPicker from "@/components/clubs/RivalClubPicker";
 import { isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
+import { invokeRebuildPlanning } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -464,6 +465,7 @@ export default function Schedule() {
         }
         await base44.entities.DayEvent.update(savedEvent.id, { match_id: linkedMatch.id });
       }
+      invokeRebuildPlanning({ squadId: activeSquadId, seasonId: activeSeasonId, mode: "execute" }).catch(() => {});
     }
     await loadEvents();
   }

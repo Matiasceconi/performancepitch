@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { base44 } from "@/api/base44Client";
 import { Area, AreaChart, Bar, BarChart, CartesianGrid, Line, LineChart, PolarAngleAxis, PolarGrid, Radar, RadarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { BarChart3, ChevronLeft, ChevronRight, Download, Printer, Save, Settings, Sparkles } from "lucide-react";
+import { BarChart3, ChevronLeft, ChevronRight, Download, Printer, RefreshCcw, Save, Settings, Sparkles } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
 import { useToast } from "@/components/ui/use-toast";
@@ -13,7 +13,7 @@ import MicrocycleAreaLegend from "@/components/planning/MicrocycleAreaLegend";
 import MicrocycleDayColumn from "@/components/planning/MicrocycleDayColumn";
 import PlannerSettingsModal from "@/components/planning/PlannerSettingsModal";
 import { MD_OPTIONS, WORK_BLOCKS, dayNameEs, getBlockAutoContent, inferSessionForBlock, isFreeDay, objectiveStyle } from "@/components/planning/microcyclePlanUtils";
-import { buildPlanKey, daysForPlan, normalizePlanDays, operationalPlans, planDateRange, syncSessionsWithWeeklyPlan } from "@/components/planning/microcycleSync";
+import { buildPlanKey, daysForPlan, normalizePlanDays, operationalPlans, planDateRange, invokeRebuildPlanning } from "@/components/planning/microcycleSync";
 
 moment.locale("es");
 
@@ -425,28 +425,8 @@ export default function WeeklyPlannerBoard() {
     next[to].blocks.splice(result.destination.index, 0, moved);
     setDays(next);
   }
-  function syncSessionFromDay(dayIdx, sessionId) {
-    const session = sessionsById[sessionId];
-    const day = days[dayIdx];
-    if (session && day) {
-      const patch = recordId ? { weekly_plan_id: recordId, weekly_plan_day_id: day.weekly_plan_day_id || day.id || day.day_id, plan_sync_updated_at: new Date().toISOString() } : {};
-      if (!session.md_manual_override && day.md && session.match_day_code !== day.md) {
-        patch.match_day_code = day.md;
-        patch.microcycle_day = day.md;
-      }
-      if (!session.physical_objective_manual_override && day.physical_objective && session.session_objective !== day.physical_objective) {
-        patch.session_objective = day.physical_objective;
-      }
-      if (Object.keys(patch).length) {
-        base44.entities.TrainingSession.update(session.id, patch).then((updated) => {
-          setSessionLibrary(prev => prev.map(item => item.id === updated.id ? updated : item));
-        });
-      }
-    }
-  }
   function selectSession(dayIdx, blockId, sessionId) {
     const session = sessionsById[sessionId];
-    syncSessionFromDay(dayIdx, sessionId);
     updateBlock(dayIdx, blockId, { session_id: sessionId, session_snapshot: session ? { title: session.title, duration_minutes: session.duration_minutes, objective: session.objective, session_type: session.session_type } : null });
   }
   function addDay() { setDays(prev => [...prev, emptyDay(moment(prev[prev.length - 1]?.date || startDate).add(1, "days").format("YYYY-MM-DD"), prev.length)]); }
@@ -499,9 +479,26 @@ export default function WeeklyPlannerBoard() {
     setStartDate(savedPlan.week_start || weekStart);
     const refreshedDays = await base44.entities.WeeklyPlanDay.filter({ weekly_plan_id: savedPlan.id }, "order", 50).catch(() => []);
     setWeeklyPlanDays((current) => [...current.filter((day) => day.weekly_plan_id !== savedPlan.id), ...refreshedDays]);
-    const syncedCount = await syncSessionsWithWeeklyPlan(savedPlan, refreshedDays);
     setSaving(false);
-    toast({ title: syncedCount ? `Microciclo guardado · ${syncedCount} sesiones sincronizadas` : "Microciclo guardado correctamente" });
+    toast({ title: "Microciclo guardado correctamente" });
+  }
+  async function regenerate() {
+    setSaving(true);
+    try {
+      const result = await invokeRebuildPlanning({ squadId: activeSquadId, seasonId: activeSeasonId, mode: "execute" });
+      const [all, dayRows] = await Promise.all([
+        base44.entities.WeeklyPlan.list("-week_start", 100),
+        base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
+      ]);
+      const scoped = activeSquadId ? all.filter(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId)) : all;
+      setWeeklyPlanDays(dayRows);
+      setSavedPlans(operationalPlans(scoped).map((plan) => ({ ...plan, operational_days: daysForPlan(plan, dayRows) })));
+      toast({ title: `Microciclos regenerados · ${result?.plans_created || 0} nuevos · ${result?.sessions_linked || 0} sesiones vinculadas` });
+    } catch {
+      toast({ title: "Error al regenerar microciclos", variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   }
   async function handleAiFile(file) {
     if (!file) return;
@@ -543,6 +540,7 @@ export default function WeeklyPlannerBoard() {
         <button onClick={() => setSettingsOpen(true)} className="px-3 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-black flex items-center gap-2 shadow-sm"><Settings size={14} /> Configuración</button>
         <button onClick={() => setShowLoadChart(prev => !prev)} className="px-3 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-black flex items-center gap-2 shadow-sm"><BarChart3 size={14} /> {showLoadChart ? "Ocultar carga" : "Mostrar carga"}</button>
         <button onClick={() => aiInputRef.current?.click()} className="px-3 py-2 rounded-lg text-white text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.green }}><Sparkles size={14} /> {aiLoading ? "Creando..." : "Crear con IA"}</button>
+        <button onClick={regenerate} disabled={saving} className="px-3 py-2 rounded-lg bg-white border border-zinc-200 text-zinc-700 text-xs font-black flex items-center gap-2 shadow-sm disabled:opacity-50"><RefreshCcw size={14} /> {saving ? "Regenerando..." : "Regenerar"}</button>
         <button onClick={save} disabled={saving} className="px-3 py-2 rounded-lg text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.yellow, color: CLUB_BRAND.colors.greenDeep }}><Save size={14} /> {saving ? "Guardando..." : "Guardar"}</button>
         <button onClick={() => setExportPromptOpen(true)} className="px-3 py-2 rounded-lg text-white text-xs font-black flex items-center gap-2 shadow-sm" style={{ backgroundColor: CLUB_BRAND.colors.greenDark }}><Download size={14} /> Exportar / Compartir</button>
       </div>
@@ -554,7 +552,7 @@ export default function WeeklyPlannerBoard() {
       <MicrocycleAreaLegend objectives={physicalObjectives} />
       <div className="min-w-0 overflow-x-auto">
         <div className="grid gap-3" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(170px, 1fr))` }}>
-          {days.map((day, dayIdx) => <MicrocycleDayColumn key={day.day_id || dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={syncSessionFromDay} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
+          {days.map((day, dayIdx) => <MicrocycleDayColumn key={day.day_id || dayIdx} day={day} dayIdx={dayIdx} sessionLibrary={sessionLibrary} sessionDetails={sessionDetails} blockSession={blockSession} sessionsById={sessionsById} updateDay={updateDay} onSelectSession={() => {}} physicalObjectives={physicalObjectives} cooldownOptions={cooldownOptions} calendarEvents={calendarEvents.filter((ev) => ev.date === day.date)} />)}
         </div>
       </div>
 
