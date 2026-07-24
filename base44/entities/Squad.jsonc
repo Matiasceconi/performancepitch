@@ -26,6 +26,30 @@
     "notes": {
       "type": "string",
       "description": "Observaciones"
+    },
+    "club_name": {
+      "type": "string",
+      "description": "Nombre del club propietario del plantel para exportaciones"
+    },
+    "club_short_name": {
+      "type": "string",
+      "description": "Abreviatura del club para encabezados compactos"
+    },
+    "club_logo_url": {
+      "type": "string",
+      "description": "URL del escudo del club para exportaciones y cronogramas"
+    },
+    "brand_primary": {
+      "type": "string",
+      "description": "Color principal del club (hex) para exportaciones"
+    },
+    "brand_secondary": {
+      "type": "string",
+      "description": "Color secundario del club (hex) para exportaciones"
+    },
+    "brand_accent": {
+      "type": "string",
+      "description": "Color de acento del club (hex) para exportaciones"
     }
   },
   "required": [

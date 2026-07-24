@@ -1,11 +1,12 @@
 import moment from "moment";
 import { base44 } from "@/api/base44Client";
+import { normalizeClubText, clubMatchesQuery, patchFromClub } from "@/lib/rivalClubs";
 
 export const EVENT_TYPES = ["Entrenamiento", "Partido", "Descanso", "Viaje", "Comida", "Video", "Gimnasio", "Cancha", "Reunión", "Otro"];
 export const TYPE_COLORS = { Partido: "red", Descanso: "cyan", Viaje: "purple", Comida: "orange", Video: "blue", Gimnasio: "purple", Cancha: "green", Entrenamiento: "green", Reunión: "yellow", Otro: "blue" };
 
 export function emptyPreviewEvent(date = moment().format("YYYY-MM-DD")) {
-  return { title: "", date, start_time: "", end_time: "", event_type: "Otro", location: "", notes: "", rival: "", home_away: "", rival_logo_url: "" };
+  return { title: "", date, start_time: "", end_time: "", event_type: "Otro", location: "", notes: "", rival: "", rival_club_id: "", home_away: "", rival_logo_url: "", is_rest_day: false, warning: "" };
 }
 
 function cleanTime(value) {
@@ -27,11 +28,11 @@ function normalizeType(value, title = "") {
   const text = `${value || ""} ${title || ""}`.toLowerCase();
   if (text.includes("partido") || text.includes("vs ")) return "Partido";
   if (text.includes("descanso") || text.includes("libre")) return "Descanso";
-  if (text.includes("viaje") || text.includes("traslado")) return "Viaje";
+  if (text.includes("viaje") || text.includes("traslado") || text.includes("llegada")) return "Viaje";
   if (text.includes("desayuno") || text.includes("almuerzo") || text.includes("cena") || text.includes("comida")) return "Comida";
   if (text.includes("video") || text.includes("auditorio")) return "Video";
-  if (text.includes("gimnasio") || text.includes("gym")) return "Gimnasio";
-  if (text.includes("cancha") || text.includes("entrenamiento")) return "Entrenamiento";
+  if (text.includes("gimnasio") || text.includes("gym") || text.includes("fuerza")) return "Gimnasio";
+  if (text.includes("cancha") || text.includes("entrenamiento")) return "Cancha";
   if (text.includes("reunión") || text.includes("reunion") || text.includes("charla")) return "Reunión";
   return EVENT_TYPES.includes(value) ? value : "Otro";
 }
@@ -93,11 +94,67 @@ function parseAiDate(ev, fallbackDate, context) {
   return fallbackDate;
 }
 
+// ── Regla fundamental de DESCANSO ──
+// Si en una fecha aparece únicamente "DESCANSO" y no hay ninguna otra actividad → día LIBRE.
+// Si aparece "DESCANSO" pero también hay otras actividades → NO es libre, se importan las actividades reales.
+// Una celda vacía no significa descanso.
+function applyRestDayRule(events) {
+  const byDate = {};
+  events.forEach((ev) => {
+    if (!ev.date) return;
+    (byDate[ev.date] ||= []).push(ev);
+  });
+  const result = [];
+  Object.entries(byDate).forEach(([date, dayEvents]) => {
+    const nonRest = dayEvents.filter((ev) => normalizeType(ev.event_type, ev.title) !== "Descanso");
+    const restOnly = dayEvents.filter((ev) => normalizeType(ev.event_type, ev.title) === "Descanso");
+    if (restOnly.length > 0 && nonRest.length === 0) {
+      // Día libre: un único evento de descanso marcado como is_rest_day
+      const rest = restOnly[0];
+      result.push({
+        ...rest,
+        title: "Descanso",
+        event_type: "Descanso",
+        is_rest_day: true,
+        start_time: "",
+        end_time: "",
+        location: "",
+        warning: "",
+      });
+    } else {
+      // Hay actividades reales: importar todas (ignorar descanso si hay otras actividades)
+      nonRest.forEach((ev) => result.push({ ...ev, is_rest_day: false }));
+    }
+  });
+  return result;
+}
+
+// ── Detección de rivales ──
+// Busca el rival en la base de RivalClub y vincula opponent_club_id.
+async function detectRival(rivalName, clubs = []) {
+  if (!rivalName) return null;
+  const normalized = normalizeClubText(rivalName);
+  if (!normalized) return null;
+  // Búsqueda exacta normalizada
+  let match = clubs.find((c) => normalizeClubText(c.official_name) === normalized || normalizeClubText(c.short_name) === normalized);
+  // Búsqueda por alias
+  if (!match) {
+    match = clubs.find((c) => (c.aliases || []).some((a) => normalizeClubText(a) === normalized));
+  }
+  // Búsqueda parcial (contains)
+  if (!match) {
+    match = clubs.find((c) => clubMatchesQuery(c, rivalName));
+  }
+  return match || null;
+}
+
 export function normalizeAiEvents(rawEvents = [], fallbackDate, output = {}) {
   const context = contextFromOutput(output, fallbackDate);
-  return rawEvents.map((ev) => {
+  const mapped = rawEvents.map((ev) => {
     const title = String(ev.title || ev.activity || ev.actividad || ev.name || "").trim();
     const event_type = normalizeType(ev.event_type || ev.type || ev.tipo, title);
+    const rival = String(ev.rival || ev.rival_name || "").trim();
+    const warning = ev.warning || (ev.time_missing ? "Horario no informado" : "");
     return {
       title: title || event_type,
       date: parseAiDate(ev, fallbackDate, context),
@@ -106,11 +163,15 @@ export function normalizeAiEvents(rawEvents = [], fallbackDate, output = {}) {
       event_type,
       location: ev.location || ev.lugar || "",
       notes: ev.notes || ev.observaciones || "",
-      rival: ev.rival || "",
+      rival,
+      rival_club_id: "",
       home_away: normalizeHomeAway(ev.home_away || ev.condicion),
       rival_logo_url: ev.rival_logo_url || "",
+      is_rest_day: false,
+      warning,
     };
   }).filter((ev) => ev.title && ev.date);
+  return applyRestDayRule(mapped);
 }
 
 export async function analyzeScheduleFile({ file, activeSquad }) {
@@ -136,36 +197,99 @@ export async function analyzeScheduleFile({ file, activeSquad }) {
             location: { type: "string" },
             notes: { type: "string" },
             rival: { type: "string" },
-            home_away: { type: "string" }
+            home_away: { type: "string" },
+            time_missing: { type: "boolean" },
+            warning: { type: "string" },
           }
         }
       }
     }
   };
+  const prompt = `Extraé el cronograma deportivo del archivo y devolvé SOLO eventos reales visibles en la tabla.
+
+REGLAS CRÍTICAS DE FECHAS:
+- NO uses la fecha actual ni la fecha de carga del archivo.
+- Cada evento debe heredar la fecha del encabezado de su columna (por ejemplo: "LUNES 6", "MARTES 7", "MIERCOLES 8", "JUEVES 23", "VIERNES 24").
+- Si el encabezado trae solo número de día, usá el mes del título/rango del cronograma.
+- Si el cronograma abarca dos meses (ej: julio-agosto), asigná el mes correcto a cada día.
+- Si no aparece año, usá ${moment().year()}.
+- En el campo day copiá el encabezado exacto de la columna.
+- En el campo date usá formato YYYY-MM-DD.
+- No crees eventos para celdas vacías. Una celda vacía NO significa descanso.
+
+REGLA FUNDAMENTAL DE DESCANSO:
+- Si en una fecha aparece únicamente "DESCANSO" y no hay ninguna otra actividad, ese día es LIBRE: creá un único evento con title="Descanso", event_type="Descanso".
+- Si aparece "DESCANSO" pero también hay otras actividades en esa misma fecha, NO marques el día como libre. Importá las actividades reales y NO crees un evento de descanso.
+- Ejemplo: si el viernes 24 tiene "Descanso" por la mañana pero también "Llegada 15:00", "Gimnasio 15:30", "Cancha 16:30", el día NO es libre: importá esas 3 actividades.
+
+TIPOS DE ACTIVIDADES A RECONOCER:
+- Desayuno, Almuerzo, Cena (Comida)
+- Video, Charla (Video)
+- Gimnasio, Fuerza (Gimnasio)
+- Cancha, Entrenamiento (Cancha)
+- Viaje, Llegada, Traslado (Viaje)
+- Partido (Partido)
+- Descanso (Descanso)
+- Reunión (Reunión)
+- Otras actividades escritas en el cronograma (Otro)
+
+DETECCIÓN DE PARTIDOS Y RIVALES:
+- Cuando veas textos como "FECHA 3 VS NEW", "PARTIDO VS NEWELL'S", "VS COLON", reconocé que es un partido.
+- En el campo rival poné el nombre del rival (ej: "Newell's Old Boys", "Colón", "Estudiantes de Río Cuarto").
+- En el campo event_type poné "Partido".
+- Si aparece número de fecha o competencia, ponelo en notes.
+
+NO INVENTAR DATOS:
+- Si el documento no indica horario, dejá start_time vacío y poné time_missing=true.
+- Si el documento no indica lugar, dejá location vacío.
+- No inventes horarios ni lugares.
+
+Plantel activo esperado: ${activeSquad?.name || ""}.`;
+
   const output = await base44.integrations.Core.InvokeLLM({
     file_urls: [upload.file_url],
     response_json_schema: schema,
-    prompt: `Extraé el cronograma deportivo del archivo y devolvé SOLO eventos reales visibles en la tabla.\n\nReglas críticas de fechas:\n- NO uses la fecha actual ni la fecha de carga del archivo.\n- Cada evento debe heredar la fecha del encabezado de su columna (por ejemplo: "LUNES 6", "MARTES 7", "MIERCOLES 8", "MARTES 14").\n- Si el encabezado trae solo número de día, usá el mes del título/rango del cronograma.\n- Si no aparece año, usá ${moment().year()}.\n- En el campo day copiá el encabezado exacto de la columna.\n- En el campo date usá formato YYYY-MM-DD.\n- No crees eventos para celdas vacías.\n- Separá desayuno, video, gimnasio, cancha, almuerzo, viajes, partidos y descansos como eventos independientes.\n\nPlantel activo esperado: ${activeSquad?.name || ""}.`,
+    prompt,
+    model: "gemini_3_flash",
   });
   const fallbackDate = moment(output.week_start, ["YYYY-MM-DD", "DD/MM/YYYY"], true).isValid() ? moment(output.week_start).format("YYYY-MM-DD") : moment().format("YYYY-MM-DD");
-  return { source_file: upload.file_url, source_file_name: file.name, squad_name: output.squad_name || activeSquad?.name || "", events: normalizeAiEvents(output.events || [], fallbackDate, output) };
+  const events = normalizeAiEvents(output.events || [], fallbackDate, output);
+
+  // Detección de rivales: buscar en RivalClub
+  const clubs = await base44.entities.RivalClub.list("official_name", 500).catch(() => []);
+  const rivalEvents = events.filter((ev) => ev.event_type === "Partido" && ev.rival);
+  await Promise.all(rivalEvents.map(async (ev) => {
+    const club = await detectRival(ev.rival, clubs);
+    if (club) {
+      ev.rival_club_id = club.id;
+      ev.rival = club.official_name || ev.rival;
+      ev.rival_logo_url = club.shield_url || "";
+    } else {
+      ev.warning = `Rival no encontrado en base de clubes: "${ev.rival}". Confirmar manualmente.`;
+    }
+  }));
+
+  return { source_file: upload.file_url, source_file_name: file.name, squad_name: output.squad_name || activeSquad?.name || "", events };
 }
 
-function importKey({ squad_id, date, time, type }) { return [squad_id || "", date || "", time || "", type || ""].join("|"); }
+function importKey({ squad_id, date, time, type, title }) { return [squad_id || "", date || "", time || "", type || "", normalizeText(title || "")].join("|"); }
 
 export async function upsertImportedEvents({ previewEvents, activeSquad, activeSquadId, activeSeasonId, sourceFile, sourceFileName }) {
   const existingRaw = await base44.entities.DayEvent.filter({ squad_id: activeSquadId }, "date", 500);
   const existing = existingRaw.filter((ev) => !ev.season_id || !activeSeasonId || ev.season_id === activeSeasonId);
-  const byKey = Object.fromEntries(existing.map((ev) => [importKey({ squad_id: ev.squad_id, date: ev.date, time: ev.time || ev.start_time || "", type: ev.type || ev.event_type || "" }), ev]));
+  const byKey = Object.fromEntries(existing.map((ev) => [importKey({ squad_id: ev.squad_id, date: ev.date, time: ev.time || ev.start_time || "", type: ev.type || ev.event_type || "", title: ev.title }), ev]));
   const saved = [];
+  const duplicates = [];
   for (const ev of previewEvents) {
     const type = ev.event_type || ev.type || "Otro";
     const time = ev.start_time || ev.time || "";
     const payload = { ...ev, home_away: normalizeHomeAway(ev.home_away), squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", time, start_time: time, type, event_type: type, duration_minutes: durationMinutes(time, ev.end_time), color: TYPE_COLORS[type] || "blue", source_file: sourceFile, source_file_name: sourceFileName, created_by_ai: true };
-    payload.import_key = importKey({ squad_id: activeSquadId, date: payload.date, time, type });
-    const current = byKey[payload.import_key];
+    payload.import_key = importKey({ squad_id: activeSquadId, date: payload.date, time, type, title: payload.title });
     if (!payload.duration_minutes) delete payload.duration_minutes;
+    if (!payload.rival_club_id) delete payload.rival_club_id;
+    const current = byKey[payload.import_key];
     if (current) {
+      duplicates.push({ ...payload, id: current.id });
       await base44.entities.DayEvent.update(current.id, payload);
       saved.push({ ...payload, id: current.id });
     } else {
@@ -174,7 +298,7 @@ export async function upsertImportedEvents({ previewEvents, activeSquad, activeS
     }
   }
   await syncWeeklyPlanFromEvents({ events: saved, activeSquad, activeSquadId, activeSeasonId });
-  return saved;
+  return { saved, duplicates };
 }
 
 function plannerEmptyDay(date) { return { date, md: "— MD —", objetivo: "—", sesionGimnasio: "", trabajoCompensatorio: "—", vueltaCalma: [], observaciones: "", tareasTecnico: [""], calendar_events: [] }; }
@@ -183,9 +307,8 @@ function goalFromEvents(events) { if (events.some(e => e.event_type === "Partido
 async function syncWeeklyPlanFromEvents({ events, activeSquad, activeSquadId, activeSeasonId }) {
   if (!events.length) return;
   const weekStart = moment.min(events.map(e => moment(e.date))).startOf("isoWeek").format("YYYY-MM-DD");
-  const weekEnd = moment(weekStart).add(6, "days").format("YYYY-MM-DD");
   const weekEventsRaw = await base44.entities.DayEvent.filter({ squad_id: activeSquadId }, "date", 500);
-  const weekEvents = weekEventsRaw.filter(e => e.date >= weekStart && e.date <= weekEnd && (!e.season_id || !activeSeasonId || e.season_id === activeSeasonId));
+  const weekEvents = weekEventsRaw.filter(e => e.date >= weekStart && e.date <= moment(weekStart).add(6, "days").format("YYYY-MM-DD") && (!e.season_id || !activeSeasonId || e.season_id === activeSeasonId));
   const records = await base44.entities.WeeklyPlan.filter({ week_start: weekStart });
   const current = records.find(r => r.squad_id === activeSquadId && (!r.season_id || !activeSeasonId || r.season_id === activeSeasonId));
   const days = Array.from({ length: 7 }, (_, i) => {

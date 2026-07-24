@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useRef } from "react";
 import { base44 } from "@/api/base44Client";
-import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, FileText, Copy, ArrowUp, ArrowDown, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, X, Clock, MapPin, Pencil, Trash2, Download, Settings2, Copy, ArrowUp, ArrowDown, Sparkles, MoreVertical } from "lucide-react";
 import moment from "moment";
 import "moment/locale/es";
-import { jsPDF } from "jspdf";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import AiScheduleImportModal from "@/components/schedule/AiScheduleImportModal";
-import { buildProfessionalWeekSchedulePDF } from "@/components/schedule/professionalSchedulePdf";
-import { buildDailySchedulePDF } from "@/components/schedule/dailySchedulePdf";
-import ScheduleExportView from "@/components/schedule/ScheduleExportView";
-import { daysForPlan, findPlanDay, operationalPlans } from "@/components/planning/microcycleSync";
+import ScheduleExportModal from "@/components/schedule/ScheduleExportModal";
 import { getLogoForRival } from "@/lib/match-utils";
 import RivalClubPicker from "@/components/clubs/RivalClubPicker";
 import { isMatchEvent, matchPayloadFromEvent } from "@/lib/matchCalendarSync";
@@ -71,151 +67,6 @@ function getCustomWeekStart(refDate, startDay) {
 }
 
 const EMPTY_TEMPLATE = { title: "", time: "", duration_minutes: "", color: "blue", type: "" };
-
-// ── PDF helpers ──
-function buildWeekPDF(days, eventsForDate, weekLabel) {
-  const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
-  const pw = doc.internal.pageSize.getWidth();
-  const ph = doc.internal.pageSize.getHeight();
-  const typeColor = (ev) => {
-    const t = ev.event_type || ev.type || "";
-    if (t === "Partido") return "#dc2626";
-    if (t === "Descanso") return "#0891b2";
-    if (t === "Viaje") return "#7c3aed";
-    return COLOR_MAP[ev.color]?.hex || "#16a34a";
-  };
-  const hexToRgb = (hex) => [parseInt(hex.slice(1,3),16), parseInt(hex.slice(3,5),16), parseInt(hex.slice(5,7),16)];
-
-  doc.setFillColor(255, 255, 255);
-  doc.rect(0, 0, pw, ph, "F");
-  doc.setFillColor(0, 90, 52);
-  doc.rect(0, 0, pw, 18, "F");
-  doc.setFillColor(240, 200, 0);
-  doc.rect(0, 18, pw, 2, "F");
-  doc.setFillColor(255, 255, 255);
-  doc.circle(14, 10, 6, "F");
-  doc.setTextColor(0, 90, 52);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(7);
-  doc.text("DYJ", 14, 12, { align: "center" });
-  doc.setTextColor(255, 255, 255);
-  doc.setFontSize(13);
-  doc.text("CALENDARIO SEMANAL", 24, 9);
-  doc.setFontSize(8);
-  doc.setFont("helvetica", "normal");
-  doc.text(weekLabel, 24, 14);
-
-  const legend = [["Partido", "#dc2626"], ["Descanso", "#0891b2"], ["Viaje", "#7c3aed"], ["Actividad", "#16a34a"]];
-  legend.forEach(([label, color], i) => {
-    const [r, g, b] = hexToRgb(color);
-    const x = pw - 72 + i * 18;
-    doc.setFillColor(r, g, b);
-    doc.roundedRect(x, 7, 4, 4, 1, 1, "F");
-    doc.setTextColor(255, 255, 255);
-    doc.setFontSize(6);
-    doc.text(label, x + 5, 10.5);
-  });
-
-  const colW = (pw - 16) / days.length;
-  const startY = 26;
-  const headerH = 13;
-  days.forEach((d, i) => {
-    const x = 8 + i * colW;
-    doc.setFillColor(245, 245, 245);
-    doc.roundedRect(x, startY, colW - 1, headerH, 1.5, 1.5, "F");
-    doc.setTextColor(30, 30, 30);
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text(d.format("dddd").toUpperCase(), x + colW / 2 - 0.5, startY + 5, { align: "center" });
-    doc.setTextColor(90, 90, 90);
-    doc.setFontSize(7);
-    doc.text(d.format("DD/MM/YYYY"), x + colW / 2 - 0.5, startY + 10, { align: "center" });
-  });
-
-  const evY = startY + headerH + 3;
-  const rowH = 13;
-  const maxRows = Math.floor((ph - evY - 12) / rowH);
-  days.forEach((d, i) => {
-    const x = 8 + i * colW;
-    const evs = eventsForDate(d.format("YYYY-MM-DD")).slice(0, maxRows);
-    evs.forEach((ev, j) => {
-      const y = evY + j * rowH;
-      const [r, g, b] = hexToRgb(typeColor(ev));
-      doc.setFillColor(r, g, b);
-      doc.roundedRect(x, y, colW - 2, rowH - 1.5, 1.5, 1.5, "F");
-      doc.setTextColor(255, 255, 255);
-      doc.setFont("helvetica", "bold");
-      doc.setFontSize((ev.event_type || ev.type) === "Partido" ? 7.2 : 6.5);
-      doc.text(ev.title, x + 2, y + 4.5, { maxWidth: colW - 4 });
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(5.5);
-      const sub = [ev.time || ev.start_time, ev.location, ev.rival && `Rival: ${ev.rival}`].filter(Boolean).join(" · ");
-      if (sub) doc.text(sub, x + 2, y + 8.5, { maxWidth: colW - 4 });
-    });
-    if (evs.length === 0) {
-      doc.setTextColor(150, 150, 150);
-      doc.setFontSize(7);
-      doc.text("Sin eventos", x + colW / 2 - 0.5, evY + 6, { align: "center" });
-    }
-  });
-
-  doc.setTextColor(100, 100, 100);
-  doc.setFontSize(6);
-  doc.text("Documento generado desde PerformancePitch · Horarios sujetos a modificación", pw / 2, ph - 5, { align: "center" });
-  return doc;
-}
-
-function buildDayPDF(day, events) {
-  const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
-  const pw = doc.internal.pageSize.getWidth();
-  const ph = doc.internal.pageSize.getHeight();
-
-  doc.setFillColor(20,20,20);
-  doc.rect(0,0,pw,ph,"F");
-  doc.setFillColor(34,197,94);
-  doc.rect(0,0,pw,14,"F");
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(11);
-  doc.setFont("helvetica","bold");
-  doc.text("CRONOGRAMA DEL DÍA", pw/2, 9, { align: "center" });
-  doc.setFontSize(8);
-  doc.setFont("helvetica","normal");
-  doc.text(`${DAY_NAMES_FULL[day.day()]} ${day.date()} DE ${day.format("MMMM YYYY")}`.toUpperCase(), pw/2, 14+5, { align: "center" });
-
-  const hexToRgb = (hex) => {
-    const r = parseInt(hex.slice(1,3),16);
-    const g = parseInt(hex.slice(3,5),16);
-    const b = parseInt(hex.slice(5,7),16);
-    return [r,g,b];
-  };
-
-  let y = 26;
-  if (events.length === 0) {
-    doc.setTextColor(120,120,120);
-    doc.setFontSize(8);
-    doc.text("Sin eventos para este día.", pw/2, y+10, { align: "center" });
-  }
-  events.forEach((ev) => {
-    const [r,g,b] = hexToRgb(COLOR_MAP[ev.color]?.hex || "#3b82f6");
-    doc.setFillColor(r,g,b);
-    doc.roundedRect(8, y, pw-16, 14, 2, 2, "F");
-    doc.setTextColor(255,255,255);
-    doc.setFontSize(9);
-    doc.setFont("helvetica","bold");
-    doc.text(ev.title, 12, y+6);
-    doc.setFontSize(7);
-    doc.setFont("helvetica","normal");
-    const sub = [ev.time && `${ev.time}${ev.duration_minutes ? ` · ${ev.duration_minutes}min` : ""}`, ev.location].filter(Boolean).join("  |  ");
-    if (sub) doc.text(sub, 12, y+11);
-    y += 17;
-    if (y > ph - 12) { doc.addPage(); y = 10; }
-  });
-
-  doc.setTextColor(120,120,120);
-  doc.setFontSize(5.5);
-  doc.text("HORARIOS SUJETOS A MODIFICACIONES", pw/2, ph-4, { align: "center" });
-  return doc;
-}
 
 // ── TemplateManagerModal ──
 function TemplateManagerModal({ open, onClose }) {
@@ -330,54 +181,50 @@ function WeekSettingsModal({ open, onClose, startDay, onChangeStartDay }) {
 // ── EventCard ──
 function EventCard({ event, onEdit, onDelete, onCopy, onMoveUp, onMoveDown }) {
   const c = COLOR_MAP[event.color] || COLOR_MAP.blue;
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
-    <div className={`rounded-lg border ${c.bg} ${c.border} overflow-hidden`}>
+    <div className={`rounded-lg border ${c.bg} ${c.border} overflow-hidden relative`}>
       <div className="flex items-start gap-2 p-2">
         {event.rival_logo_url
-          ? <img src={event.rival_logo_url} alt="Escudo" className="w-6 h-6 object-contain shrink-0 mt-0.5" onError={(e) => { e.target.style.display = "none"; }} />
+          ? <img src={event.rival_logo_url} alt="Escudo" className="w-5 h-5 object-contain shrink-0 mt-0.5" onError={(e) => { e.target.style.display = "none"; }} />
           : <div className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${c.dot}`} />
         }
         <div className="flex-1 min-w-0">
-          <p className={`text-xs font-bold ${c.text} leading-tight`}>{event.title}</p>
+          <p className={`text-xs font-bold ${c.text} leading-tight truncate`}>{event.title}</p>
           {event.time && (
-            <p className="text-xs text-zinc-400 mt-0.5">
+            <p className="text-[11px] text-zinc-400 mt-0.5">
               {event.time}{event.duration_minutes ? ` · ${event.duration_minutes}min` : ""}
             </p>
           )}
-          {event.location && <p className="text-xs text-zinc-500 truncate">{event.location}</p>}
+          {event.location && <p className="text-[11px] text-zinc-500 truncate">{event.location}</p>}
         </div>
-        {/* Move up/down arrows */}
-        <div className="flex flex-col gap-0.5 shrink-0">
-          <button onClick={(e) => { e.stopPropagation(); onMoveUp(event); }} title="Mover antes" className="p-0.5 rounded hover:bg-white/20 text-zinc-500 hover:text-white transition-colors">
-            <ArrowUp size={11} />
-          </button>
-          <button onClick={(e) => { e.stopPropagation(); onMoveDown(event); }} title="Mover después" className="p-0.5 rounded hover:bg-white/20 text-zinc-500 hover:text-white transition-colors">
-            <ArrowDown size={11} />
-          </button>
-        </div>
-      </div>
-      <div className="flex border-t border-white/10">
-        <button
-          onClick={(e) => { e.stopPropagation(); onEdit(event); }}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <Pencil size={11} /> Editar
-        </button>
-        <div className="w-px bg-white/10" />
-        <button
-          onClick={(e) => { e.stopPropagation(); onCopy(event); }}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-zinc-300 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <Copy size={11} /> Copiar
-        </button>
-        <div className="w-px bg-white/10" />
-        <button
-          onClick={(e) => { e.stopPropagation(); onDelete(event.id); }}
-          className="flex-1 flex items-center justify-center gap-1 py-1.5 text-xs text-red-400 hover:bg-red-500/20 hover:text-red-300 transition-colors"
-        >
-          <Trash2 size={11} /> Eliminar
+        <button onClick={(e) => { e.stopPropagation(); setMenuOpen(!menuOpen); }} className="p-1 rounded hover:bg-white/20 text-zinc-500 hover:text-white transition-colors shrink-0">
+          <MoreVertical size={13} />
         </button>
       </div>
+      {menuOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setMenuOpen(false); }} />
+          <div className="absolute right-1 top-8 z-20 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl py-1 min-w-[120px]">
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onEdit(event); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors">
+              <Pencil size={11} /> Editar
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onCopy(event); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors">
+              <Copy size={11} /> Copiar
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onMoveUp(event); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors">
+              <ArrowUp size={11} /> Mover antes
+            </button>
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onMoveDown(event); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors">
+              <ArrowDown size={11} /> Mover después
+            </button>
+            <div className="border-t border-zinc-700 my-1" />
+            <button onClick={(e) => { e.stopPropagation(); setMenuOpen(false); onDelete(event.id); }} className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-red-400 hover:bg-red-500/20 transition-colors">
+              <Trash2 size={11} /> Eliminar
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -541,24 +388,17 @@ export default function Schedule() {
   const [showSettings, setShowSettings] = useState(false);
   const [copyData, setCopyData] = useState(null);
   const [showAiImport, setShowAiImport] = useState(false);
+  const [showExport, setShowExport] = useState(false);
   const [copyingEvent, setCopyingEvent] = useState(null); // event being copied
   const [copyTargetDate, setCopyTargetDate] = useState(""); // target date for paste
-  const [weeklyPlans, setWeeklyPlans] = useState([]);
-  const [weeklyPlanDays, setWeeklyPlanDays] = useState([]);
-  const [exportDays, setExportDays] = useState(null);
   const [rivalClubs, setRivalClubs] = useState([]);
 
   async function loadEvents() {
     setLoading(true);
-    const [all, allPlans, allPlanDays, clubRows] = await Promise.all([
+    const [all, clubRows] = await Promise.all([
       base44.entities.DayEvent.list("-date", 500),
-      base44.entities.WeeklyPlan.list("-week_start", 100),
-      base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
       base44.entities.RivalClub.list("official_name", 500).catch(() => []),
     ]);
-    const scopedPlans = activeSquadId ? allPlans.filter(p => p.squad_id === activeSquadId && (!p.season_id || !activeSeasonId || p.season_id === activeSeasonId)) : allPlans;
-    setWeeklyPlanDays(allPlanDays);
-    setWeeklyPlans(operationalPlans(scopedPlans).map((plan) => ({ ...plan, operational_days: daysForPlan(plan, allPlanDays) })));
     // Mostrar únicamente eventos del plantel activo
     const filtered = activeSquadId
       ? all.filter(e => e.squad_id === activeSquadId && (!e.season_id || e.season_id === activeSeasonId))
@@ -689,39 +529,6 @@ export default function Schedule() {
     return Array.from({ length: 7 }, (_, i) => currentWeekStart.clone().add(i, "day"));
   }
 
-  function getPlanMetaForDate(date) {
-    return findPlanDay(weeklyPlans, { date, squadId: activeSquadId, seasonId: activeSeasonId || activeSquad?.season, weeklyPlanDays })?.values || null;
-  }
-
-  function planLabelForDate(date, dayEvents = []) {
-    const meta = getPlanMetaForDate(date);
-    if (!meta) return "";
-    const hasMatch = dayEvents.some(isMatchEvent);
-    return [meta.match_day_code, meta.day_type === "rest" ? "Libre" : hasMatch ? "Partido" : ""].filter(Boolean).join(" · ");
-  }
-
-  async function downloadWeekPDF() {
-    const days = getWeekDays();
-    const doc = await buildProfessionalWeekSchedulePDF({
-      days,
-      eventsForDate: getEventsForDate,
-      weekLabel: `${days[0].format("DD-MM")}_${days[6].format("DD-MM-YYYY")}`,
-      squadName: activeSquad?.name || "Plantel",
-      season: activeSeasonId || activeSquad?.season || "",
-    });
-    doc.save(`cronograma_semanal_${days[0].format("YYYY-MM-DD")}.pdf`);
-  }
-
-  async function downloadDayPDF(day) {
-    const dateStr = day.format("YYYY-MM-DD");
-    const doc = await buildDailySchedulePDF({
-      day,
-      events: getEventsForDate(dateStr),
-      squadName: activeSquad?.name || "Plantel",
-    });
-    doc.save(`cronograma_diario_${dateStr}.pdf`);
-  }
-
   // ── WEEK VIEW ──
   function renderWeek() {
     const days = getWeekDays();
@@ -741,33 +548,56 @@ export default function Schedule() {
           </button>
         </div>
 
-        <div className="flex gap-3 overflow-x-auto pb-3" style={{ scrollSnapType: "x mandatory" }}>
+        {/* Desktop: 7 columnas sin scroll horizontal */}
+        <div className="hidden md:grid gap-2" style={{ gridTemplateColumns: "repeat(7, minmax(0, 1fr))" }}>
           {days.map((d) => {
             const dateStr = d.format("YYYY-MM-DD");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
-            const planLabel = planLabelForDate(dateStr, dayEvents);
-
             return (
-              <div key={dateStr} style={{ minWidth: "200px", scrollSnapAlign: "start" }} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20" : "border-zinc-800"}`}>
-                <div className={`flex items-center justify-between px-3 py-2 border-b ${isToday ? "border-white/10" : "border-zinc-800"}`}>
+              <div key={dateStr} className={`bg-zinc-900 border rounded-xl flex flex-col ${isToday ? "border-white/20 ring-1 ring-white/10" : "border-zinc-800"}`}>
+                <div className={`flex items-center justify-between px-2.5 py-2 border-b ${isToday ? "border-white/10" : "border-zinc-800"}`}>
+                  <div className="min-w-0">
+                    <p className="text-[10px] text-zinc-500 uppercase font-medium truncate">{DAY_NAMES_FULL[d.day()]}</p>
+                    <p className={`text-base font-bold leading-tight ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()}</p>
+                  </div>
+                  <button onClick={() => openNew(dateStr)} className="p-1 rounded-lg hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors shrink-0" title="Agregar evento">
+                    <Plus size={13} />
+                  </button>
+                </div>
+                <div className="flex-1 p-1.5 space-y-1.5 min-h-[200px]">
+                  {dayEvents.length === 0 && (
+                    <p className="text-[11px] text-zinc-700 text-center pt-4">Sin eventos</p>
+                  )}
+                  {dayEvents.map((ev) => (
+                    <EventCard key={ev.id} event={ev} onEdit={openEdit} onDelete={handleDelete} onCopy={handleCopy} onMoveUp={handleMoveUp} onMoveDown={handleMoveDown} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Mobile: agenda vertical por días */}
+        <div className="md:hidden space-y-3">
+          {days.map((d) => {
+            const dateStr = d.format("YYYY-MM-DD");
+            const isToday = dateStr === today;
+            const dayEvents = getEventsForDate(dateStr);
+            return (
+              <div key={dateStr} className={`bg-zinc-900 border rounded-xl ${isToday ? "border-white/20" : "border-zinc-800"}`}>
+                <div className={`flex items-center justify-between px-3 py-2.5 border-b ${isToday ? "border-white/10" : "border-zinc-800"}`}>
                   <div>
                     <p className="text-xs text-zinc-500 uppercase font-medium">{DAY_NAMES_FULL[d.day()]}</p>
-                    <p className={`text-lg font-bold ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()}</p>
-                    {planLabel && <p className="text-[10px] font-bold text-emerald-300 mt-0.5">{planLabel}</p>}
+                    <p className={`text-lg font-bold ${isToday ? "text-white" : "text-zinc-300"}`}>{d.date()} · {d.format("DD/MM")}</p>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button onClick={() => downloadDayPDF(d)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-600 hover:text-zinc-300 transition-colors" title="Descargar PDF del día">
-                      <FileText size={12} />
-                    </button>
-                    <button onClick={() => openNew(dateStr)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors" title="Agregar evento">
-                      <Plus size={14} />
-                    </button>
-                  </div>
+                  <button onClick={() => openNew(dateStr)} className="p-1.5 rounded-lg hover:bg-zinc-700 text-zinc-500 hover:text-white transition-colors" title="Agregar evento">
+                    <Plus size={15} />
+                  </button>
                 </div>
-                <div className="flex-1 p-2 space-y-1.5 min-h-[120px]">
+                <div className="p-2 space-y-2">
                   {dayEvents.length === 0 && (
-                    <p className="text-xs text-zinc-700 text-center pt-4">Sin eventos</p>
+                    <p className="text-xs text-zinc-700 text-center py-3">Sin eventos</p>
                   )}
                   {dayEvents.map((ev) => (
                     <EventCard key={ev.id} event={ev} onEdit={openEdit} onDelete={handleDelete} onCopy={handleCopy} onMoveUp={handleMoveUp} onMoveDown={handleMoveDown} />
@@ -812,16 +642,12 @@ export default function Schedule() {
             const isCurrentMonth = d.isSame(currentMonth, "month");
             const isToday = dateStr === today;
             const dayEvents = getEventsForDate(dateStr);
-            const planLabel = planLabelForDate(dateStr, dayEvents);
             return (
-              <div key={dateStr} className={`bg-zinc-900 min-h-[90px] p-1.5 ${!isCurrentMonth ? "opacity-25" : ""}`}>
+              <div key={dateStr} className={`bg-zinc-900 min-h-[100px] p-1.5 ${!isCurrentMonth ? "opacity-30" : ""} cursor-pointer hover:bg-zinc-800/50 transition-colors`} onClick={() => openNew(dateStr)}>
                 <div className="flex items-center justify-between mb-1">
-                  <div>
-                    <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-white text-zinc-900" : "text-zinc-400"}`}>{d.date()}</div>
-                    {planLabel && <p className="text-[9px] text-emerald-300 font-bold leading-none mt-0.5">{planLabel}</p>}
-                  </div>
+                  <div className={`text-xs font-semibold w-6 h-6 flex items-center justify-center rounded-full ${isToday ? "bg-white text-zinc-900" : "text-zinc-400"}`}>{d.date()}</div>
                   {isCurrentMonth && (
-                    <button onClick={() => openNew(dateStr)} className="p-0.5 rounded hover:bg-zinc-700 text-zinc-700 hover:text-zinc-400 transition-colors">
+                    <button onClick={(e) => { e.stopPropagation(); openNew(dateStr); }} className="p-0.5 rounded hover:bg-zinc-700 text-zinc-700 hover:text-zinc-400 transition-colors">
                       <Plus size={10} />
                     </button>
                   )}
@@ -830,13 +656,13 @@ export default function Schedule() {
                   {dayEvents.slice(0, 3).map((ev) => {
                     const c = COLOR_MAP[ev.color] || COLOR_MAP.blue;
                     return (
-                      <div key={ev.id} className={`flex items-center gap-1 text-xs px-1 py-0.5 rounded truncate cursor-pointer ${c.bg} ${c.text}`} onClick={() => openEdit(ev)}>
+                      <div key={ev.id} className={`flex items-center gap-1 text-[11px] px-1 py-0.5 rounded truncate cursor-pointer ${c.bg} ${c.text}`} onClick={(e) => { e.stopPropagation(); openEdit(ev); }}>
                         {ev.rival_logo_url ? <img src={ev.rival_logo_url} alt="Escudo" className="w-3 h-3 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${c.dot}`} />}
                         <span className="truncate">{ev.time && `${ev.time} `}{ev.title}</span>
                       </div>
                     );
                   })}
-                  {dayEvents.length > 3 && <p className="text-xs text-zinc-600 pl-1">+{dayEvents.length - 3} más</p>}
+                  {dayEvents.length > 3 && <p className="text-[11px] text-zinc-600 pl-1">+{dayEvents.length - 3} eventos</p>}
                 </div>
               </div>
             );
@@ -867,12 +693,12 @@ export default function Schedule() {
           {view === "week" && (
             <>
               <button onClick={() => setShowAiImport(true)} className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-500 transition-colors" title="Importar cronograma con IA">
-                <Sparkles size={15} /> Importar cronograma con IA
+                <Sparkles size={15} /> Importar con IA
               </button>
               <button onClick={() => setShowSettings(true)} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors" title="Configurar semana">
                 <Settings2 size={15} /> Configurar
               </button>
-              <button onClick={downloadWeekPDF} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors">
+              <button onClick={() => setShowExport(true)} className="flex items-center gap-1.5 px-3 py-2 bg-zinc-800 text-zinc-300 rounded-lg text-sm hover:bg-zinc-700 transition-colors">
                 <Download size={15} /> Exportar calendario
               </button>
             </>
@@ -940,6 +766,15 @@ export default function Schedule() {
         activeSquadId={activeSquadId}
         activeSeasonId={activeSeasonId || activeSquad?.season || ""}
         onImported={loadEvents}
+      />
+
+      <ScheduleExportModal
+        open={showExport}
+        onClose={() => setShowExport(false)}
+        activeSquad={activeSquad}
+        eventsForDate={getEventsForDate}
+        currentWeekStart={currentWeekStart}
+        currentMonth={currentMonth}
       />
     </div>
   );
