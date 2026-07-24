@@ -5,7 +5,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import { Loader2, AlertCircle } from "lucide-react";
 import { createHistory } from "@/components/tactical/lib/tacticalHistory";
 import { createElement, cloneElement, serializeElements } from "@/components/tactical/lib/tacticalElementFactory";
-import { normalizeBoard, createBoardPayload } from "@/components/tactical/lib/tacticalDocument";
+import { normalizeBoard, createBoardPayload, createProjectPayload } from "@/components/tactical/lib/tacticalDocument";
 import { resolveTacticalBrand } from "@/components/tactical/lib/tacticalBrandResolver";
 import { DEFAULT_PITCH_CONFIG } from "@/components/tactical/lib/tacticalPitchModels";
 import TacticalTopBar from "@/components/tactical/editor/TacticalTopBar";
@@ -80,6 +80,43 @@ export default function TacticalEditor() {
   useEffect(() => {
     loadProject();
   }, [loadProject]);
+
+  // Ruta /tactical/new: crear proyecto + pizarra inicial y redirigir
+  useEffect(() => {
+    if (projectId) return;
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      try {
+        const projPayload = createProjectPayload({
+          name: "Nueva pizarra",
+          default_mode: "tactical",
+          squad_id: activeSquadId,
+          squad_name: activeSquad?.name || "",
+          season_id: activeSeasonId || activeSquad?.season || "",
+        });
+        const project = await base44.entities.TacticalProject.create(projPayload);
+        if (cancelled) return;
+        const boardPayload = createBoardPayload(project.id, {
+          name: "Pizarra 1",
+          mode: "tactical",
+          pitch_config: { ...DEFAULT_PITCH_CONFIG },
+          squad_id: activeSquadId,
+          season_id: activeSeasonId || "",
+          order: 0,
+        });
+        await base44.entities.TacticalBoard.create(boardPayload);
+        if (cancelled) return;
+        navigate(`/tactical/${project.id}`, { replace: true });
+      } catch (e) {
+        if (!cancelled) setError("No se pudo crear el proyecto");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
 
   // Cargar jugadores del plantel activo
   useEffect(() => {
