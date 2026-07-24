@@ -1,0 +1,58 @@
+{
+  "name": "TacticalBoardLink",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n si corresponde"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada vinculada"
+    },
+    "project_id": {
+      "type": "string",
+      "description": "ID del TacticalProject vinculado"
+    },
+    "board_id": {
+      "type": "string",
+      "description": "ID del TacticalBoard vinculado (opcional, si el v\u00ednculo es a nivel proyecto)"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "match",
+        "training_session",
+        "session_exercise",
+        "field_library_exercise",
+        "weekly_plan_day"
+      ],
+      "description": "Tipo de destino del v\u00ednculo"
+    },
+    "target_id": {
+      "type": "string",
+      "description": "ID del destino vinculado"
+    },
+    "label": {
+      "type": "string",
+      "description": "Etiqueta visible del v\u00ednculo"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "project_id",
+    "target_type",
+    "target_id"
+  ]
+}

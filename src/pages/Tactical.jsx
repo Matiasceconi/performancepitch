@@ -1,190 +1,216 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
-import PitchMap from "@/components/staff/PitchMap";
-import PlayerStatusBadge from "@/components/staff/PlayerStatusBadge";
-import { Users, Dumbbell, Wrench } from "lucide-react";
-import UtileriaPanel from "@/components/tactical/UtileriaPanel";
+import { useWorkspace } from "@/lib/WorkspaceContext";
+import { Plus, Search, Loader2, LayoutGrid } from "lucide-react";
 import moment from "moment";
+import "moment/locale/es";
+import TacticalProjectCard from "@/components/tactical/projects/TacticalProjectCard";
+import TacticalProjectFilters from "@/components/tactical/projects/TacticalProjectFilters";
+import NewTacticalProjectModal from "@/components/tactical/projects/NewTacticalProjectModal";
+import { resolveTacticalBrand } from "@/components/tactical/lib/tacticalBrandResolver";
+
+moment.locale("es");
 
 export default function Tactical() {
-  const [players, setPlayers] = useState([]);
-  const [loading, setLoading]  = useState(true);
-  const [tab, setTab]          = useState("squad"); // "squad" | "session"
-  // Session map: set of player ids selected for today's session
-  const [sessionIds, setSessionIds] = useState(new Set());
+  const navigate = useNavigate();
+  const { activeSquadId, activeSquad, activeSeasonId, can, clubBrand } = useWorkspace();
+  const brand = resolveTacticalBrand({ clubBrand, activeSquad });
+
+  const [projects, setProjects] = useState([]);
+  const [boards, setBoards] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [showNew, setShowNew] = useState(false);
+
+  const canCreate = can("create", "/tactical");
+  const canEdit = can("edit", "/tactical");
+  const canDelete = can("delete", "/tactical");
+
+  const load = useCallback(async () => {
+    if (!activeSquadId) {
+      setProjects([]);
+      setBoards([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const [projRows, boardRows] = await Promise.all([
+        base44.entities.TacticalProject.filter({ squad_id: activeSquadId }, "-updated_at", 200),
+        base44.entities.TacticalBoard.filter({ squad_id: activeSquadId }, "order", 500),
+      ]);
+      setProjects(projRows);
+      setBoards(boardRows);
+    } catch (e) {
+      console.error("Error loading tactical projects", e);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeSquadId]);
 
   useEffect(() => {
-    base44.entities.Player.list("-created_date", 100).then((data) => {
-      setPlayers(data);
-      // Pre-select available players for the session map
-      const available = data.filter((p) => p.status === "Disponible").map((p) => p.id);
-      setSessionIds(new Set(available));
-    }).finally(() => setLoading(false));
-  }, []);
+    load();
+    const unsubP = base44.entities.TacticalProject.subscribe(load);
+    const unsubB = base44.entities.TacticalBoard.subscribe(load);
+    return () => { unsubP?.(); unsubB?.(); };
+  }, [load]);
 
-  function toggleSession(player) {
-    setSessionIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(player.id)) next.delete(player.id);
-      else next.add(player.id);
-      return next;
+  const boardsByProject = useMemo(() => {
+    const map = {};
+    boards.forEach((b) => {
+      if (!map[b.project_id]) map[b.project_id] = [];
+      map[b.project_id].push(b);
     });
+    return map;
+  }, [boards]);
+
+  const filtered = useMemo(() => {
+    let list = projects;
+    if (filter === "archived") {
+      list = list.filter((p) => p.status === "archived");
+    } else if (filter === "templates") {
+      list = list.filter((p) => p.is_template);
+    } else if (filter === "templates") {
+      list = list.filter((p) => p.is_template);
+    } else if (["formation", "tactical", "exercise"].includes(filter)) {
+      list = list.filter((p) => p.default_mode === filter && p.status !== "archived");
+    } else {
+      list = list.filter((p) => p.status !== "archived");
+    }
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      list = list.filter((p) => (p.name || "").toLowerCase().includes(q));
+    }
+    return list;
+  }, [projects, filter, search]);
+
+  function handleOpen(projectId) {
+    navigate(`/tactical/${projectId}`);
   }
 
-  const available    = players.filter((p) => p.status === "Disponible");
-  const notAvailable = players.filter((p) => p.status !== "Disponible");
-  const sessionPlayers = players.filter((p) => sessionIds.has(p.id));
-  const sessionOut     = players.filter((p) => !sessionIds.has(p.id));
+  async function handleDuplicate(project) {
+    if (!canCreate) return;
+    try {
+      const { id, created_date, updated_date, created_by_id, ...rest } = project;
+      const newProj = await base44.entities.TacticalProject.create({
+        ...rest,
+        name: `${project.name} (copia)`,
+        source_project_id: project.id,
+        status: "active",
+        is_template: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      });
+      const projBoards = boardsByProject[project.id] || [];
+      for (const b of projBoards) {
+        const { id: bid, created_date: _cd, updated_date: _ud, created_by_id: _cb, ...brest } = b;
+        await base44.entities.TacticalBoard.create({
+          ...brest,
+          project_id: newProj.id,
+          elements: (b.elements || []).map((el) => ({ ...el, id: `${el.id}_copy_${Date.now()}` })),
+          revision: 1,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+      }
+      await load();
+    } catch (e) {
+      console.error("Error duplicating project", e);
+    }
+  }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" />
-      </div>
-    );
+  async function handleRename(project, newName) {
+    if (!canEdit) return;
+    await base44.entities.TacticalProject.update(project.id, { name: newName, updated_at: new Date().toISOString() });
+    await load();
+  }
+
+  async function handleArchive(project) {
+    if (!canDelete) return;
+    await base44.entities.TacticalProject.update(project.id, { status: "archived", updated_at: new Date().toISOString() });
+    await load();
+  }
+
+  async function handleSaveAsTemplate(project) {
+    if (!canEdit) return;
+    await base44.entities.TacticalProject.update(project.id, { is_template: true, template_category: project.template_category || "General", updated_at: new Date().toISOString() });
+    await load();
   }
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-white tracking-tight">Mapa táctico</h1>
-        <p className="text-zinc-500 text-sm mt-1">Visualizá el plantel y la sesión de hoy en la cancha</p>
-      </div>
-
-      {/* Tab toggle */}
-      <div className="flex items-center bg-zinc-800 rounded-lg p-1 gap-1 w-fit">
-        <button
-          onClick={() => setTab("squad")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "squad" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <Users size={15} /> Plantel
-        </button>
-        <button
-          onClick={() => setTab("session")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "session" ? "bg-white text-zinc-900" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <Dumbbell size={15} /> Sesión de hoy
-        </button>
-        <button
-          onClick={() => setTab("utileria")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-            tab === "utileria" ? "bg-yellow-400 text-zinc-900" : "text-zinc-400 hover:text-white"
-          }`}
-        >
-          <Wrench size={15} /> Utilería
-        </button>
-      </div>
-
-      {/* ── SQUAD MAP ── */}
-      {tab === "squad" && (
-        <div className="grid lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-3 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-4">
-            <PitchMap players={available} />
-          </div>
-          <div className="space-y-3">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
-                Disponibles ({available.length})
-              </p>
-              <div className="space-y-2">
-                {available.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2">
-                    <span className="text-zinc-600 text-xs font-mono w-5 text-right">{p.jersey_number || p.number}</span>
-                    <span className="text-sm text-white flex-1">{p.full_name}</span>
-                    <span className="text-xs text-zinc-500">{(p.position || "").slice(0,3)}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-            {notAvailable.length > 0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                <p className="text-xs font-semibold text-zinc-500 uppercase tracking-wider mb-3">
-                  No disponibles ({notAvailable.length})
-                </p>
-                <div className="space-y-2">
-                  {notAvailable.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <span className="text-zinc-600 text-xs font-mono w-5 text-right">{p.jersey_number || p.number}</span>
-                      <span className="text-sm text-zinc-400 flex-1">{p.full_name}</span>
-                      <PlayerStatusBadge status={p.status} />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+    <div className="space-y-5">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">Pizarra Táctica</h1>
+          <p className="text-zinc-500 text-sm mt-1">{activeSquad?.name || "Seleccioná un plantel"}</p>
         </div>
-      )}
+        {canCreate && (
+          <button
+            onClick={() => setShowNew(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold text-zinc-950 transition-colors"
+            style={{ backgroundColor: brand.colors.accent, color: brand.colors.onAccent }}
+          >
+            <Plus size={16} /> Nueva pizarra
+          </button>
+        )}
+      </div>
 
-      {/* ── UTILERÍA ── */}
-      {tab === "utileria" && <UtileriaPanel />}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px] max-w-md">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Buscar proyectos..."
+            className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white placeholder-zinc-600 focus:outline-none focus:border-zinc-600"
+          />
+        </div>
+        <TacticalProjectFilters value={filter} onChange={setFilter} />
+      </div>
 
-      {/* ── SESSION MAP ── */}
-      {tab === "session" && (
-        <div className="grid lg:grid-cols-4 gap-4">
-          <div className="lg:col-span-3 bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden p-4">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <p className="text-xs text-zinc-500">
-                Hacé clic en un jugador para incluirlo o quitarlo de la sesión
-              </p>
-              <span className="text-xs text-emerald-400 font-semibold">{sessionIds.size} en sesión</span>
-            </div>
-            <PitchMap
-              players={players}
-              highlighted={sessionIds}
-              onToggle={toggleSession}
-              emptyLabel="Sin jugadores en el plantel"
+      {loading ? (
+        <div className="flex items-center justify-center h-48">
+          <Loader2 className="w-6 h-6 text-zinc-600 animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="flex flex-col items-center justify-center h-64 text-center">
+          <LayoutGrid size={40} className="text-zinc-700 mb-3" />
+          <p className="text-zinc-500 text-sm">
+            {activeSquadId ? "No hay proyectos tácticos aún." : "Seleccioná un plantel para ver sus proyectos."}
+          </p>
+          {canCreate && activeSquadId && (
+            <button onClick={() => setShowNew(true)} className="mt-4 flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-zinc-950" style={{ backgroundColor: brand.colors.accent, color: brand.colors.onAccent }}>
+              <Plus size={15} /> Crear primer proyecto
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {filtered.map((p) => (
+            <TacticalProjectCard
+              key={p.id}
+              project={p}
+              boards={boardsByProject[p.id] || []}
+              onOpen={() => handleOpen(p.id)}
+              onDuplicate={() => handleDuplicate(p)}
+              onRename={(name) => handleRename(p, name)}
+              onArchive={() => handleArchive(p)}
+              onSaveAsTemplate={() => handleSaveAsTemplate(p)}
+              canEdit={canEdit}
+              canDelete={canDelete}
+              canCreate={canCreate}
             />
-          </div>
-
-          <div className="space-y-3">
-            <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-              <p className="text-xs font-semibold text-emerald-500 uppercase tracking-wider mb-3">
-                En sesión ({sessionPlayers.length})
-              </p>
-              <div className="space-y-2">
-                {sessionPlayers.length === 0 && (
-                  <p className="text-zinc-600 text-xs">Ninguno seleccionado</p>
-                )}
-                {sessionPlayers.map((p) => (
-                  <div key={p.id} className="flex items-center gap-2">
-                    <span className="text-zinc-600 text-xs font-mono w-5 text-right">{p.jersey_number || p.number}</span>
-                    <span className="text-sm text-white flex-1">{p.full_name}</span>
-                    <button
-                      onClick={() => toggleSession(p)}
-                      className="text-xs text-zinc-600 hover:text-red-400 transition-colors"
-                    >✕</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {sessionOut.length > 0 && (
-              <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-4">
-                <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-3">
-                  Fuera de sesión ({sessionOut.length})
-                </p>
-                <div className="space-y-2">
-                  {sessionOut.map((p) => (
-                    <div key={p.id} className="flex items-center gap-2">
-                      <span className="text-zinc-700 text-xs font-mono w-5 text-right">{p.jersey_number || p.number}</span>
-                      <span className="text-sm text-zinc-500 flex-1">{p.full_name}</span>
-                      <button
-                        onClick={() => toggleSession(p)}
-                        className="text-xs text-zinc-600 hover:text-emerald-400 transition-colors"
-                      >＋</button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
+          ))}
         </div>
       )}
+
+      <NewTacticalProjectModal
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        onCreated={(projectId) => { setShowNew(false); navigate(`/tactical/${projectId}`); }}
+      />
     </div>
   );
 }

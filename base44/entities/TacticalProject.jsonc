@@ -1,0 +1,81 @@
+{
+  "name": "TacticalProject",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n si corresponde"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada vinculada"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del proyecto t\u00e1ctico"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del proyecto"
+    },
+    "default_mode": {
+      "type": "string",
+      "enum": [
+        "formation",
+        "tactical",
+        "exercise"
+      ],
+      "default": "tactical",
+      "description": "Modo principal del proyecto"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "archived"
+      ],
+      "default": "active",
+      "description": "Estado del proyecto"
+    },
+    "is_template": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el proyecto es una plantilla reutilizable"
+    },
+    "template_category": {
+      "type": "string",
+      "description": "Categor\u00eda de la plantilla"
+    },
+    "source_project_id": {
+      "type": "string",
+      "description": "ID del proyecto origen si fue duplicado"
+    },
+    "thumbnail_url": {
+      "type": "string",
+      "description": "URL de la miniatura del proyecto"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de actualizaci\u00f3n"
+    },
+    "last_opened_at": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima apertura"
+    }
+  },
+  "required": [
+    "name"
+  ]
+}

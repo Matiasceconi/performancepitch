@@ -1,0 +1,95 @@
+{
+  "name": "TacticalBoard",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n si corresponde"
+    },
+    "project_id": {
+      "type": "string",
+      "description": "ID del TacticalProject padre"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada vinculada"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre de la pizarra"
+    },
+    "order": {
+      "type": "number",
+      "description": "Orden visual dentro del proyecto"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "formation",
+        "tactical",
+        "exercise"
+      ],
+      "default": "tactical",
+      "description": "Modo de la pizarra"
+    },
+    "pitch_config": {
+      "type": "object",
+      "description": "Configuraci\u00f3n de cancha: modelo, orientaci\u00f3n, estilo, superposiciones"
+    },
+    "document_width": {
+      "type": "number",
+      "default": 1600,
+      "description": "Ancho l\u00f3gico del documento"
+    },
+    "document_height": {
+      "type": "number",
+      "default": 900,
+      "description": "Alto l\u00f3gico del documento"
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Elementos serializables de la pizarra"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo de la pizarra"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas de la pizarra"
+    },
+    "thumbnail_url": {
+      "type": "string",
+      "description": "URL de la miniatura de la pizarra"
+    },
+    "editor_version": {
+      "type": "string",
+      "default": "1",
+      "description": "Versi\u00f3n del editor para migraciones futuras"
+    },
+    "revision": {
+      "type": "number",
+      "default": 1,
+      "description": "Revisi\u00f3n del documento para control de concurrencia"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "project_id"
+  ]
+}

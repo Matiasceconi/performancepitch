@@ -25,7 +25,7 @@ export const MODULES = [
   { id: "dashboard", label: "Dashboard", path: "/" },
   { id: "sesiones", label: "Sesiones", path: "/sessions" },
   { id: "partidos", label: "Partidos", path: "/matches" },
-  { id: "mapa_tactico", label: "Mapa Táctico", path: "/tactical" },
+  { id: "mapa_tactico", label: "Pizarra Táctica", path: "/tactical" },
   { id: "carga_externa", label: "Carga Externa", path: "/performance/external-load" },
   { id: "carga_interna", label: "Carga Interna", path: "/performance/internal-load" },
   { id: "area_medica", label: "Área Médica", path: "/performance/medical" },

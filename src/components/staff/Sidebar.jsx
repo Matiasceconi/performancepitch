@@ -14,7 +14,7 @@ const NAV_ITEMS = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
   { label: "Sesiones", path: "/sessions", icon: Video },
   { label: "Partidos", path: "/matches", icon: Trophy },
-  { label: "Mapa Táctico", path: "/tactical", icon: Map },
+  { label: "Pizarra Táctica", path: "/tactical", icon: Map },
   { label: "Carga Externa", path: "/performance/external-load", icon: Gauge },
   { label: "Carga Interna", path: "/performance/internal-load", icon: HeartPulse },
   { label: "Área Médica", path: "/performance/medical", icon: Heart },

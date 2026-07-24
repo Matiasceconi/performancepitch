@@ -1,14 +1,19 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import html2canvas from "html2canvas";
 import { jsPDF } from "jspdf";
-import { Download, Eraser, RefreshCw, Save, Search, Shield, Users, X } from "lucide-react";
+import { Download, Eraser, Map, RefreshCw, Save, Search, Shield, Users, X } from "lucide-react";
 
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import FormationPoster from "@/components/matches/tabs/FormationPoster";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getPlayerName, getPlayerNumber, loadMatchCallupState } from "@/lib/matchCallupUtils";
 import { buildFormationSlots, compatibilityScore, nearestSlotForPosition, shortPosition } from "@/components/matches/tabs/formationSlots";
+import { buildElementsFromMatch, buildRivalElementsFromMatch } from "@/components/tactical/lib/tacticalMatchAdapter";
+import { createProjectPayload, createBoardPayload } from "@/components/tactical/lib/tacticalDocument";
+import { DEFAULT_PITCH_CONFIG } from "@/components/tactical/lib/tacticalPitchModels";
 
 const SYSTEMS = ["4-2-3-1", "4-3-3", "4-4-2", "3-5-2", "3-4-3", "5-3-2", "4-1-4-1"];
 const EXPORTS = {
@@ -38,6 +43,10 @@ function normalizeFormationPosition(raw, slots) {
 
 export default function FormacionTab({ match, players = [], onRegisterSave, onMatchUpdated, onCallupsUpdated }) {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { activeSquadId, activeSquad, activeSeasonId } = useWorkspace();
+  const [tacticalLink, setTacticalLink] = useState(null);
+  const [creatingPizarra, setCreatingPizarra] = useState(false);
   const fieldRef = useRef(null);
   const exportRef = useRef(null);
   const [callups, setCallups] = useState([]);
@@ -86,6 +95,62 @@ export default function FormacionTab({ match, players = [], onRegisterSave, onMa
   }
 
   useEffect(() => { loadFormation(); }, [match.id]);
+
+  // Buscar vínculo existente con Pizarra Táctica
+  useEffect(() => {
+    if (!match?.id) return;
+    base44.entities.TacticalBoardLink.filter({ target_type: "match", target_id: match.id }, "-created_at", 5)
+      .then((links) => setTacticalLink(links[0] || null))
+      .catch(() => setTacticalLink(null));
+  }, [match?.id]);
+
+  async function handleOpenOrCreatePizarra() {
+    if (tacticalLink) {
+      navigate(`/tactical/${tacticalLink.project_id}`);
+      return;
+    }
+    // Crear proyecto + pizarra desde el partido
+    setCreatingPizarra(true);
+    try {
+      const projPayload = createProjectPayload({
+        name: `Plan vs ${match.rival || ""}`.trim(),
+        default_mode: "formation",
+        squad_id: activeSquadId,
+        squad_name: activeSquad?.name || "",
+        season_id: activeSeasonId || activeSquad?.season || "",
+      });
+      const project = await base44.entities.TacticalProject.create(projPayload);
+      const ownElements = buildElementsFromMatch(match, players);
+      const rivalElements = buildRivalElementsFromMatch(match);
+      const boardPayload = createBoardPayload(project.id, {
+        name: `Formación vs ${match.rival || ""}`.trim(),
+        mode: "formation",
+        pitch_config: { ...DEFAULT_PITCH_CONFIG },
+        elements: [...ownElements, ...rivalElements],
+        objective: `Partido vs ${match.rival || ""} · ${match.date || ""}`,
+        squad_id: activeSquadId,
+        season_id: activeSeasonId || "",
+        order: 0,
+      });
+      const board = await base44.entities.TacticalBoard.create(boardPayload);
+      await base44.entities.TacticalBoardLink.create({
+        project_id: project.id,
+        board_id: board.id,
+        squad_id: activeSquadId,
+        season_id: activeSeasonId || "",
+        target_type: "match",
+        target_id: match.id,
+        label: `Partido vs ${match.rival || ""}`,
+        created_at: new Date().toISOString(),
+      });
+      toast({ title: "Pizarra creada desde el partido" });
+      navigate(`/tactical/${project.id}`);
+    } catch (error) {
+      toast({ title: error.message || "No se pudo crear la pizarra", variant: "destructive" });
+    } finally {
+      setCreatingPizarra(false);
+    }
+  }
 
   useEffect(() => {
     function onKeyDown(event) { if (event.key === "Escape") setActivePlayerId(""); }
@@ -287,6 +352,7 @@ export default function FormacionTab({ match, players = [], onRegisterSave, onMa
             <button onClick={saveFormation} disabled={!dirty || saving} className="rounded-lg bg-yellow-500 px-3 py-2 text-xs font-semibold text-zinc-950 transition hover:bg-yellow-400 disabled:opacity-50"><Save size={13} className="mr-1 inline" /> {saving ? "Guardando…" : "Guardar formación"}</button>
             <button onClick={() => { setRoleOverrides((current) => ({ ...current, ...Object.fromEntries(starterIds.map((id) => [id, "suplente"])) })); setPositions({}); setDirty(true); }} className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"><Eraser size={13} className="mr-1 inline" /> Limpiar</button>
             <button onClick={autoArrange} className="rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-xs text-zinc-300 hover:bg-zinc-800"><RefreshCw size={13} className="mr-1 inline" /> Ordenar</button>
+            <button onClick={handleOpenOrCreatePizarra} disabled={creatingPizarra} className="rounded-lg border border-violet-500/30 bg-violet-500/10 px-3 py-2 text-xs text-violet-300 hover:bg-violet-500/20 disabled:opacity-50"><Map size={13} className="mr-1 inline" /> {tacticalLink ? "Abrir pizarra" : "Crear pizarra"}</button>
           </div>
         </div>
         {captainInvalid && <p className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs font-semibold text-red-200">El capitán actual no está en el XI. Elegí otro capitán antes de guardar.</p>}
