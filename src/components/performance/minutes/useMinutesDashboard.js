@@ -311,16 +311,18 @@ export default function useMinutesDashboard() {
   }, [normalizedMatches, data.competitions, filters.squadId, filters.seasonId]);
 
   useEffect(() => {
+    if (loading) return;
     if (!seasonOptions.some((option) => option.value === filters.seasonId)) {
       setFilters((current) => ({ ...current, seasonId: "all", competitionId: "all" }));
     }
-  }, [seasonOptions, filters.seasonId]);
+  }, [seasonOptions, filters.seasonId, loading]);
 
   useEffect(() => {
+    if (loading) return;
     if (!competitionOptions.some((option) => option.value === filters.competitionId)) {
       setFilters((current) => ({ ...current, competitionId: "all" }));
     }
-  }, [competitionOptions, filters.competitionId]);
+  }, [competitionOptions, filters.competitionId, loading]);
 
   const filteredMatches = useMemo(() => {
     let list = [...normalizedMatches];
