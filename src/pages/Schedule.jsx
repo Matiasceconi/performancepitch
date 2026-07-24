@@ -425,7 +425,7 @@ function EventModal({ open, onClose, onSave, initial, copyData, defaultDate, clu
     setSaving(true);
     const isMatchEvent = (form.event_type || form.type) === "Partido" || form.type === "Jornada de Juveniles";
     const autoLogo = isMatchEvent ? getLogoForRival(form.rival) : null;
-    const payload = { ...form, rival_logo_url: form.rival_logo_url || autoLogo || "", duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined };
+    const payload = { ...form, rival_logo_url: form.rival_logo_url || autoLogo || "", duration_minutes: form.duration_minutes ? Number(form.duration_minutes) : undefined, matchday_number: form.matchday_number ? Number(form.matchday_number) : undefined };
     await onSave(payload);
     setSaving(false);
     onClose();
@@ -600,7 +600,7 @@ export default function Schedule() {
   async function handleSave(form) {
     const eventType = form.event_type || form.type || "";
     const startTime = form.start_time || form.time || "";
-    const payload = { ...form, time: startTime, start_time: startTime, type: eventType, event_type: eventType, squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", sync_source: "calendar", sync_updated_at: new Date().toISOString() };
+    const payload = { ...form, time: startTime, start_time: startTime, type: eventType, event_type: eventType, squad_id: activeSquadId, squad_name: activeSquad?.name || "", season_id: activeSeasonId || activeSquad?.season || "", matchday_number: form.matchday_number ? Number(form.matchday_number) : undefined, sync_source: "calendar", sync_updated_at: new Date().toISOString() };
     let savedEvent = null;
     if (editingEvent) {
       await base44.entities.DayEvent.update(editingEvent.id, payload);
