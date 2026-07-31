@@ -18,7 +18,9 @@ export default function Login() {
     setLoading(true);
     try {
       await base44.auth.loginViaEmailPassword(email, password);
-      window.location.href = "/";
+      const urlParams = new URLSearchParams(window.location.search);
+      const returnTo = urlParams.get('returnTo') || '/';
+      window.location.href = returnTo;
     } catch (err) {
       setError("Email o contraseña incorrectos. Verificá tus datos e intentá nuevamente.");
     } finally {

@@ -7,7 +7,15 @@ import { AuthProvider, useAuth } from '@/lib/AuthContext';
 import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
+
+// Redirige a login preservando la ruta actual en ?returnTo para que el usuario
+// (especialmente jugadores) vuelva a la página que intentaba acceder.
+function RedirectToLogin() {
+  const location = useLocation();
+  const returnTo = encodeURIComponent(location.pathname + location.search);
+  return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
+}
 import { Component } from 'react';
 import { base44 } from '@/api/base44Client';
 import Login from '@/pages/Login';
@@ -113,7 +121,7 @@ const AuthenticatedApp = () => {
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
-      <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+      <Route element={<ProtectedRoute unauthenticatedElement={<RedirectToLogin />} />}>
         <Route path="/player/*" element={<PlayerApp />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />

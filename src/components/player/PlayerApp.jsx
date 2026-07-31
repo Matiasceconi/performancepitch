@@ -9,12 +9,12 @@ import PlayerHistory from '@/pages/player/PlayerHistory';
 export default function PlayerApp() {
   return (
     <Routes>
-      <Route path="/" element={<PlayerLayout />}>
+      <Route path="/player" element={<PlayerLayout />}>
         <Route index element={<PlayerHome />} />
-        <Route path="wellness" element={<PlayerWellness />} />
-        <Route path="rpe" element={<PlayerRpe />} />
-        <Route path="rpe/:sessionId" element={<PlayerRpe />} />
-        <Route path="history" element={<PlayerHistory />} />
+        <Route path="/player/wellness" element={<PlayerWellness />} />
+        <Route path="/player/rpe" element={<PlayerRpe />} />
+        <Route path="/player/rpe/:sessionId" element={<PlayerRpe />} />
+        <Route path="/player/history" element={<PlayerHistory />} />
       </Route>
       <Route path="*" element={<Navigate to="/player" replace />} />
     </Routes>
