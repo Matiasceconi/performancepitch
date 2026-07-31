@@ -1,0 +1,96 @@
+{
+  "name": "PlayerUserAccess",
+  "type": "object",
+  "properties": {
+    "user_id": {
+      "type": "string",
+      "description": "ID del usuario de la plataforma vinculado al jugador"
+    },
+    "user_email": {
+      "type": "string",
+      "description": "Email de la cuenta del jugador"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador vinculado (Player)"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado para auditor\u00eda)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel del jugador"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada del plantel"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n si corresponde"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el acceso del jugador est\u00e1 activo"
+    },
+    "invited_at": {
+      "type": "string",
+      "description": "Fecha/hora de la \u00faltima invitaci\u00f3n enviada"
+    },
+    "last_access_at": {
+      "type": "string",
+      "description": "Fecha/hora del \u00faltimo ingreso del jugador al portal"
+    },
+    "invitation_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "sent",
+        "active",
+        "disabled"
+      ],
+      "default": "pending",
+      "description": "Estado de la invitaci\u00f3n del jugador"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora l\u00f3gica de actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "user_email",
+    "player_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

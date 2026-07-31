@@ -3,12 +3,14 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Video, LayoutDashboard, Menu, X, Map, UsersRound, CalendarDays, Trophy,
   ClipboardList, Settings2, ShieldCheck, BookOpen, Dumbbell, LogOut, User,
-  Gauge, HeartPulse, Heart, Apple, Clock, Repeat, PanelLeftClose, PanelLeftOpen
+  Gauge, HeartPulse, Heart, Apple, Clock, Repeat, PanelLeftClose, PanelLeftOpen,
+  Smartphone, UserRound
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
 import { useAuth } from "@/lib/AuthContext";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { useUserType } from "@/lib/UserTypeContext";
 
 const NAV_ITEMS = [
   { label: "Dashboard", path: "/", icon: LayoutDashboard },
@@ -28,6 +30,7 @@ const NAV_ITEMS = [
   { label: "Biblioteca Fuerza", path: "/strength-library", icon: Dumbbell },
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
   { label: "Planteles", path: "/squad-manager", icon: UsersRound },
+  { label: "Accesos de jugadores", path: "/player-access", icon: UserRound },
   { label: "Configuración", path: "/admin", icon: Settings2 },
 ];
 
@@ -37,6 +40,7 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
   const [showProfile, setShowProfile] = useState(false);
   const { user } = useAuth();
   const { activeAreaName, canSeePath, requestAreaChange, myAreas, clubBrand } = useWorkspace();
+  const { isPlayer } = useUserType();
   const visibleItems = NAV_ITEMS.filter((item) => canSeePath(item.path));
   const accent = clubBrand?.colors?.accent || "#F0C800";
   const onAccent = clubBrand?.colors?.onAccent || "#1a1a1a";
@@ -78,6 +82,12 @@ export default function Sidebar({ collapsed = false, onCollapsedChange }) {
             {visibleItems.map((item) => <NavLink key={item.path} item={item} />)}
           </nav>
           <div className="absolute bottom-0 left-0 right-0 p-3 border-t border-zinc-800 bg-zinc-950">
+            {isPlayer && (
+              <Link to="/player" className="w-full flex items-center gap-2.5 px-2 py-2 mb-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 hover:bg-emerald-500/20 transition-colors text-left">
+                <Smartphone size={16} className="text-emerald-400" />
+                <span className="text-xs font-semibold text-emerald-300">Portal del Jugador</span>
+              </Link>
+            )}
             <button onClick={() => setShowProfile(true)} className="w-full flex items-center gap-2.5 px-2 py-2 rounded-lg hover:bg-zinc-800 transition-colors text-left group">
               <div className="w-7 h-7 rounded-full bg-zinc-700 flex items-center justify-center shrink-0">{user?.photo_url ? <img src={user.photo_url} className="w-7 h-7 rounded-full object-cover" alt="" /> : <User size={13} className="text-zinc-400" />}</div>
               <div className="flex-1 min-w-0"><p className="text-xs font-medium text-zinc-300 truncate group-hover:text-white transition-colors">{user?.full_name || user?.email || "Usuario"}</p></div>

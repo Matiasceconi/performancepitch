@@ -215,6 +215,19 @@
     "gps_report_observations": {
       "type": "string",
       "description": "Observaciones editables del Informe de Sesi\u00f3n GPS"
+    },
+    "rpe_enabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la solicitud de RPE est\u00e1 habilitada para los jugadores de la sesi\u00f3n"
+    },
+    "rpe_available_at": {
+      "type": "string",
+      "description": "Fecha/hora desde la que los jugadores pueden responder el RPE"
+    },
+    "rpe_deadline": {
+      "type": "string",
+      "description": "Fecha/hora l\u00edmite para responder el RPE"
     }
   },
   "required": [

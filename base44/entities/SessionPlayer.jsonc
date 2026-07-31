@@ -57,7 +57,36 @@
     },
     "rpe": {
       "type": "number",
-      "description": "Percepci\u00f3n del esfuerzo (1-10)"
+      "description": "Percepci\u00f3n del esfuerzo (0-10 escala CR10)"
+    },
+    "rpe_comment": {
+      "type": "string",
+      "description": "Comentario opcional del jugador sobre el RPE"
+    },
+    "rpe_submitted_at": {
+      "type": "string",
+      "description": "Fecha/hora del primer env\u00edo del RPE por el jugador"
+    },
+    "rpe_updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de la \u00faltima actualizaci\u00f3n del RPE"
+    },
+    "rpe_source": {
+      "type": "string",
+      "enum": [
+        "player",
+        "staff"
+      ],
+      "description": "Origen del RPE: player (portal) o staff (panel)"
+    },
+    "internal_load": {
+      "type": "number",
+      "description": "Carga interna = rpe \u00d7 minutos realizados"
+    },
+    "internal_load_pending": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la carga interna est\u00e1 pendiente porque no hay duraci\u00f3n definida"
     },
     "notes": {
       "type": "string",

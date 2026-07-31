@@ -1,0 +1,129 @@
+{
+  "name": "WellnessResponse",
+  "type": "object",
+  "properties": {
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador que responde"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel del jugador"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada del plantel"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n si corresponde"
+    },
+    "response_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la respuesta (YYYY-MM-DD). Una sola respuesta por jugador y fecha"
+    },
+    "sleep_hours": {
+      "type": "number",
+      "description": "Horas de sue\u00f1o reportadas"
+    },
+    "sleep_quality": {
+      "type": "number",
+      "description": "Calidad del sue\u00f1o (1-5, mayor es mejor)"
+    },
+    "energy_level": {
+      "type": "number",
+      "description": "Nivel de energ\u00eda (1-5, mayor es mejor)"
+    },
+    "muscular_readiness": {
+      "type": "number",
+      "description": "Sensaci\u00f3n muscular (1-5, mayor es mejor)"
+    },
+    "mood": {
+      "type": "number",
+      "description": "Estado de \u00e1nimo (1-5, mayor es mejor)"
+    },
+    "calmness": {
+      "type": "number",
+      "description": "Tranquilidad (1-5, mayor es mejor)"
+    },
+    "has_pain": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el jugador reporta dolor o molestia"
+    },
+    "pain_zone": {
+      "type": "string",
+      "description": "Zona corporal del dolor"
+    },
+    "pain_intensity": {
+      "type": "number",
+      "description": "Intensidad del dolor (0-10)"
+    },
+    "comment": {
+      "type": "string",
+      "description": "Comentario opcional del jugador"
+    },
+    "wellness_score": {
+      "type": "number",
+      "description": "Puntaje de wellness de 0 a 100 (promedio de 5 preguntas \u00d7 20)"
+    },
+    "alert_level": {
+      "type": "string",
+      "enum": [
+        "verde",
+        "amarillo",
+        "rojo"
+      ],
+      "description": "Nivel de alerta calculado"
+    },
+    "is_drop": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el wellness cay\u00f3 20% o m\u00e1s respecto al promedio de los \u00faltimos 7 registros"
+    },
+    "submitted_at": {
+      "type": "string",
+      "description": "Fecha/hora del primer env\u00edo"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de la \u00faltima actualizaci\u00f3n"
+    },
+    "source": {
+      "type": "string",
+      "default": "player",
+      "description": "Origen de la respuesta: player o staff"
+    }
+  },
+  "required": [
+    "player_id",
+    "response_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

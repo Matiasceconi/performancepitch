@@ -16,8 +16,11 @@ import ForgotPassword from '@/pages/ForgotPassword';
 import ResetPassword from '@/pages/ResetPassword';
 import Layout from '@/components/staff/Layout';
 import { WorkspaceProvider } from '@/lib/WorkspaceContext';
+import { UserTypeProvider, useUserType } from '@/lib/UserTypeContext';
 import { PlayerCard360Provider } from '@/components/player/PlayerCard360Context';
 import PlayerCard360 from '@/components/player/PlayerCard360';
+import PlayerApp from '@/components/player/PlayerApp';
+import PlayerAccessPending from '@/pages/player/PlayerAccessPending';
 import Dashboard from '@/pages/Dashboard';
 import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
@@ -43,6 +46,7 @@ import SquadManager from '@/pages/SquadManager';
 import FieldLibrary from '@/pages/FieldLibrary';
 import StrengthLibrary from '@/pages/StrengthLibrary';
 import UsersAccess from '@/pages/UsersAccess';
+import PlayerAccess from '@/pages/PlayerAccess';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
 class GlobalErrorBoundary extends Component {
@@ -110,6 +114,7 @@ const AuthenticatedApp = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
+        <Route path="/player" element={<PlayerApp />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/sessions" element={<Sessions />} />
@@ -138,6 +143,7 @@ const AuthenticatedApp = () => {
           <Route path="/field-library" element={<FieldLibrary />} />
           <Route path="/strength-library" element={<StrengthLibrary />} />
           <Route path="/users-access" element={<UsersAccess />} />
+          <Route path="/player-access" element={<PlayerAccess />} />
         </Route>
       </Route>
       <Route path="*" element={<PageNotFound />} />
@@ -146,6 +152,42 @@ const AuthenticatedApp = () => {
 };
 
 
+function StaffApp() {
+  return (
+    <WorkspaceProvider>
+      <PlayerCard360Provider>
+        <AuthenticatedApp />
+        <PlayerCard360 />
+      </PlayerCard360Provider>
+    </WorkspaceProvider>
+  );
+}
+
+function LoadingScreen() {
+  return (
+    <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
+      <div className="w-8 h-8 border-4 border-zinc-700 border-t-emerald-400 rounded-full animate-spin" />
+    </div>
+  );
+}
+
+function AppShell() {
+  const { isAuthenticated, isLoadingAuth, isLoadingPublicSettings } = useAuth();
+  const { isStaff, isPlayer, loading: loadingType } = useUserType();
+
+  // Mientras carga auth o el usuario no está autenticado, el flujo de staff
+  // (que incluye login/registro) se encarga de todo.
+  if (isLoadingPublicSettings || isLoadingAuth || !isAuthenticated) {
+    return <StaffApp />;
+  }
+
+  // Autenticado: resolver tipo de usuario antes de elegir la experiencia.
+  if (loadingType) return <LoadingScreen />;
+  if (isStaff) return <StaffApp />;
+  if (isPlayer) return <PlayerApp />;
+  return <PlayerAccessPending />;
+}
+
 function App() {
   return (
     <GlobalErrorBoundary>
@@ -153,12 +195,9 @@ function App() {
         <QueryClientProvider client={queryClientInstance}>
           <Router>
             <ScrollToTop />
-            <WorkspaceProvider>
-              <PlayerCard360Provider>
-                <AuthenticatedApp />
-                <PlayerCard360 />
-              </PlayerCard360Provider>
-            </WorkspaceProvider>
+            <UserTypeProvider>
+              <AppShell />
+            </UserTypeProvider>
           </Router>
           <Toaster />
         </QueryClientProvider>

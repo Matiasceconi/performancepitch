@@ -54,6 +54,7 @@ const PATH_AREA_MAP = {
   "/admin": "administracion",
   "/squad-manager": "administracion",
   "/users-access": "administracion",
+  "/player-access": "administracion",
 };
 
 export function WorkspaceProvider({ children }) {
