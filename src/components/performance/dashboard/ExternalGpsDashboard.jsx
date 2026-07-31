@@ -159,7 +159,7 @@ export default function ExternalGpsDashboard() {
         base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
         base44.entities.SquadMembership.list("-created_date", 2000),
         selectedSquadId ? base44.entities.WeeklyPlan.filter({ squad_id: selectedSquadId }, "-week_start", 100) : base44.entities.WeeklyPlan.list("-week_start", 100),
-        base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
+        selectedSquadId ? base44.entities.WeeklyPlanDay.filter({ squad_id: selectedSquadId }, "date", 5000).catch(() => []) : base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
         base44.entities.DayEvent.list("-date", 500),
         base44.entities.MatchReport.list("-date", 500),
         base44.entities.CatapultReport.list("-date", 5000).catch(() => []),
@@ -190,24 +190,29 @@ export default function ExternalGpsDashboard() {
       const squadSessions = allSessions.filter((s) => selectedSquadId && s.squad_id === selectedSquadId && (!selectedSeason || !s.season_id || s.season_id === selectedSeason));
       setSessions(squadSessions);
 
-      const allGpsRows = await withRetry(() => base44.entities.SessionGPSData.list("-created_date", 5000));
-      const allGrouped = {};
-      allGpsRows.forEach((r) => {
-        if (!allGrouped[r.session_id]) allGrouped[r.session_id] = [];
-        allGrouped[r.session_id].push(r);
-      });
+      // Consultar SessionGPSData solo para las sesiones del plantel
+      const squadSessionIds = squadSessions.map((s) => s.id);
+      let grouped = {};
+      let allGrouped = {};
+      if (squadSessionIds.length > 0) {
+        // Cargar en lotes si hay muchas sesiones
+        const batchSize = 50;
+        for (let i = 0; i < squadSessionIds.length; i += batchSize) {
+          const batch = squadSessionIds.slice(i, i + batchSize);
+          const rows = await withRetry(() => base44.entities.SessionGPSData.filter({ session_id: { $in: batch } }, "-created_date", 5000).catch(() => []));
+          rows.forEach((r) => {
+            if (!grouped[r.session_id]) grouped[r.session_id] = [];
+            grouped[r.session_id].push(r);
+            if (!allGrouped[r.session_id]) allGrouped[r.session_id] = [];
+            allGrouped[r.session_id].push(r);
+          });
+        }
+      }
+      setGpsBySession(grouped);
       setAllGpsBySession(allGrouped);
-
       if (squadSessions.length > 0) {
-        const sessionIds = new Set(squadSessions.map((s) => s.id));
-        const grouped = {};
-        Object.entries(allGrouped).forEach(([sessionId, rows]) => {
-          if (sessionIds.has(sessionId)) grouped[sessionId] = rows;
-        });
-        setGpsBySession(grouped);
         setSelectedSessionId((prev) => prev && squadSessions.some((s) => s.id === prev) ? prev : squadSessions[0].id);
       } else {
-        setGpsBySession({});
         setSelectedSessionId("");
       }
     } catch (err) {
@@ -219,14 +224,24 @@ export default function ExternalGpsDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    const unsubscribePlan = base44.entities.WeeklyPlan.subscribe(load);
-    const unsubscribeCatapult = base44.entities.CatapultReport.subscribe(load);
-    const unsubscribeSession = base44.entities.TrainingSession.subscribe(load);
-    const unsubscribeGps = base44.entities.SessionGPSData.subscribe(load);
-    const unsubscribeMatch = base44.entities.MatchReport.subscribe(load);
-    return () => { unsubscribePlan?.(); unsubscribeCatapult?.(); unsubscribeSession?.(); unsubscribeGps?.(); unsubscribeMatch?.(); };
+  const reloadTimerRef = useRef(null);
+  const debouncedLoad = useCallback(() => {
+    if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+    reloadTimerRef.current = setTimeout(() => { load(); reloadTimerRef.current = null; }, 400);
   }, [load]);
+
+  useEffect(() => {
+    const unsubscribePlan = base44.entities.WeeklyPlan.subscribe(debouncedLoad);
+    const unsubscribePlanDay = base44.entities.WeeklyPlanDay.subscribe(debouncedLoad);
+    const unsubscribeCatapult = base44.entities.CatapultReport.subscribe(debouncedLoad);
+    const unsubscribeSession = base44.entities.TrainingSession.subscribe(debouncedLoad);
+    const unsubscribeGps = base44.entities.SessionGPSData.subscribe(debouncedLoad);
+    const unsubscribeMatch = base44.entities.MatchReport.subscribe(debouncedLoad);
+    return () => {
+      if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
+      unsubscribePlan?.(); unsubscribePlanDay?.(); unsubscribeCatapult?.(); unsubscribeSession?.(); unsubscribeGps?.(); unsubscribeMatch?.();
+    };
+  }, [debouncedLoad]);
 
   const playerMap = useMemo(() => {
     const map = {};
@@ -366,12 +381,50 @@ export default function ExternalGpsDashboard() {
   const today = moment().format("YYYY-MM-DD");
   const currentCycle = useMemo(() => {
     if (!weeklyPlans.length) return null;
+    // 1. Respetar selección manual del usuario
     const selected = weeklyPlans.find((p) => p.id === selectedWeeklyPlanId);
     if (selected) return selected;
+    // 2. Sesión más reciente con GPS utilizable
+    const sessionsWithGps = sessions
+      .filter((s) => (gpsBySession[s.id] || []).some((r) => r.include_in_session_average !== false))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    if (sessionsWithGps.length) {
+      const latest = sessionsWithGps[0];
+      if (latest.weekly_plan_id) {
+        const plan = weeklyPlans.find((p) => p.id === latest.weekly_plan_id);
+        if (plan) return plan;
+      }
+      if (latest.weekly_plan_day_id) {
+        const plan = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => (d.weekly_plan_day_id || d.id) === latest.weekly_plan_day_id));
+        if (plan) return plan;
+      }
+      const planByDate = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === latest.date));
+      if (planByDate) return planByDate;
+    }
+    // 3. Plan que contiene la fecha actual
     const withToday = weeklyPlans.filter((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === today));
-    const withTarget = weeklyPlans.filter((p) => p.target_match_id).sort((a, b) => String(b.week_start || "").localeCompare(String(a.week_start || "")));
-    return withToday[0] || withTarget[0] || weeklyPlans[0];
-  }, [weeklyPlans, weeklyPlanDays, selectedWeeklyPlanId, today]);
+    if (withToday.length) return withToday[0];
+    // 4. Plan activo con period_end más reciente
+    return [...weeklyPlans].sort((a, b) => String(b.period_end || b.week_end || b.week_start || "").localeCompare(String(a.period_end || a.week_end || a.week_start || "")))[0] || null;
+  }, [weeklyPlans, weeklyPlanDays, selectedWeeklyPlanId, today, sessions, gpsBySession]);
+
+  function goToLatestLoad() {
+    const sessionsWithGps = sessions
+      .filter((s) => (gpsBySession[s.id] || []).some((r) => r.include_in_session_average !== false))
+      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    if (!sessionsWithGps.length) return;
+    const latest = sessionsWithGps[0];
+    if (latest.weekly_plan_id) {
+      const plan = weeklyPlans.find((p) => p.id === latest.weekly_plan_id);
+      if (plan) { setSelectedWeeklyPlanId(plan.id); return; }
+    }
+    if (latest.weekly_plan_day_id) {
+      const plan = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => (d.weekly_plan_day_id || d.id) === latest.weekly_plan_day_id));
+      if (plan) { setSelectedWeeklyPlanId(plan.id); return; }
+    }
+    const planByDate = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === latest.date));
+    if (planByDate) setSelectedWeeklyPlanId(planByDate.id);
+  }
 
   useEffect(() => {
     if (currentCycle?.id && currentCycle.id !== selectedWeeklyPlanId) setSelectedWeeklyPlanId(currentCycle.id);
@@ -491,7 +544,7 @@ export default function ExternalGpsDashboard() {
       </div>
 
       {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} matchGpsByMatch={matchGpsByMatch} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} selectedWeeklyPlanId={selectedWeeklyPlanId} onSelectWeeklyPlan={setSelectedWeeklyPlanId} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} calendarEvents={calendarEvents} matchReports={matchReports} onReload={load} />
+        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} matchGpsByMatch={matchGpsByMatch} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} selectedWeeklyPlanId={selectedWeeklyPlanId} onSelectWeeklyPlan={setSelectedWeeklyPlanId} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} calendarEvents={calendarEvents} matchReports={matchReports} onReload={load} onGoToLatestLoad={goToLatestLoad} />
       )}
 
       {activeTab === "sessions" && (

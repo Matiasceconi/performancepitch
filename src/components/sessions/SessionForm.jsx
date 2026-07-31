@@ -4,7 +4,7 @@ import { Users, CheckSquare, Square, Search } from "lucide-react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
-import { getMicrocycleDefaults, SESSION_MD_CODES } from "@/components/planning/microcycleSync";
+import { getMicrocycleDefaults, SESSION_MD_CODES, invokeRebuildPlanning } from "@/components/planning/microcycleSync";
 
 const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
@@ -69,7 +69,9 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
       const match = await getMicrocycleDefaults({ date: form.date, squadId: form.squad_id, seasonId: activeSeasonId || squad?.season });
       if (cancelled) return;
       const defaults = match?.values || null;
-      setPlanDefaults(defaults);
+      const planId = match?.plan?.id || "";
+      const dayId = match?.day?.id || "";
+      setPlanDefaults(defaults ? { ...defaults, weekly_plan_id: planId, weekly_plan_day_id: dayId } : null);
       if (defaults) {
         setForm(prev => ({
           ...prev,
@@ -185,6 +187,8 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
       title: `Sesión ${sessionNumber}`,
       session_number: sessionNumber,
       microcycle_day: form.match_day_code,
+      weekly_plan_id: planDefaults?.weekly_plan_id || "",
+      weekly_plan_day_id: planDefaults?.weekly_plan_day_id || "",
       md_manual_override: manualMeta.md,
       md_source: manualMeta.md ? "manual_override" : (planDefaults?.md_source || "calculated"),
       md_override_reason: manualMeta.md ? (form.md_override_reason || "") : "",
@@ -220,8 +224,16 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
 
     if (spRecords.length > 0) await base44.entities.SessionPlayer.bulkCreate(spRecords);
 
-    setSaving(false);
-    onCreated(session);
+    // Ejecutar el motor de planificación y recargar la sesión con su vinculación final
+    try {
+      await invokeRebuildPlanning({ squadId: form.squad_id, seasonId: activeSeasonId || squad?.season || "", mode: "execute" });
+      const reloaded = await base44.entities.TrainingSession.get(session.id);
+      setSaving(false);
+      onCreated(reloaded || session);
+    } catch {
+      setSaving(false);
+      onCreated(session);
+    }
   }
 
   const allPositions = [...new Set(squadPlayers.map(({ player }) => player.position).filter(Boolean))];

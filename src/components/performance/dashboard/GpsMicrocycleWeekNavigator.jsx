@@ -12,8 +12,16 @@ function weekLabel(plan) {
   return start ? `${moment(start).format("D")}–${moment(end || start).format("D MMMM YYYY")}` : "Semana";
 }
 function planStatus(plan, sessions, gpsBySession) {
-  const dates = new Set(planDays(plan).map((d) => d.date).filter(Boolean));
-  const linked = sessions.filter((s) => dates.has(s.date));
+  const days = planDays(plan);
+  const dayIds = new Set(days.map((d) => d.weekly_plan_day_id || d.id || d.day_id).filter(Boolean));
+  const linkedIds = new Set(days.flatMap((d) => d.linked_session_ids || []));
+  const dates = new Set(days.map((d) => d.date).filter(Boolean));
+  const linked = sessions.filter((s) => {
+    if (s.weekly_plan_id === plan.id) return true;
+    if (s.weekly_plan_day_id && dayIds.has(s.weekly_plan_day_id)) return true;
+    if (linkedIds.has(s.id)) return true;
+    return dates.has(s.date);
+  });
   const withGps = linked.filter((s) => (gpsBySession[s.id] || []).length > 0).length;
   if (!linked.length) return { label: "Sin sesión", className: "bg-zinc-800 text-zinc-300 border-zinc-700" };
   if (withGps === linked.length) return { label: `GPS ${withGps}/${linked.length}`, className: "bg-emerald-500/15 text-emerald-300 border-emerald-500/30" };

@@ -185,11 +185,6 @@ Deno.serve(async (req) => {
       } else {
         periodStart = addDays(targetMatch.date, -7);
         periodEnd = targetMatch.date;
-        const earlierSessions = scopedSessions.filter((s) => s.date && s.date < periodStart && s.date <= targetMatch.date);
-        if (earlierSessions.length) {
-          const earliest = earlierSessions.reduce((min, s) => s.date < min ? s.date : min, earlierSessions[0].date);
-          periodStart = earliest;
-        }
       }
       if (!periodStart || !periodEnd) return;
       const daysBetween = diffDays(targetMatch.date, previousMatch ? previousMatch.date : periodStart);
@@ -342,7 +337,128 @@ Deno.serve(async (req) => {
       }
     }
 
-    return Response.json({ success: true, ...result });
+    // ── Limpieza idempotente ──────────────────────────────────────────────
+    const rebuiltPlanIds = new Set();
+    for (const mc of microcycles) {
+      const planKey = buildAutoPlanKey(org, squadId, seasonId, mc.target_match_id);
+      const plan = plansByKey.get(planKey);
+      if (plan?.id) rebuiltPlanIds.add(plan.id);
+    }
+    for (const [weekStart] of sessionsByWeek) {
+      const planKey = buildCalendarWeekPlanKey(org, squadId, seasonId, weekStart);
+      const plan = plansByKey.get(planKey);
+      if (plan?.id) rebuiltPlanIds.add(plan.id);
+    }
+
+    // Fechas válidas por plan reconstruido
+    const validDatesByPlan = new Map();
+    for (const [key, day] of daysByPlanDate.entries()) {
+      if (!day.active) continue;
+      const planId = key.split('|')[0];
+      if (!validDatesByPlan.has(planId)) validDatesByPlan.set(planId, new Set());
+      validDatesByPlan.get(planId).add(day.date);
+    }
+
+    // Sesiones cubiertas por match_to_match
+    const matchToMatchSessionIds = new Set();
+    for (const mc of microcycles) {
+      const planKey = buildAutoPlanKey(org, squadId, seasonId, mc.target_match_id);
+      const plan = plansByKey.get(planKey);
+      if (!plan?.id) continue;
+      scopedDays.filter((d) => d.weekly_plan_id === plan.id && d.active).forEach((d) => {
+        (d.linked_session_ids || []).forEach((sid) => matchToMatchSessionIds.add(sid));
+      });
+    }
+
+    const validMatchIds = new Set(sortedMatches.map((m) => m.id));
+    const diagnostic = {
+      sessions_without_weekly_plan: 0,
+      sessions_without_day_id: 0,
+      sessions_day_not_found: 0,
+      sessions_date_mismatch: 0,
+      days_outside_period: 0,
+      overlapping_plans: 0,
+      plans_with_invalid_match: 0,
+      calendar_week_replaced: 0,
+      days_with_multiple_sessions: 0,
+    };
+
+    // Detectar sesiones sin vinculación
+    scopedSessions.forEach((s) => {
+      if (!s.weekly_plan_id) diagnostic.sessions_without_weekly_plan++;
+      else if (!s.weekly_plan_day_id) diagnostic.sessions_without_day_id++;
+    });
+
+    for (const plan of scopedPlans) {
+      if (plan.status === 'superseded' || plan.status === 'archived') continue;
+
+      // Plan con partido objetivo inválido → superseded
+      if (plan.planning_mode === 'match_to_match' && plan.target_match_id && !validMatchIds.has(plan.target_match_id)) {
+        diagnostic.plans_with_invalid_match++;
+        if (!dryRun) {
+          await base44.asServiceRole.entities.WeeklyPlan.update(plan.id, {
+            status: 'superseded', sync_status: 'needs_review', needs_review: true,
+            review_reasons: ['target_match_invalid'], updated_at: now,
+          }).catch(() => {});
+        }
+        continue;
+      }
+
+      // calendar_week reemplazado por match_to_match → superseded
+      if (plan.planning_mode === 'calendar_week' && !rebuiltPlanIds.has(plan.id)) {
+        const planDays = scopedDays.filter((d) => d.weekly_plan_id === plan.id && d.active);
+        const planSessionIds = planDays.flatMap((d) => d.linked_session_ids || []);
+        if (planSessionIds.length && planSessionIds.every((sid) => matchToMatchSessionIds.has(sid))) {
+          diagnostic.calendar_week_replaced++;
+          if (!dryRun) {
+            await base44.asServiceRole.entities.WeeklyPlan.update(plan.id, {
+              status: 'superseded', sync_status: 'synced', updated_at: now,
+            }).catch(() => {});
+          }
+        }
+      }
+    }
+
+    // Desactivar días activos fuera del nuevo período
+    for (const day of scopedDays) {
+      if (!day.active || !rebuiltPlanIds.has(day.weekly_plan_id)) continue;
+      const validDates = validDatesByPlan.get(day.weekly_plan_id);
+      if (validDates && !validDates.has(day.date)) {
+        diagnostic.days_outside_period++;
+        if (!dryRun) {
+          const reasons = Array.isArray(day.review_reasons) ? [...day.review_reasons] : [];
+          if (!reasons.includes('outside_rebuilt_period')) reasons.push('outside_rebuilt_period');
+          await base44.asServiceRole.entities.WeeklyPlanDay.update(day.id, {
+            active: false, needs_review: true, review_reasons: reasons, updated_at: now,
+          }).catch(() => {});
+        }
+      }
+    }
+
+    // Detectar días con múltiples sesiones
+    for (const [key, day] of daysByPlanDate.entries()) {
+      if (day.active && (day.linked_session_ids || []).length > 1) diagnostic.days_with_multiple_sessions++;
+    }
+
+    // Evitar planes activos duplicados por target_match_id
+    const activeMatchPlans = scopedPlans.filter((p) =>
+      p.status !== 'superseded' && p.status !== 'archived' && p.planning_mode === 'match_to_match' && p.target_match_id
+    ).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || '')));
+    const seenTargetMatch = new Set();
+    for (const plan of activeMatchPlans) {
+      if (seenTargetMatch.has(plan.target_match_id)) {
+        diagnostic.overlapping_plans++;
+        if (!dryRun) {
+          await base44.asServiceRole.entities.WeeklyPlan.update(plan.id, {
+            status: 'superseded', updated_at: now,
+          }).catch(() => {});
+        }
+      } else {
+        seenTargetMatch.add(plan.target_match_id);
+      }
+    }
+
+    return Response.json({ success: true, ...result, diagnostic });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
   }

@@ -8,11 +8,13 @@ import GpsMicrocyclePdfButton from "./GpsMicrocyclePdfButton";
 import GpsMicrocycleFiltersPanel, { getMicrocycleFilterLabels } from "./GpsMicrocycleFiltersPanel";
 import GpsMicrocycleHistoryPanel from "./GpsMicrocycleHistoryPanel";
 import GpsMicrocycleWeekNavigator from "./GpsMicrocycleWeekNavigator";
-import GpsMicrocycleSourceHeader from "./GpsMicrocycleSourceHeader";
+import GpsMicrocycleDayHeader from "./GpsMicrocycleDayHeader";
 import GpsDailyPlayerTable from "./GpsDailyPlayerTable";
 import GpsMicrocycleCharts, { DEFAULT_CHART_CONFIG } from "./GpsMicrocycleCharts";
 import { MICRO_METRICS, buildHighlights } from "./gpsMicrocycleReportUtils";
 import { buildGpsSources, filterSourcesByDateRange, rowsFromGpsSources, buildDailySummariesFromSources, buildComparisonFromSources } from "./externalGpsSources";
+import { buildDailySummariesFromDays } from "./gpsDayAccumulation";
+import { resolveDaySessions, dayGpsStatus } from "./gpsDayResolver";
 
 const RANKING_STORAGE_KEY = "gps_microcycle_ranking_metrics_v1";
 const CHART_STORAGE_KEY = "gps_microcycle_chart_config_v1";
@@ -36,7 +38,7 @@ function loadChartConfig() {
   try { return { ...DEFAULT_CHART_CONFIG, ...(JSON.parse(window.localStorage.getItem(CHART_STORAGE_KEY) || "{}")) }; } catch { return DEFAULT_CHART_CONFIG; }
 }
 
-export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchGpsByMatch = {}, cycleDays: _cycleDays, playerMap, squadName, season, squadId, weeklyPlans = [], selectedWeeklyPlanId = "", onSelectWeeklyPlan, competitionProfiles = [], microcycleProfiles = [], calendarEvents: _calendarEvents, matchReports = [], onReload: _onReload }) {
+export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchGpsByMatch = {}, cycleDays = [], playerMap, squadName, season, squadId, weeklyPlans = [], selectedWeeklyPlanId = "", onSelectWeeklyPlan, competitionProfiles = [], microcycleProfiles = [], calendarEvents: _calendarEvents, matchReports = [], onReload: _onReload, onGoToLatestLoad }) {
   const reportCaptureRef = useRef(null);
   const [filters, setFilters] = useState({});
   const [summaries, setSummaries] = useState([]);
@@ -44,6 +46,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchG
   const [selectedSummaryId, setSelectedSummaryId] = useState("");
   const [selectedPlanId, setSelectedPlanId] = useState(selectedWeeklyPlanId || "");
   const [selectedSourceIds, setSelectedSourceIds] = useState([]);
+  const [selectedDayDate, setSelectedDayDate] = useState("");
   const [showHistory, setShowHistory] = useState(false);
   const [savingState, setSavingState] = useState("");
   const [saveMessage, setSaveMessage] = useState("");
@@ -115,15 +118,43 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchG
     return filterSourcesByDateRange(gpsSources, periodDateRange.from, periodDateRange.to);
   }, [gpsSources, periodDateRange, cycleMode]);
 
-  // ── Auto-select most recent source ──
+  // ── Derivar source IDs desde un día ──
+  function sourceIdsForDay(date) {
+    if (!date) return [];
+    const day = (cycleDays || []).find((d) => d.date === date);
+    if (!day) return [];
+    const daySessions = resolveDaySessions(day, sessions, squadId, season);
+    const ids = daySessions.map((s) => `training:${s.id}`);
+    if (day.day_type === "match" && day.match_id) ids.push(`match:${day.match_id}`);
+    return ids;
+  }
+
+  function handleSelectDay(date) {
+    setSelectedDayDate(date);
+    setSelectedSourceIds(sourceIdsForDay(date));
+  }
+
+  function handleToggleSession(sessionId) {
+    const sourceId = `training:${sessionId}`;
+    setSelectedSourceIds((current) =>
+      current.includes(sourceId) ? current.filter((id) => id !== sourceId) : [...current, sourceId]
+    );
+  }
+
+  // ── Auto-select most recent day with GPS ──
   useEffect(() => {
-    if (!periodSources.length) { setSelectedSourceIds([]); return; }
-    setSelectedSourceIds((current) => {
-      const valid = current.filter((id) => periodSources.some((s) => s.id === id));
-      if (valid.length) return valid;
-      return [periodSources[0].id];
-    });
-  }, [periodSources]);
+    if (cycleMode === "historical" || cycleMode === "lastSaved") return;
+    if (!cycleDays.length) { setSelectedSourceIds([]); setSelectedDayDate(""); return; }
+    if (selectedDayDate && cycleDays.some((d) => d.date === selectedDayDate)) return;
+    const daysWithGps = (cycleDays || []).filter((day) => {
+      const daySessions = resolveDaySessions(day, sessions, squadId, season);
+      const st = dayGpsStatus(day, daySessions, gpsBySession, matchGpsByMatch);
+      return st !== "free" && st !== "no_session";
+    }).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const target = daysWithGps[0] || (cycleDays || []).sort((a, b) => (b.date || "").localeCompare(a.date || ""))[0];
+    if (target) { setSelectedDayDate(target.date); setSelectedSourceIds(sourceIdsForDay(target.date)); }
+    else { setSelectedDayDate(""); setSelectedSourceIds([]); }
+  }, [cycleDays, sessions, gpsBySession, matchGpsByMatch, squadId, season, cycleMode]);
 
   const selectedDates = useMemo(() => [...new Set(periodSources.filter((s) => selectedSourceIds.includes(s.id)).map((s) => s.date))].sort(), [periodSources, selectedSourceIds]);
   const selectedSources = useMemo(() => periodSources.filter((s) => selectedSourceIds.includes(s.id)), [periodSources, selectedSourceIds]);
@@ -138,7 +169,10 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchG
   }, [visibleMetrics, selectedChartMetrics]);
   const rankingMetrics = useMemo(() => (rankingConfig.metricKeys || []).map((key) => MICRO_METRICS.find((metric) => metric.key === key)).filter(Boolean), [rankingConfig.metricKeys]);
 
-  const dailySummaries = useMemo(() => buildDailySummariesFromSources({ gpsSources: periodSources, playerMap, filters, metrics: reportMetrics }), [periodSources, playerMap, filters, reportMetrics]);
+  const dailySummaries = useMemo(() => {
+    if (cycleDays.length) return buildDailySummariesFromDays({ cycleDays, sessions, gpsBySession, matchReports, matchGpsByMatch, squadId, seasonId: season, metrics: reportMetrics });
+    return buildDailySummariesFromSources({ gpsSources: periodSources, playerMap, filters, metrics: reportMetrics });
+  }, [cycleDays, sessions, gpsBySession, matchReports, matchGpsByMatch, squadId, season, periodSources, playerMap, filters, reportMetrics]);
   const cycleRows = useMemo(() => rowsFromGpsSources(periodSources, playerMap, filters), [periodSources, playerMap, filters]);
   const allCycleRows = useMemo(() => rowsFromGpsSources(periodSources, playerMap, filters, true), [periodSources, playerMap, filters]);
   const rankingRows = useMemo(() => rankingConfig.scope === "selected" && selectedSourceIds.length ? rowsFromGpsSources(selectedSources, playerMap, filters) : cycleRows, [rankingConfig.scope, selectedSourceIds, selectedSources, periodSources, playerMap, filters, cycleRows]);
@@ -239,13 +273,7 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchG
     setSaveMessage("Microciclo eliminado.");
   }
 
-  function toggleSelectedSource(sourceId) {
-    setSelectedSourceIds((current) => current.includes(sourceId) ? current.filter((id) => id !== sourceId) : [...current, sourceId]);
-  }
-  function selectAllSources() { setSelectedSourceIds(periodSources.map((s) => s.id)); }
-  function clearSelectedSources() { setSelectedSourceIds([]); }
-
-  const hasSources = periodSources.length > 0;
+  const hasSources = cycleDays.length > 0 || periodSources.length > 0;
   const isHistorical = isSavedMicrocycleView;
 
   return (
@@ -254,7 +282,8 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchG
         <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <h2 className="text-xl font-black tracking-tight text-white">Carga del Microciclo</h2>
           <div className="flex flex-1 flex-wrap items-center justify-end gap-3">
-            <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedPlanId={selectedPlan?.id || selectedPlanId} onSelectPlan={(planId) => { setSelectedPlanId(planId); onSelectWeeklyPlan?.(planId); setCycleMode("current"); setSelectedSummaryId(""); setSelectedSourceIds([]); setFilters((current) => ({ ...current, selectedSourceIds: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
+            <GpsMicrocycleWeekNavigator weeklyPlans={weeklyPlans} selectedPlanId={selectedPlan?.id || selectedPlanId} onSelectPlan={(planId) => { setSelectedPlanId(planId); onSelectWeeklyPlan?.(planId); setCycleMode("current"); setSelectedSummaryId(""); setSelectedSourceIds([]); setSelectedDayDate(""); setFilters((current) => ({ ...current, selectedSourceIds: [] })); }} sessions={sessions} gpsBySession={gpsBySession} />
+            {onGoToLatestLoad && <button onClick={onGoToLatestLoad} className="h-10 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-4 text-sm font-semibold text-emerald-300 hover:bg-emerald-500/20 transition-colors">Ir a la última carga</button>}
             <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} gpsSources={gpsSources} metrics={MICRO_METRICS} />
             <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={shownDailySummaries} highlights={shownHighlights} comparison={shownComparison} cycleDays={shownDailySummaries} selectedDates={selectedDates} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={displayedChartConfig} rankingConfig={rankingConfig} matchContext={matchContext} cycleRows={rankingRows} />
           </div>
@@ -272,12 +301,24 @@ export default function GpsWeeklyEvolutionPanel({ sessions, gpsBySession, matchG
         </div>
       ) : !hasSources ? (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-950/70 p-8 text-center">
-          <h3 className="text-lg font-black text-white">No hay sesiones ni partidos con GPS cargado en este período</h3>
-          <p className="mt-2 text-sm text-zinc-500">Las cargas aparecen automáticamente cuando se procesan datos GPS reales.</p>
+          <h3 className="text-lg font-black text-white">No hay microciclo seleccionado</h3>
+          <p className="mt-2 text-sm text-zinc-500">Seleccioná un microciclo para ver los días y sus cargas.</p>
         </div>
       ) : (
         <>
-          <GpsMicrocycleSourceHeader gpsSources={periodSources} selectedSourceIds={selectedSourceIds} onToggleSource={toggleSelectedSource} onSelectAll={selectAllSources} onClear={clearSelectedSources} />
+          <GpsMicrocycleDayHeader
+            cycleDays={cycleDays}
+            sessions={sessions}
+            gpsBySession={gpsBySession}
+            matchReports={matchReports}
+            matchGpsByMatch={matchGpsByMatch}
+            squadId={squadId}
+            seasonId={season}
+            selectedDayDate={selectedDayDate}
+            onSelectDay={handleSelectDay}
+            selectedSessionIds={selectedSourceIds.filter((id) => id.startsWith("training:")).map((id) => id.replace("training:", ""))}
+            onToggleSession={handleToggleSession}
+          />
           <GpsDailyPlayerTable gpsSources={periodSources} selectedSourceIds={selectedSourceIds} playerMap={playerMap} microcycleProfiles={microcycleProfiles} competitionProfiles={competitionProfiles} squadId={squadId} season={season} />
           {selectedSourceIds.length > 0 && <div className="flex justify-end"><button onClick={() => setFilters((current) => ({ ...current, selectedSourceIds }))} className="rounded-xl border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs font-semibold text-zinc-300 hover:text-white">Filtrar gráficos por cargas seleccionadas</button></div>}
         </>

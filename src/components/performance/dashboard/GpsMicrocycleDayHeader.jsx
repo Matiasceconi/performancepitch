@@ -1,101 +1,148 @@
-import React, { useState } from "react";
+import React, { useMemo } from "react";
 import moment from "moment";
 import "moment/locale/es";
-import { Activity, CalendarDays, CheckCircle2, Trash2, Trophy } from "lucide-react";
-import { resolveDayMatch } from "./gpsMatchResolver";
-import { getMatchRowsForDay, matchGpsStatus } from "./matchGpsAdapter";
+import { Activity, AlertTriangle, CalendarOff, CheckCircle2, Clock, Trophy, Users } from "lucide-react";
+import { resolveDaySessions, dayGpsStatus, dayGpsPlayerCount } from "./gpsDayResolver";
+import { buildDailySummariesFromDays } from "./gpsDayAccumulation";
+import { MICRO_METRICS } from "./gpsMicrocycleReportUtils";
 
 moment.locale("es");
 
-function isRestDay(day) { return day?.day_type === "rest" || day?.is_rest_day === true; }
-function linkedSessionsForDay(day, sessions) {
-  if (isRestDay(day)) return [];
-  const linkedIds = Array.isArray(day.linked_session_ids) ? day.linked_session_ids : [];
-  if (day.day_id) {
-    const byDayId = sessions.filter((s) => s.weekly_plan_day_id === day.day_id);
-    if (byDayId.length) return byDayId;
-  }
-  if (linkedIds.length) return sessions.filter((s) => linkedIds.includes(s.id));
-  return sessions.filter((s) => s.date === day.date);
+const STATUS_CONFIG = {
+  free: { label: "Día libre", icon: CalendarOff, color: "text-zinc-500", border: "border-zinc-800", bg: "from-zinc-900 to-zinc-950", badge: "bg-zinc-800 text-zinc-400" },
+  no_session: { label: "Sin sesión", icon: Clock, color: "text-zinc-500", border: "border-zinc-800", bg: "from-zinc-900 to-zinc-950", badge: "bg-zinc-800 text-zinc-400" },
+  gps_pending: { label: "GPS pendiente", icon: Clock, color: "text-amber-400", border: "border-amber-500/30", bg: "from-amber-950/40 to-zinc-950", badge: "bg-amber-500/15 text-amber-300" },
+  gps_partial: { label: "GPS incompleto", icon: AlertTriangle, color: "text-yellow-400", border: "border-yellow-500/30", bg: "from-yellow-950/40 to-zinc-950", badge: "bg-yellow-500/15 text-yellow-300" },
+  gps_complete: { label: "GPS procesado", icon: CheckCircle2, color: "text-lime-400", border: "border-lime-500/30", bg: "from-emerald-950/40 to-zinc-950", badge: "bg-lime-500/15 text-lime-300" },
+  match_with_gps: { label: "Partido con GPS", icon: Trophy, color: "text-lime-300", border: "border-emerald-500/40", bg: "from-emerald-950 via-zinc-950 to-zinc-950", badge: "bg-emerald-400/15 text-emerald-200" },
+  match_no_gps: { label: "Partido sin GPS", icon: Trophy, color: "text-emerald-300", border: "border-emerald-500/30", bg: "from-emerald-950/40 to-zinc-950", badge: "bg-emerald-500/15 text-emerald-300" },
+  needs_review: { label: "Requiere revisión", icon: AlertTriangle, color: "text-red-400", border: "border-red-500/30", bg: "from-red-950/40 to-zinc-950", badge: "bg-red-500/15 text-red-300" },
+};
+
+function fmtMetric(value, unit) {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  const n = Number(value);
+  const shown = unit === "km/h" || unit === "u/min" || unit === "%" || n < 100 ? n.toFixed(1) : Math.round(n).toLocaleString("es-AR");
+  return `${shown}${unit ? " " + unit : ""}`.trim();
 }
 
-function dayStatus(day, linked, gpsBySession, match, matchRows = []) {
-  if (match) return matchGpsStatus(match, matchRows);
-  const withGps = linked.filter((s) => (gpsBySession[s.id] || []).length > 0).length;
-  const withoutGps = Math.max(0, linked.length - withGps);
-  if (linked.length && withGps === linked.length) return { label: `GPS completo ${withGps}/${linked.length}`, state: "complete", withGps, withoutGps };
-  if (linked.length && withGps) return { label: `GPS parcial ${withGps}/${linked.length}`, state: "partial", withGps, withoutGps };
-  if (isRestDay(day)) return { label: "Día libre — sin carga planificada", state: "rest", withGps: 0, withoutGps: 0 };
-  if (!linked.length) return { label: "Sin sesión", state: "empty", withGps, withoutGps };
-  return { label: `GPS pendiente ${withoutGps}/${linked.length}`, state: "pending", withGps, withoutGps };
-}
+function DayCard({ day, daySessions, status, gpsPlayers, metricValues, active, onClick, onSessionClick, selectedSessionIds }) {
+  const config = STATUS_CONFIG[status] || STATUS_CONFIG.no_session;
+  const StatusIcon = config.icon;
+  const isMatch = day.day_type === "match";
+  const isRest = day.day_type === "rest" || status === "free";
+  const totalDistance = metricValues?.total_distance;
+  const playerLoad = metricValues?.player_load;
 
-function selectionLabel(days, selectedDates) {
-  const selected = days.filter((day) => selectedDates.includes(day.date));
-  if (!selected.length) return "Sin días seleccionados";
-  const names = selected.map((day) => moment(day.date).format("dddd"));
-  if (names.length === 1) return `1 día seleccionado · ${names[0]}`;
-  if (names.length === days.length) return "Semana completa seleccionada";
-  return `${names.length} días seleccionados · ${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}`;
-}
-
-function initials(name) {
-  return String(name || "R").split(" ").slice(0, 2).map((part) => part[0]).join("").toUpperCase();
-}
-
-function RivalShield({ match }) {
-  const [failed, setFailed] = useState(false);
-  if (match?.rival_logo_url && !failed) {
-    return <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/95 p-2 shadow-inner"><img src={match.rival_logo_url} alt={`Escudo de ${match.rival}`} className="h-16 w-16 object-contain" onError={() => setFailed(true)} /></div>;
-  }
-  return <div title="Escudo no cargado" className="flex h-20 w-20 items-center justify-center rounded-2xl border border-zinc-700 bg-zinc-800/80 text-zinc-300">{match?.rival ? <span className="text-lg font-black">{initials(match.rival)}</span> : <Trophy size={30} />}</div>;
-}
-
-function MatchCard({ day, match, status, active, onClick }) {
-  return <button onClick={onClick} className={`relative min-h-[230px] min-w-[242px] rounded-xl border bg-gradient-to-br from-emerald-950 via-zinc-950 to-zinc-950 p-4 text-left transition ${active ? "border-lime-400 shadow-[0_0_0_1px_rgba(163,230,53,0.35),0_18px_42px_rgba(0,0,0,0.35)]" : "border-emerald-500/30 hover:border-emerald-400/60"}`}>
-    {active && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime-400 text-[11px] font-black text-zinc-950">✓</span>}
-    <div className="flex items-center justify-between gap-3">
-      <div>
-        <p className="text-lg font-black leading-none text-white">MD</p>
-        <p className="mt-1 text-xs font-bold text-zinc-300">{moment(day.date).format("dddd")} · {moment(day.date).format("DD/MM")}</p>
-      </div>
-      <span className="rounded-full border border-emerald-400/40 bg-emerald-400/10 px-2 py-1 text-[10px] font-black tracking-widest text-emerald-200">PARTIDO</span>
-    </div>
-    <div className="mt-4 flex items-center gap-4">
-      <RivalShield match={match} />
-      <div className="min-w-0 flex-1">
-        <p className="text-xs font-bold uppercase tracking-wider text-zinc-500">vs.</p>
-        <p className="truncate text-lg font-black text-white">{match?.rival || "Rival no definido"}</p>
-        <p className="mt-1 text-xs leading-relaxed text-zinc-400">{[match?.time, match?.competition, match?.home_away].filter(Boolean).join(" · ") || "Sin datos del partido"}</p>
-      </div>
-    </div>
-    <div className="mt-4 flex items-center justify-between gap-2 border-t border-emerald-500/20 pt-3"><span className="inline-flex items-center gap-2 text-xs font-semibold text-lime-300"><Activity size={13} />{status.label}</span><span className="text-[11px] text-zinc-500">Partido</span></div>
-  </button>;
-}
-
-export default function GpsMicrocycleDayHeader({ days = [], sessions = [], gpsBySession = {}, matchGpsByMatch = {}, selectedDates = [], onToggleDate, onSelectAll, onClear, calendarEvents = [], matchReports = [] }) {
-  const planDates = new Set(days.map((day) => day.date).filter(Boolean));
-  const validDayIds = new Set(days.map((day) => day.day_id || day.weekly_plan_day_id || day.id).filter(Boolean));
-  const planStart = days[0]?.date;
-  const planEnd = days[days.length - 1]?.date;
-  const outsidePlan = sessions.filter((session) => session.date && (!planStart || session.date >= planStart) && (!planEnd || session.date <= planEnd) && (!session.weekly_plan_day_id || !validDayIds.has(session.weekly_plan_day_id)) && (gpsBySession[session.id] || []).length > 0);
-  return <div className="space-y-4">
-    <div className="flex items-center justify-between rounded-2xl border border-zinc-800 bg-zinc-950/60 px-4 py-2.5">
-      <div className="flex items-center gap-2 text-sm text-zinc-400"><CheckCircle2 size={16} className="text-zinc-500" />{selectionLabel(days, selectedDates)}</div>
-      <div className="flex gap-2"><button onClick={onSelectAll} className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-300 hover:text-white"><CalendarDays size={13} /> Toda la semana</button><button onClick={onClear} className="inline-flex h-8 items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900/80 px-3 text-xs font-semibold text-zinc-300 hover:text-white"><Trash2 size={13} /> Limpiar</button></div>
-    </div>
-    {outsidePlan.length > 0 && <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-2 text-xs font-semibold text-amber-200">Sesión fuera del Plan semanal: {outsidePlan.length} con GPS cargado</div>}
-    <div className="flex gap-3 overflow-x-auto pb-1">{days.map((day) => { const match = resolveDayMatch(day, calendarEvents, matchReports); const linked = linkedSessionsForDay(day, sessions); const matchRows = getMatchRowsForDay(day, matchReports, matchGpsByMatch); const status = dayStatus(day, linked, gpsBySession, match, matchRows); const active = selectedDates.includes(day.date); const isEmpty = status.state === "empty"; if (match) return <MatchCard key={day.day_id || day.date} day={day} match={match} status={status} active={active} onClick={() => onToggleDate(day.date)} />; return <button key={day.day_id || day.date} onClick={() => onToggleDate(day.date)} className={`relative min-h-[206px] min-w-[132px] rounded-lg border bg-gradient-to-b from-zinc-900 to-zinc-950 p-4 text-left transition ${active ? "border-lime-400 shadow-[0_0_0_1px_rgba(163,230,53,0.35),0_18px_42px_rgba(0,0,0,0.35)]" : "border-zinc-800 hover:border-zinc-700"}`}>
-      <div className={`mb-5 h-1 w-9 rounded-full ${isEmpty ? "bg-zinc-700" : "bg-emerald-400"}`} />
+  return (
+    <button
+      onClick={onClick}
+      className={`relative min-h-[180px] min-w-[150px] max-w-[200px] rounded-xl border bg-gradient-to-b ${config.bg} p-3.5 text-left transition ${active ? `${config.border} shadow-[0_0_0_1px_rgba(163,230,53,0.35),0_18px_42px_rgba(0,0,0,0.35)]` : `${config.border} hover:border-zinc-600`}`}
+    >
       {active && <span className="absolute right-2 top-2 flex h-5 w-5 items-center justify-center rounded-full bg-lime-400 text-[11px] font-black text-zinc-950">✓</span>}
-      <p className="text-lg font-black leading-none text-white">{day.md || day.match_day_code || "—"}</p>
-      <p className="mt-1 text-xs font-bold text-zinc-400">{moment(day.date).format("dddd")}</p>
-      <p className="text-xs text-zinc-500">{moment(day.date).format("DD/MM")}</p>
-      <div className="my-3 border-t border-dashed border-zinc-800" />
-      {!isRestDay(day) && <p className="min-h-[34px] text-xs leading-snug text-zinc-200">{day.physical_objective || day.objetivo_fisico || day.objetivo || "Sin objetivo"}</p>}
-      {isRestDay(day) && <p className="min-h-[34px] text-xs font-semibold leading-snug text-blue-200">Día libre — sin carga planificada</p>}
-      <div className="mt-5 flex items-center gap-2"><span className={`flex h-6 w-6 items-center justify-center rounded-full ${isEmpty || isRestDay(day) ? "bg-zinc-800 text-zinc-500" : "bg-lime-500/10 text-lime-400"}`}><Activity size={13} /></span><span className={`text-xs font-semibold ${isEmpty || isRestDay(day) ? "text-zinc-500" : "text-lime-400"}`}>{status.label}</span></div>
-      <p className="mt-2 text-[11px] text-zinc-500">{linked.length} {linked.length === 1 ? "sesión" : "sesiones"}</p>
-    </button>; })}</div>
-  </div>;
+
+      {/* Header: weekday + date + MD */}
+      <div className="mb-2">
+        <p className="text-[10px] uppercase font-medium text-zinc-500">{day.date ? moment(day.date).format("dddd") : "—"}</p>
+        <p className="text-sm font-bold text-white leading-tight">{day.date ? moment(day.date).format("DD/MM") : "—"}</p>
+        <p className="text-base font-black leading-none mt-1" style={{ color: isMatch ? "#a3e635" : "#fff" }}>
+          {day.display_md_label || day.md || day.md_code || "—"}
+        </p>
+      </div>
+
+      {/* Status badge */}
+      <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${config.badge}`}>
+        <StatusIcon size={10} /> {config.label}
+      </span>
+
+      {/* Sessions */}
+      {!isRest && daySessions.length > 0 && (
+        <div className="mt-2 space-y-0.5">
+          {daySessions.map((s) => (
+            <div
+              key={s.id}
+              onClick={(e) => { e.stopPropagation(); onSessionClick?.(s.id); }}
+              className={`flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] transition ${selectedSessionIds?.includes(s.id) ? "bg-lime-500/15 text-lime-300" : "text-zinc-300 hover:bg-zinc-800/50"}`}
+            >
+              {s.start_time && <Clock size={9} className="shrink-0 text-zinc-500" />}
+              <span className="truncate">{s.start_time || ""} {s.session_type || s.title || "Sesión"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Objective */}
+      {!isRest && daySessions.length > 0 && daySessions[0]?.session_objective && (
+        <p className="mt-1.5 text-[10px] text-zinc-500 truncate">{daySessions[0].session_objective}</p>
+      )}
+
+      {/* Footer: GPS players + load */}
+      {!isRest && (
+        <div className="mt-2 border-t border-zinc-800 pt-1.5 space-y-0.5">
+          {gpsPlayers > 0 && (
+            <p className="flex items-center gap-1 text-[10px] text-zinc-400">
+              <Users size={9} /> GPS {gpsPlayers} jugadores
+            </p>
+          )}
+          {totalDistance != null && (
+            <p className="flex items-center gap-1 text-[10px] text-zinc-400">
+              <Activity size={9} /> {fmtMetric(totalDistance, "m")}
+            </p>
+          )}
+          {playerLoad != null && (
+            <p className="text-[10px] text-zinc-500">PL {fmtMetric(playerLoad, "u")}</p>
+          )}
+        </div>
+      )}
+    </button>
+  );
+}
+
+export default function GpsMicrocycleDayHeader({
+  cycleDays = [],
+  sessions = [],
+  gpsBySession = {},
+  matchReports = [],
+  matchGpsByMatch = {},
+  squadId,
+  seasonId,
+  selectedDayDate = "",
+  onSelectDay,
+  selectedSessionIds = [],
+  onToggleSession,
+}) {
+  const dayData = useMemo(() => {
+    return (cycleDays || []).map((day) => {
+      const daySessions = resolveDaySessions(day, sessions, squadId, seasonId);
+      const status = dayGpsStatus(day, daySessions, gpsBySession, matchGpsByMatch);
+      const gpsPlayers = dayGpsPlayerCount(daySessions, gpsBySession);
+      const summaries = buildDailySummariesFromDays({
+        cycleDays: [day], sessions, gpsBySession, matchReports, matchGpsByMatch, squadId, seasonId, metrics: MICRO_METRICS,
+      });
+      return { day, daySessions, status, gpsPlayers, metricValues: summaries[0] || {} };
+    });
+  }, [cycleDays, sessions, gpsBySession, matchReports, matchGpsByMatch, squadId, seasonId]);
+
+  if (!cycleDays.length) return null;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-3 overflow-x-auto pb-1">
+        {dayData.map(({ day, daySessions, status, gpsPlayers, metricValues }) => (
+          <DayCard
+            key={day.weekly_plan_day_id || day.id || day.date || Math.random()}
+            day={day}
+            daySessions={daySessions}
+            status={status}
+            gpsPlayers={gpsPlayers}
+            metricValues={metricValues}
+            active={selectedDayDate === day.date}
+            onClick={() => onSelectDay?.(day.date)}
+            onSessionClick={onToggleSession}
+            selectedSessionIds={selectedSessionIds}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }

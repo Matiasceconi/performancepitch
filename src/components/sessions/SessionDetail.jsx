@@ -12,7 +12,7 @@ import SessionVideoObs from "@/components/sessions/SessionVideoObs";
 import SessionVideoLinks from "@/components/sessions/SessionVideoLinks";
 import { useToast } from "@/components/ui/use-toast";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
-import { effectiveSessionMeta, getMicrocycleDefaults, SESSION_MD_CODES } from "@/components/planning/microcycleSync";
+import { effectiveSessionMeta, getMicrocycleDefaults, SESSION_MD_CODES, invokeRebuildPlanning } from "@/components/planning/microcycleSync";
 
 const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
@@ -86,17 +86,31 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
 
   async function handleSaveEdit() {
     setSaving(true);
+    const dateChanged = editForm.date !== currentSession.date;
     const mdOverride = planDefaults?.match_day_code ? editForm.match_day_code !== planDefaults.match_day_code : editManualMeta.md;
     const objectiveOverride = planDefaults?.session_objective ? editForm.session_objective !== planDefaults.session_objective : editManualMeta.objective;
     const sessionNumber = Number(editForm.session_number || currentSession.session_number || 1);
-    const updated = await base44.entities.TrainingSession.update(currentSession.id, {
+    const updatePayload = {
       title: `Sesión ${sessionNumber}`, session_number: sessionNumber, date: editForm.date, period: editForm.period || "Competencia",
       match_day_code: editForm.match_day_code, microcycle_day: editForm.match_day_code,
       session_objective: editForm.session_objective,
       md_manual_override: mdOverride,
       physical_objective_manual_override: objectiveOverride,
       duration_minutes: editForm.duration_minutes, location: editForm.location,
-    });
+    };
+    // No sobrescribir el MD si ya tenía override manual y no se editó manualmente
+    if (currentSession.md_manual_override && !editManualMeta.md) {
+      delete updatePayload.match_day_code;
+      delete updatePayload.microcycle_day;
+    }
+    let updated = await base44.entities.TrainingSession.update(currentSession.id, updatePayload);
+    // Si cambió la fecha, reconstruir la planificación y recargar la sesión con sus nuevos vínculos
+    if (dateChanged) {
+      try {
+        await invokeRebuildPlanning({ squadId: currentSession.squad_id, seasonId: currentSession.season_id || "", mode: "execute" });
+        updated = await base44.entities.TrainingSession.get(currentSession.id);
+      } catch { /* mantener updated sin recargar */ }
+    }
     setCurrentSession(updated);
     setEditForm(updated);
     setEditing(false);
