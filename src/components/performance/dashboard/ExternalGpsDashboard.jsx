@@ -6,15 +6,14 @@ import { isGoalkeeper } from "@/components/squad/squadConstants";
 import { avg, withRetry } from "../externalGpsLoadUtils";
 import ImportHistoricalGPSModal from "../ImportHistoricalGPSModal";
 import GpsDashboardHeader from "./GpsDashboardHeader";
-import GpsWeeklyEvolutionPanel from "./GpsWeeklyEvolutionPanel";
+import GpsSessionLoadPanel from "./GpsSessionLoadPanel";
 import GpsIndividualProfilePanel from "./GpsIndividualProfilePanel";
 import GpsIndividualPlayerTab from "./GpsIndividualPlayerTab";
 import GpsKinesiologyLoadTab from "./GpsKinesiologyLoadTab";
 import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import GpsSessionAnalyticsFilters from "./GpsSessionAnalyticsFilters";
 import GpsSessionsAdvancedTable from "./GpsSessionsAdvancedTable";
-import moment from "moment";
-import { daysForPlan, operationalPlans } from "@/components/planning/microcycleSync";
+
 
 function positionGroup(position, player) {
   if (isGoalkeeper(player || { position })) return "Arquero";
@@ -70,17 +69,13 @@ export default function ExternalGpsDashboard() {
   const [medicalEpisodes, setMedicalEpisodes] = useState([]);
   const [medicalStatuses, setMedicalStatuses] = useState([]);
   const [memberships, setMemberships] = useState([]);
-  const [weeklyPlans, setWeeklyPlans] = useState([]);
-  const [weeklyPlanDays, setWeeklyPlanDays] = useState([]);
-  const [selectedWeeklyPlanId, setSelectedWeeklyPlanId] = useState("");
-  const [calendarEvents, setCalendarEvents] = useState([]);
   const [matchReports, setMatchReports] = useState([]);
   const [matchGpsByMatch, setMatchGpsByMatch] = useState({});
   const [loading, setLoading] = useState(true);
   const [showImportModal, setShowImportModal] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState("");
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
-  const [activeTab, setActiveTab] = useState("microcycle");
+  const [activeTab, setActiveTab] = useState("session-load");
   const [sessionFilters, setSessionFilters] = useState({
     squadId: activeSquadId || "all",
     season: "",
@@ -150,7 +145,7 @@ export default function ExternalGpsDashboard() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allWeeklyPlans, allWeeklyPlanDays, allCalendarEvents, allMatchReports, allCatapultReports] = await Promise.all([
+      const [allPlayers, allSessions, allCompetitionProfiles, allMicrocycleProfiles, allMedicalEpisodes, allMedicalStatuses, allMemberships, allMatchReports, allCatapultReports] = await Promise.all([
         base44.entities.Player.list("-created_date", 500),
         selectedSquadId ? base44.entities.TrainingSession.filter({ squad_id: selectedSquadId }, "-date", 500) : base44.entities.TrainingSession.list("-date", 500),
         base44.entities.PlayerCompetitionProfile.list("-updated_at", 1000),
@@ -158,9 +153,6 @@ export default function ExternalGpsDashboard() {
         base44.entities.MedicalEpisode.list("-fecha_inicio_tto", 2000),
         base44.entities.MedicalCurrentStatus.list("-updated_at", 2000),
         base44.entities.SquadMembership.list("-created_date", 2000),
-        selectedSquadId ? base44.entities.WeeklyPlan.filter({ squad_id: selectedSquadId }, "-week_start", 100) : base44.entities.WeeklyPlan.list("-week_start", 100),
-        selectedSquadId ? base44.entities.WeeklyPlanDay.filter({ squad_id: selectedSquadId }, "date", 5000).catch(() => []) : base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
-        base44.entities.DayEvent.list("-date", 500),
         base44.entities.MatchReport.list("-date", 500),
         base44.entities.CatapultReport.list("-date", 5000).catch(() => []),
       ]);
@@ -173,10 +165,6 @@ export default function ExternalGpsDashboard() {
       setMedicalEpisodes(allMedicalEpisodes.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
       setMedicalStatuses(allMedicalStatuses.filter((s) => (!selectedSquadId || !s.squad_id || s.squad_id === selectedSquadId)));
       setMemberships(allMemberships.filter((m) => m.squad_id === selectedSquadId && m.status !== "fuera_del_plantel" && m.status !== "inactivo" && !m.effective_to));
-      const scopedPlans = selectedSquadId ? allWeeklyPlans.filter((p) => p.squad_id === selectedSquadId && (!selectedSeason || !p.season_id || p.season_id === selectedSeason)) : allWeeklyPlans;
-      setWeeklyPlanDays(allWeeklyPlanDays);
-      setWeeklyPlans(operationalPlans(scopedPlans).map((plan) => ({ ...plan, operational_days: daysForPlan(plan, allWeeklyPlanDays) })).filter((plan) => (plan.operational_days || []).length));
-      setCalendarEvents(allCalendarEvents.filter((e) => (!selectedSquadId || !e.squad_id || e.squad_id === selectedSquadId) && (!selectedSeason || !e.season_id || e.season_id === selectedSeason)));
       const scopedMatchReports = allMatchReports.filter((m) => (!selectedSquadId || !m.squad_id || m.squad_id === selectedSquadId) && (!selectedSeason || !m.season_id || m.season_id === selectedSeason));
       setMatchReports(scopedMatchReports);
       const scopedMatchIds = new Set(scopedMatchReports.map((match) => match.id));
@@ -231,15 +219,13 @@ export default function ExternalGpsDashboard() {
   }, [load]);
 
   useEffect(() => {
-    const unsubscribePlan = base44.entities.WeeklyPlan.subscribe(debouncedLoad);
-    const unsubscribePlanDay = base44.entities.WeeklyPlanDay.subscribe(debouncedLoad);
     const unsubscribeCatapult = base44.entities.CatapultReport.subscribe(debouncedLoad);
     const unsubscribeSession = base44.entities.TrainingSession.subscribe(debouncedLoad);
     const unsubscribeGps = base44.entities.SessionGPSData.subscribe(debouncedLoad);
     const unsubscribeMatch = base44.entities.MatchReport.subscribe(debouncedLoad);
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      unsubscribePlan?.(); unsubscribePlanDay?.(); unsubscribeCatapult?.(); unsubscribeSession?.(); unsubscribeGps?.(); unsubscribeMatch?.();
+      unsubscribeCatapult?.(); unsubscribeSession?.(); unsubscribeGps?.(); unsubscribeMatch?.();
     };
   }, [debouncedLoad]);
 
@@ -378,60 +364,6 @@ export default function ExternalGpsDashboard() {
     };
   }, [sessions, gpsBySession, sortedSessions, allEnrichedRows]);
 
-  const today = moment().format("YYYY-MM-DD");
-  const currentCycle = useMemo(() => {
-    if (!weeklyPlans.length) return null;
-    // 1. Respetar selección manual del usuario
-    const selected = weeklyPlans.find((p) => p.id === selectedWeeklyPlanId);
-    if (selected) return selected;
-    // 2. Sesión más reciente con GPS utilizable
-    const sessionsWithGps = sessions
-      .filter((s) => (gpsBySession[s.id] || []).some((r) => r.include_in_session_average !== false))
-      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    if (sessionsWithGps.length) {
-      const latest = sessionsWithGps[0];
-      if (latest.weekly_plan_id) {
-        const plan = weeklyPlans.find((p) => p.id === latest.weekly_plan_id);
-        if (plan) return plan;
-      }
-      if (latest.weekly_plan_day_id) {
-        const plan = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => (d.weekly_plan_day_id || d.id) === latest.weekly_plan_day_id));
-        if (plan) return plan;
-      }
-      const planByDate = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === latest.date));
-      if (planByDate) return planByDate;
-    }
-    // 3. Plan que contiene la fecha actual
-    const withToday = weeklyPlans.filter((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === today));
-    if (withToday.length) return withToday[0];
-    // 4. Plan activo con period_end más reciente
-    return [...weeklyPlans].sort((a, b) => String(b.period_end || b.week_end || b.week_start || "").localeCompare(String(a.period_end || a.week_end || a.week_start || "")))[0] || null;
-  }, [weeklyPlans, weeklyPlanDays, selectedWeeklyPlanId, today, sessions, gpsBySession]);
-
-  function goToLatestLoad() {
-    const sessionsWithGps = sessions
-      .filter((s) => (gpsBySession[s.id] || []).some((r) => r.include_in_session_average !== false))
-      .sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    if (!sessionsWithGps.length) return;
-    const latest = sessionsWithGps[0];
-    if (latest.weekly_plan_id) {
-      const plan = weeklyPlans.find((p) => p.id === latest.weekly_plan_id);
-      if (plan) { setSelectedWeeklyPlanId(plan.id); return; }
-    }
-    if (latest.weekly_plan_day_id) {
-      const plan = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => (d.weekly_plan_day_id || d.id) === latest.weekly_plan_day_id));
-      if (plan) { setSelectedWeeklyPlanId(plan.id); return; }
-    }
-    const planByDate = weeklyPlans.find((p) => daysForPlan(p, weeklyPlanDays).some((d) => d.date === latest.date));
-    if (planByDate) setSelectedWeeklyPlanId(planByDate.id);
-  }
-
-  useEffect(() => {
-    if (currentCycle?.id && currentCycle.id !== selectedWeeklyPlanId) setSelectedWeeklyPlanId(currentCycle.id);
-  }, [currentCycle, selectedWeeklyPlanId]);
-
-  const cycleDays = currentCycle ? daysForPlan(currentCycle, weeklyPlanDays) : [];
-
   const rosterPlayerIds = useMemo(() => new Set(memberships.map((m) => m.player_id)), [memberships]);
   const rosterPlayers = useMemo(() => players.filter((p) => rosterPlayerIds.has(p.id)), [players, rosterPlayerIds]);
 
@@ -504,7 +436,7 @@ export default function ExternalGpsDashboard() {
   );
 
   const tabs = [
-    { id: "microcycle", label: "Carga del Microciclo" },
+    { id: "session-load", label: "Carga de sesión" },
     { id: "sessions", label: "Buscar sesiones" },
     { id: "kinesiology", label: "Diferenciados en Kinesiología" },
     { id: "individual-player", label: "Individual" },
@@ -543,8 +475,8 @@ export default function ExternalGpsDashboard() {
         ))}
       </div>
 
-      {activeTab === "microcycle" && (
-        <GpsWeeklyEvolutionPanel sessions={sessions} gpsBySession={gpsBySession} matchGpsByMatch={matchGpsByMatch} cycleDays={cycleDays} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} weeklyPlans={weeklyPlans} selectedWeeklyPlanId={selectedWeeklyPlanId} onSelectWeeklyPlan={setSelectedWeeklyPlanId} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} calendarEvents={calendarEvents} matchReports={matchReports} onReload={load} onGoToLatestLoad={goToLatestLoad} />
+      {activeTab === "session-load" && (
+        <GpsSessionLoadPanel sessions={sessions} gpsBySession={gpsBySession} matchGpsByMatch={matchGpsByMatch} playerMap={playerMap} squadName={selectedSquad?.name} season={selectedSeason} squadId={selectedSquadId} competitionProfiles={competitionProfiles} microcycleProfiles={microcycleProfiles} matchReports={matchReports} onReload={load} />
       )}
 
       {activeTab === "sessions" && (
