@@ -1,16 +1,16 @@
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import moment from "moment";
 import "moment/locale/es";
-import { Search, ChevronDown, CheckCircle2, Clock, AlertCircle, X } from "lucide-react";
+import { Search, CheckCircle2, Clock, AlertCircle, X, Target, Users } from "lucide-react";
 
 moment.locale("es");
 
 export function gpsStatus(session, gpsBySession) {
   const rows = gpsBySession[session.id] || [];
   const hasProcessed = rows.some((r) => r.include_in_session_average !== false);
-  if (hasProcessed) return { label: "Procesado", color: "text-emerald-400", Icon: CheckCircle2 };
-  if (rows.length) return { label: "Pendiente", color: "text-amber-400", Icon: Clock };
-  return { label: "Sin datos", color: "text-zinc-500", Icon: AlertCircle };
+  if (hasProcessed) return { label: "Procesado", color: "text-emerald-400", Icon: CheckCircle2, dot: "bg-emerald-400" };
+  if (rows.length) return { label: "Pendiente", color: "text-amber-400", Icon: Clock, dot: "bg-amber-400" };
+  return { label: "Sin datos", color: "text-zinc-500", Icon: AlertCircle, dot: "bg-zinc-600" };
 }
 
 export function sessionLabel(session) {
@@ -18,11 +18,13 @@ export function sessionLabel(session) {
   return session.title || "Sesión";
 }
 
+function gpsPlayerCount(session, gpsBySession) {
+  const rows = (gpsBySession[session.id] || []).filter((r) => r.include_in_session_average !== false);
+  return new Set(rows.map((r) => r.player_id).filter(Boolean)).size;
+}
+
 export default function GpsSessionSelector({ sessions, gpsBySession, selectedSessionId, onSelect, loading }) {
-  const [open, setOpen] = useState(false);
   const [search, setSearch] = useState("");
-  const containerRef = useRef(null);
-  const inputRef = useRef(null);
 
   const sorted = useMemo(() => [...sessions].sort((a, b) => {
     const dc = (b.date || "").localeCompare(a.date || "");
@@ -42,95 +44,77 @@ export default function GpsSessionSelector({ sessions, gpsBySession, selectedSes
     });
   }, [sorted, search]);
 
-  const selected = sorted.find((s) => s.id === selectedSessionId);
-
-  useEffect(() => { if (open && inputRef.current) inputRef.current.focus(); }, [open]);
-
-  useEffect(() => {
-    function handleClickOutside(e) {
-      if (containerRef.current && !containerRef.current.contains(e.target)) { setOpen(false); setSearch(""); }
-    }
-    if (open) document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
-
-  const selectedStatus = selected ? gpsStatus(selected, gpsBySession) : null;
-
   return (
-    <div className="relative" ref={containerRef}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between gap-3 rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-left hover:border-zinc-600 transition-colors"
-      >
-        <div className="flex-1 min-w-0">
-          {selected ? (
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-bold text-white shrink-0">{moment(selected.date).format("DD/MM/YYYY")}</span>
-              <span className="text-sm text-zinc-300 truncate">{sessionLabel(selected)}</span>
-              {selected.session_type && <span className="text-xs text-zinc-500 truncate hidden sm:inline">· {selected.session_type}</span>}
-            </div>
-          ) : (
-            <span className="text-sm text-zinc-500">{loading ? "Cargando sesiones..." : "Seleccionar sesión"}</span>
-          )}
-        </div>
-        {selectedStatus && (
-          <span className={`flex items-center gap-1 text-xs font-semibold ${selectedStatus.color} shrink-0`}>
-            <selectedStatus.Icon size={14} />
-            <span className="hidden sm:inline">{selectedStatus.label}</span>
-          </span>
+    <div className="space-y-3">
+      {/* Search bar */}
+      <div className="relative">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Buscar sesión por número, nombre, fecha o tipo..."
+          className="w-full rounded-xl border border-zinc-700 bg-zinc-950 pl-9 pr-9 py-2.5 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none"
+        />
+        {search && (
+          <button onClick={() => setSearch("")} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
+            <X size={16} />
+          </button>
         )}
-        <ChevronDown size={18} className={`text-zinc-500 transition-transform shrink-0 ${open ? "rotate-180" : ""}`} />
-      </button>
+      </div>
 
-      {open && (
-        <div className="absolute z-50 mt-2 w-full rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl">
-          <div className="p-3 border-b border-zinc-800">
-            <div className="relative">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-              <input
-                ref={inputRef}
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar por número, nombre, fecha o tipo..."
-                className="w-full rounded-lg border border-zinc-700 bg-zinc-950 pl-9 pr-9 py-2 text-sm text-white placeholder-zinc-500 focus:border-emerald-500 focus:outline-none"
-              />
-              {search && (
-                <button onClick={() => setSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-white">
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-          </div>
-          <div className="max-h-80 overflow-y-auto">
-            {filtered.length === 0 ? (
-              <div className="p-6 text-center text-sm text-zinc-500">No se encontraron sesiones</div>
-            ) : (
-              filtered.map((session) => {
-                const status = gpsStatus(session, gpsBySession);
-                const isSelected = session.id === selectedSessionId;
-                return (
-                  <button
-                    key={session.id}
-                    onClick={() => { onSelect(session.id); setOpen(false); setSearch(""); }}
-                    className={`w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-zinc-800/70 transition-colors border-b border-zinc-800/50 last:border-0 ${isSelected ? "bg-emerald-500/10" : ""}`}
-                  >
-                    <span className="text-sm font-bold text-white w-20 shrink-0">{moment(session.date).format("DD/MM/YYYY")}</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold text-zinc-200 truncate">{sessionLabel(session)}</span>
-                        {session.session_type && <span className="text-xs text-zinc-500 truncate">· {session.session_type}</span>}
-                      </div>
-                      {session.session_objective && <span className="text-xs text-zinc-500 truncate block">{session.session_objective}</span>}
-                    </div>
-                    <span className={`flex items-center gap-1 text-xs font-semibold ${status.color} shrink-0`}>
-                      <status.Icon size={12} />
-                      {status.label}
+      {/* Grid of session cards */}
+      {loading ? (
+        <div className="text-sm text-zinc-500 py-8 text-center">Cargando sesiones...</div>
+      ) : filtered.length === 0 ? (
+        <div className="text-sm text-zinc-500 py-8 text-center">No se encontraron sesiones</div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {filtered.map((session) => {
+            const status = gpsStatus(session, gpsBySession);
+            const isSelected = session.id === selectedSessionId;
+            const playerCount = gpsPlayerCount(session, gpsBySession);
+            return (
+              <button
+                key={session.id}
+                onClick={() => onSelect(session.id)}
+                className={`group relative flex flex-col rounded-2xl border p-4 text-left transition-all ${
+                  isSelected
+                    ? "border-emerald-500 bg-emerald-500/10 ring-1 ring-emerald-500/40"
+                    : "border-zinc-800 bg-zinc-900 hover:border-zinc-600 hover:bg-zinc-800/60"
+                }`}
+              >
+                {/* Header */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-white truncate">{sessionLabel(session)}</h4>
+                    <p className="text-xs text-zinc-500 capitalize mt-0.5 truncate">
+                      {moment(session.date).format("dddd DD/MM/YYYY")}
+                    </p>
+                  </div>
+                  <span className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold shrink-0 ${status.color} bg-zinc-950 border border-zinc-800`}>
+                    <status.Icon size={11} />
+                    {status.label}
+                  </span>
+                </div>
+
+                {/* Footer metrics */}
+                <div className="mt-3 pt-3 border-t border-zinc-800/70 flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 text-zinc-400 min-w-0">
+                    <Target size={13} className="text-zinc-500 shrink-0" />
+                    <span className="text-zinc-500 shrink-0">Objetivo:</span>
+                    <span className="font-semibold text-zinc-200 truncate">
+                      {session.session_objective || "—"}
                     </span>
-                  </button>
-                );
-              })
-            )}
-          </div>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-zinc-400 shrink-0">
+                    <Users size={13} className="text-zinc-500" />
+                    <span className="text-zinc-500">GPS:</span>
+                    <span className="font-semibold text-white">{playerCount}</span>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
       )}
     </div>

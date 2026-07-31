@@ -95,18 +95,17 @@ export default function GpsSessionLoadPanel({ sessions, gpsBySession, matchGpsBy
 
   return (
     <div className="space-y-5">
-      {/* Selector + toolbar */}
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/70 p-4 shadow-[0_18px_48px_rgba(0,0,0,0.25)]">
-        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex-1 xl:max-w-2xl">
-            <GpsSessionSelector sessions={sortedSessions} gpsBySession={gpsBySession} selectedSessionId={selectedSessionId} onSelect={setSelectedSessionId} />
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} gpsSources={allGpsSources} metrics={MICRO_METRICS} />
-            <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} cycleDays={dailySummaries} selectedDates={selectedSession ? [selectedSession.date] : []} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={chartConfig} rankingConfig={rankingConfig} matchContext={null} cycleRows={cycleRows} />
-          </div>
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Seleccionar sesión</h3>
+        <div className="flex flex-wrap items-center gap-3">
+          <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} gpsSources={allGpsSources} metrics={MICRO_METRICS} />
+          <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} cycleDays={dailySummaries} selectedDates={selectedSession ? [selectedSession.date] : []} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={chartConfig} rankingConfig={rankingConfig} matchContext={null} cycleRows={cycleRows} />
         </div>
       </div>
+
+      {/* Session grid */}
+      <GpsSessionSelector sessions={sortedSessions} gpsBySession={gpsBySession} selectedSessionId={selectedSessionId} onSelect={setSelectedSessionId} />
 
       {/* Session header */}
       {selectedSession && (
