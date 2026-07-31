@@ -45,3 +45,18 @@ export function generateUniqueUsername(base: string, existing: Set<string>): str
   while (existing.has(`${base}${n}`)) n++;
   return `${base}${n}`;
 }
+
+// Helper central: unifica dni y document_number en un solo valor normalizado.
+export function getNormalizedPlayerDni(player: any): string {
+  return normalizeDni(player?.dni || player?.document_number);
+}
+
+// Devuelve la fecha de hoy (YYYY-MM-DD) en la zona horaria especificada.
+export function getTodayInTimezone(timezone = 'America/Argentina/Buenos_Aires'): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date());
+}

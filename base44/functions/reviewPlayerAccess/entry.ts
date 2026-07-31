@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolvePlayerAccessAdmin } from "../../shared/playerPortalAuth.ts";
-import { generateUsernameBase, generateUniqueUsername, normalizeDni } from "../../shared/playerAccessUtils.ts";
+import { generateUsernameBase, generateUniqueUsername, normalizeDni, getNormalizedPlayerDni } from "../../shared/playerAccessUtils.ts";
 
 export default async function(req) {
   try {
@@ -14,6 +14,66 @@ export default async function(req) {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || 'dry_run');
     const squadId = String(body.squad_id || '');
+
+    // ── Auditoría de DNI: reportar estado de dni vs document_number ──────
+    if (action === 'dni_audit') {
+      const playerQuery: any = {};
+      if (squadId) playerQuery.squad_id = squadId;
+      const allPlayers = await base44.asServiceRole.entities.Player.filter(playerQuery, "last_name", 2000);
+      const stats = {
+        total: allPlayers.length,
+        with_dni: 0,
+        with_document_number: 0,
+        both_equal: 0,
+        both_different: 0,
+        without_document: 0,
+        duplicates: [] as any[],
+      };
+      const docMap: Record<string, string[]> = {};
+      for (const p of allPlayers) {
+        const dni = normalizeDni(p.dni);
+        const docNum = normalizeDni(p.document_number);
+        if (dni) stats.with_dni++;
+        if (docNum) stats.with_document_number++;
+        if (dni && docNum) {
+          if (dni === docNum) stats.both_equal++;
+          else stats.both_different++;
+        }
+        if (!dni && !docNum) stats.without_document++;
+        const doc = dni || docNum;
+        if (doc) {
+          if (!docMap[doc]) docMap[doc] = [];
+          docMap[doc].push(`${p.first_name} ${p.last_name}`);
+        }
+      }
+      for (const [doc, names] of Object.entries(docMap)) {
+        if (names.length > 1) stats.duplicates.push({ document: doc, players: names });
+      }
+      return Response.json({ ok: true, stats });
+    }
+
+    // ── Unificación de DNI: completar el campo faltante ─────────────────
+    if (action === 'dni_unify') {
+      const playerQuery: any = {};
+      if (squadId) playerQuery.squad_id = squadId;
+      const allPlayers = await base44.asServiceRole.entities.Player.filter(playerQuery, "last_name", 2000);
+      let updated = 0;
+      let skipped = 0;
+      for (const p of allPlayers) {
+        const dni = normalizeDni(p.dni);
+        const docNum = normalizeDni(p.document_number);
+        if (dni && !docNum) {
+          await base44.asServiceRole.entities.Player.update(p.id, { document_number: dni });
+          updated++;
+        } else if (!dni && docNum) {
+          await base44.asServiceRole.entities.Player.update(p.id, { dni: docNum });
+          updated++;
+        } else if (dni && docNum && dni !== docNum) {
+          skipped++;
+        }
+      }
+      return Response.json({ ok: true, updated, skipped });
+    }
 
     // Obtener todos los jugadores
     const playerQuery: any = {};
@@ -45,7 +105,7 @@ export default async function(req) {
     const operations: any[] = [];
 
     for (const player of players) {
-      const dni = normalizeDni(player.dni);
+      const dni = getNormalizedPlayerDni(player);
       const hasDni = dni.length > 0;
       const existing = accessByPlayerId[player.id];
 

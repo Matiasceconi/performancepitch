@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { normalizeDni, normalizeUsername, generateActivationToken, hashToken } from "../../shared/playerAccessUtils.ts";
+import { normalizeDni, normalizeUsername, generateActivationToken, hashToken, getNormalizedPlayerDni } from "../../shared/playerAccessUtils.ts";
 
 const MAX_ATTEMPTS = 5;
 const LOCK_MINUTES = 15;
@@ -60,7 +60,7 @@ export default async function(req) {
       return Response.json({ error: 'Los datos ingresados no son correctos' }, { status: 400 });
     }
 
-    const playerDni = normalizeDni(player.dni);
+    const playerDni = getNormalizedPlayerDni(player);
     if (!playerDni || playerDni !== rawDni) {
       // Incrementar intentos fallidos
       const attempts = (record.failed_attempts || 0) + 1;

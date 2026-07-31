@@ -1,6 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolvePlayerAccessAdmin } from "../../shared/playerPortalAuth.ts";
-import { generateUsernameBase, generateUniqueUsername, normalizeDni } from "../../shared/playerAccessUtils.ts";
+import { generateUsernameBase, generateUniqueUsername, normalizeDni, getNormalizedPlayerDni } from "../../shared/playerAccessUtils.ts";
 
 export default async function(req) {
   try {
@@ -27,7 +27,7 @@ export default async function(req) {
       accesses.forEach(a => { accessByPlayer[a.player_id] = a; });
       const rows = players.map(p => {
         const acc = accessByPlayer[p.id];
-        const hasDni = !!normalizeDni(p.dni);
+        const hasDni = !!getNormalizedPlayerDni(p);
         return {
           player: p,
           access: acc,
@@ -65,7 +65,7 @@ export default async function(req) {
       const username = generateUniqueUsername(base, existingUsernames);
       const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
         username,
-        status: normalizeDni(player.dni) ? 'ready_to_activate' : 'missing_document',
+        status: getNormalizedPlayerDni(player) ? 'ready_to_activate' : 'missing_document',
         updated_at: new Date().toISOString(),
       });
       return Response.json({ ok: true, access: updated });
@@ -112,7 +112,7 @@ export default async function(req) {
     if (action === 'reset_activation') {
       if (!access) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
       const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
-        status: normalizeDni(player.dni) ? 'ready_to_activate' : 'missing_document',
+        status: getNormalizedPlayerDni(player) ? 'ready_to_activate' : 'missing_document',
         active: false,
         user_email: '',
         user_id: '',
@@ -150,7 +150,7 @@ export default async function(req) {
       const existingUsernames = new Set(allAccess.filter(a => a.username).map(a => a.username));
       const base = generateUsernameBase(player.first_name, player.last_name) || `jugador.${player.id.slice(-6)}`;
       const username = generateUniqueUsername(base, existingUsernames);
-      const hasDni = !!normalizeDni(player.dni);
+      const hasDni = !!getNormalizedPlayerDni(player);
       const accessRecord = await base44.asServiceRole.entities.PlayerUserAccess.create({
         user_email: email,
         player_id: playerId,

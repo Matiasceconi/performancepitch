@@ -1,0 +1,100 @@
+{
+  "name": "DailyCheckinToken",
+  "type": "object",
+  "properties": {
+    "record_type": {
+      "type": "string",
+      "enum": [
+        "attempt",
+        "token"
+      ],
+      "description": "Tipo de registro: attempt (control de intentos fallidos) o token (sesi\u00f3n de checkin activa)"
+    },
+    "token_hash": {
+      "type": "string",
+      "description": "Hash del token temporal (nunca el token en texto plano)"
+    },
+    "dni_hash": {
+      "type": "string",
+      "description": "Hash del DNI para rate limiting y tracking de intentos"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador reconocido"
+    },
+    "player_first_name": {
+      "type": "string",
+      "description": "Primer nombre del jugador para saludo"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel del jugador"
+    },
+    "club_id": {
+      "type": "string",
+      "description": "Club del jugador"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada del plantel"
+    },
+    "checkin_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha local del checkin (YYYY-MM-DD en zona horaria del club)"
+    },
+    "expires_at": {
+      "type": "string",
+      "description": "Fecha/hora de vencimiento del token (ISO)"
+    },
+    "scope": {
+      "type": "string",
+      "default": "daily_checkin",
+      "description": "Alcance del token"
+    },
+    "active": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el token est\u00e1 activo"
+    },
+    "failed_attempts": {
+      "type": "number",
+      "default": 0,
+      "description": "Intentos fallidos por DNI"
+    },
+    "locked_until": {
+      "type": "string",
+      "description": "Bloqueo temporal por intentos fallidos"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "dni_hash",
+    "record_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

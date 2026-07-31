@@ -24,11 +24,11 @@ export default function PublicHome() {
         {/* Botones */}
         <div className="space-y-3">
           <Link
-            to="/activar-jugador"
+            to="/ingreso-jugador"
             className="flex items-center justify-center gap-3 w-full h-14 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors"
           >
             <User size={20} />
-            Ingresar como jugador
+            Responder Wellness y RPE
           </Link>
           <Link
             to="/login?access=staff"
