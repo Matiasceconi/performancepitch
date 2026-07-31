@@ -1,21 +1,9 @@
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
-import { BrowserRouter as Router, Route, Routes } from 'react-router-dom';
-import PageNotFound from './lib/PageNotFound';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from '@/lib/AuthContext';
-import UserNotRegisteredError from '@/components/UserNotRegisteredError';
 import ScrollToTop from './components/ScrollToTop';
-import ProtectedRoute from '@/components/ProtectedRoute';
-import { Navigate, useLocation } from 'react-router-dom';
-
-// Redirige a login preservando la ruta actual en ?returnTo para que el usuario
-// (especialmente jugadores) vuelva a la página que intentaba acceder.
-function RedirectToLogin() {
-  const location = useLocation();
-  const returnTo = encodeURIComponent(location.pathname + location.search);
-  return <Navigate to={`/login?returnTo=${returnTo}`} replace />;
-}
 import { Component } from 'react';
 import { base44 } from '@/api/base44Client';
 import Login from '@/pages/Login';
@@ -28,7 +16,8 @@ import { UserTypeProvider, useUserType } from '@/lib/UserTypeContext';
 import { PlayerCard360Provider } from '@/components/player/PlayerCard360Context';
 import PlayerCard360 from '@/components/player/PlayerCard360';
 import PlayerApp from '@/components/player/PlayerApp';
-import PlayerAccessPending from '@/pages/player/PlayerAccessPending';
+import PublicHome from '@/pages/PublicHome';
+import AccessScreen from '@/components/AccessScreen';
 import Dashboard from '@/pages/Dashboard';
 import Sessions from '@/pages/Sessions';
 import Catapult from '@/pages/Catapult';
@@ -78,7 +67,7 @@ class GlobalErrorBoundary extends Component {
                 Reintentar
               </button>
               <button
-                onClick={() => base44.auth.logout(window.location.origin)}
+                onClick={() => { localStorage.clear(); base44.auth.logout('/'); }}
                 className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
                 Cerrar sesión
               </button>
@@ -91,115 +80,142 @@ class GlobalErrorBoundary extends Component {
   }
 }
 
-const AuthenticatedApp = () => {
-  const { isLoadingAuth, isLoadingPublicSettings, authError, navigateToLogin } = useAuth();
-
-  // Show loading spinner while checking app public settings or auth
-  if (isLoadingPublicSettings || isLoadingAuth) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin"></div>
-      </div>
-    );
-  }
-
-  // Handle authentication errors
-  if (authError) {
-    if (authError.type === 'user_not_registered') {
-      return <UserNotRegisteredError />;
-    } else if (authError.type === 'auth_required') {
-      // Redirect to login automatically
-      navigateToLogin();
-      return null;
-    }
-  }
-
-  // Render the main app
+function LoadingScreen() {
   return (
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/register" element={<Register />} />
-      <Route path="/forgot-password" element={<ForgotPassword />} />
-      <Route path="/reset-password" element={<ResetPassword />} />
-      <Route element={<ProtectedRoute unauthenticatedElement={<RedirectToLogin />} />}>
-        <Route path="/player/*" element={<PlayerApp />} />
-        <Route element={<Layout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/sessions" element={<Sessions />} />
-          <Route path="/catapult" element={<Catapult />} />
-          <Route path="/tactical" element={<Tactical />} />
-          <Route path="/tactical/new" element={<TacticalEditor />} />
-          <Route path="/tactical/:projectId" element={<TacticalEditor />} />
-          <Route path="/performance/external-load" element={<PerformanceExternalLoad />} />
-          <Route path="/gps" element={<PerformanceExternalLoad />} />
-          <Route path="/performance/microcycle-history" element={<MicrocycleHistory />} />
-          <Route path="/performance/internal-load" element={<PerformanceInternalLoad />} />
-          <Route path="/performance/medical" element={<PerformanceMedical />} />
-          <Route path="/performance/nutrition" element={<PerformanceNutrition />} />
-          <Route path="/performance/minutes" element={<PerformanceMinutes />} />
-          <Route path="/team" element={<Team />} />
-          <Route path="/schedule" element={<Schedule />} />
-          <Route path="/matches" element={<Matches />} />
-          <Route path="/matches/:id" element={<MatchDetail />} />
-          <Route path="/player-names" element={<PlayerNameManagement />} />
-          <Route path="/plantil-diagnostic" element={<PlantilDiagnostic />} />
-          <Route path="/weekly-planner" element={<WeeklyPlanner />} />
-          <Route path="/admin" element={<AdminHub />} />
-          <Route path="/daily-squad" element={<DailySquad />} />
-          <Route path="/players" element={<Players />} />
-          <Route path="/squad-manager" element={<SquadManager />} />
-          <Route path="/field-library" element={<FieldLibrary />} />
-          <Route path="/strength-library" element={<StrengthLibrary />} />
-          <Route path="/users-access" element={<UsersAccess />} />
-          <Route path="/player-access" element={<PlayerAccess />} />
-        </Route>
-      </Route>
-      <Route path="*" element={<PageNotFound />} />
-    </Routes>
+    <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
+      <div className="w-8 h-8 border-4 border-zinc-700 border-t-blue-400 rounded-full animate-spin" />
+    </div>
   );
-};
+}
 
-
-function StaffApp() {
+// ── Staff Routes (wrapped with WorkspaceProvider) ─────────────────────────
+function StaffRoutes() {
   return (
     <WorkspaceProvider>
       <PlayerCard360Provider>
-        <AuthenticatedApp />
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/sessions" element={<Sessions />} />
+            <Route path="/catapult" element={<Catapult />} />
+            <Route path="/tactical" element={<Tactical />} />
+            <Route path="/tactical/new" element={<TacticalEditor />} />
+            <Route path="/tactical/:projectId" element={<TacticalEditor />} />
+            <Route path="/performance/external-load" element={<PerformanceExternalLoad />} />
+            <Route path="/gps" element={<PerformanceExternalLoad />} />
+            <Route path="/performance/microcycle-history" element={<MicrocycleHistory />} />
+            <Route path="/performance/internal-load" element={<PerformanceInternalLoad />} />
+            <Route path="/performance/medical" element={<PerformanceMedical />} />
+            <Route path="/performance/nutrition" element={<PerformanceNutrition />} />
+            <Route path="/performance/minutes" element={<PerformanceMinutes />} />
+            <Route path="/team" element={<Team />} />
+            <Route path="/schedule" element={<Schedule />} />
+            <Route path="/matches" element={<Matches />} />
+            <Route path="/matches/:id" element={<MatchDetail />} />
+            <Route path="/player-names" element={<PlayerNameManagement />} />
+            <Route path="/plantil-diagnostic" element={<PlantilDiagnostic />} />
+            <Route path="/weekly-planner" element={<WeeklyPlanner />} />
+            <Route path="/admin" element={<AdminHub />} />
+            <Route path="/daily-squad" element={<DailySquad />} />
+            <Route path="/players" element={<Players />} />
+            <Route path="/squad-manager" element={<SquadManager />} />
+            <Route path="/field-library" element={<FieldLibrary />} />
+            <Route path="/strength-library" element={<StrengthLibrary />} />
+            <Route path="/users-access" element={<UsersAccess />} />
+            <Route path="/player-access" element={<PlayerAccess />} />
+          </Route>
+          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+        </Routes>
         <PlayerCard360 />
       </PlayerCard360Provider>
     </WorkspaceProvider>
   );
 }
 
-function LoadingScreen() {
-  return (
-    <div className="fixed inset-0 flex items-center justify-center bg-zinc-950">
-      <div className="w-8 h-8 border-4 border-zinc-700 border-t-emerald-400 rounded-full animate-spin" />
-    </div>
-  );
+// ── Post-login redirect based on real permissions ──────────────────────────
+function PostLoginRedirect() {
+  const { isStaff, isPlayer, loading, error, retry } = useUserType();
+  const { logout } = useAuth();
+  const location = useLocation();
+  const access = new URLSearchParams(location.search).get('access');
+
+  if (loading) return <LoadingScreen />;
+  if (error) return <AccessScreen variant="error" onRetry={retry} onLogout={() => logout('/')} />;
+
+  if (access === 'player') {
+    if (isPlayer) return <Navigate to="/player" replace />;
+    if (isStaff) return <AccessScreen variant="no-player" onLogout={() => logout('/')} />;
+    return <AccessScreen variant="none" onLogout={() => logout('/')} />;
+  }
+  if (access === 'staff') {
+    if (isStaff) return <Navigate to="/dashboard" replace />;
+    if (isPlayer) return <AccessScreen variant="no-staff" onLogout={() => logout('/')} />;
+    return <AccessScreen variant="none" onLogout={() => logout('/')} />;
+  }
+  // Sin access especificado — redirigir automáticamente
+  if (isStaff) return <Navigate to="/dashboard" replace />;
+  if (isPlayer) return <Navigate to="/player" replace />;
+  return <AccessScreen variant="none" onLogout={() => logout('/')} />;
 }
 
+// ── Main App Shell ─────────────────────────────────────────────────────────
 function AppShell() {
-  const { isAuthenticated, isLoadingAuth, isLoadingPublicSettings } = useAuth();
-  const { isStaff, isPlayer, loading: loadingType } = useUserType();
-  const pathname = window.location.pathname || '';
+  const { isAuthenticated, isLoadingAuth, isLoadingPublicSettings, authError, logout } = useAuth();
+  const { isStaff, isPlayer, loading: loadingType, error: typeError, retry } = useUserType();
+  const location = useLocation();
+  const pathname = location.pathname;
 
-  // Mientras carga auth o el usuario no está autenticado, el flujo de staff
-  // (que incluye login/registro) se encarga de todo.
-  if (isLoadingPublicSettings || isLoadingAuth || !isAuthenticated) {
-    return <StaffApp />;
+  if (isLoadingPublicSettings || isLoadingAuth) return <LoadingScreen />;
+
+  // ── Rutas públicas (sin auth, sin WorkspaceProvider) ─────────────────────
+  if (pathname === '/') {
+    if (!isAuthenticated) return <PublicHome />;
+    if (loadingType) return <LoadingScreen />;
+    if (typeError) return <AccessScreen variant="error" onRetry={retry} onLogout={() => logout('/')} />;
+    if (isStaff) return <Navigate to="/dashboard" replace />;
+    if (isPlayer) return <Navigate to="/player" replace />;
+    return <AccessScreen variant="none" onLogout={() => logout('/')} />;
   }
 
-  // Autenticado: resolver tipo de usuario antes de elegir la experiencia.
+  if (pathname === '/login') {
+    if (isAuthenticated) return <PostLoginRedirect />;
+    return <Login />;
+  }
+
+  if (pathname === '/register') {
+    if (isAuthenticated) return <Navigate to="/" replace />;
+    return <Register />;
+  }
+  if (pathname === '/forgot-password') return <ForgotPassword />;
+  if (pathname.startsWith('/reset-password')) return <ResetPassword />;
+
+  // ── Rutas protegidas (requieren auth) ────────────────────────────────────
+  if (authError) {
+    if (authError.type === 'user_not_registered') {
+      return <AccessScreen variant="not-registered" onLogout={() => logout('/')} />;
+    }
+    return <Navigate to="/login" replace />;
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
+
   if (loadingType) return <LoadingScreen />;
 
-  // Si la URL comienza con /player y existe un PlayerUserAccess activo,
-  // priorizar el portal del jugador aunque la cuenta también tenga acceso de staff.
-  if (isPlayer && pathname.startsWith('/player')) return <PlayerApp />;
+  if (typeError) {
+    return <AccessScreen variant="error" onRetry={retry} onLogout={() => logout('/')} />;
+  }
 
-  if (isStaff) return <StaffApp />;
-  if (isPlayer) return <PlayerApp />;
-  return <PlayerAccessPending />;
+  // ── Rutas del jugador ────────────────────────────────────────────────────
+  if (pathname.startsWith('/player')) {
+    if (!isPlayer) return <AccessScreen variant="no-player" onLogout={() => logout('/')} />;
+    return <PlayerApp />;
+  }
+
+  // ── Rutas del staff ───────────────────────────────────────────────────────
+  if (!isStaff) return <AccessScreen variant="no-staff" onLogout={() => logout('/')} />;
+  return <StaffRoutes />;
 }
 
 function App() {
@@ -220,4 +236,4 @@ function App() {
   );
 }
 
-export default App
+export default App;

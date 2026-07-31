@@ -22,7 +22,7 @@ export const MODULE_ACTIONS = [
 ];
 
 export const MODULES = [
-  { id: "dashboard", label: "Dashboard", path: "/" },
+  { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "sesiones", label: "Sesiones", path: "/sessions" },
   { id: "partidos", label: "Partidos", path: "/matches" },
   { id: "mapa_tactico", label: "Pizarra Táctica", path: "/tactical" },

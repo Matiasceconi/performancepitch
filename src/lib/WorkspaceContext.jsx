@@ -14,7 +14,7 @@ const WorkspaceContext = createContext(null);
 const EMPTY_PERMS = { can_view: false, can_create: false, can_edit: false, can_delete: false, can_export: false, can_admin: false };
 
 const LEGACY_MODULE_PATHS = {
-  dashboard: ["/"],
+  dashboard: ["/dashboard"],
   daily_squad: ["/daily-squad"],
   jugadores: ["/players", "/player-names"],
   players: ["/players", "/player-names"],
@@ -59,7 +59,7 @@ const PATH_AREA_MAP = {
 };
 
 export function WorkspaceProvider({ children }) {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, logout } = useAuth();
   const { staffAccess, isPlatformAdmin } = useUserType();
   const location = useLocation();
   const [squads, setSquads] = useState([]);
@@ -373,7 +373,7 @@ export function WorkspaceProvider({ children }) {
               Reintentar
             </button>
             <button
-              onClick={() => base44.auth.logout(window.location.origin)}
+              onClick={() => logout('/')}
               className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
               Cerrar sesión
             </button>
@@ -396,7 +396,7 @@ export function WorkspaceProvider({ children }) {
             Tu usuario no tiene permisos configurados en la plataforma. Contactá al administrador.
           </p>
           <button
-            onClick={() => base44.auth.logout(window.location.origin)}
+            onClick={() => logout('/')}
             className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
             Cerrar sesión
           </button>
@@ -418,7 +418,7 @@ export function WorkspaceProvider({ children }) {
             Tu usuario no tiene módulos habilitados. Contactá al administrador para que te asigne permisos en Configuración.
           </p>
           <button
-            onClick={() => base44.auth.logout(window.location.origin)}
+            onClick={() => logout('/')}
             className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
             Cerrar sesión
           </button>
@@ -440,7 +440,7 @@ export function WorkspaceProvider({ children }) {
             Tu usuario no tiene planteles asignados. Contactá al administrador para que te asigne acceso.
           </p>
           <button
-            onClick={() => base44.auth.logout(window.location.origin)}
+            onClick={() => logout('/')}
             className="w-full px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm rounded-xl transition-colors">
             Cerrar sesión
           </button>

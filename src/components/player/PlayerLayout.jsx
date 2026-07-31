@@ -1,7 +1,7 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
 import { Home, HeartPulse, Gauge, History, LogOut } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { useAuth } from '@/lib/AuthContext';
 
 const NAV = [
   { to: '/player', label: 'Inicio', icon: Home, end: true },
@@ -12,9 +12,10 @@ const NAV = [
 
 export default function PlayerLayout() {
   const navigate = useNavigate();
+  const { logout } = useAuth();
 
   function handleLogout() {
-    base44.auth.logout(window.location.origin);
+    logout('/');
   }
 
   return (

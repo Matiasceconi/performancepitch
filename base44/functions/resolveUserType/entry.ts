@@ -13,12 +13,12 @@ export default async function(req) {
         { user_email: normalizedEmail, active: true },
         "-invited_at",
         5
-      ).catch(() => []),
+      ),
       base44.asServiceRole.entities.UserAccess.filter(
         { user_email: normalizedEmail, active: true },
         "-created_date",
         1
-      ).catch(() => []),
+      ),
     ]);
 
     const playerAccess = playerAccessRows[0] || null;

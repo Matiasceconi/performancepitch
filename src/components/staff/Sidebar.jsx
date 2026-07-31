@@ -13,7 +13,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import { useUserType } from "@/lib/UserTypeContext";
 
 const NAV_ITEMS = [
-  { label: "Dashboard", path: "/", icon: LayoutDashboard },
+  { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Sesiones", path: "/sessions", icon: Video },
   { label: "Partidos", path: "/matches", icon: Trophy },
   { label: "Pizarra Táctica", path: "/tactical", icon: Map },

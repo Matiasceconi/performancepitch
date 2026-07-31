@@ -114,17 +114,22 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = (shouldRedirect = true) => {
+  const logout = (redirectUrl = '/') => {
+    // Limpiar datos del workspace y usuario del localStorage
+    localStorage.removeItem("activeSquadId");
+    localStorage.removeItem("activeSquadUserId");
+    localStorage.removeItem("activeAreaId");
+    localStorage.removeItem("activeAreaUserId");
+    localStorage.removeItem("performancepitch_sidebar_collapsed_v1");
+
+    // Limpiar estado de auth
     setUser(null);
     setIsAuthenticated(false);
-    
-    if (shouldRedirect) {
-      // Use the SDK's logout method which handles token cleanup and redirect
-      base44.auth.logout(window.location.href);
-    } else {
-      // Just remove the token without redirect
-      base44.auth.logout();
-    }
+    setAuthChecked(false);
+    setAuthError(null);
+
+    // Logout del SDK (limpia token y redirige)
+    base44.auth.logout(redirectUrl);
   };
 
   const navigateToLogin = () => {

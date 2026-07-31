@@ -52,7 +52,7 @@ export default function Layout() {
 
   // Seguridad: si la página actual no corresponde al área/rol activo, no se renderiza (redirige al dashboard).
   if (!canSeePath(location.pathname)) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/dashboard" replace />;
   }
 
   return (

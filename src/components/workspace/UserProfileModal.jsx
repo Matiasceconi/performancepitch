@@ -97,7 +97,7 @@ export default function UserProfileModal({ onClose }) {
 
               <div className="pt-3 border-t border-zinc-800">
                 <button
-                  onClick={() => logout(true)}
+                  onClick={() => logout('/')}
                   className="w-full py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-colors"
                 >
                   Cerrar sesión

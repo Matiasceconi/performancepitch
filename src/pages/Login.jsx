@@ -4,7 +4,7 @@ import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Lock, Loader2, Shield } from "lucide-react";
+import { Lock, Loader2, Shield, ArrowLeft } from "lucide-react";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -12,15 +12,19 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const urlParams = new URLSearchParams(window.location.search);
+  const access = urlParams.get('access') || 'staff';
+  const isPlayer = access === 'player';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setLoading(true);
     try {
       await base44.auth.loginViaEmailPassword(email, password);
-      const urlParams = new URLSearchParams(window.location.search);
-      const returnTo = urlParams.get('returnTo') || '/';
-      window.location.href = returnTo;
+      // Recargar para que AuthProvider se reinicialice con el nuevo token.
+      // PostLoginRedirect se encarga de redirigir según los permisos reales.
+      window.location.href = `/login?access=${access}`;
     } catch (err) {
       setError("Email o contraseña incorrectos. Verificá tus datos e intentá nuevamente.");
     } finally {
@@ -43,20 +47,8 @@ export default function Login() {
             Performance<span className="text-blue-400">Pitch</span>
           </h1>
           <p className="text-zinc-400 text-base leading-relaxed">
-            Plataforma de gestión de alto rendimiento para fútbol profesional
+            Plataforma integral para la gestión y el rendimiento deportivo
           </p>
-          <div className="mt-10 grid grid-cols-3 gap-4 text-center">
-            {[
-              { label: "GPS", desc: "Análisis físico" },
-              { label: "Sesiones", desc: "Planificación" },
-              { label: "Equipo", desc: "Seguimiento" },
-            ].map(item => (
-              <div key={item.label} className="bg-zinc-800/50 rounded-xl p-3 border border-zinc-700">
-                <p className="text-xs font-bold text-white">{item.label}</p>
-                <p className="text-[10px] text-zinc-500 mt-0.5">{item.desc}</p>
-              </div>
-            ))}
-          </div>
         </div>
       </div>
 
@@ -69,8 +61,12 @@ export default function Login() {
             <span className="text-lg font-black text-white">Performance<span className="text-blue-400">Pitch</span></span>
           </div>
 
-          <h2 className="text-2xl font-bold text-white mb-1">Iniciar sesión</h2>
-          <p className="text-zinc-500 text-sm mb-8">Ingresá con tu cuenta del cuerpo técnico</p>
+          <h2 className="text-2xl font-bold text-white mb-1">
+            {isPlayer ? "Ingreso de jugadores" : "Ingreso del staff"}
+          </h2>
+          <p className="text-zinc-500 text-sm mb-8">
+            {isPlayer ? "Ingresá con tu cuenta de jugador" : "Ingresá con tu cuenta del cuerpo técnico"}
+          </p>
 
           {error && (
             <div className="mb-5 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-300 text-sm">
@@ -97,7 +93,7 @@ export default function Login() {
               <div className="flex items-center justify-between">
                 <Label className="text-zinc-300 text-xs font-medium">Contraseña</Label>
                 <Link to="/forgot-password" className="text-xs text-blue-400 hover:text-blue-300 transition-colors">
-                  ¿Olvidaste tu contraseña?
+                  Olvidé mi contraseña
                 </Link>
               </div>
               <div className="relative">
@@ -127,9 +123,12 @@ export default function Login() {
             </Button>
           </form>
 
-          <p className="mt-8 text-center text-xs text-zinc-600">
-            ¿No tenés cuenta? Contactá al administrador de la plataforma.
-          </p>
+          <Link
+            to="/"
+            className="mt-6 flex items-center justify-center gap-1.5 text-sm text-zinc-400 hover:text-white transition-colors"
+          >
+            <ArrowLeft size={14} /> Volver
+          </Link>
         </div>
       </div>
     </div>
