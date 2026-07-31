@@ -114,7 +114,7 @@ const AuthenticatedApp = () => {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
       <Route element={<ProtectedRoute unauthenticatedElement={<Navigate to="/login" replace />} />}>
-        <Route path="/player" element={<PlayerApp />} />
+        <Route path="/player/*" element={<PlayerApp />} />
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/sessions" element={<Sessions />} />
@@ -174,6 +174,7 @@ function LoadingScreen() {
 function AppShell() {
   const { isAuthenticated, isLoadingAuth, isLoadingPublicSettings } = useAuth();
   const { isStaff, isPlayer, loading: loadingType } = useUserType();
+  const pathname = window.location.pathname || '';
 
   // Mientras carga auth o el usuario no está autenticado, el flujo de staff
   // (que incluye login/registro) se encarga de todo.
@@ -183,6 +184,11 @@ function AppShell() {
 
   // Autenticado: resolver tipo de usuario antes de elegir la experiencia.
   if (loadingType) return <LoadingScreen />;
+
+  // Si la URL comienza con /player y existe un PlayerUserAccess activo,
+  // priorizar el portal del jugador aunque la cuenta también tenga acceso de staff.
+  if (isPlayer && pathname.startsWith('/player')) return <PlayerApp />;
+
   if (isStaff) return <StaffApp />;
   if (isPlayer) return <PlayerApp />;
   return <PlayerAccessPending />;

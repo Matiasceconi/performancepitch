@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import { useLocation } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
+import { useUserType } from "@/lib/UserTypeContext";
 import SquadSelectModal from "@/components/workspace/SquadSelectModal";
 import AreaSelectScreen from "@/components/workspace/AreaSelectScreen";
 import { AREAS, PAGES, MODULE_ACTIONS } from "@/lib/areasConfig";
@@ -59,6 +60,7 @@ const PATH_AREA_MAP = {
 
 export function WorkspaceProvider({ children }) {
   const { user, isAuthenticated } = useAuth();
+  const { staffAccess, isPlatformAdmin } = useUserType();
   const location = useLocation();
   const [squads, setSquads] = useState([]);
   const [activeSquad, setActiveSquadState] = useState(null);
@@ -115,11 +117,11 @@ export function WorkspaceProvider({ children }) {
       const allSquads = await base44.entities.Squad.filter({ active: true }, "name", 100);
       setSquads(allSquads);
 
-      // 2. Find user access record by email
-      const accessRecords = await base44.entities.UserAccess.filter({ user_email: user.email }, "-created_date", 1);
-      let access = accessRecords[0] || null;
+      // 2. Reuse staff_access already resolved by resolveUserType (one backend call).
+      //    Filtered by active: true and normalized email on the server side.
+      let access = staffAccess || null;
 
-      const platformAdmin = user.role === "admin";
+      const platformAdmin = user.role === "admin" || isPlatformAdmin;
 
       // 3. If platform admin with no access record → full access, no roles needed
       if (!access && platformAdmin) {
@@ -266,9 +268,9 @@ export function WorkspaceProvider({ children }) {
         setNeedSquadSelection(false);
       }
 
-      // 9. Update last_seen (fire and forget)
-      if (accessRecords[0]) {
-        base44.entities.UserAccess.update(accessRecords[0].id, {
+      // 9. Update last_seen (fire and forget) — solo si hay un UserAccess real
+      if (staffAccess?.id) {
+        base44.entities.UserAccess.update(staffAccess.id, {
           last_seen: new Date().toISOString(),
         }).catch(() => {});
       }

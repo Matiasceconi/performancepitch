@@ -9,7 +9,7 @@ import PlayerHistory from '@/pages/player/PlayerHistory';
 export default function PlayerApp() {
   return (
     <Routes>
-      <Route path="/player" element={<PlayerLayout />}>
+      <Route path="/" element={<PlayerLayout />}>
         <Route index element={<PlayerHome />} />
         <Route path="wellness" element={<PlayerWellness />} />
         <Route path="rpe" element={<PlayerRpe />} />

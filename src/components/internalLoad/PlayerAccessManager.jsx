@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useWorkspace } from '@/lib/WorkspaceContext';
-import { UserPlus, Send, Power, Mail, CheckCircle2, XCircle, Search } from 'lucide-react';
+import { UserPlus, Send, Power, Mail, CheckCircle2, XCircle, Search, Link2 } from 'lucide-react';
+
+const PLAYER_PORTAL_URL = 'https://performancepitch.base44.app/player';
 
 export default function PlayerAccessManager() {
   const { activeSquadId, activeSquadName } = useWorkspace();
@@ -13,6 +15,7 @@ export default function PlayerAccessManager() {
   const [email, setEmail] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
     if (!activeSquadId) { setPlayers([]); setAccesses([]); setLoading(false); return; }
@@ -59,6 +62,24 @@ export default function PlayerAccessManager() {
     }
   }
 
+  async function handleCopyLink() {
+    try {
+      await navigator.clipboard.writeText(PLAYER_PORTAL_URL);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      // Fallback para navegadores sin clipboard API
+      const ta = document.createElement('textarea');
+      ta.value = PLAYER_PORTAL_URL;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
   async function handleAction(playerId, action) {
     setBusy(true);
     setError('');
@@ -83,9 +104,19 @@ export default function PlayerAccessManager() {
           <h2 className="text-lg font-bold text-white">Accesos de jugadores</h2>
           <p className="text-sm text-zinc-500">Vinculá cada jugador con su cuenta para el portal móvil</p>
         </div>
-        <div className="relative">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar jugador..." className="pl-9 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-white w-56 focus:outline-none focus:border-emerald-500" />
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleCopyLink}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors ${copied ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'}`}
+            title="Copiar enlace del portal del jugador"
+          >
+            {copied ? <CheckCircle2 size={14} /> : <Link2 size={14} />}
+            {copied ? '¡Copiado!' : 'Copiar enlace del jugador'}
+          </button>
+          <div className="relative">
+            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar jugador..." className="pl-9 pr-3 py-2 bg-zinc-900 border border-zinc-800 rounded-lg text-sm text-white w-56 focus:outline-none focus:border-emerald-500" />
+          </div>
         </div>
       </div>
 
@@ -144,6 +175,13 @@ export default function PlayerAccessManager() {
             </div>
             <p className="text-sm text-zinc-400">Ingresá el email del jugador. Se le enviará una invitación para acceder al portal desde su celular.</p>
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="email@ejemplo.com" className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white text-sm focus:outline-none focus:border-emerald-500" />
+            <button
+              onClick={handleCopyLink}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold transition-colors w-full justify-center ${copied ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 border border-zinc-700'}`}
+            >
+              {copied ? <CheckCircle2 size={14} /> : <Link2 size={14} />}
+              {copied ? '¡Enlace copiado!' : 'Copiar enlace del portal'}
+            </button>
             {error && <p className="text-red-400 text-sm">{error}</p>}
             <div className="flex gap-2">
               <button onClick={() => setModalPlayer(null)} className="flex-1 py-2.5 rounded-xl bg-zinc-800 text-zinc-300 text-sm font-semibold">Cancelar</button>

@@ -12,6 +12,16 @@ export default async function(req) {
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || '');
+
+    // Procesar list antes de exigir player_id
+    if (action === 'list') {
+      const squadId = String(body.squad_id || '');
+      let query = {};
+      if (squadId) query = { squad_id: squadId };
+      const accesses = await base44.asServiceRole.entities.PlayerUserAccess.filter(query, "-invited_at", 500);
+      return Response.json({ ok: true, accesses });
+    }
+
     const playerId = String(body.player_id || '');
     const email = String(body.email || '').toLowerCase().trim();
 
@@ -54,12 +64,21 @@ export default async function(req) {
         created_at: nowISO,
         updated_at: nowISO,
       });
-      // Invitar al usuario a la app con rol user
+      // Invitar al usuario a la app con rol user.
+      // No ocultamos errores: si la invitación falla por un motivo distinto a
+      // "ya existe el usuario", lo propagamos para que el staff lo vea.
       try {
         await base44.asServiceRole.users.inviteUser(email, 'user');
       } catch (e) {
-        // Si ya existe el usuario, continuamos igualmente
-        console.warn('inviteUser (no bloqueante):', e?.message);
+        const msg = String(e?.message || '');
+        const alreadyExists = /already|exist|invited|registered|409|conflict/i.test(msg);
+        if (!alreadyExists) {
+          return Response.json({
+            error: `No se pudo invitar al usuario: ${msg || 'error desconocido'}`,
+            access,
+          }, { status: 500 });
+        }
+        console.warn('inviteUser (usuario ya existe, no bloqueante):', msg);
       }
       return Response.json({ ok: true, access });
     }
@@ -80,7 +99,15 @@ export default async function(req) {
       try {
         await base44.asServiceRole.users.inviteUser(existing[0].user_email, 'user');
       } catch (e) {
-        console.warn('inviteUser (no bloqueante):', e?.message);
+        const msg = String(e?.message || '');
+        const alreadyExists = /already|exist|invited|registered|409|conflict/i.test(msg);
+        if (!alreadyExists) {
+          return Response.json({
+            error: `No se pudo reenviar la invitación: ${msg || 'error desconocido'}`,
+            access: updated,
+          }, { status: 500 });
+        }
+        console.warn('inviteUser resend (usuario ya existe, no bloqueante):', msg);
       }
       return Response.json({ ok: true, access: updated });
     }
@@ -99,14 +126,6 @@ export default async function(req) {
         updated_at: new Date().toISOString(),
       });
       return Response.json({ ok: true, access: updated });
-    }
-
-    if (action === 'list') {
-      const squadId = String(body.squad_id || '');
-      let query = {};
-      if (squadId) query = { squad_id: squadId };
-      const accesses = await base44.asServiceRole.entities.PlayerUserAccess.filter(query, "-invited_at", 500);
-      return Response.json({ ok: true, accesses });
     }
 
     return Response.json({ error: 'Acción no válida' }, { status: 400 });

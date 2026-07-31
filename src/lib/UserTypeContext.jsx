@@ -27,6 +27,8 @@ export function UserTypeProvider({ children }) {
       isStaff: !!userType?.is_staff,
       isPlayer: !!userType?.is_player,
       playerAccess: userType?.player_access || null,
+      staffAccess: userType?.staff_access || null,
+      isPlatformAdmin: !!userType?.is_platform_admin,
       loading,
     }}>
       {children}
@@ -36,5 +38,5 @@ export function UserTypeProvider({ children }) {
 
 export const useUserType = () => {
   const ctx = useContext(UserTypeContext);
-  return ctx || { isStaff: false, isPlayer: false, playerAccess: null, loading: true };
+  return ctx || { isStaff: false, isPlayer: false, playerAccess: null, staffAccess: null, isPlatformAdmin: false, loading: true };
 };
