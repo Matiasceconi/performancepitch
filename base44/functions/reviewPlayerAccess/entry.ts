@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { resolveStaffAccess } from "../../shared/playerPortalAuth.ts";
+import { resolvePlayerAccessAdmin } from "../../shared/playerPortalAuth.ts";
 import { generateUsernameBase, generateUniqueUsername, normalizeDni } from "../../shared/playerAccessUtils.ts";
 
 export default async function(req) {
@@ -8,8 +8,8 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
 
-    const staff = await resolveStaffAccess(base44, user);
-    if (!staff) return Response.json({ error: 'Sin permisos de staff' }, { status: 403 });
+    const admin = await resolvePlayerAccessAdmin(base44, user);
+    if (!admin) return Response.json({ error: 'No tenés permisos de administrador' }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || 'dry_run');

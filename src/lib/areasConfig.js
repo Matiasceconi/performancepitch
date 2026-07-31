@@ -39,6 +39,7 @@ export const MODULES = [
   { id: "biblioteca_fuerza", label: "Biblioteca Fuerza", path: "/strength-library" },
   { id: "cuerpo_tecnico", label: "Cuerpo Técnico", path: "/team" },
   { id: "configuracion", label: "Configuración", path: "/admin" },
+  { id: "accesos_jugadores", label: "Accesos de jugadores", path: "/player-access" },
 ];
 
 export const PAGES = [

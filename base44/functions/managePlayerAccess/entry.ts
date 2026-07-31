@@ -1,5 +1,5 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
-import { resolveStaffAccess } from "../../shared/playerPortalAuth.ts";
+import { resolvePlayerAccessAdmin } from "../../shared/playerPortalAuth.ts";
 import { generateUsernameBase, generateUniqueUsername, normalizeDni } from "../../shared/playerAccessUtils.ts";
 
 export default async function(req) {
@@ -8,32 +8,37 @@ export default async function(req) {
     const user = await base44.auth.me();
     if (!user) return Response.json({ error: 'No autenticado' }, { status: 401 });
 
-    const staff = await resolveStaffAccess(base44, user);
-    if (!staff) return Response.json({ error: 'Sin permisos de staff' }, { status: 403 });
+    const admin = await resolvePlayerAccessAdmin(base44, user);
+    if (!admin) return Response.json({ error: 'No tenés permisos de administrador' }, { status: 403 });
 
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || '');
 
-    // Listar accesos del plantel
+    // Listar jugadores + accesos del plantel (o todos los planteles)
     if (action === 'list') {
       const squadId = String(body.squad_id || '');
-      let query: any = {};
-      if (squadId) query.squad_id = squadId;
-      const accesses = await base44.asServiceRole.entities.PlayerUserAccess.filter(query, "-created_date", 500);
-      // Obtener DNI de cada jugador
-      const playerIds = [...new Set(accesses.map(a => a.player_id).filter(Boolean))];
-      const players: any[] = [];
-      for (const pid of playerIds) {
-        const p = await base44.asServiceRole.entities.Player.get(pid).catch(() => null);
-        if (p) players.push(p);
-      }
-      const playerById: Record<string, any> = {};
-      players.forEach(p => { playerById[p.id] = p; });
-      const enriched = accesses.map(a => ({
-        ...a,
-        has_dni: !!normalizeDni(playerById[a.player_id]?.dni),
-      }));
-      return Response.json({ ok: true, accesses: enriched });
+      const playerQuery: any = {};
+      if (squadId && squadId !== 'all') playerQuery.squad_id = squadId;
+      const players = await base44.asServiceRole.entities.Player.filter(playerQuery, "last_name", 2000);
+      const accessQuery: any = {};
+      if (squadId && squadId !== 'all') accessQuery.squad_id = squadId;
+      const accesses = await base44.asServiceRole.entities.PlayerUserAccess.filter(accessQuery, "-created_date", 5000);
+      const accessByPlayer: Record<string, any> = {};
+      accesses.forEach(a => { accessByPlayer[a.player_id] = a; });
+      const rows = players.map(p => {
+        const acc = accessByPlayer[p.id];
+        const hasDni = !!normalizeDni(p.dni);
+        return {
+          player: p,
+          access: acc,
+          has_dni: hasDni,
+          username: acc?.username || '',
+          status: acc?.status || (hasDni ? 'ready_to_activate' : 'missing_document'),
+          email: acc?.user_email || '',
+          last_login: acc?.last_login_at || acc?.last_access_at || '',
+        };
+      });
+      return Response.json({ ok: true, rows });
     }
 
     const playerId = String(body.player_id || '');

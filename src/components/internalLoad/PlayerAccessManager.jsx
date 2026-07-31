@@ -2,8 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useWorkspace } from '@/lib/WorkspaceContext';
 import {
-  UserPlus, Search, RefreshCw, Copy, CheckCircle2, XCircle, AlertTriangle,
-  Lock, Unlock, RotateCcw, Mail, Edit3, Loader2, Shield, User, KeyRound, Power
+  Search, RefreshCw, Copy, CheckCircle2, XCircle, AlertTriangle,
+  Lock, Unlock, RotateCcw, Mail, Edit3, Loader2, User, KeyRound, Power, ShieldAlert
 } from 'lucide-react';
 
 const STATUS_LABELS = {
@@ -24,71 +24,56 @@ function maskDni(dni) {
 }
 
 export default function PlayerAccessManager() {
-  const { activeSquadId } = useWorkspace();
-  const [players, setPlayers] = useState([]);
-  const [accesses, setAccesses] = useState([]);
+  const { mySquads, activeSquadId, isAdmin } = useWorkspace();
+  const [selectedSquadId, setSelectedSquadId] = useState(activeSquadId || '');
+  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [error, setError] = useState('');
+  const [authError, setAuthError] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showMissingDniOnly, setShowMissingDniOnly] = useState(false);
   const [reviewResult, setReviewResult] = useState(null);
-  const [modal, setModal] = useState(null); // { type: 'dni' | 'email', player, access }
+  const [modal, setModal] = useState(null);
   const [modalValue, setModalValue] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
   const load = useCallback(async () => {
-    if (!activeSquadId) { setPlayers([]); setAccesses([]); setLoading(false); return; }
+    if (!selectedSquadId) { setRows([]); setLoading(false); return; }
     setLoading(true);
     setError('');
+    setAuthError(false);
     try {
-      const [playerRows, accessRes] = await Promise.all([
-        base44.entities.Player.filter({ squad_id: activeSquadId, active: { $ne: false } }, "last_name", 500),
-        base44.functions.invoke('managePlayerAccess', { action: 'list', squad_id: activeSquadId }),
-      ]);
-      setPlayers(playerRows);
-      setAccesses((accessRes.data || accessRes).accesses || []);
+      const res = await base44.functions.invoke('managePlayerAccess', { action: 'list', squad_id: selectedSquadId });
+      const result = res.data || res;
+      if (result.error) {
+        if (result.error.includes('permisos') || result.error.includes('admin')) setAuthError(true);
+        throw new Error(result.error);
+      }
+      setRows(result.rows || []);
     } catch (e) {
-      setError(e?.message || 'Error al cargar');
+      const msg = e?.message || 'Error al cargar';
+      if (msg.includes('permisos') || msg.includes('admin') || msg.includes('403')) setAuthError(true);
+      setError(msg);
     } finally {
       setLoading(false);
     }
-  }, [activeSquadId]);
+  }, [selectedSquadId]);
 
   useEffect(() => { load(); }, [load]);
-
-  const playerById = {};
-  players.forEach(p => { playerById[p.id] = p; });
-
-  const accessByPlayer = {};
-  accesses.forEach(a => { accessByPlayer[a.player_id] = a; });
-
-  // Combinar jugadores + accesos
-  const rows = players.map(p => {
-    const acc = accessByPlayer[p.id];
-    return {
-      player: p,
-      access: acc,
-      hasDni: !!String(p.dni || '').replace(/\D/g, ''),
-      username: acc?.username || '',
-      status: acc?.status || (String(p.dni || '').replace(/\D/g, '') ? 'ready_to_activate' : 'missing_document'),
-      email: acc?.user_email || '',
-      lastLogin: acc?.last_login_at || acc?.last_access_at || '',
-    };
-  });
 
   const stats = {
     total: rows.length,
     active: rows.filter(r => r.status === 'access_active').length,
     pending: rows.filter(r => r.status === 'activation_pending' || r.status === 'ready_to_activate').length,
-    missingDni: rows.filter(r => !r.hasDni).length,
+    missingDni: rows.filter(r => !r.has_dni).length,
     blocked: rows.filter(r => r.status === 'access_blocked').length,
   };
 
   const filtered = rows.filter(r => {
     const name = `${r.player.first_name} ${r.player.last_name}`.toLowerCase();
     const matchSearch = name.includes(search.toLowerCase()) || r.username.includes(search.toLowerCase());
-    const matchFilter = !showMissingDniOnly || !r.hasDni;
+    const matchFilter = !showMissingDniOnly || !r.has_dni;
     return matchSearch && matchFilter;
   });
 
@@ -96,8 +81,10 @@ export default function PlayerAccessManager() {
     setBusy(true);
     setError('');
     try {
-      const res = await base44.functions.invoke('reviewPlayerAccess', { action: dryRun ? 'dry_run' : 'execute', squad_id: activeSquadId });
-      setReviewResult(res.data || res);
+      const res = await base44.functions.invoke('reviewPlayerAccess', { action: dryRun ? 'dry_run' : 'execute', squad_id: selectedSquadId });
+      const result = res.data || res;
+      if (result.error) throw new Error(result.error);
+      setReviewResult(result);
       if (!dryRun) load();
     } catch (e) {
       setError(e?.message || 'Error al revisar');
@@ -145,14 +132,50 @@ export default function PlayerAccessManager() {
     setModalValue('');
   }
 
-  if (loading) return (
-    <div className="flex items-center justify-center py-12">
-      <div className="w-8 h-8 border-4 border-zinc-700 border-t-emerald-400 rounded-full animate-spin" />
-    </div>
-  );
+  // Error de autorización
+  if (authError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh] gap-4">
+        <div className="w-14 h-14 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
+          <ShieldAlert size={28} className="text-red-400" />
+        </div>
+        <div className="text-center space-y-1">
+          <h2 className="text-lg font-bold text-white">No tenés permisos de administrador</h2>
+          <p className="text-zinc-500 text-sm max-w-sm">{error || 'No pudimos verificar tus permisos para esta página.'}</p>
+        </div>
+        <button onClick={load} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white text-sm rounded-lg">Reintentar</button>
+      </div>
+    );
+  }
+
+  // Sin plantel seleccionado
+  if (!selectedSquadId) {
+    return (
+      <div className="space-y-5">
+        <SquadSelector
+          mySquads={mySquads}
+          selectedSquadId={selectedSquadId}
+          onSelect={setSelectedSquadId}
+        />
+        <div className="flex flex-col items-center justify-center h-[40vh] gap-3">
+          <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
+            <User size={24} className="text-zinc-500" />
+          </div>
+          <p className="text-zinc-400 text-sm">Seleccioná un plantel para administrar los accesos de sus jugadores</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-5">
+      {/* Squad selector */}
+      <SquadSelector
+        mySquads={mySquads}
+        selectedSquadId={selectedSquadId}
+        onSelect={setSelectedSquadId}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div>
@@ -250,141 +273,147 @@ export default function PlayerAccessManager() {
       </div>
 
       {/* Table */}
-      <div className="rounded-xl border border-zinc-800 overflow-x-auto">
-        <table className="w-full text-sm min-w-[900px]">
-          <thead className="bg-zinc-900 text-zinc-400 text-xs uppercase">
-            <tr>
-              <th className="text-left p-3 font-semibold">Jugador</th>
-              <th className="text-left p-3 font-semibold">Usuario</th>
-              <th className="text-left p-3 font-semibold">DNI</th>
-              <th className="text-left p-3 font-semibold">Estado</th>
-              <th className="text-left p-3 font-semibold">Email</th>
-              <th className="text-left p-3 font-semibold">Último ingreso</th>
-              <th className="text-right p-3 font-semibold">Acciones</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-zinc-800">
-            {filtered.map((row) => {
-              const statusCfg = STATUS_LABELS[row.status] || STATUS_LABELS.access_disabled;
-              return (
-                <tr key={row.player.id} className="hover:bg-zinc-900/50">
-                  <td className="p-3">
-                    <div className="flex items-center gap-2">
-                      {row.player.photo_url ? (
-                        <img src={row.player.photo_url} className="w-8 h-8 rounded-full object-cover" alt="" />
-                      ) : (
-                        <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
-                          <User size={14} className="text-zinc-500" />
+      {loading ? (
+        <div className="flex items-center justify-center py-12">
+          <div className="w-8 h-8 border-4 border-zinc-700 border-t-emerald-400 rounded-full animate-spin" />
+        </div>
+      ) : (
+        <div className="rounded-xl border border-zinc-800 overflow-x-auto">
+          <table className="w-full text-sm min-w-[900px]">
+            <thead className="bg-zinc-900 text-zinc-400 text-xs uppercase">
+              <tr>
+                <th className="text-left p-3 font-semibold">Jugador</th>
+                <th className="text-left p-3 font-semibold">Usuario</th>
+                <th className="text-left p-3 font-semibold">DNI</th>
+                <th className="text-left p-3 font-semibold">Estado</th>
+                <th className="text-left p-3 font-semibold">Email</th>
+                <th className="text-left p-3 font-semibold">Último ingreso</th>
+                <th className="text-right p-3 font-semibold">Acciones</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-800">
+              {filtered.map((row) => {
+                const statusCfg = STATUS_LABELS[row.status] || STATUS_LABELS.access_disabled;
+                return (
+                  <tr key={row.player.id} className="hover:bg-zinc-900/50">
+                    <td className="p-3">
+                      <div className="flex items-center gap-2">
+                        {row.player.photo_url ? (
+                          <img src={row.player.photo_url} className="w-8 h-8 rounded-full object-cover" alt="" />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center">
+                            <User size={14} className="text-zinc-500" />
+                          </div>
+                        )}
+                        <div>
+                          <p className="font-medium text-white">{row.player.first_name} {row.player.last_name}</p>
+                          <p className="text-xs text-zinc-500">{row.player.squad_name || row.player.position || ''}</p>
                         </div>
-                      )}
-                      <div>
-                        <p className="font-medium text-white">{row.player.first_name} {row.player.last_name}</p>
-                        <p className="text-xs text-zinc-500">{row.player.squad_name || row.player.position || ''}</p>
                       </div>
-                    </div>
-                  </td>
-                  <td className="p-3">
-                    {row.username ? (
-                      <span className="font-mono text-emerald-400 text-xs">{row.username}</span>
-                    ) : (
-                      <span className="text-xs text-zinc-600">—</span>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    {row.hasDni ? (
-                      <span className="font-mono text-zinc-400 text-xs">{maskDni(row.player.dni)}</span>
-                    ) : (
-                      <button onClick={() => openModal('dni', row)} className="text-xs text-orange-400 hover:text-orange-300 font-semibold">Cargar DNI</button>
-                    )}
-                  </td>
-                  <td className="p-3">
-                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${statusCfg.color}`}>
-                      {statusCfg.label}
-                    </span>
-                  </td>
-                  <td className="p-3 text-zinc-300 text-xs">{row.email || '—'}</td>
-                  <td className="p-3 text-zinc-400 text-xs">{row.lastLogin ? new Date(row.lastLogin).toLocaleDateString('es-AR') : '—'}</td>
-                  <td className="p-3">
-                    <div className="flex items-center justify-end gap-1 flex-wrap">
-                      {row.username && (
-                        <button
-                          onClick={() => handleCopyInstructions(row)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
-                          title="Copiar instrucciones de activación"
-                        >
-                          {copiedId === row.player.id ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
-                        </button>
+                    </td>
+                    <td className="p-3">
+                      {row.username ? (
+                        <span className="font-mono text-emerald-400 text-xs">{row.username}</span>
+                      ) : (
+                        <span className="text-xs text-zinc-600">—</span>
                       )}
-                      {row.hasDni && (
-                        <button
-                          onClick={() => handleAction(row.player.id, 'regenerate_username')}
-                          disabled={busy}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
-                          title="Regenerar usuario"
-                        >
-                          <RotateCcw size={12} />
-                        </button>
+                    </td>
+                    <td className="p-3">
+                      {row.has_dni ? (
+                        <span className="font-mono text-zinc-400 text-xs">{maskDni(row.player.dni)}</span>
+                      ) : (
+                        <button onClick={() => openModal('dni', row)} className="text-xs text-orange-400 hover:text-orange-300 font-semibold">Cargar DNI</button>
                       )}
-                      {!row.hasDni && (
-                        <button
-                          onClick={() => openModal('dni', row)}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500/10 text-orange-300 text-xs hover:bg-orange-500/20"
-                          title="Cargar DNI"
-                        >
-                          <Edit3 size={12} />
-                        </button>
-                      )}
-                      {row.email && (
-                        <button
-                          onClick={() => openModal('email', row)}
-                          disabled={busy}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
-                          title="Cambiar email"
-                        >
-                          <Mail size={12} />
-                        </button>
-                      )}
-                      {row.status === 'access_blocked' && (
-                        <button
-                          onClick={() => handleAction(row.player.id, 'unlock')}
-                          disabled={busy}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-300 text-xs hover:bg-emerald-500/20"
-                          title="Desbloquear"
-                        >
-                          <Unlock size={12} />
-                        </button>
-                      )}
-                      {row.access && row.status === 'access_active' && (
-                        <button
-                          onClick={() => handleAction(row.player.id, 'reset_activation')}
-                          disabled={busy}
-                          className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
-                          title="Reiniciar activación"
-                        >
-                          <KeyRound size={12} />
-                        </button>
-                      )}
-                      {row.access && (
-                        <button
-                          onClick={() => handleAction(row.player.id, 'toggle')}
-                          disabled={busy}
-                          className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${row.access.active ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'}`}
-                          title={row.access.active ? 'Desactivar' : 'Reactivar'}
-                        >
-                          <Power size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-        {filtered.length === 0 && (
-          <div className="p-8 text-center text-zinc-500 text-sm">No hay jugadores que coincidan con la búsqueda</div>
-        )}
-      </div>
+                    </td>
+                    <td className="p-3">
+                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${statusCfg.color}`}>
+                        {statusCfg.label}
+                      </span>
+                    </td>
+                    <td className="p-3 text-zinc-300 text-xs">{row.email || '—'}</td>
+                    <td className="p-3 text-zinc-400 text-xs">{row.last_login ? new Date(row.last_login).toLocaleDateString('es-AR') : '—'}</td>
+                    <td className="p-3">
+                      <div className="flex items-center justify-end gap-1 flex-wrap">
+                        {row.username && (
+                          <button
+                            onClick={() => handleCopyInstructions(row)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
+                            title="Copiar instrucciones de activación"
+                          >
+                            {copiedId === row.player.id ? <CheckCircle2 size={12} className="text-emerald-400" /> : <Copy size={12} />}
+                          </button>
+                        )}
+                        {row.has_dni && (
+                          <button
+                            onClick={() => handleAction(row.player.id, 'regenerate_username')}
+                            disabled={busy}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
+                            title="Regenerar usuario"
+                          >
+                            <RotateCcw size={12} />
+                          </button>
+                        )}
+                        {!row.has_dni && (
+                          <button
+                            onClick={() => openModal('dni', row)}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-orange-500/10 text-orange-300 text-xs hover:bg-orange-500/20"
+                            title="Cargar DNI"
+                          >
+                            <Edit3 size={12} />
+                          </button>
+                        )}
+                        {row.email && (
+                          <button
+                            onClick={() => openModal('email', row)}
+                            disabled={busy}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
+                            title="Cambiar email"
+                          >
+                            <Mail size={12} />
+                          </button>
+                        )}
+                        {row.status === 'access_blocked' && (
+                          <button
+                            onClick={() => handleAction(row.player.id, 'unlock')}
+                            disabled={busy}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-emerald-500/10 text-emerald-300 text-xs hover:bg-emerald-500/20"
+                            title="Desbloquear"
+                          >
+                            <Unlock size={12} />
+                          </button>
+                        )}
+                        {row.access && row.status === 'access_active' && (
+                          <button
+                            onClick={() => handleAction(row.player.id, 'reset_activation')}
+                            disabled={busy}
+                            className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700"
+                            title="Reiniciar activación"
+                          >
+                            <KeyRound size={12} />
+                          </button>
+                        )}
+                        {row.access && (
+                          <button
+                            onClick={() => handleAction(row.player.id, 'toggle')}
+                            disabled={busy}
+                            className={`flex items-center gap-1 px-2 py-1 rounded-md text-xs ${row.access.active ? 'bg-red-500/10 text-red-300 hover:bg-red-500/20' : 'bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20'}`}
+                            title={row.access.active ? 'Desactivar' : 'Reactivar'}
+                          >
+                            <Power size={12} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {filtered.length === 0 && (
+            <div className="p-8 text-center text-zinc-500 text-sm">No hay jugadores que coincidan con la búsqueda</div>
+          )}
+        </div>
+      )}
 
       {/* Modal DNI / Email */}
       {modal && (
@@ -421,6 +450,24 @@ export default function PlayerAccessManager() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function SquadSelector({ mySquads, selectedSquadId, onSelect }) {
+  return (
+    <div className="flex items-center gap-2">
+      <select
+        value={selectedSquadId}
+        onChange={(e) => onSelect(e.target.value)}
+        className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-emerald-500"
+      >
+        <option value="">Seleccionar plantel...</option>
+        <option value="all">Todos los planteles</option>
+        {mySquads.map(s => (
+          <option key={s.id} value={s.id}>{s.name}</option>
+        ))}
+      </select>
     </div>
   );
 }

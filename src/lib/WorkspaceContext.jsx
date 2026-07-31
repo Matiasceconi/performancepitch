@@ -339,6 +339,7 @@ export function WorkspaceProvider({ children }) {
   // Seguridad: valida si una página puede verse por módulo independiente.
   // Administradores tienen acceso total; ya no depende del área activa ni de un módulo padre.
   function canSeePath(path) {
+    if (path === "/player-access") return effectiveAdminAccess;
     if (effectiveAdminAccess) return true;
     if (path === "/gps" && allowedPages.includes("/performance/external-load")) return true;
     return allowedPages.includes(path);
