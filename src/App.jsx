@@ -210,7 +210,7 @@ function AppShell() {
   }
 
   // ── Rutas del jugador ────────────────────────────────────────────────────
-  if (pathname.startsWith('/player')) {
+  if (pathname === '/player' || pathname.startsWith('/player/')) {
     if (!isPlayer) return <AccessScreen variant="no-player" onLogout={() => logout('/')} />;
     return <PlayerApp />;
   }
