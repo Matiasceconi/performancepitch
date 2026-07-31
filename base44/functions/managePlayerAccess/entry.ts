@@ -1,5 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolveStaffAccess } from "../../shared/playerPortalAuth.ts";
+import { generateUsernameBase, generateUniqueUsername, normalizeDni } from "../../shared/playerAccessUtils.ts";
 
 export default async function(req) {
   try {
@@ -13,119 +14,164 @@ export default async function(req) {
     const body = await req.json().catch(() => ({}));
     const action = String(body.action || '');
 
-    // Procesar list antes de exigir player_id
+    // Listar accesos del plantel
     if (action === 'list') {
       const squadId = String(body.squad_id || '');
-      let query = {};
-      if (squadId) query = { squad_id: squadId };
-      const accesses = await base44.asServiceRole.entities.PlayerUserAccess.filter(query, "-invited_at", 500);
-      return Response.json({ ok: true, accesses });
+      let query: any = {};
+      if (squadId) query.squad_id = squadId;
+      const accesses = await base44.asServiceRole.entities.PlayerUserAccess.filter(query, "-created_date", 500);
+      // Obtener DNI de cada jugador
+      const playerIds = [...new Set(accesses.map(a => a.player_id).filter(Boolean))];
+      const players: any[] = [];
+      for (const pid of playerIds) {
+        const p = await base44.asServiceRole.entities.Player.get(pid).catch(() => null);
+        if (p) players.push(p);
+      }
+      const playerById: Record<string, any> = {};
+      players.forEach(p => { playerById[p.id] = p; });
+      const enriched = accesses.map(a => ({
+        ...a,
+        has_dni: !!normalizeDni(playerById[a.player_id]?.dni),
+      }));
+      return Response.json({ ok: true, accesses: enriched });
     }
 
     const playerId = String(body.player_id || '');
-    const email = String(body.email || '').toLowerCase().trim();
-
     if (!playerId) return Response.json({ error: 'Jugador requerido' }, { status: 400 });
 
     const player = await base44.asServiceRole.entities.Player.get(playerId).catch(() => null);
     if (!player) return Response.json({ error: 'Jugador no encontrado' }, { status: 404 });
 
+    // Buscar acceso existente
+    const existing = await base44.asServiceRole.entities.PlayerUserAccess.filter(
+      { player_id: playerId },
+      "-created_date",
+      5
+    );
+    const access = existing[0];
+
+    // Regenerar nombre de usuario
+    if (action === 'regenerate_username') {
+      if (!access) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
+      // Obtener todos los usernames existentes excepto el actual
+      const allAccess = await base44.asServiceRole.entities.PlayerUserAccess.filter({}, "-created_date", 5000);
+      const existingUsernames = new Set(allAccess.filter(a => a.id !== access.id && a.username).map(a => a.username));
+      const base = generateUsernameBase(player.first_name, player.last_name) || `jugador.${player.id.slice(-6)}`;
+      const username = generateUniqueUsername(base, existingUsernames);
+      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
+        username,
+        status: normalizeDni(player.dni) ? 'ready_to_activate' : 'missing_document',
+        updated_at: new Date().toISOString(),
+      });
+      return Response.json({ ok: true, access: updated });
+    }
+
+    // Desbloquear intentos
+    if (action === 'unlock') {
+      if (!access) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
+      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
+        failed_attempts: 0,
+        locked_until: null,
+        status: access.status === 'access_blocked' ? 'ready_to_activate' : access.status,
+        updated_at: new Date().toISOString(),
+      });
+      return Response.json({ ok: true, access: updated });
+    }
+
+    // Actualizar DNI del jugador
+    if (action === 'update_dni') {
+      const dni = normalizeDni(body.dni);
+      await base44.asServiceRole.entities.Player.update(playerId, { dni });
+      if (access) {
+        const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
+          status: dni ? (access.status === 'access_active' ? 'access_active' : 'ready_to_activate') : 'missing_document',
+          updated_at: new Date().toISOString(),
+        });
+        return Response.json({ ok: true, access: updated });
+      }
+      return Response.json({ ok: true });
+    }
+
+    // Cambiar email vinculado
+    if (action === 'update_email') {
+      if (!access) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
+      const email = String(body.email || '').toLowerCase().trim();
+      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
+        user_email: email,
+        updated_at: new Date().toISOString(),
+      });
+      return Response.json({ ok: true, access: updated });
+    }
+
+    // Reiniciar activación
+    if (action === 'reset_activation') {
+      if (!access) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
+      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
+        status: normalizeDni(player.dni) ? 'ready_to_activate' : 'missing_document',
+        active: false,
+        user_email: '',
+        user_id: '',
+        auth_user_id: '',
+        activated_at: '',
+        activation_token_hash: '',
+        activation_token_expires_at: '',
+        failed_attempts: 0,
+        locked_until: '',
+        invitation_status: 'pending',
+        updated_at: new Date().toISOString(),
+      });
+      return Response.json({ ok: true, access: updated });
+    }
+
+    // Activar/desactivar (toggle)
+    if (action === 'toggle') {
+      if (!access) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
+      const newActive = !access.active;
+      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(access.id, {
+        active: newActive,
+        status: newActive ? 'access_active' : 'access_disabled',
+        invitation_status: newActive ? 'active' : 'disabled',
+        updated_at: new Date().toISOString(),
+      });
+      return Response.json({ ok: true, access: updated });
+    }
+
+    // Crear/invitar (legado - mantener compatibilidad)
     if (action === 'create' || action === 'invite') {
-      if (!email) return Response.json({ error: 'Email requerido' }, { status: 400 });
-      // Verificar que no existan dos accesos activos para el mismo jugador
-      const existing = await base44.asServiceRole.entities.PlayerUserAccess.filter(
-        { player_id: playerId, active: true },
-        "-invited_at",
-        10
-      );
-      if (existing.length > 0) {
-        return Response.json({ error: 'Ya existe un acceso activo para este jugador' }, { status: 409 });
-      }
-      // Verificar email único
-      const byEmail = await base44.asServiceRole.entities.PlayerUserAccess.filter(
-        { user_email: email, active: true },
-        "-invited_at",
-        5
-      );
-      if (byEmail.length > 0) {
-        return Response.json({ error: 'Ya existe un acceso activo con ese email' }, { status: 409 });
-      }
+      const email = String(body.email || '').toLowerCase().trim();
+      if (access) return Response.json({ error: 'Ya existe un acceso para este jugador' }, { status: 409 });
       const nowISO = new Date().toISOString();
-      const access = await base44.asServiceRole.entities.PlayerUserAccess.create({
+      const allAccess = await base44.asServiceRole.entities.PlayerUserAccess.filter({}, "-created_date", 5000);
+      const existingUsernames = new Set(allAccess.filter(a => a.username).map(a => a.username));
+      const base = generateUsernameBase(player.first_name, player.last_name) || `jugador.${player.id.slice(-6)}`;
+      const username = generateUniqueUsername(base, existingUsernames);
+      const hasDni = !!normalizeDni(player.dni);
+      const accessRecord = await base44.asServiceRole.entities.PlayerUserAccess.create({
         user_email: email,
         player_id: playerId,
         player_name: player.full_name || `${player.first_name} ${player.last_name}`,
         squad_id: player.squad_id || '',
         squad_name: player.squad_name || '',
-        season_id: '',
-        active: true,
-        invited_at: nowISO,
-        invitation_status: 'sent',
+        username,
+        status: hasDni ? 'ready_to_activate' : 'missing_document',
+        active: false,
+        invitation_status: 'pending',
+        failed_attempts: 0,
         created_at: nowISO,
         updated_at: nowISO,
+        created_by: user.id,
       });
-      // Invitar al usuario a la app con rol user.
-      // No ocultamos errores: si la invitación falla por un motivo distinto a
-      // "ya existe el usuario", lo propagamos para que el staff lo vea.
-      try {
-        await base44.asServiceRole.users.inviteUser(email, 'user');
-      } catch (e) {
-        const msg = String(e?.message || '');
-        const alreadyExists = /already|exist|invited|registered|409|conflict/i.test(msg);
-        if (!alreadyExists) {
-          return Response.json({
-            error: `No se pudo invitar al usuario: ${msg || 'error desconocido'}`,
-            access,
-          }, { status: 500 });
+      if (email) {
+        try {
+          await base44.asServiceRole.users.inviteUser(email, 'user');
+        } catch (e) {
+          const msg = String(e?.message || '');
+          if (!/already|exist|invited|registered|409|conflict/i.test(msg)) {
+            console.warn('inviteUser:', msg);
+          }
         }
-        console.warn('inviteUser (usuario ya existe, no bloqueante):', msg);
       }
-      return Response.json({ ok: true, access });
-    }
-
-    if (action === 'resend') {
-      const existing = await base44.asServiceRole.entities.PlayerUserAccess.filter(
-        { player_id: playerId, active: true },
-        "-invited_at",
-        1
-      );
-      if (!existing[0]) return Response.json({ error: 'No hay acceso activo para reenviar' }, { status: 404 });
-      const nowISO = new Date().toISOString();
-      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(existing[0].id, {
-        invited_at: nowISO,
-        invitation_status: 'sent',
-        updated_at: nowISO,
-      });
-      try {
-        await base44.asServiceRole.users.inviteUser(existing[0].user_email, 'user');
-      } catch (e) {
-        const msg = String(e?.message || '');
-        const alreadyExists = /already|exist|invited|registered|409|conflict/i.test(msg);
-        if (!alreadyExists) {
-          return Response.json({
-            error: `No se pudo reenviar la invitación: ${msg || 'error desconocido'}`,
-            access: updated,
-          }, { status: 500 });
-        }
-        console.warn('inviteUser resend (usuario ya existe, no bloqueante):', msg);
-      }
-      return Response.json({ ok: true, access: updated });
-    }
-
-    if (action === 'toggle') {
-      const existing = await base44.asServiceRole.entities.PlayerUserAccess.filter(
-        { player_id: playerId },
-        "-invited_at",
-        1
-      );
-      if (!existing[0]) return Response.json({ error: 'No hay acceso para este jugador' }, { status: 404 });
-      const newActive = !existing[0].active;
-      const updated = await base44.asServiceRole.entities.PlayerUserAccess.update(existing[0].id, {
-        active: newActive,
-        invitation_status: newActive ? 'active' : 'disabled',
-        updated_at: new Date().toISOString(),
-      });
-      return Response.json({ ok: true, access: updated });
+      return Response.json({ ok: true, access: accessRecord });
     }
 
     return Response.json({ error: 'Acción no válida' }, { status: 400 });

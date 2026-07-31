@@ -17,6 +17,7 @@ import { PlayerCard360Provider } from '@/components/player/PlayerCard360Context'
 import PlayerCard360 from '@/components/player/PlayerCard360';
 import PlayerApp from '@/components/player/PlayerApp';
 import PublicHome from '@/pages/PublicHome';
+import ActivatePlayer from '@/pages/ActivatePlayer';
 import AccessScreen from '@/components/AccessScreen';
 import Dashboard from '@/pages/Dashboard';
 import Sessions from '@/pages/Sessions';
@@ -188,6 +189,7 @@ function AppShell() {
   }
   if (pathname === '/forgot-password') return <ForgotPassword />;
   if (pathname.startsWith('/reset-password')) return <ResetPassword />;
+  if (pathname === '/activar-jugador') return <ActivatePlayer />;
 
   // ── Rutas protegidas (requieren auth) ────────────────────────────────────
   if (authError) {

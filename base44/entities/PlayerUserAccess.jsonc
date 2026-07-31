@@ -8,11 +8,15 @@
     },
     "user_email": {
       "type": "string",
-      "description": "Email de la cuenta del jugador"
+      "description": "Email de la cuenta del jugador (se asigna al activar)"
+    },
+    "auth_user_id": {
+      "type": "string",
+      "description": "ID del usuario en el sistema de autenticaci\u00f3n de Base44"
     },
     "player_id": {
       "type": "string",
-      "description": "ID del jugador vinculado (Player)"
+      "description": "ID del jugador vinculado (Player). Relaci\u00f3n permanente y definitiva"
     },
     "player_name": {
       "type": "string",
@@ -34,18 +38,28 @@
       "type": "string",
       "description": "ID de organizaci\u00f3n si corresponde"
     },
+    "username": {
+      "type": "string",
+      "description": "Nombre de usuario \u00fanico generado autom\u00e1ticamente (nombre.apellido). No incluye DNI ni datos sensibles"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "missing_document",
+        "ready_to_activate",
+        "activation_pending",
+        "access_active",
+        "access_blocked",
+        "access_disabled",
+        "link_error"
+      ],
+      "default": "missing_document",
+      "description": "Estado del acceso del jugador"
+    },
     "active": {
       "type": "boolean",
-      "default": true,
+      "default": false,
       "description": "Si el acceso del jugador est\u00e1 activo"
-    },
-    "invited_at": {
-      "type": "string",
-      "description": "Fecha/hora de la \u00faltima invitaci\u00f3n enviada"
-    },
-    "last_access_at": {
-      "type": "string",
-      "description": "Fecha/hora del \u00faltimo ingreso del jugador al portal"
     },
     "invitation_status": {
       "type": "string",
@@ -56,7 +70,44 @@
         "disabled"
       ],
       "default": "pending",
-      "description": "Estado de la invitaci\u00f3n del jugador"
+      "description": "Estado de la invitaci\u00f3n del jugador (legado)"
+    },
+    "invited_at": {
+      "type": "string",
+      "description": "Fecha/hora de la \u00faltima invitaci\u00f3n enviada"
+    },
+    "activated_at": {
+      "type": "string",
+      "description": "Fecha/hora de activaci\u00f3n de la cuenta"
+    },
+    "last_access_at": {
+      "type": "string",
+      "description": "\u00daltimo acceso (legado)"
+    },
+    "last_login_at": {
+      "type": "string",
+      "description": "Fecha/hora del \u00faltimo ingreso al portal"
+    },
+    "failed_attempts": {
+      "type": "number",
+      "default": 0,
+      "description": "Intentos fallidos de activaci\u00f3n"
+    },
+    "locked_until": {
+      "type": "string",
+      "description": "Fecha/hora hasta la que el acceso est\u00e1 bloqueado temporalmente"
+    },
+    "activation_token_hash": {
+      "type": "string",
+      "description": "Hash del token de activaci\u00f3n temporal (nunca el token en texto plano)"
+    },
+    "activation_token_expires_at": {
+      "type": "string",
+      "description": "Fecha/hora de vencimiento del token de activaci\u00f3n"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario que cre\u00f3 el registro"
     },
     "created_at": {
       "type": "string",
@@ -68,7 +119,6 @@
     }
   },
   "required": [
-    "user_email",
     "player_id"
   ],
   "rls": {
