@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, Loader2, Shield, ArrowLeft } from "lucide-react";
+import GoogleIcon from "@/components/GoogleIcon";
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,6 +16,16 @@ export default function Login() {
   const urlParams = new URLSearchParams(window.location.search);
   const access = urlParams.get('access') || 'staff';
   const isPlayer = access === 'player';
+
+  const handleGoogleLogin = () => {
+    setError("");
+    const returnUrl = `${window.location.origin}/login?access=${encodeURIComponent(access)}`;
+    try {
+      base44.auth.loginWithProvider("google", returnUrl);
+    } catch (err) {
+      setError("No pudimos ingresar con Google. Intentá nuevamente o utilizá email y contraseña.");
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -73,6 +84,22 @@ export default function Login() {
               {error}
             </div>
           )}
+
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleGoogleLogin}
+            className="w-full h-11 bg-white hover:bg-zinc-100 text-zinc-900 border-zinc-300 font-semibold flex items-center justify-center gap-2.5"
+          >
+            <GoogleIcon className="w-5 h-5" />
+            Continuar con Google
+          </Button>
+
+          <div className="flex items-center gap-3 my-6">
+            <div className="flex-1 h-px bg-zinc-800" />
+            <span className="text-xs text-zinc-500 whitespace-nowrap">o ingresá con email y contraseña</span>
+            <div className="flex-1 h-px bg-zinc-800" />
+          </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-1.5">
