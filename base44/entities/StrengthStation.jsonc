@@ -44,9 +44,13 @@
       "type": "string",
       "description": "Nombre del ejercicio"
     },
+    "category": {
+      "type": "string",
+      "description": "Categor\u00eda del ejercicio (heredada de biblioteca)"
+    },
     "volume": {
       "type": "string",
-      "description": "Volumen en formato libre (ej: 3x8, 3+3, 12+12)"
+      "description": "Volumen en formato libre (ej: 3x8, 3+3, 12+12). Campo legado, usar series para prescripci\u00f3n detallada"
     },
     "restore_exercise": {
       "type": "string",
@@ -58,19 +62,19 @@
     },
     "sets": {
       "type": "string",
-      "description": "Series"
+      "description": "Series (legado, usar series para prescripci\u00f3n detallada)"
     },
     "reps": {
       "type": "string",
-      "description": "Repeticiones"
+      "description": "Repeticiones (legado, usar series para prescripci\u00f3n detallada)"
     },
     "time": {
       "type": "string",
-      "description": "Tiempo"
+      "description": "Tiempo (legado, usar series para prescripci\u00f3n detallada)"
     },
     "rest_time": {
       "type": "string",
-      "description": "Pausa"
+      "description": "Pausa general del ejercicio en segundos (aplica a todas sus series)"
     },
     "rir": {
       "type": "string",
@@ -90,7 +94,7 @@
     },
     "notes": {
       "type": "string",
-      "description": "Observaciones"
+      "description": "Indicaciones t\u00e9cnicas del ejercicio"
     },
     "tags": {
       "type": "array",
@@ -99,6 +103,14 @@
       },
       "default": [],
       "description": "Etiquetas"
+    },
+    "series": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Prescripci\u00f3n serie por serie. Cada elemento: { reps, time, load_type, load_value }. load_type: kg | pct_1rm | pct_bodyweight | none"
     },
     "library_exercise_id": {
       "type": "string",
