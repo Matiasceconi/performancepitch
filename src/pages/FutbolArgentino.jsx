@@ -6,6 +6,9 @@ import FixturesList from "@/components/futbol/FixturesList";
 import CalendarTab from "@/components/futbol/CalendarTab";
 import StatsTab from "@/components/futbol/StatsTab";
 import CompetitionSelector from "@/components/futbol/CompetitionSelector";
+import MatchDetailModal from "@/components/futbol/MatchDetailModal";
+
+const GENERAL = "__general__";
 
 function fmtUpdated(iso) {
   if (!iso) return "—";
@@ -32,6 +35,7 @@ export default function FutbolArgentino() {
   const [selectedCompId, setSelectedCompId] = useState(null);
   const [selectedTournament, setSelectedTournament] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
+  const [matchModal, setMatchModal] = useState(null);
 
   const competitions = data?.competitions || [];
   const activeCompId = selectedCompId || competitions[0]?.id || null;
@@ -51,20 +55,24 @@ export default function FutbolArgentino() {
     return [...set].sort();
   }, [compStandings, compFixtures]);
 
-  const activeTournament = tournaments.includes(selectedTournament) ? selectedTournament : tournaments[0] || null;
+  // Tournament options: Apertura, Clausura + Tabla General
+  const tournamentOptions = [...tournaments, GENERAL];
+  const activeTournament = (selectedTournament && (selectedTournament === GENERAL || tournaments.includes(selectedTournament)))
+    ? selectedTournament
+    : tournaments[0] || null;
 
-  // Standings filtered by tournament
+  // Standings filtered by tournament (or all for Tabla General)
   const tournamentStandings = useMemo(() => {
     if (!compStandings) return null;
-    if (!activeTournament) return compStandings;
+    if (!activeTournament || activeTournament === GENERAL) return compStandings;
     return compStandings.filter((s) => s.tournament === activeTournament);
   }, [compStandings, activeTournament]);
 
-  // Zones within the selected tournament
+  // Zones within the selected tournament (not for Tabla General)
   const zones = useMemo(() => {
-    if (!tournamentStandings) return [];
+    if (!tournamentStandings || activeTournament === GENERAL) return [];
     return [...new Set(tournamentStandings.map((s) => s.group).filter(Boolean))];
-  }, [tournamentStandings]);
+  }, [tournamentStandings, activeTournament]);
 
   const activeZone = zones.includes(selectedZone) ? selectedZone : zones[0] || null;
 
@@ -76,7 +84,7 @@ export default function FutbolArgentino() {
 
   // Fixtures filtered by tournament (+ zone for fixture tab)
   const tournamentFixtures = useMemo(() => {
-    if (!activeTournament) return compFixtures;
+    if (!activeTournament || activeTournament === GENERAL) return compFixtures;
     return compFixtures.filter((f) => f.tournament === activeTournament);
   }, [compFixtures, activeTournament]);
 
@@ -141,27 +149,31 @@ export default function FutbolArgentino() {
         <CompetitionSelector competitions={competitions} value={activeCompId} onChange={setSelectedCompId} />
       )}
 
-      {/* Tournament toggle (Apertura / Clausura) — prominent */}
-      {tournaments.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {tournaments.map((t) => (
-            <button
-              key={t}
-              onClick={() => setSelectedTournament(t)}
-              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-base font-bold transition-all ${
-                activeTournament === t
-                  ? "bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/20"
-                  : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white hover:border-zinc-600"
-              }`}
-            >
-              <Trophy size={18} />
-              {t}
-            </button>
-          ))}
+      {/* Tournament toggle (Apertura / Clausura / Tabla General) — prominent */}
+      {tournamentOptions.length > 0 && (
+        <div className={`grid gap-2 ${tournamentOptions.length === 2 ? "grid-cols-2" : "grid-cols-3"}`}>
+          {tournamentOptions.map((t) => {
+            const isGeneral = t === GENERAL;
+            const label = isGeneral ? "Tabla General" : t;
+            return (
+              <button
+                key={t}
+                onClick={() => setSelectedTournament(t)}
+                className={`flex items-center justify-center gap-2 px-3 py-3 rounded-xl text-sm sm:text-base font-bold transition-all ${
+                  activeTournament === t
+                    ? "bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/20"
+                    : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white hover:border-zinc-600"
+                }`}
+              >
+                <Trophy size={16} />
+                <span className="truncate">{label}</span>
+              </button>
+            );
+          })}
         </div>
       )}
 
-      {/* Zone selector (standings + fixtures tabs only) */}
+      {/* Zone selector (standings + fixtures tabs only, not for Tabla General) */}
       {showZoneSelector && (
         <div className="flex items-center gap-2 flex-wrap">
           <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
@@ -226,11 +238,14 @@ export default function FutbolArgentino() {
       ) : (
         <>
           {tab === "standings" && <StandingsTable standings={zoneStandings} competitionName={competition?.name} />}
-          {tab === "fixtures" && <FixturesList fixtures={zoneFixtures} />}
-          {tab === "calendar" && <CalendarTab fixtures={tournamentFixtures} />}
+          {tab === "fixtures" && <FixturesList fixtures={zoneFixtures} onMatchClick={setMatchModal} />}
+          {tab === "calendar" && <CalendarTab fixtures={tournamentFixtures} onMatchClick={setMatchModal} />}
           {tab === "stats" && <StatsTab fixtures={tournamentFixtures} standings={zoneStandings} />}
         </>
       )}
+
+      {/* Match detail modal */}
+      {matchModal && <MatchDetailModal fixture={matchModal} onClose={() => setMatchModal(null)} />}
     </div>
   );
 }

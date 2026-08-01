@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye } from "lucide-react";
 
 const STATUS_CFG = {
   finished: { label: "Finalizado", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -26,13 +26,17 @@ function extractRoundNumber(round) {
   return m ? parseInt(m[1], 10) : null;
 }
 
-function CalendarFixtureCard({ fx }) {
+function CalendarFixtureCard({ fx, onMatchClick }) {
   const cfg = STATUS_CFG[fx.status] || STATUS_CFG.scheduled;
   const isFinished = fx.status === "finished";
   const isInPlay = fx.status === "in_play";
+  const clickable = isFinished && onMatchClick;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-700 transition-colors">
+    <div
+      onClick={clickable ? () => onMatchClick(fx) : undefined}
+      className={`bg-zinc-900 border rounded-xl p-3 transition-colors ${clickable ? "border-zinc-800 hover:border-blue-500/50 cursor-pointer" : "border-zinc-800 hover:border-zinc-700"}`}
+    >
       <div className="flex items-center gap-3">
         <div className="flex-1 flex items-center gap-2 min-w-0 justify-end text-right">
           <span className={`text-sm truncate ${isFinished ? "text-white font-semibold" : "text-zinc-300"}`}>{fx.homeTeam}</span>
@@ -59,13 +63,20 @@ function CalendarFixtureCard({ fx }) {
           <p className="text-xs text-zinc-400 capitalize">{fmtDate(fx.date)}</p>
           {fx.venue && <p className="text-xs text-zinc-600 truncate">{fx.venue}</p>}
         </div>
-        <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>{cfg.label}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {clickable && (
+            <span className="flex items-center gap-1 text-xs text-blue-400 font-medium">
+              <Eye size={12} /> Detalles
+            </span>
+          )}
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>{cfg.label}</span>
+        </div>
       </div>
     </div>
   );
 }
 
-function RoundSection({ round, items, defaultOpen }) {
+function RoundSection({ round, items, defaultOpen, onMatchClick }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
@@ -81,14 +92,14 @@ function RoundSection({ round, items, defaultOpen }) {
       </button>
       {open && (
         <div className="p-3 space-y-2 border-t border-zinc-800/60">
-          {items.map((fx, i) => <CalendarFixtureCard key={i} fx={fx} />)}
+          {items.map((fx, i) => <CalendarFixtureCard key={i} fx={fx} onMatchClick={onMatchClick} />)}
         </div>
       )}
     </div>
   );
 }
 
-export default function CalendarTab({ fixtures }) {
+export default function CalendarTab({ fixtures, onMatchClick }) {
   const grouped = useMemo(() => {
     const list = (fixtures || []).filter((f) => f && f.homeTeam);
     const map = new Map();
@@ -113,7 +124,7 @@ export default function CalendarTab({ fixtures }) {
   return (
     <div className="space-y-3">
       {grouped.map((g, i) => (
-        <RoundSection key={g.key} round={g} items={g.items} defaultOpen={i === 0} />
+        <RoundSection key={g.key} round={g} items={g.items} defaultOpen={i === 0} onMatchClick={onMatchClick} />
       ))}
     </div>
   );

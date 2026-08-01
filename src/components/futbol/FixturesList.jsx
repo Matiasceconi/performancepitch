@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Eye } from "lucide-react";
 
 const STATUS_CFG = {
   finished: { label: "Finalizado", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -21,13 +21,17 @@ function fmtDate(iso) {
   }
 }
 
-function FixtureCard({ fx }) {
+function FixtureCard({ fx, onMatchClick }) {
   const cfg = STATUS_CFG[fx.status] || STATUS_CFG.scheduled;
   const isFinished = fx.status === "finished";
   const isInPlay = fx.status === "in_play";
+  const clickable = isFinished && onMatchClick;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-3 hover:border-zinc-700 transition-colors">
+    <div
+      onClick={clickable ? () => onMatchClick(fx) : undefined}
+      className={`bg-zinc-900 border rounded-xl p-3 transition-colors ${clickable ? "border-zinc-800 hover:border-blue-500/50 cursor-pointer" : "border-zinc-800 hover:border-zinc-700"}`}
+    >
       <div className="flex items-center gap-3">
         <div className="flex-1 flex items-center gap-2 min-w-0 justify-end text-right">
           <span className={`text-sm truncate ${isFinished ? "text-white font-semibold" : "text-zinc-300"}`}>{fx.homeTeam}</span>
@@ -54,8 +58,38 @@ function FixtureCard({ fx }) {
           <p className="text-xs text-zinc-400 capitalize">{fmtDate(fx.date)}</p>
           {fx.venue && <p className="text-xs text-zinc-600 truncate">{fx.venue}</p>}
         </div>
-        <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>{cfg.label}</span>
+        <div className="flex items-center gap-2 shrink-0">
+          {clickable && (
+            <span className="flex items-center gap-1 text-xs text-blue-400 font-medium">
+              <Eye size={12} /> Ver detalles
+            </span>
+          )}
+          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold border ${cfg.cls}`}>{cfg.label}</span>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function RoundSection({ round, defaultOpen, onMatchClick }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/40 transition-colors"
+      >
+        <span className="text-sm font-bold text-white">{round.label}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">{round.items.length} partidos</span>
+          {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
+        </span>
+      </button>
+      {open && (
+        <div className="p-3 space-y-2 border-t border-zinc-800/60">
+          {round.items.map((fx, i) => <FixtureCard key={i} fx={fx} onMatchClick={onMatchClick} />)}
+        </div>
+      )}
     </div>
   );
 }
@@ -82,34 +116,10 @@ function groupByRound(list) {
   return Array.from(map.values());
 }
 
-function RoundSection({ round, defaultOpen }) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/40 transition-colors"
-      >
-        <span className="text-sm font-bold text-white">{round.label}</span>
-        <span className="flex items-center gap-2">
-          <span className="text-xs text-zinc-500">{round.items.length} partidos</span>
-          {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
-        </span>
-      </button>
-      {open && (
-        <div className="p-3 space-y-2 border-t border-zinc-800/60">
-          {round.items.map((fx, i) => <FixtureCard key={i} fx={fx} />)}
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default function FixturesList({ fixtures }) {
+export default function FixturesList({ fixtures, onMatchClick }) {
   const grouped = useMemo(() => {
     const list = (fixtures || []).filter((f) => f && f.homeTeam);
     const groups = groupByRound(list);
-    // Sort by round number if available
     return groups.sort((a, b) => {
       const na = extractRoundNumber(a.key);
       const nb = extractRoundNumber(b.key);
@@ -131,7 +141,7 @@ export default function FixturesList({ fixtures }) {
   return (
     <div className="space-y-3">
       {grouped.map((g, i) => (
-        <RoundSection key={g.key} round={g} defaultOpen={i === 0} />
+        <RoundSection key={g.key} round={g} defaultOpen={i === 0} onMatchClick={onMatchClick} />
       ))}
     </div>
   );
