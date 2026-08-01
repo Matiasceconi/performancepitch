@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
-import { base44 } from "@/api/base44Client";
 import { X, Loader2, AlertCircle, Goal, Square, Repeat, ChevronRight } from "lucide-react";
+
+const MATCH_DETAIL_ENDPOINT = "https://base44.app/api/apps/6a6d734e0e73182fe462b682/functions/fetchMatchDetail";
 
 const POS_LABEL = { G: "ARCO", D: "DEF", M: "MED", F: "DEL" };
 
@@ -197,22 +198,27 @@ export default function MatchDetailModal({ fixture, onClose }) {
   const [error, setError] = useState("");
   const [view, setView] = useState("pitch");
 
-  const loadDetail = (fx) => {
+  const loadDetail = async (fx) => {
     setLoading(true);
     setError("");
     setDetail(null);
-    base44.functions
-      .invoke("fetchMatchDetail", { fixtureId: fx.fixtureId || fx.id })
-      .then((res) => {
-        const data = res.data || res;
-        if (data.error) throw new Error(data.error);
-        setDetail(data);
-        setLoading(false);
-      })
-      .catch((e) => {
-        setError(e?.message || "Error al cargar el detalle");
-        setLoading(false);
+    try {
+      const res = await fetch(MATCH_DETAIL_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fixtureId: Number(fx.matchId) }),
       });
+      if (!res.ok) throw new Error(`Error ${res.status} al obtener detalle del partido`);
+      const json = await res.json();
+      if (json.error) throw new Error(json.error);
+      const hasFormations = json.homeFormation || json.awayFormation || (json.homeLineup && json.homeLineup.length) || (json.awayLineup && json.awayLineup.length);
+      setView(hasFormations ? "pitch" : "events");
+      setDetail(json);
+    } catch (e) {
+      setError(e?.message || "Error al cargar el detalle");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -228,6 +234,8 @@ export default function MatchDetailModal({ fixture, onClose }) {
   }, [onClose]);
 
   if (!fixture) return null;
+
+  const hasFormations = detail && !!(detail.homeFormation || detail.awayFormation || (detail.homeLineup && detail.homeLineup.length) || (detail.awayLineup && detail.awayLineup.length));
 
   const homeName = fixture.homeTeam || detail?.homeName;
   const awayName = fixture.awayTeam || detail?.awayName;
@@ -299,10 +307,10 @@ export default function MatchDetailModal({ fixture, onClose }) {
               {/* View tabs */}
               <div className="flex gap-1 mb-4 border-b border-zinc-800">
                 {[
-                  { id: "pitch", label: "Formaciones" },
-                  { id: "events", label: "Eventos" },
-                  { id: "stats", label: "Estadísticas" },
-                ].map((t) => (
+                  { id: "pitch", label: "Formaciones", show: hasFormations },
+                  { id: "events", label: "Eventos", show: true },
+                  { id: "stats", label: "Estadísticas", show: true },
+                ].filter((t) => t.show).map((t) => (
                   <button
                     key={t.id}
                     onClick={() => setView(t.id)}
@@ -313,7 +321,7 @@ export default function MatchDetailModal({ fixture, onClose }) {
                 ))}
               </div>
 
-              {view === "pitch" && (
+              {view === "pitch" && hasFormations && (
                 <div className="space-y-4">
                   <FormationPitch
                     homeLineup={detail.homeLineup}
