@@ -77,6 +77,16 @@ export default function IngresoJugador() {
     setError('Tu sesión expiró. Ingresá tu DNI nuevamente.');
   }
 
+  // Auto-navegar al formulario de RPE si el Wellness está completo y hay una sola sesión
+  useEffect(() => {
+    const wellnessDone = data?.wellness?.status === 'completed';
+    const rpeSessions = data?.rpe_sessions || [];
+    if (step === 'dashboard' && wellnessDone && rpeSessions.length === 1 && !selectedRpe) {
+      setSelectedRpe(rpeSessions[0]);
+      setStep('rpe');
+    }
+  }, [step, data, selectedRpe]);
+
   // ── Step: DNI input ─────────────────────────────────────────────────────
   if (step === 'dni') {
     return (
@@ -179,16 +189,6 @@ export default function IngresoJugador() {
       </div>
     );
   }
-
-  // Auto-navegar al formulario de RPE si el Wellness está completo y hay una sola sesión
-  useEffect(() => {
-    const wellnessDone = data?.wellness?.status === 'completed';
-    const rpeSessions = data?.rpe_sessions || [];
-    if (step === 'dashboard' && wellnessDone && rpeSessions.length === 1 && !selectedRpe) {
-      setSelectedRpe(rpeSessions[0]);
-      setStep('rpe');
-    }
-  }, [step, data, selectedRpe]);
 
   // ── Step: Dashboard ─────────────────────────────────────────────────────
   if (loading) {

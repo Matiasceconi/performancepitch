@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { hashToken, getTodayInTimezone } from "../../shared/playerAccessUtils.ts";
 import { computeWellness as cw, computeIsDrop as cid } from "../../shared/playerPortalAuth.ts";
+import { resolvePlayerContextForDate } from "../../shared/squadRosterResolver.ts";
 
 export default async function(req) {
   try {
@@ -32,9 +33,12 @@ export default async function(req) {
     }
 
     const playerId = tokenRecord.player_id;
-    const squadId = tokenRecord.squad_id;
-    const seasonId = tokenRecord.season_id || '';
-    const organizationId = '';
+
+    // Resolver el plantel operativo real del jugador para la fecha
+    const context = await resolvePlayerContextForDate(base44, playerId, today);
+    const squadId = context?.squad_id || tokenRecord.squad_id || '';
+    const seasonId = context?.season_id || tokenRecord.season_id || '';
+    const organizationId = context?.organization_id || '';
 
     // Validar valores
     const sleepHours = Number(body.sleep_hours) || 0;
