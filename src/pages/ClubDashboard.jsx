@@ -77,6 +77,8 @@ export default function ClubDashboard() {
 
   const nextMatchPrimera = useMemo(() => allFixtures.filter((f) => f.competitionId === LIGA_PROFESIONAL_ID && f.status === "scheduled" && (f.homeTeam === TEAM_NAME || f.awayTeam === TEAM_NAME)).sort((a, b) => new Date(a.date) - new Date(b.date))[0], [allFixtures]);
 
+  const reservaClausuraFixtures = useMemo(() => allFixtures.filter((f) => f.competitionId === COMPETITION_ID && f.tournament === "Clausura"), [allFixtures]);
+
   if (loading) {
     return (
       <div className="p-4 sm:p-6 space-y-6 max-w-6xl mx-auto">
@@ -159,7 +161,7 @@ export default function ClubDashboard() {
 
       {/* Last results + Next 5 */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <LastResults fixtures={allFixtures} teamName={TEAM_NAME} />
+        <LastResults fixtures={reservaClausuraFixtures} teamName={TEAM_NAME} />
         <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
           <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
             <Calendar size={16} className="text-emerald-400" /> Próximos Partidos — Reserva
