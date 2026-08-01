@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { Plus, Trash2, GripVertical, Copy, Dumbbell, Loader2, Save, Send, X, Users, Calendar, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus, Trash2, GripVertical, Copy, Dumbbell, Loader2, Save, Send, X, Users, Calendar, ChevronDown, ChevronUp, UserCog, Bookmark } from 'lucide-react';
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import ExercisePickerModal from './ExercisePickerModal';
+import PlayerOverrideModal from './PlayerOverrideModal';
 
 const BLOCK_TYPES = [
   { value: 'activation', label: 'Activación' },
@@ -27,7 +29,8 @@ function emptyExercise(lib) {
   };
 }
 
-function ExerciseRow({ ex, onChange, onRemove, onDuplicate }) {
+function ExerciseRow({ ex, onChange, onRemove, onDuplicate, onOpenOverrides, assignedCount }) {
+  const overrideCount = (ex.overrides || []).length;
   return (
     <div className="bg-zinc-800/40 border border-zinc-700/50 rounded-lg p-2.5 space-y-2">
       <div className="flex items-start gap-2">
@@ -37,6 +40,11 @@ function ExerciseRow({ ex, onChange, onRemove, onDuplicate }) {
         <div className="flex-1 min-w-0">
           <p className="text-sm text-white font-medium truncate">{ex.library_exercise_name}</p>
         </div>
+        {assignedCount > 0 && (
+          <button onClick={onOpenOverrides} className={`flex items-center gap-1 px-1.5 py-1 rounded text-xs ${overrideCount > 0 ? 'bg-blue-500/15 text-blue-400' : 'text-zinc-500 hover:text-white hover:bg-zinc-800'}`} title="Ajustes individuales por jugador">
+            <UserCog size={13} /> {overrideCount > 0 && <span className="font-bold">{overrideCount}</span>}
+          </button>
+        )}
         <button onClick={onDuplicate} className="text-zinc-500 hover:text-white p-1"><Copy size={13} /></button>
         <button onClick={onRemove} className="text-zinc-500 hover:text-red-400 p-1"><Trash2 size={13} /></button>
       </div>
@@ -59,9 +67,10 @@ function ExerciseRow({ ex, onChange, onRemove, onDuplicate }) {
   );
 }
 
-function BlockEditor({ block, onChange, onRemove, onMoveUp, onMoveDown, squadId }) {
+function BlockEditor({ block, onChange, onRemove, squadId, assignedCount, onOpenOverrides }) {
   const [open, setOpen] = useState(true);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [overrideEx, setOverrideEx] = useState(null);
 
   function addExercise(lib) {
     onChange({ ...block, exercises: [...(block.exercises || []), emptyExercise(lib)] });
@@ -76,8 +85,15 @@ function BlockEditor({ block, onChange, onRemove, onMoveUp, onMoveDown, squadId 
   }
   function dupEx(i) {
     const list = [...(block.exercises || [])];
-    const copy = { ...list[i], id: undefined };
+    const copy = { ...list[i], id: undefined, overrides: [] };
     list.splice(i + 1, 0, copy);
+    onChange({ ...block, exercises: list });
+  }
+  function onDragEnd(result) {
+    if (!result.destination) return;
+    const list = [...(block.exercises || [])];
+    const [moved] = list.splice(result.source.index, 1);
+    list.splice(result.destination.index, 0, moved);
     onChange({ ...block, exercises: list });
   }
 
@@ -89,24 +105,51 @@ function BlockEditor({ block, onChange, onRemove, onMoveUp, onMoveDown, squadId 
           {BLOCK_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
         </select>
         <input value={block.name || ''} onChange={(e) => onChange({ ...block, name: e.target.value })} placeholder="Nombre del bloque" className="flex-1 bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white" />
-        <button onClick={onMoveUp} className="text-zinc-500 hover:text-white p-1"><ChevronUp size={14} /></button>
-        <button onClick={onMoveDown} className="text-zinc-500 hover:text-white p-1"><ChevronDown size={14} /></button>
         <button onClick={onRemove} className="text-zinc-500 hover:text-red-400 p-1"><Trash2 size={14} /></button>
         <button onClick={() => setOpen(!open)} className="text-zinc-500 hover:text-white p-1">{open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}</button>
       </div>
       {open && (
         <div className="px-2.5 pb-2.5 space-y-2">
           <input value={block.instructions || ''} onChange={(e) => onChange({ ...block, instructions: e.target.value })} placeholder="Indicaciones del bloque" className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white" />
-          {(block.exercises || []).map((ex, i) => <ExerciseRow key={i} ex={ex} onChange={(e) => updateEx(i, e)} onRemove={() => removeEx(i)} onDuplicate={() => dupEx(i)} />)}
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId={`ex-${block._key || block.name || 'block'}`}>
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                  {(block.exercises || []).map((ex, i) => (
+                    <Draggable key={i} draggableId={`ex-${i}`} index={i}>
+                      {(p, s) => (
+                        <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps} className={s.isDragging ? 'opacity-70' : ''}>
+                          <ExerciseRow ex={ex} onChange={(e) => updateEx(i, e)} onRemove={() => removeEx(i)} onDuplicate={() => dupEx(i)} onOpenOverrides={() => setOverrideEx(ex)} assignedCount={assignedCount} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
           <button onClick={() => setPickerOpen(true)} className="w-full py-1.5 rounded-lg border border-dashed border-zinc-700 text-xs text-zinc-400 hover:border-zinc-500 hover:text-white flex items-center justify-center gap-1"><Plus size={12} /> Agregar ejercicio</button>
         </div>
       )}
       {pickerOpen && <ExercisePickerModal squadId={squadId} onPick={addExercise} onClose={() => setPickerOpen(false)} />}
+      {overrideEx && (
+        <PlayerOverrideModal
+          exercise={overrideEx}
+          assignments={onOpenOverrides.assignments}
+          roster={onOpenOverrides.roster}
+          onChange={(newEx) => {
+            updateEx((block.exercises || []).findIndex((e) => e === overrideEx), newEx);
+            setOverrideEx(newEx);
+          }}
+          onClose={() => setOverrideEx(null)}
+        />
+      )}
     </div>
   );
 }
 
-function WorkoutEditor({ workout, onChange, onRemove, squadId }) {
+function WorkoutEditor({ workout, onChange, onRemove, squadId, assignedCount, assignments, roster }) {
   const [open, setOpen] = useState(true);
   function addBlock(type) {
     const newBlock = { block_type: type, name: '', instructions: '', exercises: [] };
@@ -120,11 +163,11 @@ function WorkoutEditor({ workout, onChange, onRemove, squadId }) {
   function removeBlock(i) {
     onChange({ ...workout, blocks: (workout.blocks || []).filter((_, idx) => idx !== i) });
   }
-  function moveBlock(i, dir) {
+  function onDragEnd(result) {
+    if (!result.destination) return;
     const list = [...(workout.blocks || [])];
-    const t = i + dir;
-    if (t < 0 || t >= list.length) return;
-    [list[i], list[t]] = [list[t], list[i]];
+    const [moved] = list.splice(result.source.index, 1);
+    list.splice(result.destination.index, 0, moved);
     onChange({ ...workout, blocks: list });
   }
 
@@ -144,9 +187,24 @@ function WorkoutEditor({ workout, onChange, onRemove, squadId }) {
             <input type="number" value={workout.estimated_duration_minutes ?? ''} onChange={(e) => onChange({ ...workout, estimated_duration_minutes: e.target.value ? Number(e.target.value) : null })} placeholder="Duración (min)" className="bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white" />
           </div>
           <input value={workout.instructions || ''} onChange={(e) => onChange({ ...workout, instructions: e.target.value })} placeholder="Indicaciones del entrenamiento" className="w-full bg-zinc-800 border border-zinc-700 rounded px-2 py-1 text-xs text-white" />
-          <div className="space-y-2">
-            {(workout.blocks || []).map((b, i) => <BlockEditor key={i} block={b} onChange={(nb) => updateBlock(i, nb)} onRemove={() => removeBlock(i)} onMoveUp={() => moveBlock(i, -1)} onMoveDown={() => moveBlock(i, 1)} squadId={squadId} />)}
-          </div>
+          <DragDropContext onDragEnd={onDragEnd}>
+            <Droppable droppableId={`blocks-${workout._key || workout.workout_date || 'w'}`}>
+              {(provided) => (
+                <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
+                  {(workout.blocks || []).map((b, i) => (
+                    <Draggable key={i} draggableId={`blk-${i}`} index={i}>
+                      {(p, s) => (
+                        <div ref={p.innerRef} {...p.draggableProps} {...p.dragHandleProps} className={s.isDragging ? 'opacity-70' : ''}>
+                          <BlockEditor block={b} onChange={(nb) => updateBlock(i, nb)} onRemove={() => removeBlock(i)} squadId={squadId} assignedCount={assignedCount} onOpenOverrides={{ assignments, roster }} />
+                        </div>
+                      )}
+                    </Draggable>
+                  ))}
+                  {provided.placeholder}
+                </div>
+              )}
+            </Droppable>
+          </DragDropContext>
           <div className="flex gap-1.5">
             {BLOCK_TYPES.map((t) => <button key={t.value} onClick={() => addBlock(t.value)} className="flex-1 py-1.5 rounded-lg border border-zinc-700 bg-zinc-900 text-zinc-300 text-[11px] hover:border-zinc-500 flex items-center justify-center gap-1"><Plus size={11} /> {t.label}</button>)}
           </div>
@@ -213,6 +271,7 @@ export default function PlanBuilder({ initialPlan, roster, squadInfo, onSaved, o
   }
 
   const assignedIds = new Set((plan.assignments || []).map((a) => a.player_id));
+  const assignedCount = (plan.assignments || []).length;
 
   return (
     <div className="space-y-4">
@@ -228,11 +287,15 @@ export default function PlanBuilder({ initialPlan, roster, squadInfo, onSaved, o
         <input value={plan.objective} onChange={(e) => setPlan({ ...plan, objective: e.target.value })} placeholder="Objetivo general" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white" />
         <textarea value={plan.description} onChange={(e) => setPlan({ ...plan, description: e.target.value })} placeholder="Descripción" rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white resize-none" />
         <textarea value={plan.general_instructions} onChange={(e) => setPlan({ ...plan, general_instructions: e.target.value })} placeholder="Indicaciones generales para el jugador" rows={2} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white resize-none" />
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={!!plan.is_template} onChange={(e) => setPlan({ ...plan, is_template: e.target.checked })} className="rounded" />
+          <span className="flex items-center gap-1.5 text-sm text-zinc-300"><Bookmark size={13} className="text-amber-400" /> Guardar como plantilla reutilizable</span>
+        </label>
       </div>
 
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl">
         <button onClick={() => setShowAssign(!showAssign)} className="w-full flex items-center justify-between p-3">
-          <span className="flex items-center gap-2 text-sm text-white font-medium"><Users size={15} /> Jugadores asignados ({(plan.assignments || []).length})</span>
+          <span className="flex items-center gap-2 text-sm text-white font-medium"><Users size={15} /> Jugadores asignados ({assignedCount})</span>
           {showAssign ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
         </button>
         {showAssign && (
@@ -253,7 +316,7 @@ export default function PlanBuilder({ initialPlan, roster, squadInfo, onSaved, o
           <h3 className="text-sm font-bold text-zinc-400 uppercase">Entrenamientos ({(plan.workouts || []).length})</h3>
           <button onClick={addWorkout} className="flex items-center gap-1 px-3 py-1.5 bg-white text-zinc-950 rounded-lg text-xs font-bold hover:bg-zinc-200"><Plus size={13} /> Agregar fecha</button>
         </div>
-        {(plan.workouts || []).map((w, i) => <WorkoutEditor key={i} workout={w} onChange={(nw) => updateWorkout(i, nw)} onRemove={() => removeWorkout(i)} squadId={plan.squad_id} />)}
+        {(plan.workouts || []).map((w, i) => <WorkoutEditor key={i} workout={w} onChange={(nw) => updateWorkout(i, nw)} onRemove={() => removeWorkout(i)} squadId={plan.squad_id} assignedCount={assignedCount} assignments={plan.assignments} roster={roster} />)}
       </div>
 
       <div className="flex gap-2 sticky bottom-0 bg-zinc-950 py-3 border-t border-zinc-800">

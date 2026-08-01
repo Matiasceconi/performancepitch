@@ -270,7 +270,7 @@ export default function ComplementaryStrengthPlans() {
               <p className="text-zinc-500 text-sm">No hay plantillas guardadas.</p>
               <p className="text-zinc-600 text-xs mt-1">Creá un plan y marcá "Guardar como plantilla" para reutilizarlo.</p>
             </div>
-          ) : templates.map((p) => <PlanCard key={p.id} plan={p} statusLabel="Plantilla" onDuplicate={duplicatePlan} />)}
+          ) : templates.map((p) => <PlanCard key={p.id} plan={p} statusLabel="Plantilla" onDuplicate={(plan) => duplicatePlan({ ...plan, is_template: false })} />)}
         </div>
       )}
 
