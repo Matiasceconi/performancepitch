@@ -17,7 +17,6 @@ const NAV_ITEMS = [
   { label: "Dashboard", path: "/dashboard", icon: LayoutDashboard },
   { label: "Sesiones", path: "/sessions", icon: Video },
   { label: "Partidos", path: "/matches", icon: Trophy },
-  { label: "Fútbol Argentino", path: "/futbol-argentino", icon: Trophy },
   { label: "Pizarra Táctica", path: "/tactical", icon: Map },
   { label: "Carga Externa", path: "/performance/external-load", icon: Gauge },
   { label: "Carga Interna", path: "/performance/internal-load", icon: HeartPulse },

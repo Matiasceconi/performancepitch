@@ -47,7 +47,6 @@ import StrengthLibrary from '@/pages/StrengthLibrary';
 import UsersAccess from '@/pages/UsersAccess';
 import PlayerAccess from '@/pages/PlayerAccess';
 import ComplementaryStrengthPlans from '@/pages/ComplementaryStrengthPlans';
-import FutbolArgentino from '@/pages/FutbolArgentino';
 import ClubDashboard from '@/pages/ClubDashboard';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
@@ -130,7 +129,6 @@ function StaffRoutes() {
             <Route path="/users-access" element={<UsersAccess />} />
             <Route path="/player-access" element={<PlayerAccess />} />
             <Route path="/complementary-strength" element={<ComplementaryStrengthPlans />} />
-            <Route path="/futbol-argentino" element={<FutbolArgentino />} />
           </Route>
           <Route path="*" element={<Navigate to="/club-dashboard" replace />} />
         </Routes>
