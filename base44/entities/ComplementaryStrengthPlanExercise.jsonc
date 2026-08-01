@@ -1,0 +1,107 @@
+{
+  "name": "ComplementaryStrengthPlanExercise",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n"
+    },
+    "plan_id": {
+      "type": "string",
+      "description": "ID del plan (desnormalizado para consultas)"
+    },
+    "workout_id": {
+      "type": "string",
+      "description": "ID del entrenamiento (desnormalizado)"
+    },
+    "block_id": {
+      "type": "string",
+      "description": "ID del bloque al que pertenece la prescripci\u00f3n"
+    },
+    "library_exercise_id": {
+      "type": "string",
+      "description": "ID del ejercicio en StrengthExerciseLibrary. Referencia, no copia"
+    },
+    "library_exercise_name": {
+      "type": "string",
+      "description": "Nombre del ejercicio (desnormalizado para listados)"
+    },
+    "library_exercise_image": {
+      "type": "string",
+      "description": "Imagen del ejercicio (desnormalizado, referenciado de la biblioteca)"
+    },
+    "library_exercise_video": {
+      "type": "string",
+      "description": "Video del ejercicio (desnormalizado, referenciado de la biblioteca)"
+    },
+    "sort_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden dentro del bloque"
+    },
+    "sets": {
+      "type": "number",
+      "description": "Series"
+    },
+    "repetitions": {
+      "type": "string",
+      "description": "Repeticiones o tiempo (formato libre)"
+    },
+    "rest_seconds": {
+      "type": "number",
+      "description": "Pausa en segundos"
+    },
+    "prescribed_load_kg": {
+      "type": "number",
+      "description": "Carga exacta en kilogramos"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "RIR",
+        "RPE",
+        "none"
+      ],
+      "default": "none",
+      "description": "Tipo de objetivo del ejercicio: RIR, RPE o ninguno"
+    },
+    "target_value": {
+      "type": "string",
+      "description": "Valor objetivo (ej: RIR 2, RPE 8)"
+    },
+    "technical_instructions": {
+      "type": "string",
+      "description": "Indicaciones t\u00e9cnicas del ejercicio"
+    },
+    "general_note": {
+      "type": "string",
+      "description": "Observaci\u00f3n general de la prescripci\u00f3n"
+    }
+  },
+  "required": [
+    "block_id",
+    "library_exercise_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

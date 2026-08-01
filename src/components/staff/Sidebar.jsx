@@ -28,6 +28,7 @@ const NAV_ITEMS = [
   { label: "Jugadores", path: "/players", icon: UsersRound },
   { label: "Biblioteca Campo", path: "/field-library", icon: BookOpen },
   { label: "Biblioteca Fuerza", path: "/strength-library", icon: Dumbbell },
+  { label: "Planes complementarios", path: "/complementary-strength", icon: Dumbbell },
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
   { label: "Planteles", path: "/squad-manager", icon: UsersRound },
   { label: "Accesos de jugadores", path: "/player-access", icon: UserRound },

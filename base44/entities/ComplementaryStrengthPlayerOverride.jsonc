@@ -1,0 +1,98 @@
+{
+  "name": "ComplementaryStrengthPlayerOverride",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n"
+    },
+    "plan_exercise_id": {
+      "type": "string",
+      "description": "ID de la prescripci\u00f3n base (ComplementaryStrengthPlanExercise)"
+    },
+    "workout_id": {
+      "type": "string",
+      "description": "ID del entrenamiento (desnormalizado)"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador con ajuste individual"
+    },
+    "sets": {
+      "type": "number",
+      "description": "Series personalizadas (si null, hereda base)"
+    },
+    "repetitions": {
+      "type": "string",
+      "description": "Repeticiones personalizadas (si null, hereda base)"
+    },
+    "rest_seconds": {
+      "type": "number",
+      "description": "Pausa personalizada (si null, hereda base)"
+    },
+    "prescribed_load_kg": {
+      "type": "number",
+      "description": "Carga personalizada (si null, hereda base)"
+    },
+    "target_type": {
+      "type": "string",
+      "enum": [
+        "RIR",
+        "RPE",
+        "none"
+      ],
+      "description": "Tipo de objetivo personalizado (si null, hereda base)"
+    },
+    "target_value": {
+      "type": "string",
+      "description": "Valor objetivo personalizado (si null, hereda base)"
+    },
+    "technical_instructions": {
+      "type": "string",
+      "description": "Indicaciones t\u00e9cnicas personalizadas (si null, hereda base)"
+    },
+    "is_excluded": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el ejercicio queda excluido para este jugador"
+    },
+    "replacement_library_exercise_id": {
+      "type": "string",
+      "description": "ID del ejercicio de biblioteca de reemplazo para este jugador"
+    },
+    "replacement_library_exercise_name": {
+      "type": "string",
+      "description": "Nombre del ejercicio de reemplazo (desnormalizado)"
+    },
+    "individual_note": {
+      "type": "string",
+      "description": "Observaci\u00f3n individual del PF para el jugador"
+    }
+  },
+  "required": [
+    "plan_exercise_id",
+    "player_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

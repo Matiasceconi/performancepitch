@@ -37,6 +37,7 @@ export const MODULES = [
   { id: "jugadores", label: "Jugadores", path: "/players" },
   { id: "biblioteca_campo", label: "Biblioteca Campo", path: "/field-library" },
   { id: "biblioteca_fuerza", label: "Biblioteca Fuerza", path: "/strength-library" },
+  { id: "planes_complementarios", label: "Planes complementarios", path: "/complementary-strength" },
   { id: "cuerpo_tecnico", label: "Cuerpo Técnico", path: "/team" },
   { id: "configuracion", label: "Configuración", path: "/admin" },
   { id: "accesos_jugadores", label: "Accesos de jugadores", path: "/player-access" },

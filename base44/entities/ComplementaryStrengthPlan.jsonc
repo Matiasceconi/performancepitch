@@ -1,0 +1,108 @@
+{
+  "name": "ComplementaryStrengthPlan",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n (club) del plan"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel objetivo del plan"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada del plantel"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre del plan"
+    },
+    "objective": {
+      "type": "string",
+      "description": "Objetivo general del plan"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n del plan"
+    },
+    "general_instructions": {
+      "type": "string",
+      "description": "Indicaciones generales para el jugador"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "closed"
+      ],
+      "default": "draft",
+      "description": "Estado del plan: borrador, publicado o cerrado"
+    },
+    "is_template": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el plan es una plantilla reutilizable"
+    },
+    "source_plan_id": {
+      "type": "string",
+      "description": "ID del plan origen si fue creado desde una plantilla"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "ID del usuario creador"
+    },
+    "created_by_name": {
+      "type": "string",
+      "description": "Nombre del creador (desnormalizado)"
+    },
+    "published_at": {
+      "type": "string",
+      "description": "Fecha/hora de publicaci\u00f3n"
+    },
+    "closed_at": {
+      "type": "string",
+      "description": "Fecha/hora de cierre del plan"
+    },
+    "version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n del plan para control de snapshots"
+    },
+    "last_workout_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Pr\u00f3xima fecha de entrenamiento (desnormalizado para listados)"
+    }
+  },
+  "required": [
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

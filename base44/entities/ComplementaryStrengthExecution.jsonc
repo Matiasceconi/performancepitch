@@ -1,0 +1,136 @@
+{
+  "name": "ComplementaryStrengthExecution",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "ID de organizaci\u00f3n"
+    },
+    "plan_id": {
+      "type": "string",
+      "description": "ID del plan"
+    },
+    "workout_id": {
+      "type": "string",
+      "description": "ID del entrenamiento"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel del jugador al momento de la ejecuci\u00f3n"
+    },
+    "workout_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del entrenamiento (desnormalizado)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "available_today",
+        "in_progress",
+        "rpe_pending",
+        "completed",
+        "not_completed",
+        "pending_expired"
+      ],
+      "default": "available_today",
+      "description": "Estado de la ejecuci\u00f3n"
+    },
+    "workout_snapshot": {
+      "type": "object",
+      "description": "Copia completa congelada de la prescripci\u00f3n efectiva del jugador al iniciar"
+    },
+    "snapshot_version": {
+      "type": "number",
+      "description": "Versi\u00f3n del plan al momento del snapshot"
+    },
+    "started_at": {
+      "type": "string",
+      "description": "Fecha/hora de inicio"
+    },
+    "exercises_finished_at": {
+      "type": "string",
+      "description": "Fecha/hora en que el jugador finaliz\u00f3 los ejercicios (pasa a RPE pendiente)"
+    },
+    "rpe": {
+      "type": "number",
+      "description": "RPE complementario (0-10). Separado del RPE principal (SessionPlayer.rpe)"
+    },
+    "rpe_comment": {
+      "type": "string",
+      "description": "Comentario opcional del RPE complementario"
+    },
+    "rpe_submitted_at": {
+      "type": "string",
+      "description": "Fecha/hora del env\u00edo del RPE complementario"
+    },
+    "completed_at": {
+      "type": "string",
+      "description": "Fecha/hora de finalizaci\u00f3n completa (tras RPE)"
+    },
+    "completed_late": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la finalizaci\u00f3n fue fuera de t\u00e9rmino (d\u00eda posterior al del entrenamiento)"
+    },
+    "not_completed_reason": {
+      "type": "string",
+      "enum": [
+        "dolor_molestia",
+        "indicacion_medica",
+        "decision_cuerpo_tecnico",
+        "falta_tiempo",
+        "no_asistio",
+        "sin_equipamiento",
+        "otro"
+      ],
+      "description": "Motivo de no realizaci\u00f3n"
+    },
+    "not_completed_comment": {
+      "type": "string",
+      "description": "Comentario del motivo (obligatorio si reason=otro)"
+    },
+    "not_completed_at": {
+      "type": "string",
+      "description": "Fecha/hora del registro de no realizaci\u00f3n"
+    },
+    "not_completed_source": {
+      "type": "string",
+      "description": "Usuario o fuente que registr\u00f3 la no realizaci\u00f3n (player o staff)"
+    }
+  },
+  "required": [
+    "workout_id",
+    "player_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
