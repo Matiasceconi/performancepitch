@@ -48,6 +48,7 @@ import UsersAccess from '@/pages/UsersAccess';
 import PlayerAccess from '@/pages/PlayerAccess';
 import ComplementaryStrengthPlans from '@/pages/ComplementaryStrengthPlans';
 import FutbolArgentino from '@/pages/FutbolArgentino';
+import ClubDashboard from '@/pages/ClubDashboard';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
 class GlobalErrorBoundary extends Component {
@@ -99,6 +100,7 @@ function StaffRoutes() {
       <PlayerCard360Provider>
         <Routes>
           <Route element={<Layout />}>
+            <Route path="/club-dashboard" element={<ClubDashboard />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/catapult" element={<Catapult />} />
@@ -130,7 +132,7 @@ function StaffRoutes() {
             <Route path="/complementary-strength" element={<ComplementaryStrengthPlans />} />
             <Route path="/futbol-argentino" element={<FutbolArgentino />} />
           </Route>
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/club-dashboard" replace />} />
         </Routes>
         <PlayerCard360 />
       </PlayerCard360Provider>
@@ -154,12 +156,12 @@ function PostLoginRedirect() {
     return <AccessScreen variant="none" onLogout={() => logout('/')} />;
   }
   if (access === 'staff') {
-    if (isStaff) return <Navigate to="/dashboard" replace />;
+    if (isStaff) return <Navigate to="/club-dashboard" replace />;
     if (isPlayer) return <AccessScreen variant="no-staff" onLogout={() => logout('/')} />;
     return <AccessScreen variant="none" onLogout={() => logout('/')} />;
   }
   // Sin access especificado — redirigir automáticamente
-  if (isStaff) return <Navigate to="/dashboard" replace />;
+  if (isStaff) return <Navigate to="/club-dashboard" replace />;
   if (isPlayer) return <Navigate to="/player" replace />;
   return <AccessScreen variant="none" onLogout={() => logout('/')} />;
 }
@@ -178,7 +180,7 @@ function AppShell() {
     if (!isAuthenticated) return <PublicHome />;
     if (loadingType) return <LoadingScreen />;
     if (typeError) return <AccessScreen variant="error" onRetry={retry} onLogout={() => logout('/')} />;
-    if (isStaff) return <Navigate to="/dashboard" replace />;
+    if (isStaff) return <Navigate to="/club-dashboard" replace />;
     if (isPlayer) return <Navigate to="/player" replace />;
     return <AccessScreen variant="none" onLogout={() => logout('/')} />;
   }
