@@ -3,8 +3,10 @@ import { Trophy, Loader2, AlertCircle, MapPin, Calendar, TrendingUp, Target, Act
 import { useFootballData } from "@/components/futbol/useFootballData";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import ClubStandingsTable from "@/components/club/ClubStandingsTable";
+import NextMatchCard from "@/components/club/NextMatchCard";
 
 const COMPETITION_ID = "6a6d7e6852dc4637a1cf1260";
+const LIGA_PROFESIONAL_ID = "6a6d7dfa52dc4637a1cf121e";
 const TEAM_NAME = "Defensa y Justicia";
 const ZONE = "Zona B";
 
@@ -72,6 +74,15 @@ export default function ClubDashboard() {
   const nextMatch = upcoming[0];
   const next5 = upcoming.slice(0, 5);
 
+  const primeraNextMatch = useMemo(
+    () =>
+      (data?.fixtures || [])
+        .filter((f) => f.competitionId === LIGA_PROFESIONAL_ID && f.status === "scheduled")
+        .filter((f) => f.homeTeam === TEAM_NAME || f.awayTeam === TEAM_NAME)
+        .sort((a, b) => new Date(a.date) - new Date(b.date))[0],
+    [data?.fixtures]
+  );
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
@@ -123,69 +134,53 @@ export default function ClubDashboard() {
         <StatTile icon={TrendingUp} label="Gol Diferencia" value={dyhRow ? (dyhRow.goalDifference > 0 ? `+${dyhRow.goalDifference}` : dyhRow.goalDifference) : "—"} accent="bg-purple-500/15 text-purple-400" />
       </div>
 
-      {/* Next match + Next 5 */}
+      {/* Next matches — Reserva + Primera */}
       <div className="grid lg:grid-cols-2 gap-4">
-        {/* Next match */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Calendar size={16} className="text-emerald-400" /> Próximo Partido
-          </h2>
-          {nextMatch ? (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex-1 flex flex-col items-center gap-2 text-center">
-                  {nextMatch.homeLogo ? <img src={nextMatch.homeLogo} alt="" className="w-14 h-14 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-14 h-14 rounded-full bg-zinc-800" />}
-                  <span className="text-sm font-semibold text-white text-center">{nextMatch.homeTeam}</span>
-                  <span className="text-xs text-zinc-500">Local</span>
-                </div>
-                <div className="px-2"><span className="text-zinc-600 text-xs font-bold uppercase">vs</span></div>
-                <div className="flex-1 flex flex-col items-center gap-2 text-center">
-                  {nextMatch.awayLogo ? <img src={nextMatch.awayLogo} alt="" className="w-14 h-14 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-14 h-14 rounded-full bg-zinc-800" />}
-                  <span className="text-sm font-semibold text-white text-center">{nextMatch.awayTeam}</span>
-                  <span className="text-xs text-zinc-500">Visitante</span>
-                </div>
-              </div>
-              <div className="border-t border-zinc-800 pt-3 space-y-1.5">
-                <p className="text-sm text-white font-medium capitalize">{fmtFull(nextMatch.date)}</p>
-                <div className="flex items-center gap-2 text-xs text-zinc-400"><MapPin size={12} /> {nextMatch.venue || "Estadio a confirmar"}</div>
-                <div className="flex items-center gap-2 text-xs text-zinc-400"><Trophy size={12} /> {nextMatch.round || "Fecha a confirmar"}</div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-zinc-500 text-sm text-center py-8">No hay próximos partidos programados.</p>
-          )}
-        </div>
+        <NextMatchCard
+          fixture={nextMatch}
+          title="Próximo Partido — Reserva"
+          badgeText="Proyección"
+          badgeClass="bg-emerald-500/15 text-emerald-300 border-emerald-500/30"
+          iconClass="text-emerald-400"
+        />
+        <NextMatchCard
+          fixture={primeraNextMatch}
+          title="Próximo Partido — Primera"
+          badgeText="Liga Profesional"
+          badgeClass="bg-blue-500/15 text-blue-300 border-blue-500/30"
+          iconClass="text-blue-400"
+        />
+      </div>
 
-        {/* Next 5 */}
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Calendar size={16} className="text-emerald-400" /> Próximos Partidos
-          </h2>
-          {next5.length ? (
-            <div className="space-y-2">
-              {next5.map((fx, i) => {
-                const isHome = fx.homeTeam === TEAM_NAME;
-                const opponent = isHome ? fx.awayTeam : fx.homeTeam;
-                const oppLogo = isHome ? fx.awayLogo : fx.homeLogo;
-                return (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60 hover:border-zinc-700 transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
-                      <span className="text-xs font-bold text-emerald-400">{isHome ? "L" : "V"}</span>
-                    </div>
-                    {oppLogo ? <img src={oppLogo} alt="" className="w-7 h-7 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-7 h-7 rounded-full bg-zinc-800 shrink-0" />}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-white truncate">vs {opponent}</p>
-                      <p className="text-xs text-zinc-500">{fx.round || "—"}</p>
-                    </div>
-                    <span className="text-xs text-zinc-400 shrink-0">{fmtShort(fx.date)}</span>
+      {/* Next 5 — Reserva */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Calendar size={16} className="text-emerald-400" /> Próximos Partidos — Reserva
+        </h2>
+        {next5.length ? (
+          <div className="space-y-2">
+            {next5.map((fx, i) => {
+              const isHome = fx.homeTeam === TEAM_NAME;
+              const opponent = isHome ? fx.awayTeam : fx.homeTeam;
+              const oppLogo = isHome ? fx.awayLogo : fx.homeLogo;
+              return (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60 hover:border-zinc-700 transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0">
+                    <span className="text-xs font-bold text-emerald-400">{isHome ? "L" : "V"}</span>
                   </div>
-                );
-              })}
-            </div>
-          ) : (
-            <p className="text-zinc-500 text-sm text-center py-8">No hay próximos partidos.</p>
-          )}
-        </div>
+                  {oppLogo ? <img src={oppLogo} alt="" className="w-7 h-7 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-7 h-7 rounded-full bg-zinc-800 shrink-0" />}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-white truncate">vs {opponent}</p>
+                    <p className="text-xs text-zinc-500">{fx.round || "—"}</p>
+                  </div>
+                  <span className="text-xs text-zinc-400 shrink-0">{fmtShort(fx.date)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="text-zinc-500 text-sm text-center py-8">No hay próximos partidos.</p>
+        )}
       </div>
 
       {/* Clausura standings */}

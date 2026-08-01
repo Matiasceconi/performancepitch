@@ -35,7 +35,7 @@ export default function ClubStandingsTable({ standings, highlightTeam }) {
                   <td className="text-center p-2.5 text-zinc-400 font-medium">{r.position}</td>
                   <td className="p-2.5">
                     <div className="flex items-center gap-2">
-                      {r.teamLogo ? <img src={r.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-5 h-5 rounded-full bg-zinc-800 shrink-0" />}
+                      {r.teamLogo ? <img src={r.teamLogo} alt="" className="w-5 h-5 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center shrink-0 text-[10px] font-bold text-zinc-400">{(r.teamName || "?").charAt(0)}</div>}
                       <span className={`truncate ${isHL ? "text-emerald-300 font-bold" : "text-white font-medium"}`}>{r.teamName}</span>
                     </div>
                   </td>
