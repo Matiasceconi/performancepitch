@@ -1,6 +1,7 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { resolvePlayerAccessAdmin } from "../../shared/playerPortalAuth.ts";
 import { generateUsernameBase, generateUniqueUsername, normalizeDni, getNormalizedPlayerDni } from "../../shared/playerAccessUtils.ts";
+import { resolvePlayerContextForDate } from "../../shared/squadRosterResolver.ts";
 
 export default async function(req) {
   try {
@@ -73,6 +74,64 @@ export default async function(req) {
         }
       }
       return Response.json({ ok: true, updated, skipped });
+    }
+
+    // ── Auditoría de Wellness: reportar estado de squad_id/season_id ────
+    if (action === 'wellness_audit') {
+      const wQuery: any = {};
+      if (squadId) wQuery.squad_id = squadId;
+      const allWellness = await base44.asServiceRole.entities.WellnessResponse.filter(wQuery, "-response_date", 5000);
+      const orphanWellness = await base44.asServiceRole.entities.WellnessResponse.filter({ squad_id: '' }, "-response_date", 2000);
+      const merged = [...allWellness, ...orphanWellness];
+      const seen = new Set<string>();
+      const unique = merged.filter((w) => { if (seen.has(w.id)) return false; seen.add(w.id); return true; });
+
+      const stats = {
+        total: unique.length,
+        with_squad_id: 0,
+        without_squad_id: 0,
+        without_season: 0,
+        duplicates: [] as any[],
+      };
+      const byPlayerDate: Record<string, any[]> = {};
+      for (const w of unique) {
+        if (w.squad_id) stats.with_squad_id++; else stats.without_squad_id++;
+        if (!w.season_id) stats.without_season++;
+        const key = `${w.player_id}|${w.response_date}`;
+        if (!byPlayerDate[key]) byPlayerDate[key] = [];
+        byPlayerDate[key].push(w);
+      }
+      for (const [key, rows] of Object.entries(byPlayerDate)) {
+        if (rows.length > 1) stats.duplicates.push({ key, count: rows.length, player_name: rows[0].player_name, response_date: rows[0].response_date });
+      }
+      return Response.json({ ok: true, stats });
+    }
+
+    // ── Reparación de Wellness: resolver plantel vigente y corregir ──────
+    if (action === 'wellness_repair') {
+      const wQuery: any = {};
+      if (squadId) wQuery.squad_id = squadId;
+      const allWellness = await base44.asServiceRole.entities.WellnessResponse.filter(wQuery, "-response_date", 5000);
+      const orphanWellness = await base44.asServiceRole.entities.WellnessResponse.filter({ squad_id: '' }, "-response_date", 2000);
+      const merged = [...allWellness, ...orphanWellness];
+      const seen = new Set<string>();
+      const unique = merged.filter((w) => { if (seen.has(w.id)) return false; seen.add(w.id); return true; });
+
+      let updated = 0;
+      let skipped = 0;
+      for (const w of unique) {
+        const ctx = await resolvePlayerContextForDate(base44, w.player_id, w.response_date);
+        if (!ctx) { skipped++; continue; }
+        const correctSquadId = ctx.squad_id || '';
+        const correctSeasonId = ctx.season_id || '';
+        const needsUpdate = w.squad_id !== correctSquadId || (correctSeasonId && w.season_id !== correctSeasonId);
+        if (!needsUpdate) { skipped++; continue; }
+        const patch: any = { squad_id: correctSquadId };
+        if (correctSeasonId) patch.season_id = correctSeasonId;
+        await base44.asServiceRole.entities.WellnessResponse.update(w.id, patch);
+        updated++;
+      }
+      return Response.json({ ok: true, updated, skipped, total: unique.length });
     }
 
     // Obtener todos los jugadores

@@ -35,6 +35,7 @@ export default function PerformanceInternalLoad() {
       const res = await base44.functions.invoke('getInternalLoadData', {
         squad_id: activeSquadId,
         season_id: activeSeasonId || '',
+        target_date: date,
       });
       setData(res.data || res);
     } catch (e) {
@@ -42,14 +43,15 @@ export default function PerformanceInternalLoad() {
     } finally {
       setLoading(false);
     }
-  }, [activeSquadId, activeSeasonId]);
+  }, [activeSquadId, activeSeasonId, date]);
 
   useEffect(() => { load(); }, [load]);
 
   // Suscripción para actualización en tiempo real cuando un jugador responde
   useEffect(() => {
-    const unsub = base44.entities.WellnessResponse.subscribe(() => { load(); });
-    return unsub;
+    const unsubW = base44.entities.WellnessResponse.subscribe(() => { load(); });
+    const unsubSP = base44.entities.SessionPlayer.subscribe(() => { load(); });
+    return () => { unsubW(); unsubSP(); };
   }, [load]);
 
   return (
@@ -76,7 +78,7 @@ export default function PerformanceInternalLoad() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">Seleccioná un plantel para ver la carga interna.</div>
       ) : (
         <>
-          {tab === 'wellness' && <WellnessDailyTab wellness={data?.wellness || []} players={data?.players || []} date={date} onDateChange={setDate} />}
+          {tab === 'wellness' && <WellnessDailyTab wellness={data?.wellness || []} players={data?.roster?.length ? data.roster : (data?.players || [])} date={date} onDateChange={setDate} />}
           {tab === 'rpe' && <RpeBySessionTab sessions={data?.sessions || []} sessionPlayers={data?.sessionPlayers || []} players={data?.players || []} />}
           {tab === 'evolution' && <EvolutionTab wellness={data?.wellness || []} sessionPlayers={data?.sessionPlayers || []} sessions={data?.sessions || []} players={data?.players || []} />}
           {tab === 'access' && <PlayerAccessManager />}

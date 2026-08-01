@@ -60,3 +60,24 @@ export function getTodayInTimezone(timezone = 'America/Argentina/Buenos_Aires'):
     day: '2-digit',
   }).format(new Date());
 }
+
+// Devuelve el offset de la zona horaria en formato ISO (ej: "-03:00").
+function getTzOffset(timezone = 'America/Argentina/Buenos_Aires'): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset',
+    }).formatToParts(new Date());
+    const offset = parts.find((p: any) => p.type === 'timeZoneName')?.value || 'GMT-03:00';
+    return offset.replace('GMT', '') || '-03:00';
+  } catch {
+    return '-03:00';
+  }
+}
+
+// Devuelve el ISO del final del día local (23:59:59) para la fecha de hoy.
+export function getEndOfTodayInTimezone(timezone = 'America/Argentina/Buenos_Aires'): string {
+  const today = getTodayInTimezone(timezone);
+  const offset = getTzOffset(timezone);
+  return new Date(`${today}T23:59:59${offset}`).toISOString();
+}

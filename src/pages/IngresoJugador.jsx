@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { Shield, ArrowLeft, Loader2, CheckCircle2, ClipboardList, Gauge, AlertTriangle } from 'lucide-react';
+import { Shield, ArrowLeft, Loader2, CheckCircle2, ClipboardList, Gauge, AlertTriangle, Lock } from 'lucide-react';
 import DailyWellnessForm from '@/components/dailyCheckin/DailyWellnessForm';
 import DailyRpeForm from '@/components/dailyCheckin/DailyRpeForm';
 
@@ -180,6 +180,16 @@ export default function IngresoJugador() {
     );
   }
 
+  // Auto-navegar al formulario de RPE si el Wellness está completo y hay una sola sesión
+  useEffect(() => {
+    const wellnessDone = data?.wellness?.status === 'completed';
+    const rpeSessions = data?.rpe_sessions || [];
+    if (step === 'dashboard' && wellnessDone && rpeSessions.length === 1 && !selectedRpe) {
+      setSelectedRpe(rpeSessions[0]);
+      setStep('rpe');
+    }
+  }, [step, data, selectedRpe]);
+
   // ── Step: Dashboard ─────────────────────────────────────────────────────
   if (loading) {
     return (
@@ -233,26 +243,47 @@ export default function IngresoJugador() {
       {/* RPE cards */}
       {rpePending ? (
         <div className="space-y-3">
-          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wide">RPE pendientes</h2>
-          {rpeSessions.map((s) => (
-            <button
-              key={s.session_id}
-              onClick={() => { setSelectedRpe(s); setStep('rpe'); }}
-              className="w-full text-left p-5 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 active:scale-[0.98] transition-all"
-            >
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                  <Gauge size={24} className="text-blue-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <h3 className="font-bold text-white">{s.title || 'Sesión'}</h3>
-                  <p className="text-sm text-zinc-500 mt-0.5">
-                    {s.match_day_code ? `${s.match_day_code} · ` : ''}Tocá para responder
-                  </p>
+          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wide">RPE de hoy</h2>
+          {rpeSessions.map((s) => {
+            const blocked = !wellnessDone;
+            return (
+              <div
+                key={s.session_id}
+                className={`w-full p-5 rounded-2xl border transition-all ${
+                  blocked
+                    ? 'bg-zinc-900 border-zinc-800 opacity-80'
+                    : 'bg-zinc-900 border-zinc-800 hover:border-emerald-500/40 active:scale-[0.98] cursor-pointer'
+                }`}
+                onClick={() => { if (!blocked) { setSelectedRpe(s); setStep('rpe'); } }}
+              >
+                <div className="flex items-start gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    blocked ? 'bg-zinc-800' : 'bg-blue-500/10'
+                  }`}>
+                    {blocked ? <Lock size={22} className="text-zinc-500" /> : <Gauge size={24} className="text-blue-400" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-bold text-white">{s.title || 'Sesión'}</h3>
+                    {blocked ? (
+                      <>
+                        <p className="text-sm text-amber-400 mt-0.5">Primero completá tu Wellness de hoy para poder responder el RPE.</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setStep('wellness'); }}
+                          className="mt-2 px-4 py-2 rounded-lg bg-emerald-500 text-zinc-950 text-sm font-bold hover:bg-emerald-400 transition-colors"
+                        >
+                          Completar Wellness
+                        </button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-zinc-500 mt-0.5">
+                        {s.match_day_code ? `${s.match_day_code} · ` : ''}Tocá para responder
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800">
@@ -262,9 +293,7 @@ export default function IngresoJugador() {
             </div>
             <div className="flex-1">
               <h3 className="font-bold text-white">RPE de hoy</h3>
-              <p className="text-sm text-zinc-500 mt-0.5">
-                {wellnessDone ? 'No hay sesiones con RPE pendiente' : 'No corresponde hoy'}
-              </p>
+              <p className="text-sm text-zinc-500 mt-0.5">No tenés una sesión con RPE para responder hoy.</p>
             </div>
           </div>
         </div>

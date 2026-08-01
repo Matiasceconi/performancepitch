@@ -32,7 +32,6 @@ export default async function(req) {
     }
 
     const playerId = tokenRecord.player_id;
-    const squadId = tokenRecord.squad_id;
 
     // 1. Wellness de hoy
     const wellnessRows = await base44.asServiceRole.entities.WellnessResponse.filter(
@@ -42,33 +41,43 @@ export default async function(req) {
     );
     const wellnessStatus = wellnessRows[0] ? 'completed' : 'pending';
 
-    // 2. RPE: sesiones de hoy con RPE habilitado
-    const sessions = await base44.asServiceRole.entities.TrainingSession.filter(
-      { squad_id: squadId, date: today, rpe_enabled: true },
+    // 2. RPE: buscar sesiones del jugador mediante SessionPlayer (no por squad_id)
+    const spRows = await base44.asServiceRole.entities.SessionPlayer.filter(
+      { player_id: playerId },
       "-created_date",
-      50
+      200
     );
 
-    const rpeSessions = [];
-    for (const session of sessions) {
-      if (session.status === 'cancelled') continue;
-      // Ventana temporal
-      if (session.rpe_available_at) {
-        if (now < new Date(session.rpe_available_at)) continue;
-      }
-      if (session.rpe_deadline) {
-        if (now > new Date(session.rpe_deadline)) continue;
-      }
-      // SessionPlayer del jugador
-      const spRows = await base44.asServiceRole.entities.SessionPlayer.filter(
-        { session_id: session.id, player_id: playerId },
-        "-created_date",
-        1
+    const sessionIds = [...new Set(spRows.map((sp) => sp.session_id))];
+    const sessionMap: Record<string, any> = {};
+    for (let i = 0; i < sessionIds.length; i += 50) {
+      const batch = sessionIds.slice(i, i + 50);
+      const rows = await base44.asServiceRole.entities.TrainingSession.filter(
+        { id: { $in: batch } },
+        "-date",
+        200
       );
-      const sp = spRows[0];
+      rows.forEach((s) => { sessionMap[s.id] = s; });
+    }
+
+    const spBySession: Record<string, any> = {};
+    spRows.forEach((sp) => { spBySession[sp.session_id] = sp; });
+
+    const rpeSessions = [];
+    let rpeCompletedCount = 0;
+
+    for (const session of Object.values(sessionMap)) {
+      if (session.date !== today) continue;
+      if (session.status === 'cancelled') continue;
+      const sp = spBySession[session.id];
       if (!sp) continue;
       if (sp.attendance === 'ausente' || sp.attendance === 'no_entrena') continue;
-      if (sp.rpe != null) continue; // ya respondido
+
+      // Ya respondido
+      if (sp.rpe != null) {
+        rpeCompletedCount++;
+        continue;
+      }
 
       rpeSessions.push({
         session_id: session.id,
@@ -84,6 +93,7 @@ export default async function(req) {
       player_first_name: tokenRecord.player_first_name || '',
       wellness: { status: wellnessStatus },
       rpe_sessions: rpeSessions,
+      rpe_completed_count: rpeCompletedCount,
     });
   } catch (error) {
     console.error('getDailyCheckinData error:', error);

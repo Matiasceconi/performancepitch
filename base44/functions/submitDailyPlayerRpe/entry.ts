@@ -31,7 +31,6 @@ export default async function(req) {
     }
 
     const playerId = tokenRecord.player_id;
-    const squadId = tokenRecord.squad_id;
     const sessionId = String(body.session_id || '');
     if (!sessionId) return Response.json({ error: 'Sesión requerida' }, { status: 400 });
 
@@ -41,29 +40,27 @@ export default async function(req) {
     }
     const comment = String(body.comment || '').slice(0, 1000);
 
-    // Validar sesión
+    // 1. CONDICIÓN OBLIGATORIA: Wellness de hoy completado
+    const wellnessRows = await base44.asServiceRole.entities.WellnessResponse.filter(
+      { player_id: playerId, response_date: today },
+      "-updated_at",
+      1
+    );
+    if (!wellnessRows[0]) {
+      return Response.json({ error: 'Primero completá tu Wellness de hoy para poder responder el RPE.' }, { status: 403 });
+    }
+
+    // 2. Validar sesión
     const session = await base44.asServiceRole.entities.TrainingSession.get(sessionId).catch(() => null);
     if (!session) return Response.json({ error: 'Sesión no encontrada' }, { status: 404 });
-    if (session.squad_id !== squadId) {
-      return Response.json({ error: 'La sesión no pertenece a tu plantel' }, { status: 403 });
-    }
     if (session.date !== today) {
       return Response.json({ error: 'La sesión no corresponde al día de hoy' }, { status: 403 });
-    }
-    if (!session.rpe_enabled) {
-      return Response.json({ error: 'El RPE no está habilitado para esta sesión' }, { status: 403 });
     }
     if (session.status === 'cancelled') {
       return Response.json({ error: 'La sesión está cancelada' }, { status: 403 });
     }
-    if (session.rpe_available_at && now < new Date(session.rpe_available_at)) {
-      return Response.json({ error: 'El RPE todavía no está disponible' }, { status: 403 });
-    }
-    if (session.rpe_deadline && now > new Date(session.rpe_deadline)) {
-      return Response.json({ error: 'El plazo para responder el RPE ya venció' }, { status: 403 });
-    }
 
-    // Validar SessionPlayer
+    // 3. Validar SessionPlayer (autorización por relación, no por squad_id)
     const spRows = await base44.asServiceRole.entities.SessionPlayer.filter(
       { session_id: sessionId, player_id: playerId },
       "-created_date",
@@ -75,7 +72,7 @@ export default async function(req) {
       return Response.json({ error: 'No estás registrado como presente en esta sesión' }, { status: 403 });
     }
 
-    // Calcular minutos
+    // 4. Calcular minutos y carga interna
     const individualMinutes = Number(sp.minutes) || 0;
     const sessionDuration = Number(session.duration_minutes) || 0;
     const minutes = individualMinutes || sessionDuration || 0;
@@ -85,6 +82,7 @@ export default async function(req) {
     const nowISO = now.toISOString();
     const wasFirstSubmission = sp.rpe == null;
 
+    // 5. Actualizar el SessionPlayer existente (no crear otro)
     const updated = await base44.asServiceRole.entities.SessionPlayer.update(sp.id, {
       rpe: rpe,
       rpe_comment: comment,
