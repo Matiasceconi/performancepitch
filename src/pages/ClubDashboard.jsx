@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { Trophy, Loader2, AlertCircle, TrendingUp, Target, Activity, Calendar } from "lucide-react";
 import { useFootballData } from "@/components/futbol/useFootballData";
 import { useWorkspace } from "@/lib/WorkspaceContext";
@@ -10,6 +10,8 @@ import CalendarDates from "@/components/club/CalendarDates";
 import QuickActions from "@/components/club/QuickActions";
 import StandingsFilters from "@/components/club/StandingsFilters";
 import FixtureModal from "@/components/club/FixtureModal";
+import ScorersTable from "@/components/club/ScorersTable";
+import { base44 } from "@/api/base44Client";
 
 const COMPETITION_ID = "6a6d7e6852dc4637a1cf1260";
 const LIGA_PROFESIONAL_ID = "6a6d7dfa52dc4637a1cf121e";
@@ -46,6 +48,20 @@ export default function ClubDashboard() {
   const [activeZone, setActiveZone] = useState(ZONE);
   const [showFixture, setShowFixture] = useState(false);
   const tableRef = useRef(null);
+  const [scorersProyeccion, setScorersProyeccion] = useState([]);
+  const [scorersLiga, setScorersLiga] = useState([]);
+
+  useEffect(() => {
+    async function fetchScorers() {
+      try {
+        const proy = await base44.entities.FootballScorer.filter({ competitionId: COMPETITION_ID, tournament: "Clausura" }, "-goals", 50);
+        const liga = await base44.entities.FootballScorer.filter({ competitionId: LIGA_PROFESIONAL_ID }, "-goals", 50);
+        setScorersProyeccion(proy || []);
+        setScorersLiga(liga || []);
+      } catch (e) { console.error("scorers", e); }
+    }
+    fetchScorers();
+  }, []);
 
   const allStandings = data?.standings?.[COMPETITION_ID] || [];
   const allFixtures = data?.fixtures || [];
@@ -126,6 +142,21 @@ export default function ClubDashboard() {
         <NextMatchCard fixture={nextMatchPrimera} title="Próximo Partido — Primera" badgeText="Liga Profesional" badgeClass="bg-blue-500/15 text-blue-300 border-blue-500/30" iconClass="text-blue-400" />
       </div>
 
+      {/* Standings with filters */}
+      <div ref={tableRef}>
+        <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Trophy size={18} className="text-emerald-400" /> Tabla de Clasificación</h2>
+          <StandingsFilters tournaments={tournaments} zones={zones} activeTournament={activeTournament} activeZone={activeZone} onTournament={setActiveTournament} onZone={setActiveZone} />
+        </div>
+        <ClubStandingsTable standings={filteredStandings} highlightTeam={TEAM_NAME} />
+      </div>
+
+      {/* Scorers tables */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <ScorersTable scorers={scorersProyeccion} title="Goleadores — Proyección Clausura" accent="green" type="proyeccion" highlightTeam={TEAM_NAME} />
+        <ScorersTable scorers={scorersLiga} title="Goleadores — Liga Profesional" accent="blue" type="liga" highlightTeam={TEAM_NAME} showPhoto />
+      </div>
+
       {/* Last results + Next 5 */}
       <div className="grid lg:grid-cols-2 gap-4">
         <LastResults fixtures={allFixtures} teamName={TEAM_NAME} />
@@ -151,15 +182,6 @@ export default function ClubDashboard() {
             </div>
           ) : <p className="text-zinc-500 text-sm text-center py-8">No hay próximos partidos.</p>}
         </div>
-      </div>
-
-      {/* Standings with filters */}
-      <div ref={tableRef}>
-        <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-          <h2 className="text-lg font-bold text-white flex items-center gap-2"><Trophy size={18} className="text-emerald-400" /> Tabla de Clasificación</h2>
-          <StandingsFilters tournaments={tournaments} zones={zones} activeTournament={activeTournament} activeZone={activeZone} onTournament={setActiveTournament} onZone={setActiveZone} />
-        </div>
-        <ClubStandingsTable standings={filteredStandings} highlightTeam={TEAM_NAME} />
       </div>
 
       {/* Calendar dates */}

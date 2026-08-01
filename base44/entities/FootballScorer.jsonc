@@ -1,0 +1,54 @@
+{
+  "name": "FootballScorer",
+  "type": "object",
+  "properties": {
+    "competitionId": {
+      "type": "string",
+      "description": "ID de la competencia"
+    },
+    "tournament": {
+      "type": "string",
+      "description": "Torneo (Clausura, Apertura, Tabla General, etc.)"
+    },
+    "playerName": {
+      "type": "string",
+      "description": "Nombre del jugador"
+    },
+    "teamName": {
+      "type": "string",
+      "description": "Nombre del equipo"
+    },
+    "teamLogo": {
+      "type": "string",
+      "description": "URL del escudo del equipo"
+    },
+    "goals": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de goles"
+    },
+    "assists": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de asistencias"
+    },
+    "yellowCards": {
+      "type": "number",
+      "default": 0,
+      "description": "Tarjetas amarillas"
+    },
+    "redCards": {
+      "type": "number",
+      "default": 0,
+      "description": "Tarjetas rojas"
+    },
+    "photo": {
+      "type": "string",
+      "description": "URL de la foto del jugador"
+    }
+  },
+  "required": [
+    "playerName",
+    "teamName"
+  ]
+}
