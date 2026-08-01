@@ -47,6 +47,7 @@ import StrengthLibrary from '@/pages/StrengthLibrary';
 import UsersAccess from '@/pages/UsersAccess';
 import PlayerAccess from '@/pages/PlayerAccess';
 import ComplementaryStrengthPlans from '@/pages/ComplementaryStrengthPlans';
+import FutbolArgentino from '@/pages/FutbolArgentino';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
 class GlobalErrorBoundary extends Component {
@@ -127,6 +128,7 @@ function StaffRoutes() {
             <Route path="/users-access" element={<UsersAccess />} />
             <Route path="/player-access" element={<PlayerAccess />} />
             <Route path="/complementary-strength" element={<ComplementaryStrengthPlans />} />
+            <Route path="/futbol-argentino" element={<FutbolArgentino />} />
           </Route>
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
