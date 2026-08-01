@@ -1,0 +1,72 @@
+{
+  "name": "ExternalTeamMapping",
+  "type": "object",
+  "properties": {
+    "provider": {
+      "type": "string",
+      "description": "Proveedor de datos externo (ej: api_sports)"
+    },
+    "provider_team_id": {
+      "type": "string",
+      "description": "ID del equipo en el proveedor"
+    },
+    "provider_team_name": {
+      "type": "string",
+      "description": "Nombre del equipo en el proveedor"
+    },
+    "provider_logo_url": {
+      "type": "string",
+      "description": "Logo del proveedor (respaldo temporal)"
+    },
+    "rival_club_id": {
+      "type": "string",
+      "description": "ID del RivalClub vinculado"
+    },
+    "rival_club_name": {
+      "type": "string",
+      "description": "Nombre del RivalClub (desnormalizado)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "verified",
+        "auto_matched",
+        "needs_review",
+        "unmatched",
+        "conflict"
+      ],
+      "default": "auto_matched",
+      "description": "Estado de la vinculaci\u00f3n"
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "high",
+        "medium",
+        "low"
+      ],
+      "description": "Nivel de confianza de la vinculaci\u00f3n"
+    },
+    "conflict_reason": {
+      "type": "string",
+      "description": "Motivo del conflicto si aplica"
+    },
+    "verified_at": {
+      "type": "string",
+      "description": "Fecha de verificaci\u00f3n manual"
+    },
+    "verified_by": {
+      "type": "string",
+      "description": "Usuario que verific\u00f3 la vinculaci\u00f3n"
+    },
+    "manual_override": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la vinculaci\u00f3n fue corregida manualmente, no se pisa en sincronizaciones"
+    }
+  },
+  "required": [
+    "provider",
+    "provider_team_id"
+  ]
+}
