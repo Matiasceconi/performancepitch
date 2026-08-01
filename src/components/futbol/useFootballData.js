@@ -5,10 +5,11 @@ const ENDPOINT = "https://lumi-e462b682.base44.app/functions/syncFootballData";
 export function useFootballData() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
 
-  const fetchData = useCallback(async () => {
-    setLoading(true);
+  const fetchData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true); else setLoading(true);
     setError("");
     try {
       const res = await fetch(ENDPOINT, {
@@ -24,12 +25,13 @@ export function useFootballData() {
       setError(e?.message || "No se pudieron cargar los datos");
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
 
   useEffect(() => {
-    fetchData();
+    fetchData(false);
   }, [fetchData]);
 
-  return { data, loading, error, refetch: fetchData };
+  return { data, loading, refreshing, error, refetch: () => fetchData(true) };
 }

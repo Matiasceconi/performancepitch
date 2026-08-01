@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useState, useMemo } from "react";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 const STATUS_CFG = {
   finished: { label: "Finalizado", cls: "bg-emerald-500/15 text-emerald-400 border-emerald-500/30" },
@@ -20,7 +21,12 @@ function fmtDate(iso) {
   }
 }
 
-function FixtureCard({ fx }) {
+function extractRoundNumber(round) {
+  const m = (round || "").match(/(\d+)/);
+  return m ? parseInt(m[1], 10) : null;
+}
+
+function CalendarFixtureCard({ fx }) {
   const cfg = STATUS_CFG[fx.status] || STATUS_CFG.scheduled;
   const isFinished = fx.status === "finished";
   const isInPlay = fx.status === "in_play";
@@ -59,45 +65,56 @@ function FixtureCard({ fx }) {
   );
 }
 
-export default function FixturesList({ fixtures }) {
-  const { upcoming, results } = useMemo(() => {
+function RoundSection({ round, items, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="bg-zinc-900/50 border border-zinc-800 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 hover:bg-zinc-800/40 transition-colors"
+      >
+        <span className="text-sm font-bold text-white">{round.label}</span>
+        <span className="flex items-center gap-2">
+          <span className="text-xs text-zinc-500">{items.length} partidos</span>
+          {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
+        </span>
+      </button>
+      {open && (
+        <div className="p-3 space-y-2 border-t border-zinc-800/60">
+          {items.map((fx, i) => <CalendarFixtureCard key={i} fx={fx} />)}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function CalendarTab({ fixtures }) {
+  const grouped = useMemo(() => {
     const list = (fixtures || []).filter((f) => f && f.homeTeam);
-    const upcoming = list
-      .filter((f) => f.status === "scheduled" || f.status === "postponed")
-      .sort((a, b) => new Date(a.date) - new Date(b.date))
-      .slice(0, 10);
-    const results = list
-      .filter((f) => f.status === "finished" || f.status === "in_play" || f.status === "cancelled")
-      .sort((a, b) => new Date(b.date) - new Date(a.date))
-      .slice(0, 10);
-    return { upcoming, results };
+    const map = new Map();
+    for (const fx of list) {
+      const round = fx.round || "Sin fecha";
+      const num = extractRoundNumber(round);
+      const key = num != null ? `round-${num}` : round;
+      if (!map.has(key)) map.set(key, { key, label: num != null ? `Fecha ${num}` : round, items: [], num: num ?? 9999 });
+      map.get(key).items.push(fx);
+    }
+    return Array.from(map.values()).sort((a, b) => a.num - b.num);
   }, [fixtures]);
 
-  return (
-    <div className="space-y-6">
-      {/* Próximos Partidos */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider px-1">Próximos Partidos</h3>
-        {upcoming.length === 0 ? (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
-            <p className="text-zinc-500 text-sm">No hay partidos programados.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">{upcoming.map((fx, i) => <FixtureCard key={`up-${i}`} fx={fx} />)}</div>
-        )}
+  if (!grouped.length) {
+    return (
+      <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-10 text-center">
+        <p className="text-zinc-500 text-sm">No hay calendario disponible para este torneo.</p>
       </div>
+    );
+  }
 
-      {/* Resultados Recientes */}
-      <div className="space-y-2">
-        <h3 className="text-sm font-bold text-zinc-400 uppercase tracking-wider px-1">Resultados Recientes</h3>
-        {results.length === 0 ? (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
-            <p className="text-zinc-500 text-sm">No hay resultados registrados.</p>
-          </div>
-        ) : (
-          <div className="space-y-2">{results.map((fx, i) => <FixtureCard key={`res-${i}`} fx={fx} />)}</div>
-        )}
-      </div>
+  return (
+    <div className="space-y-3">
+      {grouped.map((g, i) => (
+        <RoundSection key={g.key} round={g} items={g.items} defaultOpen={i === 0} />
+      ))}
     </div>
   );
 }
