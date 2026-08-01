@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { Trophy, Loader2, AlertCircle, RefreshCw, Calendar, ListOrdered, CalendarDays, ChevronDown, Info } from "lucide-react";
+import { Trophy, Loader2, AlertCircle, RefreshCw, Calendar, ListOrdered, CalendarDays, Info, Layers } from "lucide-react";
 import { useFootballData } from "@/components/futbol/useFootballData";
 import StandingsTable from "@/components/futbol/StandingsTable";
 import FixturesList from "@/components/futbol/FixturesList";
 import CalendarTab from "@/components/futbol/CalendarTab";
+import CompetitionSelector from "@/components/futbol/CompetitionSelector";
 
 function fmtUpdated(iso) {
   if (!iso) return "—";
@@ -24,35 +25,57 @@ const TABS = [
 ];
 
 export default function FutbolArgentino() {
-  const { data, loading, error, refetch, refreshing } = useFootballData();
+  const { data, loading, refreshing, error, refetch } = useFootballData();
   const [tab, setTab] = useState("standings");
   const [selectedCompId, setSelectedCompId] = useState(null);
+  const [selectedZone, setSelectedZone] = useState(null);
 
   const competitions = data?.competitions || [];
-
-  // Auto-select first competition when data loads
-  const activeCompId = selectedCompId || (competitions[0]?.id) || null;
+  const activeCompId = selectedCompId || competitions[0]?.id || null;
   const competition = competitions.find((c) => c.id === activeCompId) || competitions[0];
 
-  const standings = activeCompId ? data?.standings?.[activeCompId] : null;
-  const fixtures = useMemo(
-    () => (data?.fixtures || []).filter((f) => f.competitionId === activeCompId || (!f.competitionId && f.competitionName === competition?.name)),
-    [data?.fixtures, activeCompId, competition?.name]
+  const allStandings = activeCompId ? data?.standings?.[activeCompId] : null;
+
+  // Zones derived from standings group field
+  const zones = useMemo(() => {
+    if (!allStandings) return [];
+    return [...new Set(allStandings.map((s) => s.group).filter(Boolean))];
+  }, [allStandings]);
+
+  // Reset zone if it's no longer valid for the current competition
+  const activeZone = zones.includes(selectedZone) ? selectedZone : zones[0] || null;
+
+  const zoneStandings = useMemo(() => {
+    if (!allStandings) return null;
+    if (!activeZone) return allStandings;
+    return allStandings.filter((s) => s.group === activeZone);
+  }, [allStandings, activeZone]);
+
+  const compFixtures = useMemo(
+    () => (data?.fixtures || []).filter((f) => f.competitionId === activeCompId),
+    [data?.fixtures, activeCompId]
   );
 
-  // Most recent updatedAt across standings + fixtures
+  // Fixtures filtered by zone (for Fixture tab only)
+  const zoneFixtures = useMemo(() => {
+    if (!activeZone) return compFixtures;
+    return compFixtures.filter((f) => !f.group || f.group === activeZone);
+  }, [compFixtures, activeZone]);
+
+  // Most recent updatedAt
   const updatedAt = useMemo(() => {
     const times = [];
-    if (standings) standings.forEach((s) => s.updatedAt && times.push(new Date(s.updatedAt).getTime()));
+    if (allStandings) allStandings.forEach((s) => s.updatedAt && times.push(new Date(s.updatedAt).getTime()));
     (data?.fixtures || []).forEach((f) => f.updatedAt && times.push(new Date(f.updatedAt).getTime()));
     if (data?.updatedAt) times.push(new Date(data.updatedAt).getTime());
     if (!times.length) return null;
     return new Date(Math.max(...times)).toISOString();
-  }, [standings, data?.fixtures, data?.updatedAt]);
+  }, [allStandings, data?.fixtures, data?.updatedAt]);
 
-  const hasStandings = standings && standings.length > 0;
-  const hasFixtures = fixtures.length > 0;
+  const hasStandings = zoneStandings && zoneStandings.length > 0;
+  const hasFixtures = compFixtures.length > 0;
   const isEmpty = !hasStandings && !hasFixtures;
+  const showZoneSelector = zones.length > 1 && (tab === "standings" || tab === "fixtures");
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-5xl mx-auto">
@@ -91,18 +114,27 @@ export default function FutbolArgentino() {
       </div>
 
       {/* Competition selector */}
-      {competitions.length > 1 && (
-        <div className="relative">
-          <select
-            value={activeCompId || ""}
-            onChange={(e) => setSelectedCompId(e.target.value)}
-            className="w-full appearance-none bg-zinc-900 border border-zinc-800 rounded-xl px-4 py-2.5 pr-10 text-white text-sm font-medium focus:outline-none focus:border-zinc-600 cursor-pointer"
-          >
-            {competitions.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}{c.season ? ` · ${c.season}` : ""}</option>
+      {competitions.length > 0 && (
+        <CompetitionSelector competitions={competitions} value={activeCompId} onChange={setSelectedCompId} />
+      )}
+
+      {/* Zone selector (standings + fixtures tabs only) */}
+      {showZoneSelector && (
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="flex items-center gap-1.5 text-xs font-semibold text-zinc-500 uppercase tracking-wider">
+            <Layers size={13} /> Zona
+          </span>
+          <div className="flex gap-1.5 flex-wrap">
+            {zones.map((z) => (
+              <button
+                key={z}
+                onClick={() => setSelectedZone(z)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${activeZone === z ? "bg-white text-zinc-950" : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white"}`}
+              >
+                {z}
+              </button>
             ))}
-          </select>
-          <ChevronDown size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none" />
+          </div>
         </div>
       )}
 
@@ -150,9 +182,9 @@ export default function FutbolArgentino() {
         </div>
       ) : (
         <>
-          {tab === "standings" && <StandingsTable standings={standings} competitionName={competition?.name} />}
-          {tab === "fixtures" && <FixturesList fixtures={fixtures} />}
-          {tab === "calendar" && <CalendarTab fixtures={fixtures} />}
+          {tab === "standings" && <StandingsTable standings={zoneStandings} competitionName={competition?.name} />}
+          {tab === "fixtures" && <FixturesList fixtures={zoneFixtures} />}
+          {tab === "calendar" && <CalendarTab fixtures={compFixtures} />}
         </>
       )}
     </div>
