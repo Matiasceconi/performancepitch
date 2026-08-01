@@ -1,7 +1,9 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
 import { hashToken, getTodayInTimezone } from "../../shared/playerAccessUtils.ts";
-import { computeWellness as cw, computeIsDrop as cid } from "../../shared/playerPortalAuth.ts";
+import { computeWellnessV2, computeIsDropV2 } from "../../shared/playerPortalAuth.ts";
 import { resolvePlayerContextForDate } from "../../shared/squadRosterResolver.ts";
+
+const SCALE_VERSION = "negative_1_10_v2";
 
 export default async function(req) {
   try {
@@ -40,27 +42,31 @@ export default async function(req) {
     const seasonId = context?.season_id || tokenRecord.season_id || '';
     const organizationId = context?.organization_id || '';
 
-    // Validar valores
-    const sleepHours = Number(body.sleep_hours) || 0;
-    const sleepQuality = clamp15(body.sleep_quality);
-    const energyLevel = clamp15(body.energy_level);
-    const muscularReadiness = clamp15(body.muscular_readiness);
-    const mood = clamp15(body.mood);
-    const calmness = clamp15(body.calmness);
+    // Validar valores escala v2 (1-10, mayor es peor)
+    const fatigue = clamp110(body.fatigue);
+    const muscularSoreness = clamp110(body.muscular_soreness);
+    const sleepLack = clamp110(body.sleep_lack);
+    const stress = clamp110(body.stress);
+    const moodLow = clamp110(body.mood_low);
+    const sleepHours = Math.round(Number(body.sleep_hours) * 2) / 2; // admite .5
     const hasPain = !!body.has_pain;
-    const painIntensity = hasPain ? clamp010(body.pain_intensity) : 0;
+    const painIntensity = hasPain ? clampPain(body.pain_intensity) : 0;
     const painZone = hasPain ? String(body.pain_zone || '').slice(0, 100) : '';
     const comment = String(body.comment || '').slice(0, 1000);
 
-    const { wellness_score, alert_level } = cw({
-      sleep_hours: sleepHours,
-      sleep_quality: sleepQuality,
-      energy_level: energyLevel,
-      muscular_readiness: muscularReadiness,
-      mood,
-      calmness,
-      has_pain: hasPain,
-      pain_intensity: painIntensity,
+    if (sleepHours <= 0) {
+      return Response.json({ error: 'Indicá cuántas horas dormiste.' }, { status: 400 });
+    }
+    if (fatigue <= 0 || muscularSoreness <= 0 || sleepLack <= 0 || stress <= 0 || moodLow <= 0) {
+      return Response.json({ error: 'Respondé todas las preguntas del wellness.' }, { status: 400 });
+    }
+    if (hasPain && (!painZone || painIntensity <= 0)) {
+      return Response.json({ error: 'Indicá la zona y la intensidad del dolor.' }, { status: 400 });
+    }
+
+    const { wellness_score, alert_level, alert_reasons } = computeWellnessV2({
+      fatigue, muscular_soreness: muscularSoreness, sleep_lack: sleepLack, stress, mood_low: moodLow,
+      has_pain: hasPain, pain_intensity: painIntensity, sleep_hours: sleepHours,
     });
 
     // Buscar respuesta existente (idempotente)
@@ -70,14 +76,14 @@ export default async function(req) {
       1
     );
 
-    // Historial para detección de caída
+    // Historial v2 para detección de caída (no mezclar con escala legado)
     const history = await base44.asServiceRole.entities.WellnessResponse.filter(
       { player_id: playerId },
       "-response_date",
       30
     );
     const historyForDrop = history.filter((r) => r.response_date !== today);
-    const isDrop = cid(historyForDrop, wellness_score);
+    const isDrop = computeIsDropV2(historyForDrop, wellness_score);
 
     const player = await base44.asServiceRole.entities.Player.get(playerId).catch(() => null);
     const playerName = player?.full_name || `${player?.first_name || ''} ${player?.last_name || ''}`.trim();
@@ -89,18 +95,20 @@ export default async function(req) {
       season_id: seasonId,
       organization_id: organizationId,
       response_date: today,
+      wellness_scale_version: SCALE_VERSION,
+      fatigue,
+      muscular_soreness: muscularSoreness,
+      sleep_lack: sleepLack,
+      stress,
+      mood_low: moodLow,
       sleep_hours: sleepHours,
-      sleep_quality: sleepQuality,
-      energy_level: energyLevel,
-      muscular_readiness: muscularReadiness,
-      mood,
-      calmness,
       has_pain: hasPain,
       pain_zone: painZone,
       pain_intensity: painIntensity,
       comment,
       wellness_score,
       alert_level,
+      alert_reasons,
       is_drop: isDrop,
       source: 'player',
     };
@@ -126,13 +134,13 @@ export default async function(req) {
   }
 }
 
-function clamp15(v) {
+function clamp110(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 0;
-  return Math.max(1, Math.min(5, Math.round(n)));
+  return Math.max(1, Math.min(10, Math.round(n)));
 }
-function clamp010(v) {
+function clampPain(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(10, Math.round(n)));
+  return Math.max(1, Math.min(10, Math.round(n)));
 }

@@ -110,3 +110,71 @@ export function computeIsDrop(history, currentScore) {
   if (avgPrev === 0) return false;
   return currentScore <= avgPrev * 0.8;
 }
+
+// ── Escala v2: 1-10, dirección negativa (1 = mejor estado, 10 = peor estado) ──
+// El índice general es el promedio de las 5 preguntas subjetivas (fatiga,
+// cansancio muscular, falta de descanso, estrés, ánimo bajo).
+// El nivel de alerta considera además dolor y horas de sueño.
+export function computeWellnessV2(values) {
+  const fatigue = clamp110(values.fatigue);
+  const muscular = clamp110(values.muscular_soreness);
+  const sleepLack = clamp110(values.sleep_lack);
+  const stress = clamp110(values.stress);
+  const moodLow = clamp110(values.mood_low);
+  const subjective = [fatigue, muscular, sleepLack, stress, moodLow].filter((n) => n > 0);
+  const index = subjective.length ? subjective.reduce((a, b) => a + b, 0) / subjective.length : 0;
+  const wellness_score = Math.round(index * 10) / 10;
+
+  const hasPain = !!values.has_pain;
+  const painIntensity = hasPain ? clamp110(values.pain_intensity) : 0;
+  const sleepHours = Number(values.sleep_hours) || 0;
+
+  const reasons: string[] = [];
+  if (fatigue >= 7) reasons.push("Alerta por fatiga elevada");
+  if (muscular >= 7) reasons.push("Alerta por cansancio muscular");
+  if (sleepLack >= 7) reasons.push("Alerta por poco descanso");
+  if (stress >= 7) reasons.push("Alerta por estrés elevado");
+  if (moodLow >= 7) reasons.push("Alerta por ánimo bajo");
+  if (painIntensity >= 7) reasons.push("Alerta por dolor elevado");
+  if (sleepHours > 0 && sleepHours < 6) reasons.push("Alerta por poco descanso");
+
+  const indexSev = severityFromScore(wellness_score);
+  const painSev = painIntensity > 0 ? severityFromScore(painIntensity) : 0;
+  const sleepSev = sleepHours > 0 ? severityFromSleep(sleepHours) : 0;
+  const maxSev = Math.max(indexSev, painSev, sleepSev);
+  const alert_level = ["verde", "amarillo", "naranja", "rojo"][maxSev] || "verde";
+
+  return { wellness_score, alert_level, alert_reasons: reasons };
+}
+
+// is_drop para escala v2: el índice empeoró (subió) 20% o más respecto al
+// promedio de los últimos registros v2. Se filtra el historial a v2 para
+// no mezclar con la escala legado 1-5.
+export function computeIsDropV2(history, currentScore) {
+  if (!history || history.length === 0 || currentScore == null) return false;
+  const last7 = history
+    .slice(0, 10)
+    .filter((r) => r.wellness_scale_version === "negative_1_10_v2" && r.wellness_score != null)
+    .slice(0, 7);
+  if (last7.length < 3) return false;
+  const avgPrev = last7.reduce((a, r) => a + r.wellness_score, 0) / last7.length;
+  if (avgPrev === 0) return false;
+  return currentScore >= avgPrev * 1.2;
+}
+
+function clamp110(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(1, Math.min(10, Math.round(n)));
+}
+function severityFromScore(n) {
+  if (n >= 9) return 3;
+  if (n >= 7) return 2;
+  if (n >= 4) return 1;
+  return 0;
+}
+function severityFromSleep(h) {
+  if (h < 6) return 3;
+  if (h < 8) return 1;
+  return 0;
+}

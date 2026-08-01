@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { Shield, ArrowLeft, Loader2, CheckCircle2, ClipboardList, Gauge, AlertTriangle, Lock } from 'lucide-react';
@@ -76,16 +76,6 @@ export default function IngresoJugador() {
     setStep('dni');
     setError('Tu sesión expiró. Ingresá tu DNI nuevamente.');
   }
-
-  // Auto-navegar al formulario de RPE si el Wellness está completo y hay una sola sesión
-  useEffect(() => {
-    const wellnessDone = data?.wellness?.status === 'completed';
-    const rpeSessions = data?.rpe_sessions || [];
-    if (step === 'dashboard' && wellnessDone && rpeSessions.length === 1 && !selectedRpe) {
-      setSelectedRpe(rpeSessions[0]);
-      setStep('rpe');
-    }
-  }, [step, data, selectedRpe]);
 
   // ── Step: DNI input ─────────────────────────────────────────────────────
   if (step === 'dni') {
@@ -201,6 +191,8 @@ export default function IngresoJugador() {
 
   const wellnessDone = data?.wellness?.status === 'completed';
   const rpeSessions = data?.rpe_sessions || [];
+  const rpeCompletedSessions = data?.rpe_completed_sessions || [];
+  const hasAnyRpe = rpeSessions.length > 0 || rpeCompletedSessions.length > 0;
   const rpePending = rpeSessions.length > 0;
 
   return (
@@ -241,9 +233,11 @@ export default function IngresoJugador() {
       </button>
 
       {/* RPE cards */}
-      {rpePending ? (
+      {hasAnyRpe ? (
         <div className="space-y-3">
           <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wide">RPE de hoy</h2>
+
+          {/* RPE pendientes */}
           {rpeSessions.map((s) => {
             const blocked = !wellnessDone;
             return (
@@ -257,9 +251,7 @@ export default function IngresoJugador() {
                 onClick={() => { if (!blocked) { setSelectedRpe(s); setStep('rpe'); } }}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                    blocked ? 'bg-zinc-800' : 'bg-blue-500/10'
-                  }`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0 ${blocked ? 'bg-zinc-800' : 'bg-blue-500/10'}`}>
                     {blocked ? <Lock size={22} className="text-zinc-500" /> : <Gauge size={24} className="text-blue-400" />}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -275,17 +267,42 @@ export default function IngresoJugador() {
                         </button>
                       </>
                     ) : (
-                      <p className="text-sm text-zinc-500 mt-0.5">
-                        {s.match_day_code ? `${s.match_day_code} · ` : ''}Tocá para responder
-                      </p>
+                      <>
+                        <p className="text-sm text-zinc-500 mt-0.5">RPE de hoy — Pendiente</p>
+                        <p className="text-xs text-zinc-600 mt-0.5">Respondelo después de finalizar el entrenamiento.</p>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setSelectedRpe(s); setStep('rpe'); }}
+                          className="mt-3 px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-bold hover:bg-blue-400 transition-colors"
+                        >
+                          Responder RPE
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
               </div>
             );
           })}
+
+          {/* RPE completados */}
+          {rpeCompletedSessions.map((s) => (
+            <div key={s.session_id} className="w-full p-5 rounded-2xl border bg-emerald-500/5 border-emerald-500/20">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 rounded-xl bg-emerald-500/15 flex items-center justify-center flex-shrink-0">
+                  <CheckCircle2 size={24} className="text-emerald-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-bold text-white">{s.title || 'Sesión'}</h3>
+                  <p className="text-sm text-emerald-400 mt-0.5">RPE de hoy — Completado ✓</p>
+                  {s.internal_load != null && (
+                    <p className="text-xs text-zinc-500 mt-0.5">Carga interna: {s.internal_load} UA</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-      ) : (
+      ) : !wellnessDone ? (
         <div className="p-5 rounded-2xl bg-zinc-900 border border-zinc-800">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center flex-shrink-0">
@@ -297,7 +314,7 @@ export default function IngresoJugador() {
             </div>
           </div>
         </div>
-      )}
+      ) : null}
 
       {/* All done badge */}
       {wellnessDone && !rpePending && (

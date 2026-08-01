@@ -2,40 +2,62 @@ import React, { useState, useCallback } from 'react';
 import { base44 } from '@/api/base44Client';
 import { ChevronLeft, Check } from 'lucide-react';
 
-const SCALE_LABELS = { 1: 'Muy mal', 2: 'Mal', 3: 'Normal', 4: 'Bien', 5: 'Muy bien' };
 const PAIN_ZONES = ['Cuello', 'Hombro', 'Espalda alta', 'Espalda baja', 'Cadera', 'Isquiotibial', 'Cuádriceps', 'Gemelo', 'Tobillo', 'Rodilla', 'Pie', 'Otro'];
 
-const STEPS = [
-  { key: 'sleep_hours', type: 'hours', label: '¿Cuántas horas dormiste?', subtitle: 'Horas de sueño' },
-  { key: 'sleep_quality', type: 'scale15', label: '¿Cómo fue la calidad de tu sueño?', subtitle: 'Pregunta 2 de 10' },
-  { key: 'energy_level', type: 'scale15', label: '¿Con cuánta energía te sentís?', subtitle: 'Pregunta 3 de 10' },
-  { key: 'muscular_readiness', type: 'scale15', label: '¿Cómo sentís muscularmente el cuerpo?', subtitle: 'Pregunta 4 de 10' },
-  { key: 'mood', type: 'scale15', label: '¿Cómo está tu estado de ánimo?', subtitle: 'Pregunta 5 de 10' },
-  { key: 'calmness', type: 'scale15', label: '¿Qué tan tranquilo te sentís?', subtitle: 'Pregunta 6 de 10' },
-  { key: 'has_pain', type: 'yesno', label: '¿Tenés algún dolor o molestia?', subtitle: 'Pregunta 7 de 10' },
+const SLEEP_OPTIONS = [3, 3.5, 4, 4.5, 5, 5.5, 6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+function formatHours(h) {
+  const int = Math.floor(h);
+  const dec = h - int;
+  return dec === 0 ? `${int} h` : `${int} h 30 min`;
+}
+
+function scaleClasses(n) {
+  if (n <= 3) return 'bg-emerald-500 text-zinc-950 border-emerald-400';
+  if (n <= 6) return 'bg-yellow-500 text-zinc-950 border-yellow-400';
+  if (n <= 8) return 'bg-orange-500 text-zinc-950 border-orange-400';
+  return 'bg-red-500 text-white border-red-400';
+}
+
+const SUBJECTIVE_STEPS = [
+  { key: 'fatigue', label: '¿Qué nivel de fatiga sentís hoy?', low: 'Totalmente descansado', high: 'Extremadamente fatigado' },
+  { key: 'muscular_soreness', label: '¿Qué nivel de cansancio o pesadez muscular tenés?', low: 'Músculos completamente recuperados', high: 'Muchísima pesadez o cansancio muscular' },
+  { key: 'sleep_lack', label: '¿Qué nivel de falta de descanso sentís hoy?', low: 'Dormí y descansé muy bien', high: 'Dormí muy mal y no me recuperé' },
+  { key: 'stress', label: '¿Qué nivel de estrés sentís hoy?', low: 'Muy tranquilo', high: 'Extremadamente estresado' },
+  { key: 'mood_low', label: '¿Qué nivel de malestar o ánimo bajo sentís hoy?', low: 'Muy buen ánimo', high: 'Muy mal ánimo' },
 ];
 
 export default function DailyWellnessForm({ token, onDone, onExpired, onBack }) {
-  const [step, setStep] = useState(0);
   const [values, setValues] = useState({
-    sleep_hours: 0, sleep_quality: 0, energy_level: 0, muscular_readiness: 0, mood: 0, calmness: 0,
+    sleep_hours: 0, fatigue: 0, muscular_soreness: 0, sleep_lack: 0, stress: 0, mood_low: 0,
     has_pain: false, pain_zone: '', pain_intensity: 0, comment: '',
   });
+  const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [done, setDone] = useState(false);
 
-  const totalSteps = STEPS.length + 3;
   const set = useCallback((k, v) => setValues((p) => ({ ...p, [k]: v })), []);
 
-  function next() { setStep((s) => Math.min(s + 1, totalSteps - 1)); }
+  // Lista plana de pasos según si hay dolor o no
+  const steps = [
+    { type: 'sleep' },
+    ...SUBJECTIVE_STEPS.map((s) => ({ type: 'scale', ...s })),
+    { type: 'pain_yesno' },
+    ...(values.has_pain ? [{ type: 'pain_zone' }, { type: 'pain_intensity' }] : []),
+    { type: 'comment' },
+  ];
+  const total = steps.length;
+  const current = steps[step];
+
+  function next() { setStep((s) => Math.min(s + 1, total - 1)); }
   function back() { setStep((s) => Math.max(s - 1, 0)); }
 
   function canProceed() {
-    const s = STEPS[step];
-    if (!s) return true;
-    if (s.type === 'hours') return values.sleep_hours > 0;
-    if (s.type === 'scale15') return values[s.key] > 0;
+    if (!current) return true;
+    if (current.type === 'sleep') return values.sleep_hours > 0;
+    if (current.type === 'scale') return values[current.key] > 0;
+    if (current.type === 'pain_zone') return !!values.pain_zone;
+    if (current.type === 'pain_intensity') return values.pain_intensity > 0;
     return true;
   }
 
@@ -50,7 +72,7 @@ export default function DailyWellnessForm({ token, onDone, onExpired, onBack }) 
         throw new Error(result.error);
       }
       setDone(true);
-      setTimeout(() => onDone(), 1500);
+      setTimeout(() => onDone(), 1600);
     } catch (e) {
       setError(e?.message || 'No se pudo guardar');
     } finally {
@@ -64,14 +86,14 @@ export default function DailyWellnessForm({ token, onDone, onExpired, onBack }) 
         <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
           <Check size={32} className="text-emerald-400" />
         </div>
-        <h2 className="text-xl font-black text-white">¡Respuesta enviada!</h2>
-        <p className="text-zinc-400 text-sm">Gracias por registrar tu wellness.</p>
+        <h2 className="text-xl font-black text-white">¡Wellness completado!</h2>
+        <p className="text-zinc-400 text-sm">Tu respuesta fue registrada correctamente.</p>
       </div>
     );
   }
 
-  const current = STEPS[step];
-  const progress = Math.round(((step + 1) / totalSteps) * 100);
+  const progress = Math.round(((step + 1) / total) * 100);
+  const isLast = step === total - 1;
 
   return (
     <div className="p-5 space-y-4 min-h-screen flex flex-col">
@@ -82,78 +104,95 @@ export default function DailyWellnessForm({ token, onDone, onExpired, onBack }) 
       <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden"><div className="h-full bg-emerald-500 transition-all" style={{ width: `${progress}%` }} /></div>
 
       <div className="flex-1 flex flex-col">
-        {current?.type === 'hours' && (
+        {/* Horas de sueño */}
+        {current?.type === 'sleep' && (
           <div className="space-y-4">
             <div>
-              <p className="text-xl font-bold text-white">{current.label}</p>
-              <p className="text-sm text-zinc-500 mt-1">{current.subtitle}</p>
+              <p className="text-xl font-bold text-white">{current.label || '¿Cuántas horas dormiste?'}</p>
+              <p className="text-sm text-zinc-500 mt-1">Pregunta {step + 1} de {total}</p>
             </div>
-            <div className="grid grid-cols-4 gap-2">
-              {[3, 4, 5, 6, 7, 8, 9, 10].map((h) => (
-                <button key={h} onClick={() => set('sleep_hours', h)} className={`py-4 rounded-xl text-lg font-black transition-all ${values.sleep_hours === h ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{h}h</button>
+            <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+              {SLEEP_OPTIONS.map((h) => (
+                <button key={h} onClick={() => set('sleep_hours', h)} className={`py-4 rounded-xl text-base font-black transition-all ${values.sleep_hours === h ? 'bg-emerald-500 text-zinc-950 border-2 border-emerald-400' : 'bg-zinc-800 text-zinc-300 border-2 border-transparent hover:bg-zinc-700'}`}>{formatHours(h)}</button>
               ))}
             </div>
           </div>
         )}
 
-        {current?.type === 'scale15' && (
+        {/* Escala 1-10 subjetiva */}
+        {current?.type === 'scale' && (
           <div className="space-y-4">
             <div>
               <p className="text-xl font-bold text-white">{current.label}</p>
-              <p className="text-sm text-zinc-500 mt-1">{current.subtitle}</p>
+              <p className="text-sm text-zinc-500 mt-1">Pregunta {step + 1} de {total} · 1 = mejor estado, 10 = peor estado</p>
             </div>
-            <div className="space-y-2">
-              {[5, 4, 3, 2, 1].map((n) => (
-                <button key={n} onClick={() => set(current.key, n)} className={`w-full flex items-center gap-3 p-4 rounded-xl transition-all ${values[current.key] === n ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'}`}>
-                  <span className="w-9 h-9 rounded-full bg-zinc-950/30 flex items-center justify-center font-black text-lg shrink-0">{n}</span>
-                  <span className="font-bold">{SCALE_LABELS[n]}</span>
-                  {values[current.key] === n && <Check size={20} className="ml-auto" />}
-                </button>
-              ))}
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+                const selected = values[current.key] === n;
+                return (
+                  <button key={n} onClick={() => set(current.key, n)} className={`aspect-square rounded-xl font-black text-lg border-2 transition-all ${selected ? `${scaleClasses(n)} scale-105` : 'bg-zinc-800 text-zinc-300 border-transparent hover:bg-zinc-700'}`}>{n}</button>
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-xs text-zinc-500 pt-1">
+              <span className="text-emerald-400/80">1 · {current.low}</span>
+              <span className="text-red-400/80">{current.high} · 10</span>
             </div>
           </div>
         )}
 
-        {current?.type === 'yesno' && (
+        {/* Dolor Sí/No */}
+        {current?.type === 'pain_yesno' && (
           <div className="space-y-4">
             <div>
-              <p className="text-xl font-bold text-white">{current.label}</p>
-              <p className="text-sm text-zinc-500 mt-1">{current.subtitle}</p>
+              <p className="text-xl font-bold text-white">¿Tenés algún dolor o molestia?</p>
+              <p className="text-sm text-zinc-500 mt-1">Pregunta {step + 1} de {total}</p>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <button onClick={() => { set('has_pain', false); set('pain_intensity', 0); set('pain_zone', ''); next(); }} className={`py-6 rounded-xl font-black text-lg transition-all ${!values.has_pain ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300'}`}>No</button>
-              <button onClick={() => { set('has_pain', true); next(); }} className={`py-6 rounded-xl font-black text-lg transition-all ${values.has_pain ? 'bg-amber-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300'}`}>Sí</button>
+              <button onClick={() => { set('has_pain', false); set('pain_intensity', 0); set('pain_zone', ''); next(); }} className={`py-6 rounded-xl font-black text-lg border-2 transition-all ${!values.has_pain ? 'bg-emerald-500 text-zinc-950 border-emerald-400' : 'bg-zinc-800 text-zinc-300 border-transparent'}`}>No</button>
+              <button onClick={() => { set('has_pain', true); next(); }} className={`py-6 rounded-xl font-black text-lg border-2 transition-all ${values.has_pain ? 'bg-amber-500 text-zinc-950 border-amber-400' : 'bg-zinc-800 text-zinc-300 border-transparent'}`}>Sí</button>
             </div>
           </div>
         )}
 
-        {step === STEPS.length && values.has_pain && (
+        {/* Zona del dolor */}
+        {current?.type === 'pain_zone' && (
           <div className="space-y-4">
-            <p className="text-xl font-bold text-white">¿Dónde sentís el dolor?</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div>
+              <p className="text-xl font-bold text-white">¿Dónde sentís el dolor?</p>
+              <p className="text-sm text-zinc-500 mt-1">Pregunta {step + 1} de {total}</p>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {PAIN_ZONES.map((z) => (
-                <button key={z} onClick={() => set('pain_zone', z)} className={`py-3 px-3 rounded-xl text-sm font-semibold transition-all ${values.pain_zone === z ? 'bg-emerald-500 text-zinc-950' : 'bg-zinc-800 text-zinc-200 hover:bg-zinc-700'}`}>{z}</button>
+                <button key={z} onClick={() => set('pain_zone', z)} className={`py-3 px-3 rounded-xl text-sm font-semibold border-2 transition-all ${values.pain_zone === z ? 'bg-amber-500 text-zinc-950 border-amber-400' : 'bg-zinc-800 text-zinc-200 border-transparent hover:bg-zinc-700'}`}>{z}</button>
               ))}
             </div>
           </div>
         )}
 
-        {step === STEPS.length + 1 && values.has_pain && (
+        {/* Intensidad del dolor */}
+        {current?.type === 'pain_intensity' && (
           <div className="space-y-4">
-            <p className="text-xl font-bold text-white">¿Qué tan intenso es el dolor?</p>
-            <p className="text-sm text-zinc-500">De 0 a 10</p>
-            <div className="grid grid-cols-6 gap-2">
-              {Array.from({ length: 11 }, (_, i) => i).map((n) => (
-                <button key={n} onClick={() => set('pain_intensity', n)} className={`aspect-square rounded-xl font-black text-lg transition-all ${values.pain_intensity === n ? 'bg-amber-500 text-zinc-950' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{n}</button>
-              ))}
+            <div>
+              <p className="text-xl font-bold text-white">¿Qué tan intenso es el dolor?</p>
+              <p className="text-sm text-zinc-500 mt-1">Pregunta {step + 1} de {total} · 1 = molestia mínima, 10 = dolor máximo</p>
+            </div>
+            <div className="grid grid-cols-5 sm:grid-cols-10 gap-2">
+              {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+                const selected = values.pain_intensity === n;
+                return (
+                  <button key={n} onClick={() => set('pain_intensity', n)} className={`aspect-square rounded-xl font-black text-lg border-2 transition-all ${selected ? `${scaleClasses(n)} scale-105` : 'bg-zinc-800 text-zinc-300 border-transparent hover:bg-zinc-700'}`}>{n}</button>
+                );
+              })}
             </div>
           </div>
         )}
 
-        {step === totalSteps - 1 && (
+        {/* Comentario */}
+        {current?.type === 'comment' && (
           <div className="space-y-4">
             <p className="text-xl font-bold text-white">¿Querés agregar un comentario?</p>
-            <p className="text-sm text-zinc-500">Opcional</p>
+            <p className="text-sm text-zinc-500">Opcional · Pregunta {step + 1} de {total}</p>
             <textarea value={values.comment} onChange={(e) => set('comment', e.target.value)} placeholder="Escribí acá..." rows={4} className="w-full bg-zinc-800 border border-zinc-700 rounded-xl p-3 text-white text-sm resize-none focus:outline-none focus:border-emerald-500" />
           </div>
         )}
@@ -161,11 +200,14 @@ export default function DailyWellnessForm({ token, onDone, onExpired, onBack }) 
 
       {error && <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-3 text-red-300 text-sm">{error}</div>}
 
-      <div className="pt-2">
-        {step < totalSteps - 1 ? (
-          <button onClick={next} disabled={!canProceed()} className="w-full py-4 rounded-xl bg-emerald-500 text-zinc-950 font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition-colors">Continuar</button>
+      <div className="pt-2 flex gap-2">
+        {step > 0 && (
+          <button onClick={back} className="px-4 py-4 rounded-xl bg-zinc-800 text-zinc-300 font-bold hover:bg-zinc-700 transition-colors"><ChevronLeft size={20} /></button>
+        )}
+        {!isLast ? (
+          <button onClick={next} disabled={!canProceed()} className="flex-1 py-4 rounded-xl bg-emerald-500 text-zinc-950 font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-emerald-400 transition-colors">Continuar</button>
         ) : (
-          <button onClick={submit} disabled={submitting} className="w-full py-4 rounded-xl bg-emerald-500 text-zinc-950 font-black disabled:opacity-50 hover:bg-emerald-400 transition-colors">{submitting ? 'Enviando...' : 'Enviar respuesta'}</button>
+          <button onClick={submit} disabled={submitting} className="flex-1 py-4 rounded-xl bg-emerald-500 text-zinc-950 font-black disabled:opacity-50 hover:bg-emerald-400 transition-colors">{submitting ? 'Enviando...' : 'Enviar respuesta'}</button>
         )}
       </div>
     </div>

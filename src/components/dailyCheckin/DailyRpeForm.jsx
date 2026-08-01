@@ -7,6 +7,14 @@ const RPE_LABELS = {
   5: 'Exigente', 6: 'Bastante exigente', 7: 'Muy exigente', 8: 'Muy, muy exigente', 9: 'Casi máximo', 10: 'Máximo',
 };
 
+function rpeClasses(n) {
+  if (n <= 2) return 'bg-emerald-500 text-zinc-950 border-emerald-400';
+  if (n <= 4) return 'bg-emerald-400 text-zinc-950 border-emerald-300';
+  if (n <= 6) return 'bg-yellow-500 text-zinc-950 border-yellow-400';
+  if (n <= 8) return 'bg-orange-500 text-zinc-950 border-orange-400';
+  return 'bg-red-500 text-white border-red-400';
+}
+
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
 function formatDate(d) {
@@ -48,7 +56,7 @@ export default function DailyRpeForm({ token, session, onDone, onExpired, onBack
         <div className="w-16 h-16 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
           <Check size={32} className="text-emerald-400" />
         </div>
-        <h2 className="text-xl font-black text-white">¡RPE enviado!</h2>
+        <h2 className="text-xl font-black text-white">¡RPE completado!</h2>
         {done.internal_load != null ? (
           <p className="text-zinc-400 text-sm">Carga interna: <span className="font-bold text-emerald-400">{done.internal_load}</span> UA</p>
         ) : (
@@ -71,7 +79,7 @@ export default function DailyRpeForm({ token, session, onDone, onExpired, onBack
         <p className="text-xl font-bold text-white">¿Qué tan exigente fue la sesión?</p>
         <div className="grid grid-cols-6 gap-2">
           {Array.from({ length: 11 }, (_, i) => i).map((n) => (
-            <button key={n} onClick={() => setRpe(n)} className={`aspect-square rounded-xl font-black text-xl transition-all ${rpe === n ? 'bg-emerald-500 text-zinc-950 scale-105' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'}`}>{n}</button>
+            <button key={n} onClick={() => setRpe(n)} className={`aspect-square rounded-xl font-black text-xl border-2 transition-all ${rpe === n ? `${rpeClasses(n)} scale-105` : 'bg-zinc-800 text-zinc-300 border-transparent hover:bg-zinc-700'}`}>{n}</button>
           ))}
         </div>
         {rpe != null && <p className="text-center text-sm font-semibold text-emerald-400">{RPE_LABELS[rpe]}</p>}

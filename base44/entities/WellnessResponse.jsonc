@@ -27,29 +27,53 @@
       "format": "date",
       "description": "Fecha de la respuesta (YYYY-MM-DD). Una sola respuesta por jugador y fecha"
     },
+    "wellness_scale_version": {
+      "type": "string",
+      "description": "Versi\u00f3n de la escala utilizada. 'negative_1_10_v2' = escala 1-10 donde 1 es el mejor estado y 10 el peor. Registros antiguos sin este campo usan la escala legado 1-5 (mayor es mejor)."
+    },
+    "fatigue": {
+      "type": "number",
+      "description": "Fatiga general (1-10, mayor es peor). 1=Totalmente descansado, 10=Extremadamente fatigado"
+    },
+    "muscular_soreness": {
+      "type": "number",
+      "description": "Cansancio o pesadez muscular (1-10, mayor es peor). 1=M\u00fasculos recuperados, 10=Much\u00edsima pesadez"
+    },
+    "sleep_lack": {
+      "type": "number",
+      "description": "Falta de descanso (1-10, mayor es peor). 1=Dorm\u00ed muy bien, 10=Dorm\u00ed muy mal"
+    },
+    "stress": {
+      "type": "number",
+      "description": "Estr\u00e9s (1-10, mayor es peor). 1=Muy tranquilo, 10=Extremadamente estresado"
+    },
+    "mood_low": {
+      "type": "number",
+      "description": "Malestar o \u00e1nimo bajo (1-10, mayor es peor). 1=Muy buen \u00e1nimo, 10=Muy mal \u00e1nimo"
+    },
     "sleep_hours": {
       "type": "number",
-      "description": "Horas de sue\u00f1o reportadas"
+      "description": "Horas de sue\u00f1o reportadas (admite fracciones de media hora)"
     },
     "sleep_quality": {
       "type": "number",
-      "description": "Calidad del sue\u00f1o (1-5, mayor es mejor)"
+      "description": "Calidad del sue\u00f1o (1-5, mayor es mejor). Campo legado escala 1-5"
     },
     "energy_level": {
       "type": "number",
-      "description": "Nivel de energ\u00eda (1-5, mayor es mejor)"
+      "description": "Nivel de energ\u00eda (1-5, mayor es mejor). Campo legado escala 1-5"
     },
     "muscular_readiness": {
       "type": "number",
-      "description": "Sensaci\u00f3n muscular (1-5, mayor es mejor)"
+      "description": "Sensaci\u00f3n muscular (1-5, mayor es mejor). Campo legado escala 1-5"
     },
     "mood": {
       "type": "number",
-      "description": "Estado de \u00e1nimo (1-5, mayor es mejor)"
+      "description": "Estado de \u00e1nimo (1-5, mayor es mejor). Campo legado escala 1-5"
     },
     "calmness": {
       "type": "number",
-      "description": "Tranquilidad (1-5, mayor es mejor)"
+      "description": "Tranquilidad (1-5, mayor es mejor). Campo legado escala 1-5"
     },
     "has_pain": {
       "type": "boolean",
@@ -62,7 +86,7 @@
     },
     "pain_intensity": {
       "type": "number",
-      "description": "Intensidad del dolor (0-10)"
+      "description": "Intensidad del dolor (0-10, mayor es peor). 0 cuando no hay dolor"
     },
     "comment": {
       "type": "string",
@@ -70,21 +94,30 @@
     },
     "wellness_score": {
       "type": "number",
-      "description": "Puntaje de wellness de 0 a 100 (promedio de 5 preguntas \u00d7 20)"
+      "description": "\u00cdndice de fatiga y malestar. Escala v2: 1-10 (mayor es peor). Escala legado: 0-100 (mayor era mejor). No mezclar promedios de escalas distintas."
     },
     "alert_level": {
       "type": "string",
       "enum": [
         "verde",
         "amarillo",
+        "naranja",
         "rojo"
       ],
       "description": "Nivel de alerta calculado"
     },
+    "alert_reasons": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Motivos que generaron el nivel de alerta (escala v2)"
+    },
     "is_drop": {
       "type": "boolean",
       "default": false,
-      "description": "Si el wellness cay\u00f3 20% o m\u00e1s respecto al promedio de los \u00faltimos 7 registros"
+      "description": "Si el \u00edndice empeor\u00f3 20% o m\u00e1s respecto al promedio de los \u00faltimos registros de la misma escala"
     },
     "submitted_at": {
       "type": "string",

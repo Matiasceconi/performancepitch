@@ -64,7 +64,7 @@ export default async function(req) {
     spRows.forEach((sp) => { spBySession[sp.session_id] = sp; });
 
     const rpeSessions = [];
-    let rpeCompletedCount = 0;
+    const rpeCompletedSessions = [];
 
     for (const session of Object.values(sessionMap)) {
       if (session.date !== today) continue;
@@ -73,19 +73,19 @@ export default async function(req) {
       if (!sp) continue;
       if (sp.attendance === 'ausente' || sp.attendance === 'no_entrena') continue;
 
-      // Ya respondido
-      if (sp.rpe != null) {
-        rpeCompletedCount++;
-        continue;
-      }
-
-      rpeSessions.push({
+      const card = {
         session_id: session.id,
         title: session.title || 'Sesión',
         date: session.date,
         match_day_code: session.match_day_code || '',
         session_type: session.session_type || '',
-      });
+      };
+
+      if (sp.rpe != null) {
+        rpeCompletedSessions.push({ ...card, rpe: sp.rpe, internal_load: sp.internal_load });
+      } else {
+        rpeSessions.push(card);
+      }
     }
 
     return Response.json({
@@ -93,7 +93,7 @@ export default async function(req) {
       player_first_name: tokenRecord.player_first_name || '',
       wellness: { status: wellnessStatus },
       rpe_sessions: rpeSessions,
-      rpe_completed_count: rpeCompletedCount,
+      rpe_completed_sessions: rpeCompletedSessions,
     });
   } catch (error) {
     console.error('getDailyCheckinData error:', error);
