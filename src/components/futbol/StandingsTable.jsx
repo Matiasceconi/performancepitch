@@ -14,9 +14,10 @@ function FormDots({ form }) {
 }
 
 function zoneClass(position, total) {
-  if (position <= 6) return "bg-emerald-500/[0.06] border-l-2 border-emerald-500/40";
-  if (position <= 12) return "bg-blue-500/[0.06] border-l-2 border-blue-500/40";
-  if (position > total - 3) return "bg-red-500/[0.06] border-l-2 border-red-500/40";
+  const isGreen = position <= 8;
+  const isRed = total > 8 ? position > total - 3 : position > total - 2;
+  if (isGreen && !isRed) return "bg-emerald-500/[0.06] border-l-2 border-emerald-500/50";
+  if (isRed && !isGreen) return "bg-red-500/[0.06] border-l-2 border-red-500/50";
   return "border-l-2 border-transparent";
 }
 
@@ -35,9 +36,8 @@ export default function StandingsTable({ standings, competitionName }) {
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
       {/* Legend */}
       <div className="flex flex-wrap items-center gap-4 px-4 py-2.5 border-b border-zinc-800 text-xs text-zinc-400">
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/40" /> Copa Libertadores</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-blue-500/40" /> Copa Sudamericana</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-500/40" /> Descenso</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-500/50" /> Clasifican a playoffs (1-8)</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-red-500/50" /> Descenso</span>
       </div>
 
       <div className="overflow-x-auto">
@@ -47,13 +47,13 @@ export default function StandingsTable({ standings, competitionName }) {
               <th className="text-center p-2.5 font-semibold w-10">#</th>
               <th className="text-left p-2.5 font-semibold">Equipo</th>
               <th className="text-center p-2.5 font-semibold">PJ</th>
-              <th className="text-center p-2.5 font-semibold hidden sm:table-cell">G</th>
-              <th className="text-center p-2.5 font-semibold hidden sm:table-cell">E</th>
-              <th className="text-center p-2.5 font-semibold hidden sm:table-cell">P</th>
+              <th className="text-center p-2.5 font-semibold hidden sm:table-cell">PG</th>
+              <th className="text-center p-2.5 font-semibold hidden sm:table-cell">PE</th>
+              <th className="text-center p-2.5 font-semibold hidden sm:table-cell">PP</th>
               <th className="text-center p-2.5 font-semibold hidden md:table-cell">GF</th>
               <th className="text-center p-2.5 font-semibold hidden md:table-cell">GC</th>
-              <th className="text-center p-2.5 font-semibold hidden md:table-cell">DIF</th>
-              <th className="text-center p-2.5 font-semibold">PTS</th>
+              <th className="text-center p-2.5 font-semibold hidden md:table-cell">DG</th>
+              <th className="text-center p-2.5 font-semibold">Pts</th>
               <th className="text-center p-2.5 font-semibold hidden lg:table-cell">Forma</th>
             </tr>
           </thead>

@@ -1,9 +1,10 @@
 import React, { useState, useMemo } from "react";
-import { Trophy, Loader2, AlertCircle, RefreshCw, Calendar, ListOrdered, CalendarDays, Info, Layers } from "lucide-react";
+import { Trophy, Loader2, AlertCircle, RefreshCw, Calendar, ListOrdered, CalendarDays, BarChart3, Info, Layers } from "lucide-react";
 import { useFootballData } from "@/components/futbol/useFootballData";
 import StandingsTable from "@/components/futbol/StandingsTable";
 import FixturesList from "@/components/futbol/FixturesList";
 import CalendarTab from "@/components/futbol/CalendarTab";
+import StatsTab from "@/components/futbol/StatsTab";
 import CompetitionSelector from "@/components/futbol/CompetitionSelector";
 
 function fmtUpdated(iso) {
@@ -19,61 +20,83 @@ function fmtUpdated(iso) {
 }
 
 const TABS = [
-  { id: "standings", label: "Tabla de Posiciones", icon: ListOrdered },
+  { id: "standings", label: "Tabla", icon: ListOrdered },
   { id: "fixtures", label: "Fixture", icon: Calendar },
   { id: "calendar", label: "Calendario", icon: CalendarDays },
+  { id: "stats", label: "Estadísticas", icon: BarChart3 },
 ];
 
 export default function FutbolArgentino() {
   const { data, loading, refreshing, error, refetch } = useFootballData();
   const [tab, setTab] = useState("standings");
   const [selectedCompId, setSelectedCompId] = useState(null);
+  const [selectedTournament, setSelectedTournament] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
 
   const competitions = data?.competitions || [];
   const activeCompId = selectedCompId || competitions[0]?.id || null;
   const competition = competitions.find((c) => c.id === activeCompId) || competitions[0];
 
-  const allStandings = activeCompId ? data?.standings?.[activeCompId] : null;
-
-  // Zones derived from standings group field
-  const zones = useMemo(() => {
-    if (!allStandings) return [];
-    return [...new Set(allStandings.map((s) => s.group).filter(Boolean))];
-  }, [allStandings]);
-
-  // Reset zone if it's no longer valid for the current competition
-  const activeZone = zones.includes(selectedZone) ? selectedZone : zones[0] || null;
-
-  const zoneStandings = useMemo(() => {
-    if (!allStandings) return null;
-    if (!activeZone) return allStandings;
-    return allStandings.filter((s) => s.group === activeZone);
-  }, [allStandings, activeZone]);
-
+  const compStandings = activeCompId ? data?.standings?.[activeCompId] : null;
   const compFixtures = useMemo(
     () => (data?.fixtures || []).filter((f) => f.competitionId === activeCompId),
     [data?.fixtures, activeCompId]
   );
 
-  // Fixtures filtered by zone (for Fixture tab only)
+  // Available tournaments for this competition
+  const tournaments = useMemo(() => {
+    const set = new Set();
+    if (compStandings) compStandings.forEach((s) => s.tournament && set.add(s.tournament));
+    compFixtures.forEach((f) => f.tournament && set.add(f.tournament));
+    return [...set].sort();
+  }, [compStandings, compFixtures]);
+
+  const activeTournament = tournaments.includes(selectedTournament) ? selectedTournament : tournaments[0] || null;
+
+  // Standings filtered by tournament
+  const tournamentStandings = useMemo(() => {
+    if (!compStandings) return null;
+    if (!activeTournament) return compStandings;
+    return compStandings.filter((s) => s.tournament === activeTournament);
+  }, [compStandings, activeTournament]);
+
+  // Zones within the selected tournament
+  const zones = useMemo(() => {
+    if (!tournamentStandings) return [];
+    return [...new Set(tournamentStandings.map((s) => s.group).filter(Boolean))];
+  }, [tournamentStandings]);
+
+  const activeZone = zones.includes(selectedZone) ? selectedZone : zones[0] || null;
+
+  const zoneStandings = useMemo(() => {
+    if (!tournamentStandings) return null;
+    if (!activeZone) return tournamentStandings;
+    return tournamentStandings.filter((s) => s.group === activeZone);
+  }, [tournamentStandings, activeZone]);
+
+  // Fixtures filtered by tournament (+ zone for fixture tab)
+  const tournamentFixtures = useMemo(() => {
+    if (!activeTournament) return compFixtures;
+    return compFixtures.filter((f) => f.tournament === activeTournament);
+  }, [compFixtures, activeTournament]);
+
   const zoneFixtures = useMemo(() => {
-    if (!activeZone) return compFixtures;
-    return compFixtures.filter((f) => !f.group || f.group === activeZone);
-  }, [compFixtures, activeZone]);
+    if (!activeZone) return tournamentFixtures;
+    return tournamentFixtures.filter((f) => !f.group || f.group === activeZone);
+  }, [tournamentFixtures, activeZone]);
 
   // Most recent updatedAt
   const updatedAt = useMemo(() => {
     const times = [];
-    if (allStandings) allStandings.forEach((s) => s.updatedAt && times.push(new Date(s.updatedAt).getTime()));
+    if (compStandings) compStandings.forEach((s) => s.updatedAt && times.push(new Date(s.updatedAt).getTime()));
     (data?.fixtures || []).forEach((f) => f.updatedAt && times.push(new Date(f.updatedAt).getTime()));
     if (data?.updatedAt) times.push(new Date(data.updatedAt).getTime());
     if (!times.length) return null;
     return new Date(Math.max(...times)).toISOString();
-  }, [allStandings, data?.fixtures, data?.updatedAt]);
+  }, [compStandings, data?.fixtures, data?.updatedAt]);
 
   const hasStandings = zoneStandings && zoneStandings.length > 0;
-  const hasFixtures = compFixtures.length > 0;
+  const hasFixtures = tournamentFixtures.length > 0;
   const isEmpty = !hasStandings && !hasFixtures;
   const showZoneSelector = zones.length > 1 && (tab === "standings" || tab === "fixtures");
 
@@ -116,6 +139,26 @@ export default function FutbolArgentino() {
       {/* Competition selector */}
       {competitions.length > 0 && (
         <CompetitionSelector competitions={competitions} value={activeCompId} onChange={setSelectedCompId} />
+      )}
+
+      {/* Tournament toggle (Apertura / Clausura) — prominent */}
+      {tournaments.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {tournaments.map((t) => (
+            <button
+              key={t}
+              onClick={() => setSelectedTournament(t)}
+              className={`flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-base font-bold transition-all ${
+                activeTournament === t
+                  ? "bg-yellow-400 text-zinc-950 shadow-lg shadow-yellow-400/20"
+                  : "bg-zinc-900 text-zinc-400 border border-zinc-800 hover:text-white hover:border-zinc-600"
+              }`}
+            >
+              <Trophy size={18} />
+              {t}
+            </button>
+          ))}
+        </div>
       )}
 
       {/* Zone selector (standings + fixtures tabs only) */}
@@ -184,7 +227,8 @@ export default function FutbolArgentino() {
         <>
           {tab === "standings" && <StandingsTable standings={zoneStandings} competitionName={competition?.name} />}
           {tab === "fixtures" && <FixturesList fixtures={zoneFixtures} />}
-          {tab === "calendar" && <CalendarTab fixtures={compFixtures} />}
+          {tab === "calendar" && <CalendarTab fixtures={tournamentFixtures} />}
+          {tab === "stats" && <StatsTab fixtures={tournamentFixtures} standings={zoneStandings} />}
         </>
       )}
     </div>

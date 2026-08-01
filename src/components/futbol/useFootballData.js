@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const ENDPOINT = "https://lumi-e462b682.base44.app/functions/syncFootballData";
+const ENDPOINT = "https://base44.app/api/apps/6a6d734e0e73182fe462b682/functions/syncFootballData";
 
 export function useFootballData() {
   const [data, setData] = useState(null);
