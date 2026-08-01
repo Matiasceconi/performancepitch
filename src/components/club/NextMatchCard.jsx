@@ -1,5 +1,6 @@
 import React from "react";
 import { MapPin, Calendar, Trophy } from "lucide-react";
+import ClubShield from "@/components/club/ClubShield";
 
 function fmtFull(iso) {
   if (!iso) return "—";
@@ -24,13 +25,13 @@ export default function NextMatchCard({ fixture, title, badgeText, badgeClass, i
         <div className="space-y-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 flex flex-col items-center gap-2 text-center">
-              {fixture.homeLogo ? <img src={fixture.homeLogo} alt="" className="w-14 h-14 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-14 h-14 rounded-full bg-zinc-800" />}
+              <ClubShield teamName={fixture.homeTeam} teamLogo={fixture.homeLogo} providerTeamId={fixture.providerTeamIdHome} size="w-14 h-14" />
               <span className="text-sm font-semibold text-white text-center">{fixture.homeTeam}</span>
               <span className="text-xs text-zinc-500">Local</span>
             </div>
             <div className="px-2"><span className="text-zinc-600 text-xs font-bold uppercase">vs</span></div>
             <div className="flex-1 flex flex-col items-center gap-2 text-center">
-              {fixture.awayLogo ? <img src={fixture.awayLogo} alt="" className="w-14 h-14 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-14 h-14 rounded-full bg-zinc-800" />}
+              <ClubShield teamName={fixture.awayTeam} teamLogo={fixture.awayLogo} providerTeamId={fixture.providerTeamIdAway} size="w-14 h-14" />
               <span className="text-sm font-semibold text-white text-center">{fixture.awayTeam}</span>
               <span className="text-xs text-zinc-500">Visitante</span>
             </div>

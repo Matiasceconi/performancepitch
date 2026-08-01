@@ -1,11 +1,6 @@
 import React from "react";
 import { Trophy } from "lucide-react";
-
-function TeamLogo({ logo, name }) {
-  return logo
-    ? <img src={logo} alt="" className="w-5 h-5 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} />
-    : <div className="w-5 h-5 rounded-full bg-zinc-800 flex items-center justify-center shrink-0 text-[10px] font-bold text-zinc-400">{(name || "?").charAt(0)}</div>;
-}
+import ClubShield from "@/components/club/ClubShield";
 
 export default function ScorersTable({ scorers, title, accent, type, highlightTeam, showPhoto }) {
   const sorted = [...(scorers || [])].sort((a, b) => (b.goals || 0) - (a.goals || 0)).slice(0, 20);
@@ -80,7 +75,7 @@ export default function ScorersTable({ scorers, title, accent, type, highlightTe
                       <div className="min-w-0">
                         <p className={`truncate ${isHL ? `${highlightText} font-semibold` : "text-white"}`}>{s.playerName}</p>
                         <div className="flex items-center gap-1">
-                          <TeamLogo logo={s.teamLogo} name={s.teamName} />
+                          <ClubShield teamName={s.teamName} teamLogo={s.teamLogo} size="w-5 h-5" />
                           <span className="text-xs text-zinc-500 truncate">{s.teamName}</span>
                         </div>
                       </div>

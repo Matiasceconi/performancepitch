@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { MapPin, Clock, Tv } from "lucide-react";
+import ClubShield from "@/components/club/ClubShield";
 
 function isToday(iso) {
   if (!iso) return false;
@@ -46,7 +47,7 @@ export default function TodayMatchAlert({ fixture, title }) {
       </div>
       <div className="flex items-center justify-between gap-3">
         <div className="flex-1 flex flex-col items-center gap-2 text-center">
-          {fixture.homeLogo ? <img src={fixture.homeLogo} alt="" className="w-16 h-16 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-16 h-16 rounded-full bg-zinc-800" />}
+          <ClubShield teamName={fixture.homeTeam} teamLogo={fixture.homeLogo} providerTeamId={fixture.providerTeamIdHome} size="w-16 h-16" />
           <span className="text-sm font-semibold text-white">{fixture.homeTeam}</span>
         </div>
         <div className="text-center shrink-0">
@@ -54,7 +55,7 @@ export default function TodayMatchAlert({ fixture, title }) {
           <p className="text-2xl font-bold text-white">{fmtTime(fixture.date)}</p>
         </div>
         <div className="flex-1 flex flex-col items-center gap-2 text-center">
-          {fixture.awayLogo ? <img src={fixture.awayLogo} alt="" className="w-16 h-16 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-16 h-16 rounded-full bg-zinc-800" />}
+          <ClubShield teamName={fixture.awayTeam} teamLogo={fixture.awayLogo} providerTeamId={fixture.providerTeamIdAway} size="w-16 h-16" />
           <span className="text-sm font-semibold text-white">{fixture.awayTeam}</span>
         </div>
       </div>

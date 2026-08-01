@@ -48,6 +48,7 @@ import UsersAccess from '@/pages/UsersAccess';
 import PlayerAccess from '@/pages/PlayerAccess';
 import ComplementaryStrengthPlans from '@/pages/ComplementaryStrengthPlans';
 import ClubDashboard from '@/pages/ClubDashboard';
+import ClubIdentityAdmin from '@/pages/ClubIdentityAdmin';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
 class GlobalErrorBoundary extends Component {
@@ -100,6 +101,7 @@ function StaffRoutes() {
         <Routes>
           <Route element={<Layout />}>
             <Route path="/club-dashboard" element={<ClubDashboard />} />
+            <Route path="/club-identity-admin" element={<ClubIdentityAdmin />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/sessions" element={<Sessions />} />
             <Route path="/catapult" element={<Catapult />} />

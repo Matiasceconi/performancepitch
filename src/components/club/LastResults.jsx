@@ -1,5 +1,6 @@
 import React from "react";
 import { Trophy } from "lucide-react";
+import ClubShield from "@/components/club/ClubShield";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -40,7 +41,7 @@ export default function LastResults({ fixtures, teamName }) {
               <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
                 <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${cfg.cls}`}>{cfg.label}</span>
                 <span className="text-xs text-zinc-500 font-medium w-4 shrink-0">{isHome ? "L" : "V"}</span>
-                {oppLogo ? <img src={oppLogo} alt="" className="w-6 h-6 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-6 h-6 rounded-full bg-zinc-800 shrink-0" />}
+                <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-6 h-6" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">vs {opponent}</p>
                   <p className="text-xs text-zinc-500">{fx.tournament || "—"} · {fmtDate(fx.date)}</p>

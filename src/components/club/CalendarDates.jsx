@@ -1,5 +1,6 @@
 import React from "react";
 import { CalendarDays } from "lucide-react";
+import ClubShield from "@/components/club/ClubShield";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -30,7 +31,7 @@ export default function CalendarDates({ fixtures, teamName }) {
               <div key={i} className="bg-zinc-950/50 border border-zinc-800/60 rounded-xl p-3 text-center">
                 <p className="text-xs font-bold text-emerald-400 uppercase mb-2">{fx.round || "Fecha"}</p>
                 <div className="flex items-center justify-center gap-2 mb-2">
-                  {oppLogo ? <img src={oppLogo} alt="" className="w-10 h-10 object-contain" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-10 h-10 rounded-full bg-zinc-800" />}
+                  <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-10 h-10" />
                 </div>
                 <p className="text-sm font-medium text-white truncate">vs {opponent}</p>
                 <p className="text-xs text-zinc-500 mt-1">{isHome ? "Local" : "Visitante"} · {fmtDate(fx.date)}</p>

@@ -1,5 +1,6 @@
 import React from "react";
 import { X } from "lucide-react";
+import ClubShield from "@/components/club/ClubShield";
 
 const COMPETITION_ID = "6a6d7e6852dc4637a1cf1260";
 
@@ -31,7 +32,7 @@ export default function FixtureModal({ fixtures, teamName, onClose }) {
               <div key={i} className="flex items-center gap-3 p-3 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
                 <span className="text-xs text-zinc-500 w-20 shrink-0">{fx.round || "—"}</span>
                 <span className={`text-xs font-bold w-5 shrink-0 ${isHome ? "text-emerald-400" : "text-blue-400"}`}>{isHome ? "L" : "V"}</span>
-                {oppLogo ? <img src={oppLogo} alt="" className="w-6 h-6 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-6 h-6 rounded-full bg-zinc-800 shrink-0" />}
+                <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-6 h-6" />
                 <span className="flex-1 text-sm text-white truncate">vs {opponent}</span>
                 <span className="text-xs text-zinc-400 shrink-0">{fmtDate(fx.date)}</span>
                 <span className="text-xs font-bold text-white shrink-0 w-20 text-right">{status}</span>

@@ -1,5 +1,6 @@
 import React from "react";
 import FormDots from "@/components/club/FormDots";
+import ClubShield from "@/components/club/ClubShield";
 
 function positionClass(position, total) {
   if (position <= 4) return "border-l-2 border-emerald-500 bg-emerald-500/[0.04]";
@@ -46,7 +47,7 @@ export default function ClubStandingsTable({ standings, highlightTeam }) {
                 <tr key={`${r.teamName}-${r.position}`} className={`border-t border-zinc-800/60 ${rowCls}`}>
                   <td className="text-center p-2.5 text-zinc-400 font-medium">{r.position}</td>
                   <td className="text-center p-2.5">
-                    {r.teamLogo ? <img src={r.teamLogo} alt="" className="w-6 h-6 object-contain mx-auto" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-6 h-6 rounded-full bg-zinc-800 flex items-center justify-center mx-auto text-[10px] font-bold text-zinc-400">{(r.teamName || "?").charAt(0)}</div>}
+                    <ClubShield teamName={r.teamName} teamLogo={r.teamLogo} providerTeamId={r.providerTeamId} size="w-6 h-6" className="mx-auto" />
                   </td>
                   <td className="p-2.5"><span className={`truncate ${isHL ? "text-emerald-300 font-bold" : "text-white font-medium"}`}>{r.teamName}</span></td>
                   <td className="text-center p-2.5 text-zinc-300">{r.played}</td>

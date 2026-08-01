@@ -12,6 +12,7 @@ import StandingsFilters from "@/components/club/StandingsFilters";
 import FixtureModal from "@/components/club/FixtureModal";
 import ScorersTable from "@/components/club/ScorersTable";
 import { base44 } from "@/api/base44Client";
+import ClubShield from "@/components/club/ClubShield";
 
 const COMPETITION_ID = "6a6d7e6852dc4637a1cf1260";
 const LIGA_PROFESIONAL_ID = "6a6d7dfa52dc4637a1cf121e";
@@ -175,7 +176,7 @@ export default function ClubDashboard() {
                 return (
                   <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60 hover:border-zinc-700 transition-colors">
                     <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0"><span className="text-xs font-bold text-emerald-400">{isHome ? "L" : "V"}</span></div>
-                    {oppLogo ? <img src={oppLogo} alt="" className="w-7 h-7 object-contain shrink-0" onError={(e) => { e.target.style.display = "none"; }} /> : <div className="w-7 h-7 rounded-full bg-zinc-800 shrink-0" />}
+                    <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-7 h-7" />
                     <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">vs {opponent}</p><p className="text-xs text-zinc-500">{fx.round || "—"}</p></div>
                     <span className="text-xs text-zinc-400 shrink-0">{fmtShort(fx.date)}</span>
                   </div>
