@@ -12,6 +12,7 @@ import StandingsFilters from "@/components/club/StandingsFilters";
 import FixtureModal from "@/components/club/FixtureModal";
 import ScorersTable from "@/components/club/ScorersTable";
 import YouthFixturesSection from "@/components/club/YouthFixturesSection";
+import NextYouthMatchCard from "@/components/club/NextYouthMatchCard";
 import { base44 } from "@/api/base44Client";
 import ClubShield from "@/components/club/ClubShield";
 
@@ -194,6 +195,9 @@ export default function ClubDashboard() {
 
       {/* Calendar dates */}
       <CalendarDates fixtures={allFixtures.filter((f) => f.competitionId === COMPETITION_ID)} teamName={TEAM_NAME} />
+
+      {/* Próximo partido juveniles */}
+      <NextYouthMatchCard />
 
       {/* Juveniles */}
       <YouthFixturesSection />
