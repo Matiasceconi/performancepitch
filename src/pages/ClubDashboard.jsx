@@ -12,6 +12,8 @@ import StandingsFilters from "@/components/club/StandingsFilters";
 import FixtureModal from "@/components/club/FixtureModal";
 import ScorersTable from "@/components/club/ScorersTable";
 import NextYouthMatch from "@/components/club/NextYouthMatch";
+import YouthCategorySelector from "@/components/club/YouthCategorySelector";
+import YouthStandingsTable from "@/components/club/YouthStandingsTable";
 import { base44 } from "@/api/base44Client";
 import ClubShield from "@/components/club/ClubShield";
 import {
@@ -19,6 +21,7 @@ import {
   extractTournamentsAndZones,
   findDefaultZone,
   findDefaultTournament,
+  squadToYouthCategory,
 } from "@/lib/standingsContextResolver";
 
 function fmtShort(iso) {
@@ -52,6 +55,7 @@ export default function ClubDashboard() {
   const [activeDivision, setActiveDivision] = useState("primera");
   const [activeTournament, setActiveTournament] = useState(null);
   const [activeZone, setActiveZone] = useState(null);
+  const [activeYouthCategory, setActiveYouthCategory] = useState("4ta");
   const [showFixture, setShowFixture] = useState(false);
   const tableRef = useRef(null);
   const [scorersProyeccion, setScorersProyeccion] = useState([]);
@@ -75,6 +79,9 @@ export default function ClubDashboard() {
       apiCompetitions: data?.competitions || [],
     });
     setActiveDivision(ctx.division);
+    if (ctx.division === "juveniles") {
+      setActiveYouthCategory(squadToYouthCategory(activeSquad) || "4ta");
+    }
   }, [activeSquad?.id, internalCompetitions, data?.competitions]);
 
   useEffect(() => {
@@ -222,11 +229,16 @@ export default function ClubDashboard() {
             onZone={setActiveZone}
           />
         </div>
-        {activeDivision === "juveniles" || !activeCompId ? (
+        {activeDivision === "juveniles" ? (
+          <div className="space-y-3">
+            <YouthCategorySelector activeCategory={activeYouthCategory} onCategory={setActiveYouthCategory} />
+            <YouthStandingsTable category={activeYouthCategory} highlightTeam={teamName} />
+          </div>
+        ) : !activeCompId ? (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
             <Trophy size={28} className="text-zinc-600 mx-auto mb-3" />
             <p className="text-zinc-400 text-sm font-medium">Tabla no disponible para esta categoría</p>
-            <p className="text-zinc-600 text-xs mt-1">No hay datos de standings de Juveniles en la fuente externa.</p>
+            <p className="text-zinc-600 text-xs mt-1">No hay datos de standings en la fuente externa.</p>
           </div>
         ) : (
           <ClubStandingsTable standings={filteredStandings} highlightTeam={teamName} />

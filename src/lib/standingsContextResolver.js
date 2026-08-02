@@ -146,6 +146,28 @@ export function resolveCompetitionByDivision(division, internalCompetitions = []
 }
 
 /**
+ * Mapea el nombre del plantel juvenil a la categoría de FootballYouthStanding.
+ * @returns {"4ta"|"5ta"|"6ta"|"7ma"|"8va"|"9na"|null}
+ */
+const YOUTH_CATEGORY_MAP = [
+  { pattern: /cuart/, category: "4ta" },
+  { pattern: /quint/, category: "5ta" },
+  { pattern: /sext/, category: "6ta" },
+  { pattern: /s[eé]pt/, category: "7ma" },
+  { pattern: /octav/, category: "8va" },
+  { pattern: /nov[eé]n/, category: "9na" },
+];
+
+export function squadToYouthCategory(squad) {
+  if (!squad?.name) return null;
+  const name = squad.name.toLowerCase().trim();
+  for (const { pattern, category } of YOUTH_CATEGORY_MAP) {
+    if (pattern.test(name)) return category;
+  }
+  return null;
+}
+
+/**
  * Extrae torneos y zonas disponibles de los standings de una competencia.
  */
 export function extractTournamentsAndZones(standingsRows) {

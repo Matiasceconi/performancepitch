@@ -1,0 +1,97 @@
+{
+  "name": "FootballYouthStanding",
+  "type": "object",
+  "properties": {
+    "category": {
+      "type": "string",
+      "enum": [
+        "4ta",
+        "5ta",
+        "6ta",
+        "7ma",
+        "8va",
+        "9na"
+      ],
+      "description": "Categor\u00eda juvenil"
+    },
+    "competitionName": {
+      "type": "string",
+      "description": "Nombre de la competencia",
+      "default": "Torneo de Juveniles LPF 2026"
+    },
+    "season": {
+      "type": "string",
+      "description": "Temporada (ej: 2026)"
+    },
+    "tournament": {
+      "type": "string",
+      "description": "Torneo (Clausura, Apertura, etc.)"
+    },
+    "position": {
+      "type": "number",
+      "description": "Posici\u00f3n en la tabla (1-36)"
+    },
+    "teamName": {
+      "type": "string",
+      "description": "Nombre del equipo"
+    },
+    "points": {
+      "type": "number",
+      "default": 0,
+      "description": "Puntos totales"
+    },
+    "played": {
+      "type": "number",
+      "default": 0,
+      "description": "Partidos jugados"
+    },
+    "won": {
+      "type": "number",
+      "default": 0,
+      "description": "Partidos ganados"
+    },
+    "drawn": {
+      "type": "number",
+      "default": 0,
+      "description": "Partidos empatados"
+    },
+    "lost": {
+      "type": "number",
+      "default": 0,
+      "description": "Partidos perdidos"
+    },
+    "goalsFor": {
+      "type": "number",
+      "default": 0,
+      "description": "Goles a favor"
+    },
+    "goalsAgainst": {
+      "type": "number",
+      "default": 0,
+      "description": "Goles en contra"
+    },
+    "goalDifference": {
+      "type": "number",
+      "default": 0,
+      "description": "Diferencia de gol"
+    },
+    "source": {
+      "type": "string",
+      "default": "LPF Website (scraping)",
+      "description": "Origen de los datos"
+    },
+    "sourceUrl": {
+      "type": "string",
+      "description": "URL de origen"
+    },
+    "updatedAt": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "category",
+    "teamName",
+    "position"
+  ]
+}
