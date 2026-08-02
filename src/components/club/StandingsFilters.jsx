@@ -1,5 +1,4 @@
 import React from "react";
-import { Trophy } from "lucide-react";
 import { DIVISIONS } from "@/lib/standingsContextResolver";
 
 /**

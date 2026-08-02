@@ -14,11 +14,12 @@ import ScorersTable from "@/components/club/ScorersTable";
 import NextYouthMatch from "@/components/club/NextYouthMatch";
 import { base44 } from "@/api/base44Client";
 import ClubShield from "@/components/club/ClubShield";
-
-const COMPETITION_ID = "6a6d7e6852dc4637a1cf1260";
-const LIGA_PROFESIONAL_ID = "6a6d7dfa52dc4637a1cf121e";
-const TEAM_NAME = "Defensa y Justicia";
-const ZONE = "Zona B";
+import {
+  resolveActiveStandingsContext,
+  extractTournamentsAndZones,
+  findDefaultZone,
+  findDefaultTournament,
+} from "@/lib/standingsContextResolver";
 
 function fmtShort(iso) {
   if (!iso) return "—";
@@ -45,42 +46,98 @@ function SkeletonCard() {
 
 export default function ClubDashboard() {
   const { data, loading, error } = useFootballData();
-  const { clubBrand } = useWorkspace();
-  const [activeTournament, setActiveTournament] = useState("Clausura");
-  const [activeZone, setActiveZone] = useState(ZONE);
+  const { clubBrand, activeSquad } = useWorkspace();
+  const teamName = clubBrand?.name || "Defensa y Justicia";
+  const [internalCompetitions, setInternalCompetitions] = useState([]);
+  const [activeDivision, setActiveDivision] = useState("primera");
+  const [activeTournament, setActiveTournament] = useState(null);
+  const [activeZone, setActiveZone] = useState(null);
   const [showFixture, setShowFixture] = useState(false);
   const tableRef = useRef(null);
   const [scorersProyeccion, setScorersProyeccion] = useState([]);
   const [scorersLiga, setScorersLiga] = useState([]);
 
   useEffect(() => {
+    async function fetchComps() {
+      try {
+        const comps = await base44.entities.Competitions.list("name", 200);
+        setInternalCompetitions(comps || []);
+      } catch (e) { console.error("competitions", e); }
+    }
+    fetchComps();
+  }, []);
+
+  useEffect(() => {
+    if (!activeSquad || !internalCompetitions.length) return;
+    const ctx = resolveActiveStandingsContext({
+      activeSquad,
+      internalCompetitions,
+      apiCompetitions: data?.competitions || [],
+    });
+    setActiveDivision(ctx.division);
+  }, [activeSquad?.id, internalCompetitions, data?.competitions]);
+
+  useEffect(() => {
+    if (!internalCompetitions.length) return;
     async function fetchScorers() {
       try {
-        const proy = await base44.entities.FootballScorer.filter({ competitionId: COMPETITION_ID, tournament: "Clausura" }, "-goals", 50);
-        const liga = await base44.entities.FootballScorer.filter({ competitionId: LIGA_PROFESIONAL_ID }, "-goals", 50);
+        const proyComp = internalCompetitions.find(c => c.division === "reserva" && c.provider_competition_id);
+        const ligaComp = internalCompetitions.find(c => c.division === "primera" && c.provider_competition_id);
+        const [proy, liga] = await Promise.all([
+          proyComp ? base44.entities.FootballScorer.filter({ competitionId: proyComp.provider_competition_id, tournament: "Clausura" }, "-goals", 50) : Promise.resolve([]),
+          ligaComp ? base44.entities.FootballScorer.filter({ competitionId: ligaComp.provider_competition_id }, "-goals", 50) : Promise.resolve([]),
+        ]);
         setScorersProyeccion(proy || []);
         setScorersLiga(liga || []);
       } catch (e) { console.error("scorers", e); }
     }
     fetchScorers();
-  }, []);
+  }, [internalCompetitions]);
 
-  const allStandings = data?.standings?.[COMPETITION_ID] || [];
   const allFixtures = data?.fixtures || [];
 
-  const tournaments = useMemo(() => [...new Set(allStandings.map((s) => s.tournament).filter(Boolean))], [allStandings]);
-  const zones = useMemo(() => [...new Set(allStandings.filter((s) => s.tournament === activeTournament).map((s) => s.group).filter(Boolean))], [allStandings, activeTournament]);
-  const filteredStandings = useMemo(() => allStandings.filter((s) => s.tournament === activeTournament && s.group === activeZone).sort((a, b) => a.position - b.position), [allStandings, activeTournament, activeZone]);
-  const dyhRow = filteredStandings.find((s) => s.teamName === TEAM_NAME);
+  const reservaCompId = useMemo(() => {
+    const c = internalCompetitions.find(c => c.division === "reserva" && c.provider_competition_id);
+    return c?.provider_competition_id || null;
+  }, [internalCompetitions]);
+  const primeraCompId = useMemo(() => {
+    const c = internalCompetitions.find(c => c.division === "primera" && c.provider_competition_id);
+    return c?.provider_competition_id || null;
+  }, [internalCompetitions]);
 
-  const upcomingReserva = useMemo(() => allFixtures.filter((f) => f.competitionId === COMPETITION_ID && f.status === "scheduled" && (f.homeTeam === TEAM_NAME || f.awayTeam === TEAM_NAME)).sort((a, b) => new Date(a.date) - new Date(b.date)), [allFixtures]);
+  const activeCompId = activeDivision === "primera" ? primeraCompId : activeDivision === "reserva" ? reservaCompId : null;
+
+  const divisionStandings = useMemo(() => {
+    if (!activeCompId) return [];
+    return data?.standings?.[activeCompId] || [];
+  }, [data?.standings, activeCompId]);
+
+  const { tournaments, zones } = useMemo(() => extractTournamentsAndZones(divisionStandings), [divisionStandings]);
+
+  useEffect(() => {
+    const defT = findDefaultTournament(tournaments);
+    setActiveTournament(defT);
+    const defZ = findDefaultZone(divisionStandings.filter(s => s.tournament === defT), teamName);
+    setActiveZone(defZ);
+  }, [activeDivision, tournaments, divisionStandings, teamName]);
+
+  const filteredStandings = useMemo(() => {
+    if (!divisionStandings.length || !activeTournament) return [];
+    return divisionStandings
+      .filter(s => s.tournament === activeTournament && s.group === activeZone)
+      .sort((a, b) => a.position - b.position);
+  }, [divisionStandings, activeTournament, activeZone]);
+
+  const dyhRow = filteredStandings.find(s => s.teamName === teamName);
+
+  const upcomingReserva = useMemo(() => allFixtures.filter(f => f.competitionId === reservaCompId && f.status === "scheduled" && (f.homeTeam === teamName || f.awayTeam === teamName)).sort((a, b) => new Date(a.date) - new Date(b.date)), [allFixtures, reservaCompId, teamName]);
   const nextMatchReserva = upcomingReserva[0];
   const next5Reserva = upcomingReserva.slice(0, 5);
 
-  const nextMatchPrimera = useMemo(() => allFixtures.filter((f) => f.competitionId === LIGA_PROFESIONAL_ID && f.status === "scheduled" && (f.homeTeam === TEAM_NAME || f.awayTeam === TEAM_NAME)).sort((a, b) => new Date(a.date) - new Date(b.date))[0], [allFixtures]);
+  const nextMatchPrimera = useMemo(() => allFixtures.filter(f => f.competitionId === primeraCompId && f.status === "scheduled" && (f.homeTeam === teamName || f.awayTeam === teamName)).sort((a, b) => new Date(a.date) - new Date(b.date))[0], [allFixtures, primeraCompId, teamName]);
 
-  const reservaClausuraFixtures = useMemo(() => allFixtures.filter((f) => f.competitionId === COMPETITION_ID && f.tournament === "Clausura"), [allFixtures]);
-  const primeraFixtures = useMemo(() => allFixtures.filter((f) => f.competitionId === LIGA_PROFESIONAL_ID), [allFixtures]);
+  const reservaClausuraFixtures = useMemo(() => allFixtures.filter(f => f.competitionId === reservaCompId && f.tournament === "Clausura"), [allFixtures, reservaCompId]);
+  const primeraFixtures = useMemo(() => allFixtures.filter(f => f.competitionId === primeraCompId), [allFixtures, primeraCompId]);
 
   if (loading) {
     return (
@@ -116,11 +173,11 @@ export default function ClubDashboard() {
               <div className="w-16 h-16 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center shrink-0"><Trophy size={28} className="text-emerald-400" /></div>
             )}
             <div>
-              <h1 className="text-2xl sm:text-3xl font-bold text-white">{clubBrand?.name || TEAM_NAME}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">{clubBrand?.name || teamName}</h1>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold border border-emerald-500/30">Torneo Proyección</span>
+                <span className="px-2.5 py-1 rounded-lg bg-emerald-500/15 text-emerald-300 text-xs font-semibold border border-emerald-500/30">{activeDivision === "primera" ? "Liga Profesional" : activeDivision === "reserva" ? "Torneo Proyección" : "Juveniles"}</span>
                 <span className="px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-700">Clausura 2026</span>
-                <span className="px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-700">{ZONE}</span>
+                {activeZone && <span className="px-2.5 py-1 rounded-lg bg-zinc-800 text-zinc-300 text-xs font-semibold border border-zinc-700">{activeZone}</span>}
               </div>
               <p className="text-xs text-zinc-500 mt-1.5">Panel de control del club</p>
             </div>
@@ -154,21 +211,38 @@ export default function ClubDashboard() {
       <div ref={tableRef}>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
           <h2 className="text-lg font-bold text-white flex items-center gap-2"><Trophy size={18} className="text-emerald-400" /> Tabla de Clasificación</h2>
-          <StandingsFilters tournaments={tournaments} zones={zones} activeTournament={activeTournament} activeZone={activeZone} onTournament={setActiveTournament} onZone={setActiveZone} />
+          <StandingsFilters
+            activeDivision={activeDivision}
+            onDivision={setActiveDivision}
+            tournaments={tournaments}
+            zones={zones}
+            activeTournament={activeTournament}
+            activeZone={activeZone}
+            onTournament={setActiveTournament}
+            onZone={setActiveZone}
+          />
         </div>
-        <ClubStandingsTable standings={filteredStandings} highlightTeam={TEAM_NAME} />
+        {activeDivision === "juveniles" || !activeCompId ? (
+          <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
+            <Trophy size={28} className="text-zinc-600 mx-auto mb-3" />
+            <p className="text-zinc-400 text-sm font-medium">Tabla no disponible para esta categoría</p>
+            <p className="text-zinc-600 text-xs mt-1">No hay datos de standings de Juveniles en la fuente externa.</p>
+          </div>
+        ) : (
+          <ClubStandingsTable standings={filteredStandings} highlightTeam={teamName} />
+        )}
       </div>
 
       {/* Scorers tables */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <ScorersTable scorers={scorersProyeccion} title="Goleadores — Proyección Clausura" accent="green" type="proyeccion" highlightTeam={TEAM_NAME} />
-        <ScorersTable scorers={scorersLiga} title="Goleadores — Liga Profesional" accent="blue" type="liga" highlightTeam={TEAM_NAME} showPhoto />
+        <ScorersTable scorers={scorersProyeccion} title="Goleadores — Proyección Clausura" accent="green" type="proyeccion" highlightTeam={teamName} />
+        <ScorersTable scorers={scorersLiga} title="Goleadores — Liga Profesional" accent="blue" type="liga" highlightTeam={teamName} showPhoto />
       </div>
 
       {/* Last results — Reserva & Primera */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <LastResults fixtures={reservaClausuraFixtures} teamName={TEAM_NAME} title="Últimos Resultados — Reserva" accent="text-emerald-400" />
-        <LastResults fixtures={primeraFixtures} teamName={TEAM_NAME} title="Últimos Resultados — Primera División" accent="text-blue-400" />
+        <LastResults fixtures={reservaClausuraFixtures} teamName={teamName} title="Últimos Resultados — Reserva" accent="text-emerald-400" />
+        <LastResults fixtures={primeraFixtures} teamName={teamName} title="Últimos Resultados — Primera División" accent="text-blue-400" />
       </div>
 
       {/* Next 5 — Reserva */}
@@ -179,7 +253,7 @@ export default function ClubDashboard() {
         {next5Reserva.length ? (
           <div className="space-y-2">
             {next5Reserva.map((fx, i) => {
-              const isHome = fx.homeTeam === TEAM_NAME;
+              const isHome = fx.homeTeam === teamName;
               const opponent = isHome ? fx.awayTeam : fx.homeTeam;
               const oppLogo = isHome ? fx.awayLogo : fx.homeLogo;
               return (
@@ -196,10 +270,10 @@ export default function ClubDashboard() {
       </div>
 
       {/* Calendar dates */}
-      <CalendarDates fixtures={allFixtures.filter((f) => f.competitionId === COMPETITION_ID)} teamName={TEAM_NAME} />
+      <CalendarDates fixtures={allFixtures.filter((f) => f.competitionId === reservaCompId)} teamName={teamName} />
 
       {/* Fixture modal */}
-      {showFixture && <FixtureModal fixtures={allFixtures} teamName={TEAM_NAME} onClose={() => setShowFixture(false)} />}
+      {showFixture && <FixtureModal fixtures={allFixtures} teamName={teamName} onClose={() => setShowFixture(false)} />}
     </div>
   );
 }
