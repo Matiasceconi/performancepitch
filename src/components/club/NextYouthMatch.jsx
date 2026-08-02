@@ -42,6 +42,7 @@ export default function NextYouthMatch() {
     matches[0]?.awayTeam === "Defensa y Justicia"
       ? matches[0]?.homeTeam
       : matches[0]?.awayTeam;
+  const rivalLogo = matches[0]?.teamLogo;
   const fecha = matches[0]?.date || matches[0]?.matchDate;
 
   return (
@@ -51,7 +52,12 @@ export default function NextYouthMatch() {
           <img src={DYJ_LOGO} alt="DYJ" className="w-8 h-8 object-contain" />
           Próximo Partido - Juveniles
         </CardTitle>
-        <p className="text-sm text-zinc-400">vs {rival} — {fecha}</p>
+        <p className="text-sm text-zinc-400 flex items-center gap-2">
+          <span>vs</span>
+          {rivalLogo && <img src={rivalLogo} alt={rival} className="w-5 h-5 object-contain" />}
+          <span className="text-white font-medium">{rival}</span>
+          <span className="text-zinc-500">— {fecha}</span>
+        </p>
       </CardHeader>
       <CardContent>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
