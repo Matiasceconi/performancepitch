@@ -163,14 +163,14 @@ export default function NextYouthMatchCard() {
       {/* Two blocks */}
       <div className="grid md:grid-cols-2 gap-3">
         <Block
-          title="LOCAL"
+          title="LAS GRANDES — LOCAL"
           icon={Home}
           tone="home"
           venue={next.grandes[0]?.venue}
           items={next.grandes.length ? next.grandes : [{ category: "4ta", time: "—" }, { category: "5ta", time: "—" }, { category: "6ta", time: "—" }]}
         />
         <Block
-          title="VISITANTE"
+          title="LAS CHICAS — VISITANTE"
           icon={Plane}
           tone="away"
           venue={next.chicas[0]?.venue}
