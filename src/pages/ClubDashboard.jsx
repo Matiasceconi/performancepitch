@@ -148,6 +148,9 @@ export default function ClubDashboard() {
         <NextMatchCard fixture={nextMatchPrimera} title="Próximo Partido — Primera" badgeText="Liga Profesional" badgeClass="bg-blue-500/15 text-blue-300 border-blue-500/30" iconClass="text-blue-400" />
       </div>
 
+      {/* Próximo partido juveniles */}
+      <NextYouthMatchCard />
+
       {/* Standings with filters */}
       <div ref={tableRef}>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
@@ -195,9 +198,6 @@ export default function ClubDashboard() {
 
       {/* Calendar dates */}
       <CalendarDates fixtures={allFixtures.filter((f) => f.competitionId === COMPETITION_ID)} teamName={TEAM_NAME} />
-
-      {/* Próximo partido juveniles */}
-      <NextYouthMatchCard />
 
       {/* Juveniles */}
       <YouthFixturesSection />
