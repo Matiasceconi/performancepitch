@@ -49,11 +49,20 @@
     },
     "division": {
       "type": "string",
-      "description": "Divisi\u00f3n"
+      "enum": [
+        "primera",
+        "reserva",
+        "juveniles"
+      ],
+      "description": "Divisi\u00f3n: primera, reserva o juveniles"
     },
     "age_category": {
       "type": "string",
-      "description": "Categor\u00eda de edad"
+      "description": "Categor\u00eda de edad (ej: 4ta, 5ta, 6ta para juveniles)"
+    },
+    "provider_competition_id": {
+      "type": "string",
+      "description": "ID de la competencia en el proveedor externo (API de f\u00fatbol). Vincula la competencia interna con los standings y fixtures del proveedor"
     },
     "official": {
       "type": "boolean",
