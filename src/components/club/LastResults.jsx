@@ -14,7 +14,7 @@ const RESULT_CFG = {
   L: { label: "P", cls: "bg-red-500 text-white" },
 };
 
-export default function LastResults({ fixtures, teamName }) {
+export default function LastResults({ fixtures, teamName, title = "Últimos Resultados", accent = "text-emerald-400" }) {
   const results = (fixtures || [])
     .filter((f) => f.status === "finished" && (f.homeTeam === teamName || f.awayTeam === teamName))
     .sort((a, b) => new Date(b.date) - new Date(a.date))
@@ -23,7 +23,7 @@ export default function LastResults({ fixtures, teamName }) {
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
       <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-        <Trophy size={16} className="text-emerald-400" /> Últimos Resultados
+        <Trophy size={16} className={accent} /> {title}
       </h2>
       {!results.length ? (
         <p className="text-zinc-500 text-sm text-center py-6">No hay resultados recientes.</p>

@@ -79,6 +79,7 @@ export default function ClubDashboard() {
   const nextMatchPrimera = useMemo(() => allFixtures.filter((f) => f.competitionId === LIGA_PROFESIONAL_ID && f.status === "scheduled" && (f.homeTeam === TEAM_NAME || f.awayTeam === TEAM_NAME)).sort((a, b) => new Date(a.date) - new Date(b.date))[0], [allFixtures]);
 
   const reservaClausuraFixtures = useMemo(() => allFixtures.filter((f) => f.competitionId === COMPETITION_ID && f.tournament === "Clausura"), [allFixtures]);
+  const primeraFixtures = useMemo(() => allFixtures.filter((f) => f.competitionId === LIGA_PROFESIONAL_ID), [allFixtures]);
 
   if (loading) {
     return (
@@ -160,31 +161,34 @@ export default function ClubDashboard() {
         <ScorersTable scorers={scorersLiga} title="Goleadores — Liga Profesional" accent="blue" type="liga" highlightTeam={TEAM_NAME} showPhoto />
       </div>
 
-      {/* Last results + Next 5 */}
+      {/* Last results — Reserva & Primera */}
       <div className="grid lg:grid-cols-2 gap-4">
-        <LastResults fixtures={reservaClausuraFixtures} teamName={TEAM_NAME} />
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
-          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
-            <Calendar size={16} className="text-emerald-400" /> Próximos Partidos — Reserva
-          </h2>
-          {next5Reserva.length ? (
-            <div className="space-y-2">
-              {next5Reserva.map((fx, i) => {
-                const isHome = fx.homeTeam === TEAM_NAME;
-                const opponent = isHome ? fx.awayTeam : fx.homeTeam;
-                const oppLogo = isHome ? fx.awayLogo : fx.homeLogo;
-                return (
-                  <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60 hover:border-zinc-700 transition-colors">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0"><span className="text-xs font-bold text-emerald-400">{isHome ? "L" : "V"}</span></div>
-                    <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-7 h-7" />
-                    <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">vs {opponent}</p><p className="text-xs text-zinc-500">{fx.round || "—"}</p></div>
-                    <span className="text-xs text-zinc-400 shrink-0">{fmtShort(fx.date)}</span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : <p className="text-zinc-500 text-sm text-center py-8">No hay próximos partidos.</p>}
-        </div>
+        <LastResults fixtures={reservaClausuraFixtures} teamName={TEAM_NAME} title="Últimos Resultados — Reserva" accent="text-emerald-400" />
+        <LastResults fixtures={primeraFixtures} teamName={TEAM_NAME} title="Últimos Resultados — Primera División" accent="text-blue-400" />
+      </div>
+
+      {/* Next 5 — Reserva */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+          <Calendar size={16} className="text-emerald-400" /> Próximos Partidos — Reserva
+        </h2>
+        {next5Reserva.length ? (
+          <div className="space-y-2">
+            {next5Reserva.map((fx, i) => {
+              const isHome = fx.homeTeam === TEAM_NAME;
+              const opponent = isHome ? fx.awayTeam : fx.homeTeam;
+              const oppLogo = isHome ? fx.awayLogo : fx.homeLogo;
+              return (
+                <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60 hover:border-zinc-700 transition-colors">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center shrink-0"><span className="text-xs font-bold text-emerald-400">{isHome ? "L" : "V"}</span></div>
+                  <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-7 h-7" />
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-white truncate">vs {opponent}</p><p className="text-xs text-zinc-500">{fx.round || "—"}</p></div>
+                  <span className="text-xs text-zinc-400 shrink-0">{fmtShort(fx.date)}</span>
+                </div>
+              );
+            })}
+          </div>
+        ) : <p className="text-zinc-500 text-sm text-center py-8">No hay próximos partidos.</p>}
       </div>
 
       {/* Calendar dates */}
