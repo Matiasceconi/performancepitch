@@ -1,0 +1,92 @@
+{
+  "name": "FootballYouthFixture",
+  "type": "object",
+  "properties": {
+    "homeTeam": {
+      "type": "string",
+      "description": "Nombre del equipo local"
+    },
+    "awayTeam": {
+      "type": "string",
+      "description": "Nombre del equipo visitante"
+    },
+    "homeScore": {
+      "type": "number",
+      "description": "Goles del equipo local"
+    },
+    "awayScore": {
+      "type": "number",
+      "description": "Goles del equipo visitante"
+    },
+    "isHome": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si Defensa y Justicia es local"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "4ta",
+        "5ta",
+        "6ta",
+        "7ma",
+        "8va",
+        "9na"
+      ],
+      "description": "Categor\u00eda juvenil"
+    },
+    "time": {
+      "type": "string",
+      "description": "Hora del partido (HH:MM)"
+    },
+    "venue": {
+      "type": "string",
+      "description": "Nombre de la cancha"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del partido (YYYY-MM-DD)"
+    },
+    "matchDate": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del partido (alias de date, compatibilidad)"
+    },
+    "fixtureRound": {
+      "type": "number",
+      "description": "N\u00famero de fecha del fixture"
+    },
+    "competitionName": {
+      "type": "string",
+      "description": "Nombre de la competencia"
+    },
+    "teamLogo": {
+      "type": "string",
+      "description": "URL del escudo del rival"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "played",
+        "scheduled"
+      ],
+      "default": "scheduled",
+      "description": "Estado del partido: jugado o programado"
+    },
+    "source": {
+      "type": "string",
+      "description": "Origen de los datos"
+    },
+    "sourceUrl": {
+      "type": "string",
+      "description": "URL de origen"
+    }
+  },
+  "required": [
+    "homeTeam",
+    "awayTeam",
+    "category",
+    "date"
+  ]
+}
