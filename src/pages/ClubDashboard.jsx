@@ -12,7 +12,7 @@ import StandingsFilters from "@/components/club/StandingsFilters";
 import FixtureModal from "@/components/club/FixtureModal";
 import ScorersTable from "@/components/club/ScorersTable";
 import YouthFixturesSection from "@/components/club/YouthFixturesSection";
-import NextYouthMatchCard from "@/components/club/NextYouthMatchCard";
+import NextYouthMatch from "@/components/club/NextYouthMatch";
 import { base44 } from "@/api/base44Client";
 import ClubShield from "@/components/club/ClubShield";
 
@@ -149,7 +149,7 @@ export default function ClubDashboard() {
       </div>
 
       {/* Próximo partido juveniles */}
-      <NextYouthMatchCard />
+      <NextYouthMatch />
 
       {/* Standings with filters */}
       <div ref={tableRef}>
