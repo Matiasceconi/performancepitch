@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { base44 } from "@/api/base44Client";
+import ClubShield from "@/components/club/ClubShield";
 
 const DYJ_LOGO = "https://media.api-sports.io/football/teams/18684.png";
 
@@ -54,7 +55,7 @@ export default function NextYouthMatch() {
         </CardTitle>
         <p className="text-sm text-zinc-400 flex items-center gap-2">
           <span>vs</span>
-          {rivalLogo && <img src={rivalLogo} alt={rival} className="w-5 h-5 object-contain" />}
+          <ClubShield teamName={rival} teamLogo={rivalLogo} size="w-6 h-6" />
           <span className="text-white font-medium">{rival}</span>
           <span className="text-zinc-500">— {fecha}</span>
         </p>
