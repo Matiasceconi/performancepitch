@@ -49,6 +49,10 @@ import PlayerAccess from '@/pages/PlayerAccess';
 import ComplementaryStrengthPlans from '@/pages/ComplementaryStrengthPlans';
 import ClubDashboard from '@/pages/ClubDashboard';
 import ClubIdentityAdmin from '@/pages/ClubIdentityAdmin';
+import ValdDashboard from '@/pages/ValdDashboard';
+import ValdPlayers from '@/pages/ValdPlayers';
+import ValdPlayerDetail from '@/pages/ValdPlayerDetail';
+import ValdSettings from '@/pages/ValdSettings';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
 class GlobalErrorBoundary extends Component {
@@ -131,6 +135,10 @@ function StaffRoutes() {
             <Route path="/users-access" element={<UsersAccess />} />
             <Route path="/player-access" element={<PlayerAccess />} />
             <Route path="/complementary-strength" element={<ComplementaryStrengthPlans />} />
+            <Route path="/vald" element={<ValdDashboard />} />
+            <Route path="/vald/players" element={<ValdPlayers />} />
+            <Route path="/vald/players/:id" element={<ValdPlayerDetail />} />
+            <Route path="/vald/settings" element={<ValdSettings />} />
           </Route>
           <Route path="*" element={<Navigate to="/club-dashboard" replace />} />
         </Routes>

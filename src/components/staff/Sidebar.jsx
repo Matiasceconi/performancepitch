@@ -4,7 +4,7 @@ import {
   Video, LayoutDashboard, Menu, X, Map, UsersRound, CalendarDays, Trophy,
   ClipboardList, Settings2, ShieldCheck, BookOpen, Dumbbell, LogOut, User,
   Gauge, HeartPulse, Heart, Apple, Clock, Repeat, PanelLeftClose, PanelLeftOpen,
-  Smartphone, UserRound
+  Smartphone, UserRound, Activity
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
@@ -34,6 +34,9 @@ const NAV_ITEMS = [
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
   { label: "Planteles", path: "/squad-manager", icon: UsersRound },
   { label: "Accesos de jugadores", path: "/player-access", icon: UserRound },
+  { label: "VALD Dashboard", path: "/vald", icon: Activity },
+  { label: "VALD Jugadores", path: "/vald/players", icon: UsersRound },
+  { label: "VALD Config", path: "/vald/settings", icon: Settings2 },
   { label: "Configuración", path: "/admin", icon: Settings2 },
 ];
 

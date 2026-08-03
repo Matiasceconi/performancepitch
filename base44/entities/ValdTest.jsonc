@@ -1,0 +1,104 @@
+{
+  "name": "ValdTest",
+  "type": "object",
+  "properties": {
+    "test_id": {
+      "type": "string",
+      "description": "GUID del test en VALD"
+    },
+    "vald_profile_id": {
+      "type": "string",
+      "description": "ID del ValdProfile vinculado"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player vinculado"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "product": {
+      "type": "string",
+      "enum": [
+        "ForceDecks",
+        "NordBord",
+        "ForceFrame",
+        "SmartSpeed",
+        "DynaMo",
+        "HumanTrak"
+      ],
+      "description": "Producto VALD utilizado"
+    },
+    "test_date": {
+      "type": "string",
+      "description": "Fecha/hora del test"
+    },
+    "test_type": {
+      "type": "string",
+      "description": "Tipo de test (ej: Countermovement Jump, Squat Jump, Nordic Hamstring)"
+    },
+    "test_side": {
+      "type": "string",
+      "enum": [
+        "Left",
+        "Right",
+        "Bilateral",
+        "N/A"
+      ],
+      "default": "Bilateral",
+      "description": "Lado del test"
+    },
+    "raw_data": {
+      "type": "object",
+      "description": "Respuesta JSON completa de la API de VALD"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "M\u00e9tricas clave extra\u00eddas (ej: jump_height, peak_force, rsi, asymmetry)"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas del test"
+    },
+    "synced_at": {
+      "type": "string",
+      "description": "Fecha/hora de sincronizaci\u00f3n"
+    }
+  },
+  "required": [
+    "test_id",
+    "product",
+    "test_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

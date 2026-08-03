@@ -1,0 +1,73 @@
+{
+  "name": "ValdSettings",
+  "type": "object",
+  "properties": {
+    "client_id": {
+      "type": "string",
+      "description": "Client ID de VALD API"
+    },
+    "client_secret": {
+      "type": "string",
+      "description": "Client secret de VALD API (sensible)"
+    },
+    "tenant_id": {
+      "type": "string",
+      "description": "Tenant ID de VALD"
+    },
+    "region": {
+      "type": "string",
+      "enum": [
+        "use",
+        "eu",
+        "au",
+        "usw"
+      ],
+      "default": "use",
+      "description": "Regi\u00f3n del endpoint de VALD"
+    },
+    "access_token": {
+      "type": "string",
+      "description": "Token de acceso OAuth 2.0 (sensible)"
+    },
+    "token_expires_at": {
+      "type": "string",
+      "description": "Fecha/hora de expiraci\u00f3n del token"
+    },
+    "last_sync_at": {
+      "type": "string",
+      "description": "Fecha/hora de la \u00faltima sincronizaci\u00f3n"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la configuraci\u00f3n est\u00e1 activa"
+    }
+  },
+  "required": [
+    "client_id",
+    "client_secret",
+    "tenant_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

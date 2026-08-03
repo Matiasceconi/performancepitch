@@ -1,0 +1,81 @@
+{
+  "name": "ValdProfile",
+  "type": "object",
+  "properties": {
+    "vald_profile_id": {
+      "type": "string",
+      "description": "GUID interno del perfil en VALD"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador vinculado (Player)"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "email": {
+      "type": "string",
+      "description": "Email del atleta en VALD"
+    },
+    "date_of_birth": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de nacimiento"
+    },
+    "gender": {
+      "type": "string",
+      "description": "G\u00e9nero"
+    },
+    "height": {
+      "type": "number",
+      "description": "Altura (cm)"
+    },
+    "weight": {
+      "type": "number",
+      "description": "Peso (kg)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el perfil est\u00e1 activo en VALD"
+    },
+    "last_synced_at": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima sincronizaci\u00f3n"
+    }
+  },
+  "required": [
+    "vald_profile_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
