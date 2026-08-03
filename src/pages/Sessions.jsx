@@ -31,12 +31,12 @@ export default function Sessions() {
     setView("list");
     setSelectedSession(null);
     Promise.all([
-      base44.entities.TrainingSession.list("-date", 200),
-      base44.entities.SessionExercise.list("-order", 3000),
-      base44.entities.SessionVideoLink.list("-created_date", 1000),
-      base44.entities.WeeklyPlan.list("-week_start", 100),
+      base44.entities.TrainingSession.list("-date", 200).catch(() => []),
+      base44.entities.SessionExercise.list("-order", 3000).catch(() => []),
+      base44.entities.SessionVideoLink.list("-created_date", 1000).catch(() => []),
+      base44.entities.WeeklyPlan.list("-week_start", 100).catch(() => []),
       base44.entities.WeeklyPlanDay.list("date", 5000).catch(() => []),
-      base44.entities.PhysicalObjective.list("order", 100),
+      base44.entities.PhysicalObjective.list("order", 100).catch(() => []),
     ]).then(([all, allExercises, allVideoLinks, allPlans, allPlanDays, allObjectives]) => {
       const filtered = activeSquadId
         ? all.filter(s => s.squad_id === activeSquadId)
@@ -63,6 +63,9 @@ export default function Sessions() {
         const found = filtered.find(s => s.id === sessionId);
         if (found) { setSelectedSession(found); setView("detail"); }
       }
+    }).catch((err) => {
+      console.error("[Sessions] Error loading data:", err);
+      setLoading(false);
     });
   }, [activeSquadId, activeSeasonId]);
 
