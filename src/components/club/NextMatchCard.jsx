@@ -1,6 +1,7 @@
 import React from "react";
 import { MapPin, Calendar, Trophy } from "lucide-react";
 import ClubShield from "@/components/club/ClubShield";
+import MatchCountdown from "@/components/club/MatchCountdown";
 
 function fmtFull(iso) {
   if (!iso) return "—";
@@ -37,7 +38,10 @@ export default function NextMatchCard({ fixture, title, badgeText, badgeClass, i
             </div>
           </div>
           <div className="border-t border-zinc-800 pt-3 space-y-1.5">
-            <p className="text-sm text-white font-medium capitalize">{fmtFull(fixture.date)}</p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm text-white font-medium capitalize">{fmtFull(fixture.date)}</p>
+              <MatchCountdown date={fixture.date} />
+            </div>
             <div className="flex items-center gap-2 text-xs text-zinc-400"><MapPin size={12} /> {fixture.venue || "Estadio a confirmar"}</div>
             <div className="flex items-center gap-2 text-xs text-zinc-400"><Trophy size={12} /> {fixture.round || "Fecha a confirmar"}</div>
           </div>
