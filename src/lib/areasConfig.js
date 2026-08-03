@@ -22,6 +22,7 @@ export const MODULE_ACTIONS = [
 ];
 
 export const MODULES = [
+  { id: "club_dashboard", label: "Tablero del Club", path: "/club-dashboard" },
   { id: "dashboard", label: "Dashboard", path: "/dashboard" },
   { id: "sesiones", label: "Sesiones", path: "/sessions" },
   { id: "partidos", label: "Partidos", path: "/matches" },
