@@ -15,6 +15,7 @@ import NextYouthMatch from "@/components/club/NextYouthMatch";
 import MatchCountdown from "@/components/club/MatchCountdown";
 import YouthCategorySelector from "@/components/club/YouthCategorySelector";
 import YouthStandingsTable from "@/components/club/YouthStandingsTable";
+import DivisionStandingsSection from "@/components/club/DivisionStandingsSection";
 import { base44 } from "@/api/base44Client";
 import ClubShield from "@/components/club/ClubShield";
 import {
@@ -222,12 +223,6 @@ export default function ClubDashboard() {
           <StandingsFilters
             activeDivision={activeDivision}
             onDivision={setActiveDivision}
-            tournaments={tournaments}
-            zones={zones}
-            activeTournament={activeTournament}
-            activeZone={activeZone}
-            onTournament={setActiveTournament}
-            onZone={setActiveZone}
           />
         </div>
         {activeDivision === "juveniles" ? (
@@ -235,14 +230,25 @@ export default function ClubDashboard() {
             <YouthCategorySelector activeCategory={activeYouthCategory} onCategory={setActiveYouthCategory} />
             <YouthStandingsTable category={activeYouthCategory} highlightTeam={teamName} />
           </div>
-        ) : !activeCompId ? (
+        ) : activeDivision === "primera" ? (
+          <DivisionStandingsSection
+            competitionName="Liga Profesional Argentina"
+            displayTitle="Liga Profesional Argentina 2026"
+            highlightTeam={teamName}
+            accent="blue"
+          />
+        ) : activeDivision === "reserva" ? (
+          <DivisionStandingsSection
+            competitionName="Reserve League"
+            displayTitle="Torneo Proyección 2026"
+            highlightTeam={teamName}
+            accent="emerald"
+          />
+        ) : (
           <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-8 text-center">
             <Trophy size={28} className="text-zinc-600 mx-auto mb-3" />
             <p className="text-zinc-400 text-sm font-medium">Tabla no disponible para esta categoría</p>
-            <p className="text-zinc-600 text-xs mt-1">No hay datos de standings en la fuente externa.</p>
           </div>
-        ) : (
-          <ClubStandingsTable standings={filteredStandings} highlightTeam={teamName} />
         )}
       </div>
 
