@@ -13,6 +13,7 @@ import FixtureModal from "@/components/club/FixtureModal";
 import ScorersTable from "@/components/club/ScorersTable";
 import NextYouthMatch from "@/components/club/NextYouthMatch";
 import MatchCountdown from "@/components/club/MatchCountdown";
+import FixturesSection from "@/components/club/FixturesSection";
 import YouthCategorySelector from "@/components/club/YouthCategorySelector";
 import YouthStandingsTable from "@/components/club/YouthStandingsTable";
 import { base44 } from "@/api/base44Client";
@@ -214,6 +215,9 @@ export default function ClubDashboard() {
 
       {/* Próximo partido juveniles */}
       <NextYouthMatch />
+
+      {/* Fixtures completos por división */}
+      <FixturesSection />
 
       {/* Standings with filters */}
       <div ref={tableRef}>

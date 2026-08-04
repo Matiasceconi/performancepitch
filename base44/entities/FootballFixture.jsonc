@@ -1,0 +1,85 @@
+{
+  "name": "FootballFixture",
+  "type": "object",
+  "properties": {
+    "homeTeam": {
+      "type": "string",
+      "description": "Nombre del equipo local"
+    },
+    "awayTeam": {
+      "type": "string",
+      "description": "Nombre del equipo visitante"
+    },
+    "homeScore": {
+      "type": "number",
+      "description": "Goles del equipo local"
+    },
+    "awayScore": {
+      "type": "number",
+      "description": "Goles del equipo visitante"
+    },
+    "date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del partido (YYYY-MM-DD)"
+    },
+    "time": {
+      "type": "string",
+      "description": "Hora del partido (HH:MM)"
+    },
+    "round": {
+      "type": "string",
+      "description": "Ronda o fecha del fixture (ej: Fecha 3)"
+    },
+    "venue": {
+      "type": "string",
+      "description": "Estadio o sede"
+    },
+    "competitionName": {
+      "type": "string",
+      "description": "Nombre de la competencia (Liga Profesional, Reserve League)"
+    },
+    "tournament": {
+      "type": "string",
+      "description": "Torneo (Clausura 2026, Apertura 2026)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "finished",
+        "scheduled"
+      ],
+      "default": "scheduled",
+      "description": "Estado del partido"
+    },
+    "homeLogo": {
+      "type": "string",
+      "description": "URL del escudo del equipo local"
+    },
+    "awayLogo": {
+      "type": "string",
+      "description": "URL del escudo del equipo visitante"
+    },
+    "providerTeamIdHome": {
+      "type": "string",
+      "description": "ID del equipo local en el proveedor externo"
+    },
+    "providerTeamIdAway": {
+      "type": "string",
+      "description": "ID del equipo visitante en el proveedor externo"
+    },
+    "source": {
+      "type": "string",
+      "description": "Origen de los datos"
+    },
+    "sourceUrl": {
+      "type": "string",
+      "description": "URL de origen"
+    }
+  },
+  "required": [
+    "homeTeam",
+    "awayTeam",
+    "date"
+  ]
+}
