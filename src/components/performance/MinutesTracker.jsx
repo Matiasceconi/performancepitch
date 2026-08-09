@@ -102,6 +102,26 @@ export default function MinutesTracker({ onSelectPlayer }) {
     return map;
   }, [players]);
 
+  // Mapa match_id -> match para resolver competencia de respaldo
+  const matchMap = useMemo(() => Object.fromEntries(matches.map((m) => [m.id, m])), [matches]);
+
+  // Resuelve el bucket efectivo de un registro usando tournament y, si es "Otro",
+  // cae back a la competencia del partido vinculado. Default: "reserva".
+  function resolveBucket(r) {
+    const t = r.tournament;
+    if (t === "Proyección Apertura" || t === "Clausura") return "reserva";
+    if (t === "Juveniles") return "juveniles";
+    if (t === "Amistosos") return "amistosos";
+    // tournament desconocido ("Otro" o vacío): usar competencia del partido
+    const match = r.match_id ? matchMap[r.match_id] : null;
+    const comp = String(match?.competition || "");
+    if (comp.includes("Juvenil")) return "juveniles";
+    if (comp.includes("Amistoso")) return "amistosos";
+    if (comp.includes("Apertura") || comp.includes("Clausura")) return "reserva";
+    // Sin info: asumir reserva (división principal por defecto)
+    return "reserva";
+  }
+
   // Consolidar registros por jugador — deduplicar por (player_id/name + match_date + tournament)
   const playerData = useMemo(() => {
     const map = {};
@@ -128,15 +148,15 @@ export default function MinutesTracker({ onSelectPlayer }) {
           hasAmistosos: false,
         };
       }
-      const t = r.tournament;
       const mins = getRecordMinutes(r);
-      if (t === "Proyección Apertura" || t === "Clausura") { map[playerKey].reserva += mins; map[playerKey].hasReserva = true; }
-      else if (t === "Juveniles") { map[playerKey].juveniles += mins; map[playerKey].hasJuveniles = true; }
-      else if (t === "Amistosos") { map[playerKey].amistosos += mins; map[playerKey].hasAmistosos = true; }
+      const bucket = resolveBucket(r);
+      if (bucket === "reserva") { map[playerKey].reserva += mins; map[playerKey].hasReserva = true; }
+      else if (bucket === "juveniles") { map[playerKey].juveniles += mins; map[playerKey].hasJuveniles = true; }
+      else if (bucket === "amistosos") { map[playerKey].amistosos += mins; map[playerKey].hasAmistosos = true; }
     });
 
     return Object.values(map);
-  }, [validRecords]);
+  }, [validRecords, matchMap]);
 
   const torneo = TORNEOS.find(t => t.id === torneoId) || TORNEOS[0];
   const showRes = torneoId !== "Juveniles" && (viewMode === "reserva" || viewMode === "ambos");
