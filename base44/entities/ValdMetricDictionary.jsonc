@@ -1,0 +1,132 @@
+{
+  "name": "ValdMetricDictionary",
+  "type": "object",
+  "properties": {
+    "metric_key": {
+      "type": "string",
+      "description": "Clave interna de la m\u00e9trica (ej: jump_height, peak_force, rsi, asymmetry_left_right)"
+    },
+    "metric_label": {
+      "type": "string",
+      "description": "Etiqueta legible (ej: Altura de Salto, Pico de Fuerza)"
+    },
+    "metric_label_en": {
+      "type": "string",
+      "description": "Etiqueta en ingl\u00e9s (original VALD)"
+    },
+    "csv_column": {
+      "type": "string",
+      "description": "Nombre exacto de la columna en el CSV de VALD"
+    },
+    "product": {
+      "type": "string",
+      "enum": [
+        "ForceDecks",
+        "NordBord",
+        "ForceFrame",
+        "SmartSpeed",
+        "DynaMo",
+        "HumanTrak"
+      ],
+      "description": "Producto VALD al que pertenece la m\u00e9trica"
+    },
+    "test_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tipos de test donde aparece (CMJ, SJ, CMRJ)"
+    },
+    "unit": {
+      "type": "string",
+      "description": "Unidad de medida (cm, N, W, ms, %, kg, m/s)"
+    },
+    "direction": {
+      "type": "string",
+      "enum": [
+        "higher_is_better",
+        "lower_is_better",
+        "absolute",
+        "asymmetry"
+      ],
+      "default": "higher_is_better",
+      "description": "Direcci\u00f3n de la m\u00e9trica: mayor es mejor, menor es mejor, absoluto, asimetr\u00eda"
+    },
+    "value_type": {
+      "type": "string",
+      "enum": [
+        "number",
+        "integer",
+        "percentage",
+        "duration_ms"
+      ],
+      "default": "number",
+      "description": "Tipo de valor"
+    },
+    "allows_negative": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la m\u00e9trica puede tener valores negativos (ej: asimetr\u00edas con direcci\u00f3n)"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "performance",
+        "force",
+        "power",
+        "velocity",
+        "asymmetry",
+        "reactive",
+        "other"
+      ],
+      "default": "performance",
+      "description": "Categor\u00eda de la m\u00e9trica"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n t\u00e9cnica de la m\u00e9trica"
+    },
+    "normalization_notes": {
+      "type": "string",
+      "description": "Notas sobre normalizaci\u00f3n de la clave (ej: acc_2_3 vs acc_2_3_eff)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la m\u00e9trica est\u00e1 activa para visualizaci\u00f3n"
+    },
+    "display_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n en tablas y gr\u00e1ficos"
+    }
+  },
+  "required": [
+    "metric_key",
+    "metric_label",
+    "csv_column"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

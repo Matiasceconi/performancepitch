@@ -1,0 +1,96 @@
+{
+  "name": "ValdAssessmentSession",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la sesi\u00f3n de evaluaci\u00f3n (UUID)"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "ID del ValdImportBatch que origin\u00f3 esta sesi\u00f3n"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la bater\u00eda (YYYY-MM-DD)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel evaluado"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "test_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tipos de test incluidos en esta sesi\u00f3n (CMJ, SJ, CMRJ)"
+    },
+    "total_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores evaluados en la sesi\u00f3n"
+    },
+    "total_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Resultados totales de la sesi\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas de la sesi\u00f3n"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "archived"
+      ],
+      "default": "active",
+      "description": "Estado de la sesi\u00f3n"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario creador"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "session_id",
+    "assessment_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

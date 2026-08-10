@@ -1,0 +1,220 @@
+{
+  "name": "ValdImportBatch",
+  "type": "object",
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "description": "ID \u00fanico del lote de importaci\u00f3n (UUID generado por el backend)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "dry_run",
+        "confirmed",
+        "importing",
+        "completed",
+        "failed",
+        "partial"
+      ],
+      "default": "dry_run",
+      "description": "Estado del lote: dry_run (vista previa), confirmed (aprobado), importing (en curso), completed, failed, partial"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "csv_upload",
+        "api_sync"
+      ],
+      "default": "csv_upload",
+      "description": "Origen del lote: carga manual de CSV o sincronizaci\u00f3n con API de VALD"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la bater\u00eda de evaluaci\u00f3n (YYYY-MM-DD)"
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "file_name": {
+            "type": "string"
+          },
+          "test_type": {
+            "type": "string",
+            "description": "CMJ, SJ, CMRJ, etc."
+          },
+          "size_bytes": {
+            "type": "number"
+          },
+          "raw_file_sha256": {
+            "type": "string",
+            "description": "Hash SHA-256 del archivo original (64 chars)"
+          },
+          "canonical_content_sha256": {
+            "type": "string",
+            "description": "Hash SHA-256 del contenido normalizado (BOM removido, saltos LF)"
+          },
+          "encoding": {
+            "type": "string"
+          },
+          "has_bom": {
+            "type": "boolean"
+          },
+          "line_ending": {
+            "type": "string",
+            "enum": [
+              "LF",
+              "CRLF"
+            ]
+          },
+          "file_url": {
+            "type": "string",
+            "description": "URL del archivo subido"
+          }
+        }
+      },
+      "default": [],
+      "description": "Metadatos de cada archivo del lote"
+    },
+    "test_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Tipos de test incluidos en el lote (CMJ, SJ, CMRJ)"
+    },
+    "total_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad total de resultados (filas) en el lote"
+    },
+    "total_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de jugadores \u00fanicos en el lote"
+    },
+    "linked_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores vinculados a un Player interno"
+    },
+    "pending_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores pendientes de vinculaci\u00f3n manual"
+    },
+    "collision_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores con colisi\u00f3n entre m\u00faltiples candidatos"
+    },
+    "duplicate_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Resultados duplicados detectados (mismo jugador + test_type + lado + fecha)"
+    },
+    "retest_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Resultados marcados como retest dentro del CSV"
+    },
+    "linking_preview": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "csv_name": {
+            "type": "string"
+          },
+          "normalized_name": {
+            "type": "string"
+          },
+          "proposed_player_id": {
+            "type": "string"
+          },
+          "proposed_player_name": {
+            "type": "string"
+          },
+          "method": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "exact_match",
+              "possible_match",
+              "collision",
+              "no_match"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "candidate_count": {
+            "type": "number"
+          }
+        }
+      },
+      "default": [],
+      "description": "Vista previa de vinculaciones (solo en dry_run)"
+    },
+    "imported_session_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de ValdAssessmentSession creadas al confirmar el lote"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Mensaje de error si el lote fall\u00f3"
+    },
+    "triggered_by": {
+      "type": "string",
+      "description": "Usuario que dispar\u00f3 la importaci\u00f3n"
+    },
+    "dry_run_at": {
+      "type": "string",
+      "description": "Fecha/hora del dry_run"
+    },
+    "confirmed_at": {
+      "type": "string",
+      "description": "Fecha/hora de confirmaci\u00f3n"
+    },
+    "completed_at": {
+      "type": "string",
+      "description": "Fecha/hora de finalizaci\u00f3n"
+    }
+  },
+  "required": [
+    "batch_id",
+    "status",
+    "assessment_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

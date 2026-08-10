@@ -1,0 +1,87 @@
+{
+  "name": "ValdPlayerAlias",
+  "type": "object",
+  "properties": {
+    "alias_name": {
+      "type": "string",
+      "description": "Nombre tal como aparece en el CSV de VALD (original)"
+    },
+    "alias_normalized": {
+      "type": "string",
+      "description": "Nombre normalizado (lowercase, sin acentos, espacios colapsados). Clave de b\u00fasqueda"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player interno vinculado definitivamente"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel del jugador"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "confirmed_by": {
+      "type": "string",
+      "description": "Usuario que confirm\u00f3 el alias"
+    },
+    "confirmed_at": {
+      "type": "string",
+      "description": "Fecha/hora de confirmaci\u00f3n"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "manual_confirmation",
+        "auto_match_confirmed",
+        "collision_resolved"
+      ],
+      "default": "manual_confirmation",
+      "description": "Origen del alias: confirmaci\u00f3n manual, auto-match confirmado, o colisi\u00f3n resuelta"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas sobre la vinculaci\u00f3n"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el alias est\u00e1 activo"
+    }
+  },
+  "required": [
+    "alias_normalized",
+    "player_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

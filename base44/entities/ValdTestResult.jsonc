@@ -1,0 +1,167 @@
+{
+  "name": "ValdTestResult",
+  "type": "object",
+  "properties": {
+    "result_id": {
+      "type": "string",
+      "description": "ID \u00fanico del resultado (UUID)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "ID de la ValdAssessmentSession"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "ID del ValdImportBatch de origen"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la bater\u00eda (desnormalizado)"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player interno vinculado. Null si est\u00e1 pendiente de vinculaci\u00f3n manual"
+    },
+    "player_name_csv": {
+      "type": "string",
+      "description": "Nombre del jugador tal como aparece en el CSV original"
+    },
+    "player_name_normalized": {
+      "type": "string",
+      "description": "Nombre normalizado (lowercase, sin acentos, espacios colapsados)"
+    },
+    "vald_profile_id": {
+      "type": "string",
+      "description": "ID del ValdProfile vinculado (si existe)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel del jugador (desnormalizado)"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "product": {
+      "type": "string",
+      "enum": [
+        "ForceDecks",
+        "NordBord",
+        "ForceFrame",
+        "SmartSpeed",
+        "DynaMo",
+        "HumanTrak"
+      ],
+      "default": "ForceDecks",
+      "description": "Producto VALD"
+    },
+    "test_type": {
+      "type": "string",
+      "description": "Tipo de test: CMJ, SJ, CMRJ, etc."
+    },
+    "test_side": {
+      "type": "string",
+      "enum": [
+        "Left",
+        "Right",
+        "Bilateral",
+        "N/A"
+      ],
+      "default": "Bilateral",
+      "description": "Lado del test"
+    },
+    "retest": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el resultado est\u00e1 marcado como retest en el CSV"
+    },
+    "retest_of": {
+      "type": "string",
+      "description": "ID del resultado original si este es un retest"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "M\u00e9tricas clave-valor extra\u00eddas del CSV. Cada clave coincide con ValdMetricDictionary.metric_key. Los valores conservan signo negativo cuando aplica. Asimetr\u00edas se separan en magnitud y direcci\u00f3n."
+    },
+    "raw_row": {
+      "type": "object",
+      "description": "Fila completa del CSV original (para auditor\u00eda)"
+    },
+    "row_sha256": {
+      "type": "string",
+      "description": "Hash SHA-256 de la fila completa (para deduplicaci\u00f3n exacta)"
+    },
+    "linking_status": {
+      "type": "string",
+      "enum": [
+        "linked",
+        "pending",
+        "collision",
+        "unlinked"
+      ],
+      "default": "pending",
+      "description": "Estado de vinculaci\u00f3n del jugador"
+    },
+    "linking_method": {
+      "type": "string",
+      "description": "M\u00e9todo usado: exact_match, alias, manual, etc."
+    },
+    "linked_at": {
+      "type": "string",
+      "description": "Fecha/hora de vinculaci\u00f3n"
+    },
+    "linked_by": {
+      "type": "string",
+      "description": "Usuario que vincul\u00f3 manualmente"
+    },
+    "z_scores": {
+      "type": "object",
+      "description": "Z-scores calculados por m\u00e9trica respecto a la l\u00ednea de base del jugador"
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Alertas calculadas: rojo, naranja, amarillo (sem\u00e1foro)"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "result_id",
+    "session_id",
+    "assessment_date",
+    "test_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
