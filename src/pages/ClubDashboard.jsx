@@ -217,7 +217,7 @@ export default function ClubDashboard() {
       <NextYouthMatch />
 
       {/* Fixtures completos por división */}
-      <FixturesSection fixtures={allFixtures} loading={loading} primeraCompId={primeraCompId} reservaCompId={reservaCompId} />
+      <FixturesSection />
 
       {/* Standings with filters */}
       <div ref={tableRef}>
