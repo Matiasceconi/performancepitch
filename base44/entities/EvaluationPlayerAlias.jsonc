@@ -1,0 +1,96 @@
+{
+  "name": "EvaluationPlayerAlias",
+  "type": "object",
+  "properties": {
+    "alias_name": {
+      "type": "string",
+      "description": "Nombre tal como aparece en la fuente externa (original)"
+    },
+    "alias_normalized": {
+      "type": "string",
+      "description": "Nombre normalizado (lowercase, sin acentos, espacios colapsados)"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player interno vinculado"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Fuente de origen del alias (ej: forcedecks)"
+    },
+    "external_player_id": {
+      "type": "string",
+      "description": "ID del jugador en el proveedor externo (para futura API)"
+    },
+    "confirmed_by": {
+      "type": "string",
+      "description": "Usuario que confirm\u00f3 el alias"
+    },
+    "confirmed_at": {
+      "type": "string",
+      "description": "Fecha/hora de confirmaci\u00f3n"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "manual_confirmation",
+        "auto_match_confirmed",
+        "collision_resolved",
+        "external_id_verified"
+      ],
+      "default": "manual_confirmation",
+      "description": "Origen del alias"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Notas sobre la vinculaci\u00f3n"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el alias est\u00e1 activo"
+    }
+  },
+  "required": [
+    "alias_normalized",
+    "player_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -34,9 +34,7 @@ const NAV_ITEMS = [
   { label: "Cuerpo Técnico", path: "/team", icon: UsersRound },
   { label: "Planteles", path: "/squad-manager", icon: UsersRound },
   { label: "Accesos de jugadores", path: "/player-access", icon: UserRound },
-  { label: "VALD Dashboard", path: "/vald", icon: Activity },
-  { label: "VALD Jugadores", path: "/vald/players", icon: UsersRound },
-  { label: "VALD Config", path: "/vald/settings", icon: Settings2 },
+  { label: "Evaluaciones", path: "/evaluations", icon: Activity },
   { label: "Configuración", path: "/admin", icon: Settings2 },
 ];
 

@@ -1,0 +1,150 @@
+{
+  "name": "EvaluationSession",
+  "type": "object",
+  "properties": {
+    "session_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la sesi\u00f3n (UUID)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel evaluado"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la bater\u00eda (YYYY-MM-DD)"
+    },
+    "context": {
+      "type": "string",
+      "description": "Contexto configurable (Pretemporada, MD+2, MD-4, Control semanal, Retorno al juego, Evaluaci\u00f3n inicial, Cierre de bloque)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre de la sesi\u00f3n"
+    },
+    "source_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Fuentes incluidas (ej: forcedecks)"
+    },
+    "test_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Pruebas realizadas (ej: cmj, sj, cmrj)"
+    },
+    "total_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores evaluados"
+    },
+    "total_batteries": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de bater\u00edas"
+    },
+    "complete_batteries": {
+      "type": "number",
+      "default": 0,
+      "description": "Bater\u00edas completas (todas las pruebas esperadas)"
+    },
+    "incomplete_batteries": {
+      "type": "number",
+      "default": 0,
+      "description": "Bater\u00edas incompletas"
+    },
+    "total_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de resultados"
+    },
+    "pending_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Resultados pendientes de vinculaci\u00f3n"
+    },
+    "retest_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Retests detectados"
+    },
+    "quality_warnings": {
+      "type": "number",
+      "default": 0,
+      "description": "Advertencias de calidad"
+    },
+    "players_without_baseline": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores sin l\u00ednea de base suficiente"
+    },
+    "import_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "importing",
+        "completed",
+        "failed",
+        "partial"
+      ],
+      "default": "completed",
+      "description": "Estado de importaci\u00f3n"
+    },
+    "notes": {
+      "type": "string",
+      "description": "Observaciones generales"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario creador"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "session_id",
+    "assessment_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

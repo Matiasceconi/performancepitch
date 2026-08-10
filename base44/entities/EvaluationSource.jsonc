@@ -1,0 +1,81 @@
+{
+  "name": "EvaluationSource",
+  "type": "object",
+  "properties": {
+    "source_key": {
+      "type": "string",
+      "description": "Clave \u00fanica de la fuente (ej: forcedecks, nordbord, iso_prono, isopush)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre visible de la fuente"
+    },
+    "provider": {
+      "type": "string",
+      "description": "Proveedor (vald, internal, other)"
+    },
+    "product_type": {
+      "type": "string",
+      "enum": [
+        "jump",
+        "strength",
+        "speed",
+        "questionnaire",
+        "anthropometry",
+        "other"
+      ],
+      "default": "jump",
+      "description": "Tipo de producto"
+    },
+    "supports_csv": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si admite importaci\u00f3n CSV"
+    },
+    "supports_api": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si admite sincronizaci\u00f3n API"
+    },
+    "config_schema": {
+      "type": "object",
+      "description": "Esquema de configuraci\u00f3n espec\u00edfico de la fuente"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la fuente est\u00e1 activa"
+    },
+    "display_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "source_key",
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

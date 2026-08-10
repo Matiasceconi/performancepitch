@@ -1,0 +1,93 @@
+{
+  "name": "EvaluationThresholdConfig",
+  "type": "object",
+  "properties": {
+    "threshold_id": {
+      "type": "string",
+      "description": "ID \u00fanico (UUID)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel (null = todos)"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Fuente"
+    },
+    "test_key": {
+      "type": "string",
+      "description": "Prueba"
+    },
+    "metric_key": {
+      "type": "string",
+      "description": "M\u00e9trica"
+    },
+    "moderate_threshold": {
+      "type": "number",
+      "description": "Umbral de desviaci\u00f3n moderada (ej: 1.0 SD o 10%)"
+    },
+    "important_threshold": {
+      "type": "number",
+      "description": "Umbral de desviaci\u00f3n importante (ej: 1.5 SD o 20%)"
+    },
+    "threshold_type": {
+      "type": "string",
+      "enum": [
+        "sd",
+        "percentage",
+        "absolute"
+      ],
+      "default": "sd",
+      "description": "Tipo de umbral: desviaci\u00f3n est\u00e1ndar, porcentaje, absoluto"
+    },
+    "asymmetry_threshold": {
+      "type": "number",
+      "description": "Umbral de asimetr\u00eda fuera de rango (ej: 10%)"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si est\u00e1 activo"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario creador"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "threshold_id",
+    "source_key",
+    "test_key",
+    "metric_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

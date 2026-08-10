@@ -1,0 +1,111 @@
+{
+  "name": "EvaluationBaselineConfig",
+  "type": "object",
+  "properties": {
+    "config_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la configuraci\u00f3n (UUID)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel (null = aplica a todos los planteles)"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "Jugador (null = aplica a todo el plantel)"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Fuente (ej: forcedecks)"
+    },
+    "test_key": {
+      "type": "string",
+      "description": "Prueba (ej: cmj)"
+    },
+    "metric_key": {
+      "type": "string",
+      "description": "M\u00e9trica (ej: jump_height)"
+    },
+    "period_type": {
+      "type": "string",
+      "enum": [
+        "last_n_sessions",
+        "date_range",
+        "season",
+        "rolling_window"
+      ],
+      "default": "last_n_sessions",
+      "description": "Tipo de per\u00edodo"
+    },
+    "period_value": {
+      "type": "number",
+      "description": "Valor del per\u00edodo (n sesiones, ventana m\u00f3vil, etc.)"
+    },
+    "min_sessions": {
+      "type": "number",
+      "default": 3,
+      "description": "Cantidad m\u00ednima de sesiones para calcular l\u00ednea de base"
+    },
+    "calculation_type": {
+      "type": "string",
+      "enum": [
+        "mean",
+        "median",
+        "mean_sd",
+        "rolling_mean"
+      ],
+      "default": "mean",
+      "description": "Tipo de c\u00e1lculo"
+    },
+    "use_primary_only": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si solo usa intentos marcados como is_primary"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si la configuraci\u00f3n est\u00e1 activa"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario creador"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "config_id",
+    "source_key",
+    "test_key",
+    "metric_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

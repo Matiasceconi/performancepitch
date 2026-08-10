@@ -1,0 +1,114 @@
+{
+  "name": "EvaluationBattery",
+  "type": "object",
+  "properties": {
+    "battery_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la bater\u00eda (UUID)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "ID de la EvaluationSession"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player vinculado. Null si est\u00e1 pendiente"
+    },
+    "player_name_csv": {
+      "type": "string",
+      "description": "Nombre del jugador tal como aparece en el CSV"
+    },
+    "player_name_normalized": {
+      "type": "string",
+      "description": "Nombre normalizado"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "test_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Pruebas presentes en la bater\u00eda (ej: cmj, sj, cmrj)"
+    },
+    "expected_test_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Pruebas esperadas para considerar la bater\u00eda completa"
+    },
+    "test_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de pruebas distintas"
+    },
+    "total_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de resultados (incluyendo intentos)"
+    },
+    "complete": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si la bater\u00eda tiene todas las pruebas esperadas"
+    },
+    "linking_status": {
+      "type": "string",
+      "enum": [
+        "linked",
+        "pending",
+        "collision",
+        "unlinked"
+      ],
+      "default": "pending",
+      "description": "Estado de vinculaci\u00f3n del jugador"
+    },
+    "linking_method": {
+      "type": "string",
+      "description": "M\u00e9todo usado para vincular"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "battery_id",
+    "session_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

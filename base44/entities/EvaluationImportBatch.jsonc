@@ -1,0 +1,193 @@
+{
+  "name": "EvaluationImportBatch",
+  "type": "object",
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "description": "ID \u00fanico del lote (UUID)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "dry_run",
+        "confirmed",
+        "importing",
+        "completed",
+        "failed",
+        "partial",
+        "rolled_back"
+      ],
+      "default": "dry_run",
+      "description": "Estado del lote"
+    },
+    "ingestion_method": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "api",
+        "manual"
+      ],
+      "default": "csv",
+      "description": "M\u00e9todo de ingreso"
+    },
+    "provider": {
+      "type": "string",
+      "description": "Proveedor (ej: vald)"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Fuente (ej: forcedecks)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la bater\u00eda"
+    },
+    "context": {
+      "type": "string",
+      "description": "Contexto de la sesi\u00f3n (Pretemporada, MD+2, etc.)"
+    },
+    "session_name": {
+      "type": "string",
+      "description": "Nombre propuesto para la sesi\u00f3n"
+    },
+    "file_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de EvaluationImportFile del lote"
+    },
+    "test_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Pruebas incluidas (ej: cmj, sj, cmrj)"
+    },
+    "total_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Total de resultados"
+    },
+    "total_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores \u00fanicos"
+    },
+    "linked_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Jugadores vinculados"
+    },
+    "pending_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Pendientes de vinculaci\u00f3n"
+    },
+    "collision_players": {
+      "type": "number",
+      "default": 0,
+      "description": "Con colisi\u00f3n"
+    },
+    "duplicate_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Duplicados detectados"
+    },
+    "retest_results": {
+      "type": "number",
+      "default": 0,
+      "description": "Retests"
+    },
+    "linking_preview": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Vista previa de vinculaciones (solo dry_run)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "ID de la EvaluationSession creada al confirmar"
+    },
+    "battery_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de EvaluationBattery creadas"
+    },
+    "error_message": {
+      "type": "string",
+      "description": "Mensaje de error si fall\u00f3"
+    },
+    "triggered_by": {
+      "type": "string",
+      "description": "Usuario que dispar\u00f3 la importaci\u00f3n"
+    },
+    "dry_run_at": {
+      "type": "string",
+      "description": "Fecha/hora del dry_run"
+    },
+    "confirmed_at": {
+      "type": "string",
+      "description": "Fecha/hora de confirmaci\u00f3n"
+    },
+    "completed_at": {
+      "type": "string",
+      "description": "Fecha/hora de finalizaci\u00f3n"
+    },
+    "rolled_back_at": {
+      "type": "string",
+      "description": "Fecha/hora de rollback si aplica"
+    }
+  },
+  "required": [
+    "batch_id",
+    "status",
+    "assessment_date"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

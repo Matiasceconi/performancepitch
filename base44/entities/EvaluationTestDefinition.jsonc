@@ -1,0 +1,90 @@
+{
+  "name": "EvaluationTestDefinition",
+  "type": "object",
+  "properties": {
+    "test_key": {
+      "type": "string",
+      "description": "Clave \u00fanica del test (ej: cmj, sj, cmrj, nordic)"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Clave de la fuente a la que pertenece (ej: forcedecks)"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre visible del test"
+    },
+    "short_name": {
+      "type": "string",
+      "description": "Nombre corto (ej: CMJ)"
+    },
+    "side_mode": {
+      "type": "string",
+      "enum": [
+        "bilateral",
+        "unilateral",
+        "na"
+      ],
+      "default": "bilateral",
+      "description": "Modo de lado del test"
+    },
+    "supports_attempts": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el test admite m\u00faltiples intentos"
+    },
+    "priority_metrics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "M\u00e9tricas prioritarias del test (metric_keys)"
+    },
+    "asymmetry_metrics": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "M\u00e9tricas de asimetr\u00eda del test"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si el test est\u00e1 activo"
+    },
+    "display_order": {
+      "type": "number",
+      "default": 0,
+      "description": "Orden de visualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "test_key",
+    "source_key",
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

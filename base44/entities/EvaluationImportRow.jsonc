@@ -1,0 +1,88 @@
+{
+  "name": "EvaluationImportRow",
+  "type": "object",
+  "properties": {
+    "row_id": {
+      "type": "string",
+      "description": "ID \u00fanico de la fila (UUID)"
+    },
+    "file_id": {
+      "type": "string",
+      "description": "ID del EvaluationImportFile"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "ID del EvaluationImportBatch"
+    },
+    "row_number": {
+      "type": "number",
+      "description": "N\u00famero de fila en el archivo original (1-based, excluye header)"
+    },
+    "row_sha256": {
+      "type": "string",
+      "description": "Hash SHA-256 de la fila completa"
+    },
+    "raw_content": {
+      "type": "object",
+      "description": "Contenido original de la fila (clave-valor)"
+    },
+    "normalized_result_id": {
+      "type": "string",
+      "description": "ID del EvaluationResult creado al confirmar (null si no se confirm\u00f3)"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "imported",
+        "duplicate",
+        "error",
+        "skipped"
+      ],
+      "default": "pending",
+      "description": "Estado de la fila"
+    },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Errores detectados"
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Advertencias detectadas"
+    }
+  },
+  "required": [
+    "row_id",
+    "file_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

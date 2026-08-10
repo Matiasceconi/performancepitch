@@ -1,0 +1,241 @@
+{
+  "name": "EvaluationResult",
+  "type": "object",
+  "properties": {
+    "result_id": {
+      "type": "string",
+      "description": "ID \u00fanico del resultado (UUID)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "ID de la EvaluationSession"
+    },
+    "battery_id": {
+      "type": "string",
+      "description": "ID de la EvaluationBattery"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "ID del EvaluationImportBatch de origen"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player vinculado. Null si pendiente"
+    },
+    "player_name_csv": {
+      "type": "string",
+      "description": "Nombre del jugador en el CSV original"
+    },
+    "player_name_normalized": {
+      "type": "string",
+      "description": "Nombre normalizado"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel (desnormalizado)"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Fuente (ej: forcedecks)"
+    },
+    "test_key": {
+      "type": "string",
+      "description": "Prueba (ej: cmj, sj, cmrj)"
+    },
+    "test_side": {
+      "type": "string",
+      "enum": [
+        "Left",
+        "Right",
+        "Bilateral",
+        "N/A"
+      ],
+      "default": "Bilateral",
+      "description": "Lado del test"
+    },
+    "attempt_number": {
+      "type": "number",
+      "default": 1,
+      "description": "N\u00famero de intento (1, 2, 3...)"
+    },
+    "retest": {
+      "type": "boolean",
+      "default": false,
+      "description": "Si el resultado est\u00e1 marcado como retest"
+    },
+    "retest_group_id": {
+      "type": "string",
+      "description": "ID del grupo de retest si aplica"
+    },
+    "is_primary": {
+      "type": "boolean",
+      "default": true,
+      "description": "Si es el intento principal para c\u00e1lculos y l\u00edneas de base"
+    },
+    "primary_reason": {
+      "type": "string",
+      "description": "Motivo de selecci\u00f3n como principal (mejor valor, primer intento, etc.)"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de la bater\u00eda (desnormalizado)"
+    },
+    "assessment_datetime": {
+      "type": "string",
+      "description": "Fecha y hora del test original (con zona horaria preservada)"
+    },
+    "metrics": {
+      "type": "object",
+      "description": "M\u00e9tricas clave-valor extra\u00eddas del CSV. Valores conservan signo. Asimetr\u00edas separan magnitud y direcci\u00f3n."
+    },
+    "asymmetries": {
+      "type": "object",
+      "description": "Asimetr\u00edas separadas: { metric_key: { magnitude: number, direction: 'L'|'R'|null } }"
+    },
+    "raw_row": {
+      "type": "object",
+      "description": "Fila completa del CSV original (para auditor\u00eda)"
+    },
+    "row_sha256": {
+      "type": "string",
+      "description": "Hash SHA-256 de la fila (deduplicaci\u00f3n exacta)"
+    },
+    "file_id": {
+      "type": "string",
+      "description": "ID del EvaluationImportFile de origen"
+    },
+    "linking_status": {
+      "type": "string",
+      "enum": [
+        "linked",
+        "pending",
+        "collision",
+        "unlinked"
+      ],
+      "default": "pending",
+      "description": "Estado de vinculaci\u00f3n del jugador"
+    },
+    "linking_method": {
+      "type": "string",
+      "description": "M\u00e9todo: external_id, alias, exact_match, manual, etc."
+    },
+    "quality_status": {
+      "type": "string",
+      "enum": [
+        "ok",
+        "warning",
+        "error"
+      ],
+      "default": "ok",
+      "description": "Estado de calidad del dato"
+    },
+    "quality_notes": {
+      "type": "string",
+      "description": "Notas de calidad (valor an\u00f3malo, informaci\u00f3n insuficiente, etc.)"
+    },
+    "z_scores": {
+      "type": "object",
+      "description": "Z-scores por m\u00e9trica: { individual, squad, position }"
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Se\u00f1ales calculadas (cambio_relevante, asimetria_fuerade_rango, valor_anomalo, etc.)"
+    },
+    "ingestion_method": {
+      "type": "string",
+      "enum": [
+        "csv",
+        "api",
+        "manual"
+      ],
+      "default": "csv",
+      "description": "M\u00e9todo de ingreso"
+    },
+    "provider": {
+      "type": "string",
+      "description": "Proveedor externo (ej: vald)"
+    },
+    "external_record_id": {
+      "type": "string",
+      "description": "ID del registro en el proveedor externo (para futura API)"
+    },
+    "external_player_id": {
+      "type": "string",
+      "description": "ID del jugador en el proveedor externo"
+    },
+    "external_session_id": {
+      "type": "string",
+      "description": "ID de la sesi\u00f3n en el proveedor externo"
+    },
+    "provider_updated_at": {
+      "type": "string",
+      "description": "Fecha de actualizaci\u00f3n en el proveedor"
+    },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "pending",
+        "synced",
+        "error",
+        "local_only"
+      ],
+      "default": "local_only",
+      "description": "Estado de sincronizaci\u00f3n con proveedor"
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Clave de idempotencia (organizaci\u00f3n + archivo + fila + m\u00e9tricas)"
+    },
+    "schema_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n del esquema"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    }
+  },
+  "required": [
+    "result_id",
+    "session_id",
+    "assessment_date",
+    "source_key",
+    "test_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

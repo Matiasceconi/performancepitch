@@ -1,0 +1,105 @@
+{
+  "name": "EvaluationImportFile",
+  "type": "object",
+  "properties": {
+    "file_id": {
+      "type": "string",
+      "description": "ID \u00fanico del archivo (UUID)"
+    },
+    "batch_id": {
+      "type": "string",
+      "description": "ID del EvaluationImportBatch"
+    },
+    "file_name": {
+      "type": "string",
+      "description": "Nombre original del archivo"
+    },
+    "source_key": {
+      "type": "string",
+      "description": "Fuente detectada (ej: forcedecks)"
+    },
+    "test_key": {
+      "type": "string",
+      "description": "Prueba detectada (ej: cmj, sj, cmrj)"
+    },
+    "size_bytes": {
+      "type": "number",
+      "description": "Tama\u00f1o en bytes"
+    },
+    "raw_file_sha256": {
+      "type": "string",
+      "description": "Hash SHA-256 del archivo original (64 chars)"
+    },
+    "canonical_content_sha256": {
+      "type": "string",
+      "description": "Hash SHA-256 del contenido normalizado (BOM removido, LF)"
+    },
+    "encoding": {
+      "type": "string",
+      "description": "Codificaci\u00f3n detectada (ej: UTF-8)"
+    },
+    "has_bom": {
+      "type": "boolean",
+      "description": "Si tiene BOM"
+    },
+    "line_ending": {
+      "type": "string",
+      "enum": [
+        "LF",
+        "CRLF"
+      ],
+      "description": "Tipo de salto de l\u00ednea"
+    },
+    "file_url": {
+      "type": "string",
+      "description": "URL del archivo subido"
+    },
+    "row_count": {
+      "type": "number",
+      "default": 0,
+      "description": "Cantidad de filas (excluyendo header)"
+    },
+    "column_headers": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Encabezados detectados"
+    },
+    "imported_by": {
+      "type": "string",
+      "description": "Usuario que import\u00f3"
+    },
+    "imported_at": {
+      "type": "string",
+      "description": "Fecha/hora de importaci\u00f3n"
+    }
+  },
+  "required": [
+    "file_id",
+    "file_name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

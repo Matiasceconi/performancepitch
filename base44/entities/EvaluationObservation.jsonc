@@ -1,0 +1,95 @@
+{
+  "name": "EvaluationObservation",
+  "type": "object",
+  "properties": {
+    "observation_id": {
+      "type": "string",
+      "description": "ID \u00fanico (UUID)"
+    },
+    "session_id": {
+      "type": "string",
+      "description": "ID de la EvaluationSession"
+    },
+    "battery_id": {
+      "type": "string",
+      "description": "ID de la EvaluationBattery (opcional)"
+    },
+    "result_id": {
+      "type": "string",
+      "description": "ID del EvaluationResult (opcional)"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del Player"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
+    },
+    "observation_type": {
+      "type": "string",
+      "enum": [
+        "technical",
+        "clinical",
+        "contextual",
+        "quality"
+      ],
+      "default": "technical",
+      "description": "Tipo de observaci\u00f3n"
+    },
+    "content": {
+      "type": "string",
+      "description": "Contenido de la observaci\u00f3n del cuerpo t\u00e9cnico"
+    },
+    "author_id": {
+      "type": "string",
+      "description": "Usuario autor"
+    },
+    "author_name": {
+      "type": "string",
+      "description": "Nombre del autor (desnormalizado)"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "observation_id",
+    "content"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
