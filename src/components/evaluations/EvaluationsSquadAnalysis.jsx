@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Loader2, Inbox, Search, Table, Grid3x3 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 import ChangeMap from "@/components/evaluations/ChangeMap";
 
 function fmtVal(v, d = 1) {
@@ -9,15 +10,23 @@ function fmtVal(v, d = 1) {
   return Number(v).toFixed(d);
 }
 
-export default function EvaluationsSquadAnalysis() {
+export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
   const { activeSquad } = useWorkspace();
   const [sessions, setSessions] = useState([]);
   const [selectedSession, setSelectedSession] = useState(null);
   const [results, setResults] = useState([]);
+  const [playersMap, setPlayersMap] = useState(new Map());
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState("table"); // table | map
   const [search, setSearch] = useState("");
   const [selectedMetric, setSelectedMetric] = useState(null);
+
+  // Load players in batch (once)
+  useEffect(() => {
+    base44.entities.Player.list("full_name", 1000)
+      .then((data) => setPlayersMap(new Map((data || []).map((p) => [p.id, p]))))
+      .catch(() => setPlayersMap(new Map()));
+  }, []);
 
   useEffect(() => {
     const filter = activeSquad?.id ? { squad_id: activeSquad.id } : {};
@@ -58,7 +67,11 @@ export default function EvaluationsSquadAnalysis() {
 
   const primaryResults = results.filter((r) => r.is_primary);
   const filtered = search
-    ? primaryResults.filter((r) => (r.player_name_csv || "").toLowerCase().includes(search.toLowerCase()))
+    ? primaryResults.filter((r) => {
+        const player = r.player_id ? playersMap.get(r.player_id) : null;
+        const name = player?.full_name || r.player_name_csv || "";
+        return name.toLowerCase().includes(search.toLowerCase());
+      })
     : primaryResults;
 
   // Build change map data from results
@@ -66,10 +79,12 @@ export default function EvaluationsSquadAnalysis() {
   for (const r of filtered) {
     const key = r.player_id || r.player_name_csv;
     if (!changeMapPlayers.has(key)) {
+      const player = r.player_id ? playersMap.get(r.player_id) : null;
       changeMapPlayers.set(key, {
         player_id: r.player_id,
-        player_name: r.player_name_csv,
-        position: "—",
+        player_name: player?.full_name || r.player_name_csv,
+        player_photo_url: player?.photo_url || null,
+        position: player?.position || "—",
         metrics: {},
       });
     }
@@ -112,7 +127,7 @@ export default function EvaluationsSquadAnalysis() {
       </div>
 
       {mode === "map" ? (
-        <ChangeMap players={[...changeMapPlayers.values()]} metricKey={selectedMetric} allMetrics={allMetrics} />
+        <ChangeMap players={[...changeMapPlayers.values()]} metricKey={selectedMetric} allMetrics={allMetrics} onSelectPlayer={onSelectPlayer} />
       ) : (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
@@ -130,9 +145,17 @@ export default function EvaluationsSquadAnalysis() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((r, i) => (
-                  <tr key={i} className="border-b border-zinc-800/40 hover:bg-zinc-800/20">
-                    <td className="p-2.5 text-white font-medium sticky left-0 bg-zinc-900">{r.player_name_csv}</td>
+                {filtered.map((r, i) => {
+                  const player = r.player_id ? playersMap.get(r.player_id) : null;
+                  const displayName = player?.full_name || r.player_name_csv;
+                  return (
+                  <tr key={i} className="border-b border-zinc-800/40 hover:bg-zinc-800/20 cursor-pointer" onClick={() => { if (r.player_id && onSelectPlayer) onSelectPlayer(r.player_id); }}>
+                    <td className="p-2.5 sticky left-0 bg-zinc-900">
+                      <div className="flex items-center gap-2">
+                        <PlayerPhoto player={{ photo_url: player?.photo_url, full_name: displayName }} className="w-6 h-6 rounded-full object-cover border border-zinc-700 shrink-0" />
+                        <span className="text-white font-medium truncate">{displayName}</span>
+                      </div>
+                    </td>
                     <td className="p-2.5"><span className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 font-bold uppercase text-[10px]">{r.test_key}</span></td>
                     <td className="p-2.5 text-zinc-400">{r.test_side}</td>
                     <td className="p-2.5 text-zinc-400">{r.attempt_number}{r.retest ? " (R)" : ""}</td>
@@ -147,7 +170,8 @@ export default function EvaluationsSquadAnalysis() {
                       <td key={mk} className="p-2.5 text-right text-zinc-300 tabular-nums">{r.metrics?.[mk] != null ? fmtVal(r.metrics[mk]) : "—"}</td>
                     ))}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>

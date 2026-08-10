@@ -11,7 +11,7 @@ function fmtDate(iso) {
   catch { return iso; }
 }
 
-export default function EvaluationsSummary() {
+export default function EvaluationsSummary({ onSelectPlayer }) {
   const { activeSquad } = useWorkspace();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -136,11 +136,11 @@ export default function EvaluationsSummary() {
       </div>
 
       {/* Review tray — main priority */}
-      <ReviewTray items={review_tray} />
+      <ReviewTray items={review_tray} onSelectPlayer={onSelectPlayer} />
 
       {/* Change map */}
       {change_map?.players?.length > 0 && (
-        <ChangeMap players={change_map.players} metricKey={selectedMetric} allMetrics={change_map.metrics} />
+        <ChangeMap players={change_map.players} metricKey={selectedMetric} allMetrics={change_map.metrics} onSelectPlayer={onSelectPlayer} />
       )}
 
       {/* Secondary info — compact */}

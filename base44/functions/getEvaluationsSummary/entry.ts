@@ -29,8 +29,9 @@ export default async function (req: Request): Promise<Response> {
       const sessions = await base44.asServiceRole.entities.EvaluationSession.filter({ session_id }, "-assessment_date", 1);
       session = sessions[0] || null;
     } else {
-      const filter = squad_id ? { squad_id } : {};
-      const sessions = await base44.asServiceRole.entities.EvaluationSession.list("-assessment_date", 1, filter);
+      const sessions = squad_id
+        ? await base44.asServiceRole.entities.EvaluationSession.filter({ squad_id }, "-assessment_date", 1)
+        : await base44.asServiceRole.entities.EvaluationSession.list("-assessment_date", 1);
       session = sessions[0] || null;
     }
 
@@ -80,9 +81,17 @@ export default async function (req: Request): Promise<Response> {
     }
 
     // ── 5. Load players for this squad ──────────────────────────────────────
-    const playersRaw = await base44.asServiceRole.entities.Player.list("full_name", 500);
+    const playersRaw = await base44.asServiceRole.entities.Player.list("full_name", 1000);
+    // Build playerMap by id for O(1) lookup (all players, not just squad — some may not have squad_id set)
+    const playerMap = new Map(playersRaw.map((p: any) => [p.id, p]));
+    // Squad players for coverage stats
+    let memberships: any[] = [];
+    try {
+      memberships = await base44.asServiceRole.entities.SquadMembership.list("created_date", 1000);
+    } catch { /* empty */ }
+    const squadPlayerIds = new Set(memberships.filter((m: any) => m.squad_id === session.squad_id).map((m: any) => m.player_id));
     const squadPlayers = session.squad_id
-      ? playersRaw.filter((p: any) => p.squad_id === session.squad_id)
+      ? playersRaw.filter((p: any) => squadPlayerIds.has(p.id) || p.squad_id === session.squad_id)
       : playersRaw;
 
     // ── 6. Load thresholds ──────────────────────────────────────────────────
@@ -115,9 +124,10 @@ export default async function (req: Request): Promise<Response> {
     for (const cr of currentResults) {
       if (!cr.is_primary) continue;
       const playerId = cr.player_id;
-      const player = playerId ? squadPlayers.find((p: any) => p.id === playerId) : null;
+      const player = playerId ? playerMap.get(playerId) : null;
       const playerName = player?.full_name || cr.player_name_csv || "Sin vincular";
       const position = player?.position || "—";
+      const photoUrl = player?.photo_url || null;
 
       for (const [mk, mv] of Object.entries(cr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
@@ -185,6 +195,8 @@ export default async function (req: Request): Promise<Response> {
           reviewItems.push({
             player_id: playerId,
             player_name: playerName,
+            player_photo_url: photoUrl,
+            player_csv_name: cr.player_name_csv,
             position,
             test_key: cr.test_key,
             metric_key: mk,
@@ -200,6 +212,7 @@ export default async function (req: Request): Promise<Response> {
             reason: signal.reason + (anomaly.anomaly ? ` · ${anomaly.reason}` : "") + (asymmetryFlag ? ` · ${asymmetryFlag.reason}` : ""),
             quality_status: cr.quality_status,
             linking_status: cr.linking_status,
+            link_valid: playerId ? playerMap.has(playerId) : false,
             has_asymmetry: !!asymmetryFlag,
             result_id: cr.result_id,
           });
@@ -211,6 +224,8 @@ export default async function (req: Request): Promise<Response> {
             changeMapPlayers.set(playerId, {
               player_id: playerId,
               player_name: playerName,
+              player_photo_url: photoUrl,
+              player_csv_name: cr.player_name_csv,
               position,
               metrics: {},
             });

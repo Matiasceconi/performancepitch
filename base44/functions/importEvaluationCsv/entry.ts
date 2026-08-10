@@ -29,9 +29,11 @@ export default async function (req: Request): Promise<Response> {
     const assessmentDate: string = payload.assessment_date;
     const context: string = payload.context || "";
     const sessionName: string = payload.session_name || "";
+    const squadId: string = payload.squad_id || null;
     const files: Array<{ url: string; test_type: string; file_name: string }> = payload.files || [];
 
     if (!assessmentDate) return Response.json({ error: "assessment_date es requerido" }, { status: 400 });
+    if (!squadId) return Response.json({ error: "squad_id es requerido — seleccioná un plantel antes de importar" }, { status: 400 });
     if (!files.length) return Response.json({ error: "files es requerido (al menos 1)" }, { status: 400 });
 
     // ── 1. Fetch + hash files ──────────────────────────────────────────────
@@ -68,38 +70,51 @@ export default async function (req: Request): Promise<Response> {
       }
     }
 
-    // ── 2. Load DB players + aliases ───────────────────────────────────────
-    const dbPlayersRaw = await base44.asServiceRole.entities.Player.list("full_name", 500);
+    // ── 2. Load DB players restricted to the selected squad ────────────────
     const squadsRaw = await base44.asServiceRole.entities.Squad.list("name", 200);
     const squadMap = new Map(squadsRaw.map((s: any) => [s.id, s]));
+    const activeSquad = squadMap.get(squadId);
+    if (!activeSquad) return Response.json({ error: "Plantel no encontrado" }, { status: 400 });
 
     let memberships: any[] = [];
     try {
-      memberships = await base44.asServiceRole.entities.SquadMembership.list("created_date", 500);
+      memberships = await base44.asServiceRole.entities.SquadMembership.list("created_date", 1000);
     } catch { /* entity may not exist */ }
+    // Only keep memberships for the selected squad
+    const squadPlayerIds = new Set(
+      memberships.filter((m: any) => m.squad_id === squadId).map((m: any) => m.player_id)
+    );
+
+    const dbPlayersRaw = await base44.asServiceRole.entities.Player.list("full_name", 1000);
+    // Restrict to players in the squad (via membership or direct squad_id)
+    const dbPlayersFiltered = dbPlayersRaw.filter((p: any) =>
+      squadPlayerIds.has(p.id) || p.squad_id === squadId
+    );
+
     const membershipByPlayer = new Map<string, any[]>();
     for (const m of memberships) {
       if (!membershipByPlayer.has(m.player_id)) membershipByPlayer.set(m.player_id, []);
       membershipByPlayer.get(m.player_id).push(m);
     }
 
-    const dbPlayers: PlayerInfo[] = dbPlayersRaw.map((p: any) => {
+    const dbPlayers: PlayerInfo[] = dbPlayersFiltered.map((p: any) => {
       const squad = p.squad_id ? squadMap.get(p.squad_id) : null;
       const ms = membershipByPlayer.get(p.id) || [];
       return {
         id: p.id,
         fullName: p.full_name || p.name || "",
         normalized: normalizeName(p.full_name || p.name || ""),
-        squadId: p.squad_id || ms[0]?.squad_id || null,
-        squadName: squad?.name || ms[0]?.squad_name || null,
-        organizationId: p.organization_id || null,
+        squadId: p.squad_id || ms[0]?.squad_id || squadId,
+        squadName: squad?.name || activeSquad.name || null,
+        organizationId: p.organization_id || p.club_id || null,
         position: p.position || null,
       };
     });
 
     let aliasesRaw: any[] = [];
     try {
-      aliasesRaw = await base44.asServiceRole.entities.EvaluationPlayerAlias.filter({ active: true });
+      // Only aliases for this squad + active
+      aliasesRaw = await base44.asServiceRole.entities.EvaluationPlayerAlias.filter({ active: true, squad_id: squadId });
     } catch { /* entity may be empty */ }
     const aliases: AliasInfo[] = aliasesRaw.map((a: any) => ({
       aliasNormalized: a.alias_normalized,
@@ -200,12 +215,9 @@ export default async function (req: Request): Promise<Response> {
       const batchId = crypto.randomUUID();
       const sessionId = crypto.randomUUID();
 
-      // Determine org/squad from first linked player
-      const firstLinked = linkingResults.find((l) => l.status === "exact_match" && l.proposedPlayerId);
-      const firstPlayer = firstLinked ? dbPlayers.find((p) => p.id === firstLinked.proposedPlayerId) : null;
-      const orgId = firstPlayer?.organizationId || null;
-      const squadId = firstPlayer?.squadId || null;
-      const squadName = firstPlayer?.squadName || null;
+      // Use squad from the explicit payload — never derive from the first linked player
+      const orgId = null; // single-club app; organization_id stays NULL (documented)
+      const squadName = activeSquad.name;
 
       // Create ImportBatch
       const batch = await base44.asServiceRole.entities.EvaluationImportBatch.create({

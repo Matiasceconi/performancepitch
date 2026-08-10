@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { AlertCircle, ArrowUp, ArrowDown, Minus, HelpCircle, User } from "lucide-react";
+import { AlertCircle, ArrowUp, ArrowDown, Minus, HelpCircle, User, AlertTriangle } from "lucide-react";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function SignalIcon({ signal }) {
   if (signal === "important") return <ArrowDown size={14} className="text-red-400 shrink-0" />;
@@ -26,7 +27,7 @@ function fmtPct(v) {
   return `${s}${Number(v).toFixed(1)}%`;
 }
 
-export default function ReviewTray({ items }) {
+export default function ReviewTray({ items, onSelectPlayer }) {
   const [expanded, setExpanded] = useState(null);
 
   if (!items?.length) {
@@ -79,14 +80,17 @@ export default function ReviewTray({ items }) {
               <tr
                 key={i}
                 className="border-b border-zinc-800/50 hover:bg-zinc-800/30 cursor-pointer"
-                onClick={() => setExpanded(expanded === i ? null : i)}
+                onClick={() => { if (item.player_id && onSelectPlayer) onSelectPlayer(item.player_id); else setExpanded(expanded === i ? null : i); }}
               >
                 <td className="p-2.5">
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                      <span className="text-[10px] font-bold text-zinc-400">{(item.player_name || "?").charAt(0)}</span>
+                    <PlayerPhoto player={{ photo_url: item.player_photo_url, full_name: item.player_name }} className="w-7 h-7 rounded-full object-cover border border-zinc-700 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-white font-medium truncate max-w-[120px]">{item.player_name}</p>
+                      {item.link_valid === false && item.linking_status === "linked" && (
+                        <p className="text-[10px] text-red-400 flex items-center gap-0.5"><AlertTriangle size={9} /> Vínculo inconsistente</p>
+                      )}
                     </div>
-                    <span className="text-white font-medium truncate max-w-[120px]">{item.player_name}</span>
                   </div>
                 </td>
                 <td className="p-2.5 text-zinc-400">{item.position}</td>
@@ -128,11 +132,9 @@ export default function ReviewTray({ items }) {
       {/* Mobile: cards */}
       <div className="lg:hidden divide-y divide-zinc-800/50">
         {items.map((item, i) => (
-          <div key={i} className="p-3" onClick={() => setExpanded(expanded === i ? null : i)}>
+          <div key={i} className="p-3" onClick={() => { if (item.player_id && onSelectPlayer) onSelectPlayer(item.player_id); else setExpanded(expanded === i ? null : i); }}>
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0">
-                <span className="text-xs font-bold text-zinc-400">{(item.player_name || "?").charAt(0)}</span>
-              </div>
+              <PlayerPhoto player={{ photo_url: item.player_photo_url, full_name: item.player_name }} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white truncate">{item.player_name}</p>
                 <p className="text-xs text-zinc-500">{item.position} · {item.test_key} · {item.metric_key}</p>

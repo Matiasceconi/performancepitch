@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { HelpCircle } from "lucide-react";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function cellStyle(signal) {
   if (signal === "important") return "bg-red-500/20 text-red-300 border-red-500/40";
@@ -13,7 +14,7 @@ function fmtVal(v, digits = 1) {
   return Number(v).toFixed(digits);
 }
 
-export default function ChangeMap({ players, metricKey, allMetrics }) {
+export default function ChangeMap({ players, metricKey, allMetrics, onSelectPlayer }) {
   const [hovered, setHovered] = useState(null);
 
   if (!players?.length || !metricKey) {
@@ -68,10 +69,16 @@ export default function ChangeMap({ players, metricKey, allMetrics }) {
                 <tr
                   key={i}
                   className="border-b border-zinc-800/40 hover:bg-zinc-800/20 cursor-pointer"
+                  onClick={() => { if (r.player_id && onSelectPlayer) onSelectPlayer(r.player_id); }}
                   onMouseEnter={() => setHovered(i)}
                   onMouseLeave={() => setHovered(null)}
                 >
-                  <td className="p-2.5 text-white font-medium sticky left-0 bg-zinc-900">{r.player_name}</td>
+                  <td className="p-2.5 sticky left-0 bg-zinc-900">
+                    <div className="flex items-center gap-2">
+                      <PlayerPhoto player={{ photo_url: r.player_photo_url, full_name: r.player_name }} className="w-6 h-6 rounded-full object-cover border border-zinc-700 shrink-0" />
+                      <span className="text-white font-medium truncate">{r.player_name}</span>
+                    </div>
+                  </td>
                   <td className="p-2.5 text-zinc-400">{r.position}</td>
                   <td className="p-2.5 text-right text-white tabular-nums">{fmtVal(e.current_value)}</td>
                   <td className="p-2.5 text-right text-zinc-400 tabular-nums">{e.baseline_sufficient ? fmtVal(e.baseline_value) : "—"}</td>
@@ -108,11 +115,14 @@ export default function ChangeMap({ players, metricKey, allMetrics }) {
         {rows.map((r, i) => {
           const e = r.entry;
           return (
-            <div key={i} className="p-3">
+            <div key={i} className="p-3 cursor-pointer" onClick={() => { if (r.player_id && onSelectPlayer) onSelectPlayer(r.player_id); }}>
               <div className="flex items-center justify-between mb-2">
-                <div>
-                  <p className="text-sm font-bold text-white">{r.player_name}</p>
-                  <p className="text-xs text-zinc-500">{r.position}</p>
+                <div className="flex items-center gap-2">
+                  <PlayerPhoto player={{ photo_url: r.player_photo_url, full_name: r.player_name }} className="w-8 h-8 rounded-full object-cover border border-zinc-700 shrink-0" />
+                  <div>
+                    <p className="text-sm font-bold text-white">{r.player_name}</p>
+                    <p className="text-xs text-zinc-500">{r.position}</p>
+                  </div>
                 </div>
                 <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${cellStyle(e.signal)}`}>
                   {e.signal === "important" ? "Importante" : e.signal === "moderate" ? "Moderado" : e.signal === "insufficient" ? "Sin base" : "Esperado"}

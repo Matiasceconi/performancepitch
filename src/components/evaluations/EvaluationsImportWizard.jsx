@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { Upload, FileCheck2, AlertCircle, CheckCircle2, Loader2, X, ArrowRight } from "lucide-react";
 import { base44 } from "@/api/base44Client";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 
 const TEST_TYPES = [
   { key: "CMJ", label: "Countermovement Jump" },
@@ -24,6 +25,7 @@ function StatusBadge({ status }) {
 }
 
 export default function EvaluationsImportWizard({ onClose, onImported, embedded }) {
+  const { activeSquad } = useWorkspace();
   const [step, setStep] = useState(1);
   const [assessmentDate, setAssessmentDate] = useState(new Date().toISOString().slice(0, 10));
   const [context, setContext] = useState("");
@@ -58,6 +60,7 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
         assessment_date: assessmentDate,
         context,
         session_name: sessionName,
+        squad_id: activeSquad?.id,
         files: fileEntries,
       });
       setPreview(resp.data);
@@ -80,6 +83,7 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
         assessment_date: assessmentDate,
         context,
         session_name: sessionName,
+        squad_id: activeSquad?.id,
         files: fileEntries,
       });
       setResult(resp.data);

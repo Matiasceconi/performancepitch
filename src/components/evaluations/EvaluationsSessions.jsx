@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Calendar, ChevronDown, ChevronRight, Loader2, Inbox, Users, FlaskConical, AlertCircle } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -9,12 +10,19 @@ function fmtDate(iso) {
   catch { return iso; }
 }
 
-export default function EvaluationsSessions() {
+export default function EvaluationsSessions({ onSelectPlayer }) {
   const { activeSquad } = useWorkspace();
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState(null);
   const [resultsBySession, setResultsBySession] = useState({});
+  const [playersMap, setPlayersMap] = useState(new Map());
+
+  useEffect(() => {
+    base44.entities.Player.list("full_name", 1000)
+      .then((data) => setPlayersMap(new Map((data || []).map((p) => [p.id, p]))))
+      .catch(() => setPlayersMap(new Map()));
+  }, []);
 
   useEffect(() => {
     const filter = activeSquad?.id ? { squad_id: activeSquad.id } : {};
@@ -90,9 +98,17 @@ export default function EvaluationsSessions() {
                         </tr>
                       </thead>
                       <tbody>
-                        {results.map((r, i) => (
-                          <tr key={i} className="border-t border-zinc-800/40 hover:bg-zinc-800/20">
-                            <td className="p-2 text-white font-medium">{r.player_name_csv}</td>
+                        {results.map((r, i) => {
+                          const player = r.player_id ? playersMap.get(r.player_id) : null;
+                          const displayName = player?.full_name || r.player_name_csv;
+                          return (
+                          <tr key={i} className="border-t border-zinc-800/40 hover:bg-zinc-800/20 cursor-pointer" onClick={() => { if (r.player_id && onSelectPlayer) onSelectPlayer(r.player_id); }}>
+                            <td className="p-2">
+                              <div className="flex items-center gap-1.5">
+                                <PlayerPhoto player={{ photo_url: player?.photo_url, full_name: displayName }} className="w-5 h-5 rounded-full object-cover border border-zinc-700 shrink-0" />
+                                <span className="text-white font-medium truncate">{displayName}</span>
+                              </div>
+                            </td>
                             <td className="p-2"><span className="px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-300 font-bold uppercase text-[10px]">{r.test_key}</span></td>
                             <td className="p-2 text-zinc-400">{r.test_side}</td>
                             <td className="p-2 text-zinc-400">{r.attempt_number}{r.retest ? " (retest)" : ""}</td>
@@ -109,7 +125,8 @@ export default function EvaluationsSessions() {
                               }`}>{r.linking_status}</span>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

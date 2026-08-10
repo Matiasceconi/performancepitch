@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2 } from "lucide-react";
 import EvaluationsSummary from "@/components/evaluations/EvaluationsSummary";
 import EvaluationsSessions from "@/components/evaluations/EvaluationsSessions";
@@ -17,9 +18,28 @@ const TABS = [
 ];
 
 export default function Evaluations() {
-  const [activeTab, setActiveTab] = useState("resumen");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "resumen");
+  const [selectedPlayerId, setSelectedPlayerId] = useState(searchParams.get("player_id") || null);
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+
+  // Sync tab to URL
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (activeTab) params.set("tab", activeTab); else params.delete("tab");
+    setSearchParams(params, { replace: true });
+  }, [activeTab]);
+
+  // Select player and switch to jugadores tab
+  const handleSelectPlayer = useCallback((playerId) => {
+    setSelectedPlayerId(playerId);
+    setActiveTab("jugadores");
+    const params = new URLSearchParams(searchParams);
+    params.set("tab", "jugadores");
+    params.set("player_id", playerId);
+    setSearchParams(params, { replace: true });
+  }, [searchParams, setSearchParams]);
 
   return (
     <div className="p-4 sm:p-6 space-y-5 max-w-7xl mx-auto">
@@ -65,10 +85,10 @@ export default function Evaluations() {
 
       {/* Tab content */}
       <div className="min-h-[400px]">
-        {activeTab === "resumen" && <EvaluationsSummary key={refreshKey} />}
-        {activeTab === "sesiones" && <EvaluationsSessions key={refreshKey} />}
-        {activeTab === "plantel" && <EvaluationsSquadAnalysis key={refreshKey} />}
-        {activeTab === "jugadores" && <EvaluationsPlayers key={refreshKey} />}
+        {activeTab === "resumen" && <EvaluationsSummary key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
+        {activeTab === "sesiones" && <EvaluationsSessions key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
+        {activeTab === "plantel" && <EvaluationsSquadAnalysis key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
+        {activeTab === "jugadores" && <EvaluationsPlayers key={refreshKey} selectedPlayerId={selectedPlayerId} onSelectPlayer={handleSelectPlayer} />}
         {activeTab === "importaciones" && <EvaluationsImportWizard embedded onImported={() => setRefreshKey((k) => k + 1)} />}
         {activeTab === "config" && <EvaluationsConfig />}
       </div>
