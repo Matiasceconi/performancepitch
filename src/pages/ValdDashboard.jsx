@@ -1,11 +1,13 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { Activity, Users, FlaskConical, RefreshCw, Calendar, Loader2, Link as LinkIcon } from "lucide-react";
+import { Activity, Users, FlaskConical, RefreshCw, Calendar, Loader2, Link as LinkIcon, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import ValdTestTable from "@/components/vald/ValdTestTable";
 import ValdProductBadge, { PRODUCT_CONFIG, PRODUCTS } from "@/components/vald/ValdProductBadge";
+import ValdImportWizard from "@/components/vald/ValdImportWizard";
+import ValdSessionsList from "@/components/vald/ValdSessionsList";
 
 function fmtSync(iso) {
   if (!iso) return "Nunca";
@@ -20,6 +22,9 @@ export default function ValdDashboard() {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
   const [filterProduct, setFilterProduct] = useState("all");
+  const [showImport, setShowImport] = useState(false);
+  const [showSessions, setShowSessions] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const fetchDashboard = useCallback(async () => {
     setLoading(true);
@@ -89,6 +94,12 @@ export default function ValdDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-3">
+            <button
+              onClick={() => setShowImport(true)}
+              className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors flex items-center gap-2"
+            >
+              <Upload size={16} /> Importar CSV
+            </button>
             <Link to="/vald/settings" className="px-3 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-colors flex items-center gap-2">
               <LinkIcon size={16} /> Configurar
             </Link>
@@ -160,10 +171,24 @@ export default function ValdDashboard() {
         </div>
       </div>
 
+      {/* Imported batteries (CSV) */}
+      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Baterías Importadas (CSV)</h2>
+          <button
+            onClick={() => setShowSessions((v) => !v)}
+            className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-medium hover:bg-zinc-700 transition-colors"
+          >
+            {showSessions ? "Ocultar" : "Ver baterías"}
+          </button>
+        </div>
+        {showSessions && <ValdSessionsList key={refreshKey} />}
+      </div>
+
       {/* Recent tests */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-5">
         <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Tests Recientes</h2>
+          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wider">Tests Recientes (API)</h2>
           <div className="flex items-center gap-2 flex-wrap">
             <button onClick={() => setFilterProduct("all")} className={`px-3 py-1.5 rounded-lg text-sm font-semibold ${filterProduct === "all" ? "bg-blue-500 text-white" : "bg-zinc-800 text-zinc-400 hover:text-white"}`}>Todos</button>
             {PRODUCTS.map(p => (
@@ -173,6 +198,18 @@ export default function ValdDashboard() {
         </div>
         <ValdTestTable tests={recentTests} limit={20} />
       </div>
+
+      {/* Import wizard modal */}
+      {showImport && (
+        <ValdImportWizard
+          onClose={() => setShowImport(false)}
+          onImported={() => {
+            setRefreshKey((k) => k + 1);
+            setShowSessions(true);
+            fetchDashboard();
+          }}
+        />
+      )}
     </div>
   );
 }
