@@ -1,7 +1,7 @@
 import moment from "moment";
-import "moment/locale/es";
+import "moment/locale/es.js";
 import { jsPDF } from "jspdf";
-import { fmt } from "./gpsMicrocycleReportUtils";
+import { fmt } from "./gpsMicrocycleReportUtils.js";
 
 moment.locale("es");
 
