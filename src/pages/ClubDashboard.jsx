@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
-import { Trophy, Loader2, AlertCircle, TrendingUp, Target, Activity, Calendar } from "lucide-react";
+import { Trophy, AlertCircle, TrendingUp, Target, Activity, Calendar } from "lucide-react";
 import { useFootballData } from "@/components/futbol/useFootballData";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import ClubStandingsTable from "@/components/club/ClubStandingsTable";
