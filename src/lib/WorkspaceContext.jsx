@@ -146,6 +146,11 @@ export function WorkspaceProvider({ children }) {
         roles = allRoles.filter(r => roleIds.includes(r.id) && r.active !== false);
       }
       setRoleNames(roles.map(r => r.name));
+      const evaluationRoleText = [access?.role, ...roles.map(r => r.name)].filter(Boolean).join(" ");
+      const evaluationRoleAreas = new Set(roles.flatMap(r => r.areas || []));
+      const isEvaluationProfessional = /(preparador|\bpf\b|rendimiento|kinesi|fisico|físico)/i.test(evaluationRoleText)
+        || evaluationRoleAreas.has("rendimiento_fisico")
+        || evaluationRoleAreas.has("kinesiologia");
 
       // 5. Merge permissions across all assigned roles (OR)
       const mergedPerms = roles.reduce((acc, r) => ({
@@ -180,6 +185,22 @@ export function WorkspaceProvider({ children }) {
           MODULE_ACTIONS.forEach(action => { mergedModulePermissions[moduleId][action.key] = !!mergedModulePermissions[moduleId][action.key] || !!perms?.[action.key]; });
         });
       });
+      // Compatibilidad para PF/Kinesiología mientras los roles existentes adoptan
+      // el módulo granular de Evaluaciones. No concede eliminar ni administrar.
+      if (isEvaluationProfessional) {
+        allowedPageSet.add("/evaluations");
+        mergedModulePermissions.evaluaciones = {
+          ...(mergedModulePermissions.evaluaciones || {}),
+          can_view: true,
+          can_create: true,
+          can_edit: true,
+          can_delete: !!mergedModulePermissions.evaluaciones?.can_delete,
+          can_export: true,
+          can_admin: !!mergedModulePermissions.evaluaciones?.can_admin,
+        };
+        if (/(kinesi)/i.test(evaluationRoleText) && !allowedAreaIds.size) allowedAreaIds.add("kinesiologia");
+        if (!/(kinesi)/i.test(evaluationRoleText) && !allowedAreaIds.size) allowedAreaIds.add("rendimiento_fisico");
+      }
       (access?.allowed_pages || []).forEach(p => allowedPageSet.add(p));
       (access?.allowed_modules || []).forEach(moduleId => (LEGACY_MODULE_PATHS[moduleId] || []).forEach(path => allowedPageSet.add(path)));
       PAGES.forEach(page => { if (mergedModulePermissions[page.module_id]?.can_view) allowedPageSet.add(page.path); });
