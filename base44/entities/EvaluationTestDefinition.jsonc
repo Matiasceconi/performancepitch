@@ -41,6 +41,43 @@
       "default": [],
       "description": "M\u00e9tricas prioritarias del test (metric_keys)"
     },
+    "primary_metric_key": {
+      "type": "string",
+      "description": "M\u00e9trica principal que define el mejor intento"
+    },
+    "primary_direction": {
+      "type": "string",
+      "enum": [
+        "higher",
+        "lower"
+      ],
+      "default": "higher",
+      "description": "Direcci\u00f3n de la m\u00e9trica principal"
+    },
+    "secondary_metric_key": {
+      "type": "string",
+      "description": "Segunda m\u00e9trica para desempatar"
+    },
+    "secondary_direction": {
+      "type": "string",
+      "enum": [
+        "higher",
+        "lower"
+      ],
+      "default": "higher",
+      "description": "Direcci\u00f3n de la m\u00e9trica secundaria"
+    },
+    "config_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n auditable de la regla del mejor intento"
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
     "asymmetry_metrics": {
       "type": "array",
       "items": {
