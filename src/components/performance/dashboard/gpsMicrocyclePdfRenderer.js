@@ -646,5 +646,6 @@ export async function generateMicrocyclePdf({
     footer(doc, page, total, meta);
   }
   doc.save(`informe-microciclo-${firstDay?.date || "gps"}.pdf`);
+  return doc;
 }
 
