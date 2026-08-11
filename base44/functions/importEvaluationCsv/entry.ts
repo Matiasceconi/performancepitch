@@ -418,10 +418,18 @@ export default async function (req: Request): Promise<Response> {
     };
     if (action === "dry_run") return Response.json(summary);
 
-    const sessionGroups = Array.isArray(payload.session_groups) ? payload.session_groups : [];
-    if (!sessionGroups.length) {
-      return Response.json({ error: "Confirmá explícitamente la agrupación de sesiones de la vista previa" }, { status: 400 });
-    }
+    const requestedSessionGroups = Array.isArray(payload.session_groups) ? payload.session_groups : [];
+    const sessionGroups = requestedSessionGroups.length
+      ? requestedSessionGroups
+      : proposals.map((proposal) => ({
+          group_id: proposal.group_id,
+          assessment_date: proposal.assessment_date,
+          assessment_time: proposal.assessment_time || null,
+          name: proposal.name,
+          context: proposal.context || context,
+          block_ids: proposal.block_ids,
+          append_to_session_id: null,
+        }));
     const allNewBlockIds = new Set(blocks.filter((block) => block.new_results > 0).map((block) => block.block_id));
     const assignment = new Map<string, any>();
     for (const group of sessionGroups) {
