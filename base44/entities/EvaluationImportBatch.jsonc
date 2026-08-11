@@ -130,6 +130,22 @@
       "type": "string",
       "description": "ID de la EvaluationSession creada al confirmar"
     },
+    "session_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Sesiones creadas o ampliadas por un lote con varias fechas"
+    },
+    "session_groups": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Agrupaci\u00f3n expl\u00edcita confirmada en la vista previa"
+    },
     "battery_ids": {
       "type": "array",
       "items": {
