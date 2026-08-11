@@ -79,7 +79,7 @@ export default function EvaluationsSummary({ onSelectPlayer }) {
       <div className="flex flex-col items-center justify-center py-16 gap-3 text-center">
         <Calendar size={28} className="text-zinc-600" />
         <div>
-          <p className="text-zinc-400 text-sm font-medium">No hay sesiones de evaluación</p>
+          <p className="text-zinc-400 text-sm font-medium">No hay fechas de evaluación</p>
           <p className="text-zinc-600 text-xs mt-1">Importá un CSV de ForceDecks para crear la primera batería</p>
         </div>
       </div>
@@ -124,7 +124,7 @@ export default function EvaluationsSummary({ onSelectPlayer }) {
           {previous_session && (
             <div className="flex items-center gap-2">
               <Calendar size={14} className="text-zinc-500" />
-              <div><p className="text-sm font-bold text-white truncate">{fmtDate(previous_session.assessment_date)}</p><p className="text-[10px] text-zinc-500">Sesión anterior</p></div>
+              <div><p className="text-sm font-bold text-white truncate">{fmtDate(previous_session.assessment_date)}</p><p className="text-[10px] text-zinc-500">Fecha anterior</p></div>
             </div>
           )}
         </div>
@@ -132,7 +132,7 @@ export default function EvaluationsSummary({ onSelectPlayer }) {
         {/* Session selector */}
         {sessions_list?.length > 1 && (
           <div className="mt-3 flex items-center gap-2 flex-wrap">
-            <span className="text-xs text-zinc-500 font-medium">Sesión:</span>
+            <span className="text-xs text-zinc-500 font-medium">Fecha:</span>
             <select
               value={selectedSession || ""}
               onChange={(e) => { setSelectedSession(e.target.value); setSelectedMetric(null); }}

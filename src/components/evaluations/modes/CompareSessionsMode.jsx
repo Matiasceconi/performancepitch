@@ -51,12 +51,12 @@ export default function CompareSessionsMode({ data }) {
           {allMetrics.map((m) => <option key={m} value={m}>{m}</option>)}
         </select>
         <select value={sessA} onChange={(e) => setSessA(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white">
-          {sessionList.map((s) => <option key={s.session_id} value={s.session_id}>{fmtDate(s.assessment_date)} — {s.name || "Sesión"}</option>)}
+          {sessionList.map((s) => <option key={s.session_id} value={s.session_id}>{fmtDate(s.assessment_date)} — {s.name || "Fecha"}</option>)}
         </select>
         <span className="text-zinc-500 text-xs">vs</span>
         <select value={sessB} onChange={(e) => setSessB(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white">
           <option value="">—</option>
-          {sessionList.map((s) => <option key={s.session_id} value={s.session_id}>{fmtDate(s.assessment_date)} — {s.name || "Sesión"}</option>)}
+          {sessionList.map((s) => <option key={s.session_id} value={s.session_id}>{fmtDate(s.assessment_date)} — {s.name || "Fecha"}</option>)}
         </select>
         {unit && <span className="text-xs text-zinc-500">Unidad: {unit}</span>}
       </div>
@@ -93,7 +93,7 @@ export default function CompareSessionsMode({ data }) {
           )}
         </>
       ) : (
-        <EmptyState message="Seleccioná dos sesiones con datos para esta métrica" />
+        <EmptyState message="Seleccioná dos fechas con datos para esta métrica" />
       )}
     </div>
   );

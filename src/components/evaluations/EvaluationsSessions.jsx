@@ -49,7 +49,7 @@ export default function EvaluationsSessions({ onSelectPlayer }) {
     return (
       <div className="py-12 text-center">
         <Inbox size={28} className="text-zinc-600 mx-auto mb-2" />
-        <p className="text-zinc-500 text-sm">No hay sesiones de evaluación</p>
+        <p className="text-zinc-500 text-sm">No hay fechas de evaluación</p>
         <p className="text-zinc-600 text-xs mt-1">Importá un CSV para crear la primera batería</p>
       </div>
     );

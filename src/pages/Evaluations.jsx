@@ -12,7 +12,7 @@ import EvaluationsConfig from "@/components/evaluations/EvaluationsConfig";
 
 const TABS = [
   { key: "resumen", label: "Resumen", icon: ClipboardCheck },
-  { key: "sesiones", label: "Sesiones", icon: CalendarDays },
+  { key: "sesiones", label: "Fechas", icon: CalendarDays },
   { key: "plantel", label: "Análisis del plantel", icon: BarChart3 },
   { key: "jugadores", label: "Jugadores", icon: Users },
   { key: "importaciones", label: "Importaciones", icon: Upload },

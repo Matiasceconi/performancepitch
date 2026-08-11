@@ -60,7 +60,7 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
     return (
       <div className="py-12 text-center">
         <Inbox size={28} className="text-zinc-600 mx-auto mb-2" />
-        <p className="text-zinc-500 text-sm">No hay sesiones para analizar</p>
+        <p className="text-zinc-500 text-sm">No hay fechas para analizar</p>
       </div>
     );
   }

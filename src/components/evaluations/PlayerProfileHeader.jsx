@@ -49,11 +49,11 @@ export default function PlayerProfileHeader({ player, sessionCount, lastSession,
             </div>
             <div className="flex items-center gap-1.5 text-zinc-400">
               <Activity size={13} className="text-emerald-400" />
-              <span>Sesiones: <span className="text-white font-medium">{sessionCount}</span></span>
+              <span>Fechas: <span className="text-white font-medium">{sessionCount}</span></span>
             </div>
             <div className="flex items-center gap-1.5 text-zinc-400">
               <FlaskConical size={13} className="text-purple-400" />
-              <span>Base: <span className="text-white font-medium">{baselineSessions} sesiones</span></span>
+              <span>Base: <span className="text-white font-medium">{baselineSessions} fechas</span></span>
             </div>
             {activeSignals > 0 && (
               <div className="flex items-center gap-1.5 text-orange-400">

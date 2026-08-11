@@ -156,7 +156,7 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
               </select>
             </div>
             <div>
-              <label className="text-xs text-zinc-500 font-medium block mb-1">Nombre de sesión</label>
+              <label className="text-xs text-zinc-500 font-medium block mb-1">Nombre de la fecha</label>
               <input value={sessionName} onChange={(e) => setSessionName(e.target.value)} placeholder="Auto: DD/MM/AAAA · PRUEBAS" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-white text-sm" />
             </div>
           </div>
@@ -178,11 +178,11 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
             <div className="flex items-start gap-2 p-3 rounded-lg bg-blue-500/10 border border-blue-500/30">
               <Info size={18} className="text-blue-400 shrink-0 mt-0.5" />
               <div className="flex-1">
-                <p className="text-sm text-blue-300 font-medium">Ya existe una sesión para esta fecha</p>
+                <p className="text-sm text-blue-300 font-medium">Ya existe una fecha de evaluación</p>
                 <p className="text-xs text-zinc-400 mt-0.5">"{preview.existing_session.name}" · {preview.existing_session.total_results} resultados · {preview.existing_session.test_keys?.join(", ")}</p>
                 <label className="flex items-center gap-2 mt-2 text-xs text-zinc-300">
                   <input type="checkbox" checked={appendToExisting} onChange={(e) => setAppendToExisting(e.target.checked)} className="accent-blue-500" />
-                  Agregar resultados a la sesión existente
+                  Agregar resultados a la fecha existente
                 </label>
               </div>
             </div>
@@ -273,7 +273,7 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
           <div>
             <h3 className="text-lg font-bold text-white">Importación completada</h3>
             <p className="text-sm text-zinc-400 mt-1">
-              {result.appended_to_existing ? "Resultados agregados a la sesión existente" : `Batería del ${assessmentDate} guardada correctamente`}
+              {result.appended_to_existing ? "Resultados agregados a la fecha existente" : `Batería del ${assessmentDate} guardada correctamente`}
             </p>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-md mx-auto">
