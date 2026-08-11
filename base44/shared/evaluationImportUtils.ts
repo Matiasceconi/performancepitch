@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { Buffer } from "node:buffer";
 
 export function normalizeName(name: string): string {
   return String(name || "")
@@ -202,6 +203,8 @@ export function computeRowHash(
   return createHash("sha256").update(JSON.stringify(canonicalizeRow(row, precisionByHeader)), "utf8").digest("hex");
 }
 
+export const computeCanonicalRowHash = computeRowHash;
+
 export function computeIdempotencyKey(
   organizationId: string | null,
   sourceKey: string,
@@ -215,10 +218,12 @@ export function computeIdempotencyKey(
   }), "utf8").digest("hex");
 }
 
-export function detectSourceKey(headers: string[]): string {
+export function detectSourceKey(headers: string[], fileName = ""): string {
   const normalized = headers.map(normalizeHeader);
-  if (normalized.includes("test type") && normalized.some((h) => h.includes("imp-mom"))) return "forcedecks";
-  if (normalized.some((h) => h.includes("nordbord") || h.includes("nordic force"))) return "nordbord";
+  const joined = [...normalized, normalizeHeader(fileName)].join(" ");
+  if (/nordbord|nordic force|nordic strength/.test(joined)) return "nordbord";
+  if (/isopush|iso push|isometric push/.test(joined)) return "isopush";
+  if (/forcedecks|force decks|imp[- ]?mom|jump height|flight time/.test(joined)) return "forcedecks";
   return "unknown";
 }
 
@@ -228,6 +233,44 @@ export function detectTestKey(_fileName: string, testTypeHint?: string): string 
   if (hint === "cmj" || hint.includes("countermovement jump")) return "cmj";
   if (hint === "sj" || hint.includes("squat jump")) return "sj";
   return hint.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "unknown";
+}
+
+export function detectTestKeyFromContent(
+  headers: string[],
+  metricColumns: string[],
+  fileName = "",
+  testTypeHint = "",
+): string {
+  const explicit = detectTestKey(fileName, testTypeHint);
+  if (explicit !== "unknown") return explicit;
+  const joined = [...headers, ...metricColumns].map(normalizeHeader).join(" ");
+  if (/cmrj|rebound|repeated jump|reactive strength/.test(joined)) return "cmrj";
+  if (/countermovement|cmj|imp[- ]?mom/.test(joined)) return "cmj";
+  if (/squat jump|\bsj\b/.test(joined)) return "sj";
+  if (/nordbord|nordic/.test(joined)) return "nordic";
+  if (/isometric|iso push|isopush/.test(joined)) return "isopush";
+  const fileHint = normalizeHeader(fileName);
+  if (/cmrj|rebound/.test(fileHint)) return "cmrj";
+  if (/cmj|countermovement/.test(fileHint)) return "cmj";
+  if (/(^|[^a-z])sj([^a-z]|$)|squat/.test(fileHint)) return "sj";
+  return "unknown";
+}
+
+export function detectDateFromContent(rows: Record<string, string>[]): string | null {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    const value = assessmentDateFromRow(row);
+    if (value) counts.set(value, (counts.get(value) || 0) + 1);
+  }
+  return [...counts.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+}
+
+export function detectTimeFromContent(rows: Record<string, string>[]): string | null {
+  for (const row of rows) {
+    const value = assessmentTimeFromRow(row);
+    if (value) return value;
+  }
+  return null;
 }
 
 export function testKeyFromRow(row: Record<string, string>): string {
@@ -350,12 +393,98 @@ export function formatSessionName(date: string, testKeys: string[]): string {
   return `${label} · ${[...new Set(testKeys)].map((key) => key.toUpperCase()).sort().join(" + ")}`;
 }
 
+export const autoSessionName = formatSessionName;
+
+export function evaluationBlockId(input: {
+  assessmentDate: string;
+  assessmentTime: string | null;
+  playerName: string;
+  testKey: string;
+}): string {
+  return createHash("sha256").update(JSON.stringify({
+    date: input.assessmentDate,
+    time: input.assessmentTime || "sin_hora",
+    player: normalizeName(input.playerName),
+    test: input.testKey,
+  }), "utf8").digest("hex").slice(0, 24);
+}
+
+export interface PrimaryMetricConfig {
+  primaryMetric: string;
+  primaryDirection: "higher" | "lower";
+  secondaryMetric: string | null;
+  secondaryDirection: "higher" | "lower";
+}
+
+export interface PrimaryAttemptCandidate {
+  result_id: string;
+  attempt_number: number;
+  assessment_datetime?: string | null;
+  metrics: Record<string, number>;
+  retest?: boolean;
+}
+
+export function selectPrimaryAttempt(
+  attempts: PrimaryAttemptCandidate[],
+  config: PrimaryMetricConfig,
+): { primaryId: string; reason: string } | null {
+  if (!attempts.length) return null;
+  const metricValue = (metrics: Record<string, number>, configuredKey: string | null) => {
+    if (!configuredKey) return { key: null, value: NaN };
+    if (Object.prototype.hasOwnProperty.call(metrics, configuredKey)) return { key: configuredKey, value: Number(metrics[configuredKey]) };
+    const target = normalizeHeader(configuredKey);
+    const matchedKey = Object.keys(metrics).find((key) => {
+      const normalized = normalizeHeader(key);
+      return normalized === target || normalized.startsWith(`${target} `) || target.startsWith(`${normalized} `);
+    });
+    return { key: matchedKey || configuredKey, value: Number(matchedKey ? metrics[matchedKey] : NaN) };
+  };
+  const directionFactor = (direction: "higher" | "lower") => direction === "lower" ? -1 : 1;
+  const ordered = [...attempts].sort((a, b) => {
+    const av = metricValue(a.metrics || {}, config.primaryMetric).value;
+    const bv = metricValue(b.metrics || {}, config.primaryMetric).value;
+    const aValid = Number.isFinite(av);
+    const bValid = Number.isFinite(bv);
+    if (aValid !== bValid) return aValid ? -1 : 1;
+    if (aValid && av !== bv) return (bv - av) * directionFactor(config.primaryDirection);
+
+    if (config.secondaryMetric) {
+      const as = metricValue(a.metrics || {}, config.secondaryMetric).value;
+      const bs = metricValue(b.metrics || {}, config.secondaryMetric).value;
+      const asValid = Number.isFinite(as);
+      const bsValid = Number.isFinite(bs);
+      if (asValid !== bsValid) return asValid ? -1 : 1;
+      if (asValid && as !== bs) return (bs - as) * directionFactor(config.secondaryDirection);
+    }
+
+    const at = String(a.assessment_datetime || "");
+    const bt = String(b.assessment_datetime || "");
+    if (at && bt && at !== bt) return at.localeCompare(bt);
+    return (a.attempt_number || 0) - (b.attempt_number || 0);
+  });
+  const selected = ordered[0];
+  const primary = metricValue(selected.metrics || {}, config.primaryMetric);
+  const secondary = metricValue(selected.metrics || {}, config.secondaryMetric);
+  return {
+    primaryId: selected.result_id,
+    reason: `${primary.key || config.primaryMetric}: ${Number.isFinite(primary.value) ? primary.value : "s/d"}${config.secondaryMetric ? ` · desempate ${secondary.key || config.secondaryMetric}: ${Number.isFinite(secondary.value) ? secondary.value : "s/d"}` : ""}`,
+  };
+}
+
 export const METADATA_COLS = new Set([
   "Name", "Athlete", "Athlete Name", "Player", "Player Name", "Nombre", "Jugador",
   "ExternalId", "External ID", "Test Type", "Test", "Assessment", "Date", "Time",
   "Assessment Date", "Assessment Time", "Rep", "Reps", "Repetitions", "Attempt",
   "Attempt Number", "Trial", "Side", "Tags", "Retest", "Is Retest",
+  "External Player ID", "Prueba", "Tipo de prueba", "Fecha", "Fecha de prueba",
+  "Hora", "Hora de prueba", "Lado", "Intento", "Repeticiones",
 ]);
+
+const NORMALIZED_METADATA_COLS = new Set([...METADATA_COLS].map(normalizeHeader));
+
+export function isMetadataColumn(header: string): boolean {
+  return NORMALIZED_METADATA_COLS.has(normalizeHeader(header));
+}
 
 export function calculateStats(values: number[]): { mean: number; median: number; std: number; cv: number; count: number } {
   const finite = values.filter(Number.isFinite);
