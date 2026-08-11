@@ -20,6 +20,17 @@ export default async function (req: Request): Promise<Response> {
       return Response.json({ error: "Forbidden — admin only" }, { status: 403 });
 
     const payload = await req.json();
+    if (payload?.squad_id && Array.isArray(payload?.files)) {
+      try {
+        const forwarded = await base44.functions.invoke("importEvaluationCsv", payload);
+        return Response.json(forwarded?.data ?? forwarded);
+      } catch (forwardError) {
+        const status = Number(forwardError?.response?.status || 500);
+        const body = forwardError?.response?.data || { error: forwardError?.message || "Error al importar evaluaciones" };
+        return Response.json(body, { status });
+      }
+    }
+
     const action: string = payload.action || "dry_run";
     const assessmentDate: string = payload.assessment_date;
     const files: Array<{ url: string; test_type: string; file_name: string }> =
