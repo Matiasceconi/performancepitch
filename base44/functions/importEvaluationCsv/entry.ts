@@ -1,648 +1,912 @@
 import { createClientFromRequest } from "npm:@base44/sdk@0.8.40";
 import {
-  normalizeName,
-  parseCsv,
+  assessmentDateFromRow,
+  assessmentTimeFromRow,
+  athleteNameFromRow,
+  autoSessionName,
   calculateFileHashes,
   computeCanonicalRowHash,
-  computeRowHash,
   computeIdempotencyKey,
-  linkPlayer,
-  extractMetrics,
-  extractAsymmetries,
-  isRetest,
-  getAttemptNumber,
-  detectTestKey,
+  detectSourceKey,
   detectTestKeyFromContent,
-  detectDateFromContent,
-  detectTimeFromContent,
-  autoSessionName,
-  METADATA_COLS,
+  evaluationBlockId,
+  extractAsymmetries,
+  extractMetrics,
+  getAttemptNumber,
+  getField,
+  isRetest,
+  linkPlayer,
+  metricHeaders,
+  normalizeName,
+  normalizeHeader,
+  parseCsv,
   selectPrimaryAttempt,
-  type PlayerInfo,
+  testKeyFromRow,
   type AliasInfo,
+  type PlayerInfo,
   type PrimaryMetricConfig,
 } from "../../shared/evaluationImportUtils.ts";
+import {
+  evaluationErrorResponse,
+  requireEvaluationAccess,
+} from "../../shared/evaluationAccess.ts";
 
-// Default primary metric config per test (can be overridden by EvaluationTestDefinition)
+type FileInput = { url: string; file_name: string; test_type?: string };
+type ParsedRow = {
+  row: Record<string, string>;
+  fileIndex: number;
+  fileName: string;
+  rowNumber: number;
+  sourceKey: string;
+  testKey: string;
+  assessmentDate: string;
+  assessmentTime: string | null;
+  playerName: string;
+  blockId: string;
+  canonicalHash?: string;
+  duplicate?: boolean;
+  duplicateReason?: string;
+  resultId?: string;
+};
+
 const DEFAULT_PRIMARY_CONFIG: Record<string, PrimaryMetricConfig> = {
   cmj: { primaryMetric: "Jump Height", primaryDirection: "higher", secondaryMetric: "RSI", secondaryDirection: "higher" },
   sj: { primaryMetric: "Jump Height", primaryDirection: "higher", secondaryMetric: null, secondaryDirection: "higher" },
   cmrj: { primaryMetric: "RSI", primaryDirection: "higher", secondaryMetric: "Jump Height", secondaryDirection: "higher" },
 };
 
+function primaryConfig(testKey: string, definition: any): PrimaryMetricConfig {
+  return {
+    primaryMetric: definition?.primary_metric_key || definition?.priority_metrics?.[0] || DEFAULT_PRIMARY_CONFIG[testKey]?.primaryMetric || "",
+    primaryDirection: definition?.primary_direction || DEFAULT_PRIMARY_CONFIG[testKey]?.primaryDirection || "higher",
+    secondaryMetric: definition?.secondary_metric_key || definition?.priority_metrics?.[1] || DEFAULT_PRIMARY_CONFIG[testKey]?.secondaryMetric || null,
+    secondaryDirection: definition?.secondary_direction || DEFAULT_PRIMARY_CONFIG[testKey]?.secondaryDirection || "higher",
+  };
+}
+
+function normalizeSide(value: string): "Left" | "Right" | "Bilateral" | "N/A" {
+  const side = String(value || "").trim().toLowerCase();
+  if (["left", "l", "izquierda", "izq"].includes(side)) return "Left";
+  if (["right", "r", "derecha", "der"].includes(side)) return "Right";
+  if (["n/a", "na", "none"].includes(side)) return "N/A";
+  return "Bilateral";
+}
+
+function chunks<T>(items: T[], size = 100): T[][] {
+  const output: T[][] = [];
+  for (let index = 0; index < items.length; index += size) output.push(items.slice(index, index + size));
+  return output;
+}
+
+async function bulkCreate(base44: any, entityName: string, records: any[]) {
+  const created: any[] = [];
+  for (const part of chunks(records)) {
+    const result = await base44.asServiceRole.entities[entityName].bulkCreate(part);
+    created.push(...result);
+  }
+  return created;
+}
+
+async function bulkUpdate(base44: any, entityName: string, records: any[]) {
+  const updated: any[] = [];
+  for (const part of chunks(records)) {
+    const result = await base44.asServiceRole.entities[entityName].bulkUpdate(part);
+    updated.push(...result);
+  }
+  return updated;
+}
+
+function buildPrecisionMap(metricDefinitions: any[], sourceKey: string, testKey: string) {
+  const precision: Record<string, number> = {};
+  let version = 1;
+  for (const definition of metricDefinitions) {
+    const appliesToTest = !definition.test_keys?.length || definition.test_keys.includes(testKey);
+    if (definition.source_key !== sourceKey || !appliesToTest) continue;
+    if (Number.isInteger(definition.precision)) {
+      if (definition.csv_column) precision[definition.csv_column] = definition.precision;
+      if (definition.csv_column) precision[normalizeHeader(definition.csv_column)] = definition.precision;
+      if (definition.metric_key) precision[definition.metric_key] = definition.precision;
+    }
+    version = Math.max(version, Number(definition.catalog_version || 1));
+  }
+  return { precision, version };
+}
+
+function precisionForRow(metricDefinitions: any[], sourceKey: string, testKey: string, row: Record<string, string>) {
+  const built = buildPrecisionMap(metricDefinitions, sourceKey, testKey);
+  for (const header of metricHeaders(row)) {
+    if (!Number.isInteger(built.precision[header]) && !Number.isInteger(built.precision[normalizeHeader(header)])) {
+      built.precision[header] = 3;
+      built.precision[normalizeHeader(header)] = 3;
+    }
+  }
+  return built;
+}
+
+function summarizeBlocks(rows: ParsedRow[]) {
+  const map = new Map<string, any>();
+  for (const item of rows) {
+    if (!map.has(item.blockId)) {
+      map.set(item.blockId, {
+        block_id: item.blockId,
+        assessment_date: item.assessmentDate,
+        assessment_time: item.assessmentTime,
+        player_name: item.playerName,
+        test_key: item.testKey,
+        source_key: item.sourceKey,
+        attempt_count: 0,
+        result_count: 0,
+        new_results: 0,
+        duplicate_results: 0,
+        files: new Set<string>(),
+      });
+    }
+    const block = map.get(item.blockId);
+    block.attempt_count += 1;
+    block.result_count += 1;
+    if (item.duplicate) block.duplicate_results += 1;
+    else block.new_results += 1;
+    block.files.add(item.fileName);
+  }
+  return [...map.values()].map((block) => ({ ...block, files: [...block.files] }));
+}
+
 export default async function (req: Request): Promise<Response> {
+  let base44: any;
+  let createdBatch: any = null;
+  let persistedResultCount = 0;
+  let persistedSessionCount = 0;
   try {
-    const base44 = createClientFromRequest(req);
+    base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (user.role !== "admin")
-      return Response.json({ error: "Forbidden — admin only" }, { status: 403 });
-
-    const payload = await req.json();
-    const action: string = payload.action || "dry_run";
-    const assessmentDate: string = payload.assessment_date;
-    const context: string = payload.context || "";
-    let sessionName: string = payload.session_name || "";
-    const squadId: string = payload.squad_id || null;
-    const files: Array<{ url: string; test_type: string; file_name: string }> = payload.files || [];
-    // Optional: player overrides from preview (csvName → playerId)
+    const payload = await req.json().catch(() => ({}));
+    const action = String(payload.action || "dry_run");
+    const squadId = payload.squad_id || null;
+    const files: FileInput[] = payload.files || [];
+    const fallbackDate = payload.fallback_date || payload.assessment_date || null;
+    const context = String(payload.context || "");
     const playerOverrides: Record<string, string> = payload.player_overrides || {};
-    // Optional: remember aliases
-    const rememberAliases: boolean = payload.remember_aliases !== false;
+    const rememberAliases = payload.remember_aliases !== false;
 
-    if (!assessmentDate) return Response.json({ error: "assessment_date es requerido" }, { status: 400 });
-    if (!squadId) return Response.json({ error: "squad_id es requerido — seleccioná un plantel antes de importar" }, { status: 400 });
-    if (!files.length) return Response.json({ error: "files es requerido (al menos 1)" }, { status: 400 });
+    await requireEvaluationAccess(base44, user, squadId, "create");
+    if (!["dry_run", "confirm"].includes(action)) {
+      return Response.json({ error: "action debe ser dry_run o confirm" }, { status: 400 });
+    }
+    if (!files.length) return Response.json({ error: "Seleccioná al menos un CSV" }, { status: 400 });
+    if (files.length > 20) return Response.json({ error: "El máximo por lote es de 20 archivos" }, { status: 400 });
 
-    // ── 1. Fetch + hash files ──────────────────────────────────────────────
-    const fileMetas: Array<any> = [];
-    const allRows: Array<{ row: Record<string, string>; testKey: string; fileName: string; fileUrl: string }> = [];
+    const [squads, metricDefinitions, testDefinitions, sourceDefinitions] = await Promise.all([
+      base44.asServiceRole.entities.Squad.list("name", 300),
+      base44.asServiceRole.entities.EvaluationMetricDefinition.list("display_order", 1000).catch(() => []),
+      base44.asServiceRole.entities.EvaluationTestDefinition.list("display_order", 200).catch(() => []),
+      base44.asServiceRole.entities.EvaluationSource.list("display_order", 100).catch(() => []),
+    ]);
+    const activeSquad = squads.find((squad: any) => squad.id === squadId);
+    if (!activeSquad) return Response.json({ error: "Plantel no encontrado" }, { status: 404 });
+    const organizationId = activeSquad.organization_id || activeSquad.club_id || null;
 
-    for (const file of files) {
-      const resp = await fetch(file.url);
-      if (!resp.ok) {
-        return Response.json({ error: `No se pudo descargar ${file.file_name}: ${resp.status}` }, { status: 400 });
+    const fileMetas: any[] = [];
+    const parsedRows: ParsedRow[] = [];
+    for (let fileIndex = 0; fileIndex < files.length; fileIndex++) {
+      const file = files[fileIndex];
+      let parsedUrl: URL;
+      try { parsedUrl = new URL(file.url); } catch { return Response.json({ error: `URL inválida para ${file.file_name}` }, { status: 400 }); }
+      const forbiddenHost = /^(localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(1[6-9]|2\d|3[01])\.)/i.test(parsedUrl.hostname);
+      if (parsedUrl.protocol !== "https:" || forbiddenHost) {
+        return Response.json({ error: `Origen de archivo no permitido para ${file.file_name}` }, { status: 400 });
       }
-      const buf = await resp.arrayBuffer();
-      const hashes = calculateFileHashes(buf);
-      const text = Buffer.from(buf).toString("utf8");
+      const response = await fetch(parsedUrl.toString());
+      if (!response.ok) {
+        return Response.json({ error: `No se pudo descargar ${file.file_name}: ${response.status}` }, { status: 400 });
+      }
+      const declaredSize = Number(response.headers.get("content-length") || 0);
+      if (declaredSize > 25 * 1024 * 1024) return Response.json({ error: `${file.file_name} supera el máximo de 25 MB` }, { status: 400 });
+      const buffer = await response.arrayBuffer();
+      if (buffer.byteLength > 25 * 1024 * 1024) return Response.json({ error: `${file.file_name} supera el máximo de 25 MB` }, { status: 400 });
+      const hashes = calculateFileHashes(buffer);
+      const text = new TextDecoder("utf-8").decode(buffer);
       const rows = parseCsv(text);
+      if (rows.length > 50000) return Response.json({ error: `${file.file_name} supera el máximo de 50.000 filas` }, { status: 400 });
+      const headers = rows[0] ? Object.keys(rows[0]) : [];
+      const detectedSource = detectSourceKey(headers, file.file_name);
+      const sourceKey = detectedSource === "unknown" ? "forcedecks" : detectedSource;
+      const fileTestKey = detectTestKeyFromContent(headers, headers, file.file_name, file.test_type || "");
+      const dates = new Set<string>();
+      const tests = new Set<string>();
+      const times = new Set<string>();
 
-      // Detect test key from CONTENT (headers + metric columns), not file name
-      const headers = rows.length ? Object.keys(rows[0]) : [];
-      const metricCols = headers.filter((h) => !METADATA_COLS.has(h));
-      const testKey = detectTestKeyFromContent(headers, metricCols, file.file_name, file.test_type);
-
-      // Detect date from content if available
-      const detectedDate = detectDateFromContent(rows);
-      const detectedTime = detectTimeFromContent(rows);
+      rows.forEach((row, rowIndex) => {
+        const assessmentDate = assessmentDateFromRow(row) || fallbackDate;
+        if (!assessmentDate) {
+          throw new Error(`${file.file_name}, fila ${rowIndex + 2}: no contiene fecha y no se indicó una fecha de respaldo`);
+        }
+        const assessmentTime = assessmentTimeFromRow(row);
+        const rowTestKey = testKeyFromRow(row);
+        const testKey = rowTestKey !== "unknown" ? rowTestKey : fileTestKey;
+        const playerName = athleteNameFromRow(row);
+        if (!playerName) {
+          throw new Error(`${file.file_name}, fila ${rowIndex + 2}: no se pudo identificar al jugador`);
+        }
+        const blockId = evaluationBlockId({ assessmentDate, assessmentTime, playerName, testKey });
+        dates.add(assessmentDate);
+        tests.add(testKey);
+        if (assessmentTime) times.add(assessmentTime);
+        parsedRows.push({
+          row,
+          fileIndex,
+          fileName: file.file_name,
+          rowNumber: rowIndex + 1,
+          sourceKey,
+          testKey,
+          assessmentDate,
+          assessmentTime,
+          playerName,
+          blockId,
+        });
+      });
 
       fileMetas.push({
         file_name: file.file_name,
-        test_type: file.test_type,
-        test_key: testKey,
-        detected_date: detectedDate,
-        detected_time: detectedTime,
+        file_url: file.url,
+        source_key: sourceKey,
+        test_key: tests.size === 1 ? [...tests][0] : "multiple",
+        detected_dates: [...dates].sort(),
+        detected_test_keys: [...tests].sort(),
+        detected_times: [...times].sort(),
         size_bytes: hashes.sizeBytes,
         raw_file_sha256: hashes.rawFileSha256,
         canonical_content_sha256: hashes.canonicalContentSha256,
         encoding: hashes.encoding,
         has_bom: hashes.hasBOM,
         line_ending: hashes.lineEnding,
-        file_url: file.url,
         row_count: rows.length,
         column_headers: headers,
       });
-
-      for (const row of rows) {
-        allRows.push({ row, testKey, fileName: file.file_name, fileUrl: file.url });
-      }
     }
 
-    // ── 2. Load DB players — CLUB-WIDE (not squad-limited) ─────────────────
-    const dbPlayersRaw = await base44.asServiceRole.entities.Player.list("full_name", 2000);
-    const squadsRaw = await base44.asServiceRole.entities.Squad.list("name", 200);
-    const squadMap = new Map(squadsRaw.map((s: any) => [s.id, s]));
-    const activeSquad = squadMap.get(squadId);
-    if (!activeSquad) return Response.json({ error: "Plantel no encontrado" }, { status: 400 });
-
-    // Load memberships for squad context
-    let memberships: any[] = [];
-    try {
-      memberships = await base44.asServiceRole.entities.SquadMembership.list("created_date", 2000);
-    } catch { /* entity may not exist */ }
-
-    const membershipByPlayer = new Map<string, any[]>();
-    for (const m of memberships) {
-      if (!membershipByPlayer.has(m.player_id)) membershipByPlayer.set(m.player_id, []);
-      membershipByPlayer.get(m.player_id).push(m);
+    const [playersRaw, memberships, aliasesRaw, existingResults, existingSessions] = await Promise.all([
+      base44.asServiceRole.entities.Player.list("full_name", 3000),
+      base44.asServiceRole.entities.SquadMembership.list("created_date", 5000).catch(() => []),
+      base44.asServiceRole.entities.EvaluationPlayerAlias.filter({ active: true }, "alias_name", 2000).catch(() => []),
+      base44.asServiceRole.entities.EvaluationResult.list("-assessment_date", 5000).catch(() => []),
+      base44.asServiceRole.entities.EvaluationSession.filter({ squad_id: squadId }, "-assessment_date", 500).catch(() => []),
+    ]);
+    const squadMap = new Map(squads.map((squad: any) => [squad.id, squad]));
+    const membershipsByPlayer = new Map<string, any[]>();
+    for (const membership of memberships) {
+      if (!membershipsByPlayer.has(membership.player_id)) membershipsByPlayer.set(membership.player_id, []);
+      membershipsByPlayer.get(membership.player_id)!.push(membership);
     }
-
-    // ALL players in the club (not just selected squad) — identity is club-wide
-    const dbPlayers: PlayerInfo[] = dbPlayersRaw.map((p: any) => {
-      const ms = membershipByPlayer.get(p.id) || [];
-      const playerSquadId = p.squad_id || ms[0]?.squad_id || null;
-      const squad = playerSquadId ? squadMap.get(playerSquadId) : null;
+    const dbPlayers: PlayerInfo[] = playersRaw.map((player: any) => {
+      const playerMemberships = membershipsByPlayer.get(player.id) || [];
+      const membership = playerMemberships.find((item: any) => item.squad_id === squadId)
+        || playerMemberships.find((item: any) => item.status !== "inactivo")
+        || playerMemberships[0];
+      const playerSquadId = membership?.squad_id || player.squad_id || null;
+      const playerSquad = playerSquadId ? squadMap.get(playerSquadId) : null;
       return {
-        id: p.id,
-        fullName: p.full_name || p.name || "",
-        normalized: normalizeName(p.full_name || p.name || ""),
+        id: player.id,
+        fullName: player.full_name || player.name || "",
+        normalized: normalizeName(player.full_name || player.name || ""),
         squadId: playerSquadId,
-        squadName: squad?.name || null,
-        organizationId: p.organization_id || p.club_id || null,
-        position: p.position || null,
+        squadName: playerSquadId ? squadMap.get(playerSquadId)?.name || null : null,
+        organizationId: player.organization_id || playerSquad?.organization_id || playerSquad?.club_id || null,
+        position: player.position || null,
+      };
+    });
+    const clubPlayers = organizationId
+      ? dbPlayers.filter((player) => player.organizationId === organizationId)
+      : dbPlayers;
+    const invalidOverride = Object.entries(playerOverrides).find(([, playerId]) => !clubPlayers.some((player) => player.id === playerId));
+    if (invalidOverride) return Response.json({ error: `La vinculación manual de ${invalidOverride[0]} no pertenece al club autorizado` }, { status: 400 });
+    const aliases: AliasInfo[] = aliasesRaw
+      .filter((alias: any) => !organizationId || !alias.organization_id || alias.organization_id === organizationId)
+      .map((alias: any) => ({
+        aliasNormalized: alias.alias_normalized,
+        playerId: alias.player_id,
+        playerName: alias.player_name,
+        externalPlayerId: alias.external_player_id || null,
+        sourceKey: alias.source_key || null,
+      }));
+
+    const uniqueNames = [...new Set(parsedRows.map((item) => item.playerName))].sort();
+    const linkingResults = uniqueNames.map((csvName) => {
+      const overridden = playerOverrides[csvName];
+      const player = overridden ? clubPlayers.find((item) => item.id === overridden) : null;
+      if (player) {
+        return {
+          csvName,
+          normalizedName: normalizeName(csvName),
+          proposedPlayerId: player.id,
+          proposedPlayerName: player.fullName,
+          method: "manual_override",
+          status: "exact_match" as const,
+          reason: "Vinculación manual confirmada en la vista previa",
+          candidateCount: 1,
+          candidates: [player],
+        };
+      }
+      const playerSources = [...new Set(parsedRows.filter((item) => item.playerName === csvName).map((item) => item.sourceKey))];
+      return linkPlayer(csvName, clubPlayers, aliases, playerSources[0] || "forcedecks");
+    });
+
+    const scopedExistingResults = organizationId
+      ? existingResults.filter((result: any) => result.organization_id === organizationId)
+      : existingResults;
+    const existingHashes = new Set(scopedExistingResults.map((result: any) => result.row_sha256).filter(Boolean));
+    const seenHashes = new Set<string>();
+    let duplicateCount = 0;
+    for (const item of parsedRows) {
+      const { precision, version } = precisionForRow(metricDefinitions, item.sourceKey, item.testKey, item.row);
+      item.canonicalHash = computeCanonicalRowHash(item.row, precision);
+      item.duplicate = existingHashes.has(item.canonicalHash) || seenHashes.has(item.canonicalHash);
+      item.duplicateReason = existingHashes.has(item.canonicalHash)
+        ? "Fila canónicamente idéntica a un resultado ya importado"
+        : item.duplicate
+          ? "Fila canónicamente idéntica dentro de este lote"
+          : "";
+      (item as any).precisionVersion = `${item.sourceKey}:${item.testKey}:v${version}`;
+      if (item.duplicate) duplicateCount += 1;
+      else seenHashes.add(item.canonicalHash);
+    }
+
+    const blocks = summarizeBlocks(parsedRows);
+    const proposals = [...new Set(parsedRows.map((item) => item.assessmentDate))].sort().map((date) => {
+      const dateRows = parsedRows.filter((item) => item.assessmentDate === date);
+      const dateBlocks = blocks.filter((block) => block.assessment_date === date);
+      const testKeys = [...new Set(dateRows.map((item) => item.testKey))].sort();
+      const sameDateSessions = existingSessions.filter((session: any) => session.assessment_date === date);
+      return {
+        group_id: `date:${date}`,
+        assessment_date: date,
+        assessment_time: null,
+        name: autoSessionName(date, testKeys),
+        context,
+        test_keys: testKeys,
+        block_ids: dateBlocks.map((block) => block.block_id),
+        blocks: dateBlocks,
+        files: [...new Set(dateRows.map((item) => item.fileName))],
+        total_results: dateRows.length,
+        new_results: dateRows.filter((item) => !item.duplicate).length,
+        duplicate_results: dateRows.filter((item) => item.duplicate).length,
+        existing_sessions: sameDateSessions.map((session: any) => ({
+          session_id: session.session_id,
+          name: session.name,
+          total_results: session.total_results || 0,
+          total_players: session.total_players || 0,
+          test_keys: session.test_keys || [],
+        })),
+        recommended_append_session_id: sameDateSessions[0]?.session_id || null,
       };
     });
 
-    // Load aliases — ALL active aliases for this organization (club-wide, not squad-limited)
-    let aliasesRaw: any[] = [];
-    try {
-      aliasesRaw = await base44.asServiceRole.entities.EvaluationPlayerAlias.filter({ active: true });
-    } catch { /* entity may be empty */ }
-    const aliases: AliasInfo[] = aliasesRaw.map((a: any) => ({
-      aliasNormalized: a.alias_normalized,
-      playerId: a.player_id,
-      playerName: a.player_name,
-      externalPlayerId: a.external_player_id || null,
-      sourceKey: a.source_key || null,
-      organizationId: a.organization_id || null,
-    }));
-
-    // ── 3. Extract unique players from CSVs and link ────────────────────────
-    const csvNames = new Set<string>();
-    for (const item of allRows) {
-      const name = item.row["Name"] || item.row["name"] || item.row["Athlete"] || item.row["athlete"] || "";
-      if (name) csvNames.add(name);
-    }
-
-    const linkingResults = [...csvNames].sort().map((csvName) => {
-      // Apply manual override from preview if provided
-      if (playerOverrides[csvName]) {
-        const player = dbPlayers.find((p) => p.id === playerOverrides[csvName]);
-        if (player) {
-          return {
-            csvName,
-            normalizedName: normalizeName(csvName),
-            proposedPlayerId: player.id,
-            proposedPlayerName: player.fullName,
-            method: "manual_override",
-            status: "exact_match" as const,
-            reason: "Vinculación manual desde vista previa",
-            candidateCount: 1,
-          };
-        }
-      }
-      return linkPlayer(csvName, dbPlayers, aliases, "forcedecks");
-    });
-
-    // ── 4. Detect duplicates using CANONICAL row hash ───────────────────────
-    let existingResults: any[] = [];
-    try {
-      existingResults = await base44.asServiceRole.entities.EvaluationResult.filter(
-        { assessment_date: assessmentDate },
-        "created_date",
-        1000
-      );
-    } catch { /* entity may be empty */ }
-    const existingCanonicalHashes = new Set(existingResults.map((r: any) => r.row_sha256).filter(Boolean));
-
-    // Load metric definitions for precision
-    let metricDefs: any[] = [];
-    try {
-      metricDefs = await base44.asServiceRole.entities.EvaluationMetricDefinition.list("display_order", 200);
-    } catch { /* empty */ }
-    const metricPrecision: Record<string, number> = {};
-    for (const md of metricDefs) {
-      if (md.csv_column && md.value_type) {
-        // precision: 2 for number, 0 for integer, 1 for percentage
-        const p = md.value_type === "integer" ? 0 : md.value_type === "percentage" ? 1 : 2;
-        metricPrecision[md.csv_column] = p;
-        metricPrecision[md.csv_column.toLowerCase()] = p;
-      }
-    }
-
-    const seenCanonicalHashes = new Set<string>();
-    let duplicateCount = 0;
-    let newCount = 0;
-    let retestCount = 0;
-    const rowStatuses: Array<{ index: number; status: "new" | "duplicate" | "error"; reason?: string }> = [];
-
-    for (let i = 0; i < allRows.length; i++) {
-      const item = allRows[i];
-      const canonicalHash = computeCanonicalRowHash(item.row, metricPrecision);
-      if (seenCanonicalHashes.has(canonicalHash) || existingCanonicalHashes.has(canonicalHash)) {
-        duplicateCount++;
-        rowStatuses.push({ index: i, status: "duplicate", reason: "Fila canónicamente idéntica a una existente" });
-      } else {
-        seenCanonicalHashes.add(canonicalHash);
-        newCount++;
-        rowStatuses.push({ index: i, status: "new" });
-      }
-      if (isRetest(item.row)) retestCount++;
-    }
-
-    // ── 5. Check for existing session on same date ──────────────────────────
-    let existingSession: any = null;
-    try {
-      const existing = await base44.asServiceRole.entities.EvaluationSession.filter(
-        { assessment_date: assessmentDate, squad_id: squadId },
-        "-assessment_date",
-        1
-      );
-      existingSession = existing[0] || null;
-    } catch { /* empty */ }
-
-    // ── 6. Auto-generate session name if not provided ────────────────────────
-    const testKeys = [...new Set(fileMetas.map((f) => f.test_key))];
-    if (!sessionName) {
-      sessionName = autoSessionName(assessmentDate, testKeys);
-    }
-
-    // ── 7. Collect metric keys ─────────────────────────────────────────────
-    const metricKeys = new Set<string>();
-    for (const item of allRows) {
-      for (const k of Object.keys(item.row)) {
-        if (!METADATA_COLS.has(k) && item.row[k] !== "") {
-          metricKeys.add(k);
-        }
-      }
-    }
-
-    // ── 8. Build summary ───────────────────────────────────────────────────
-    const linked = linkingResults.filter((l) => l.status === "exact_match").length;
-    const pending = linkingResults.filter((l) => l.status === "no_match").length;
-    const collisions = linkingResults.filter((l) => l.status === "collision").length;
-    const possible = linkingResults.filter((l) => l.status === "possible_match").length;
-
     const summary = {
       status: action,
-      assessment_date: assessmentDate,
-      detected_date: fileMetas[0]?.detected_date || null,
-      detected_time: fileMetas[0]?.detected_time || null,
-      context,
-      session_name: sessionName,
-      auto_session_name: autoSessionName(assessmentDate, testKeys),
       files: fileMetas,
-      test_keys: testKeys,
-      total_results: allRows.length,
-      new_results: newCount,
+      session_proposals: proposals,
+      blocks,
+      total_results: parsedRows.length,
+      new_results: parsedRows.length - duplicateCount,
       duplicate_results: duplicateCount,
-      total_players: csvNames.size,
-      linked_players: linked,
-      pending_players: pending,
-      collision_players: collisions,
-      possible_match_players: possible,
-      retest_results: retestCount,
-      metric_keys: [...metricKeys].sort(),
-      linking_preview: linkingResults,
-      existing_session: existingSession ? {
-        session_id: existingSession.session_id,
-        name: existingSession.name,
-        assessment_date: existingSession.assessment_date,
-        total_results: existingSession.total_results,
-        test_keys: existingSession.test_keys || [],
-      } : null,
-      row_statuses_summary: {
-        new: newCount,
-        duplicate: duplicateCount,
-        error: 0,
-      },
+      total_players: uniqueNames.length,
+      linked_players: linkingResults.filter((item) => item.status === "exact_match").length,
+      pending_players: linkingResults.filter((item) => item.status === "no_match").length,
+      collision_players: linkingResults.filter((item) => item.status === "collision").length,
+      possible_match_players: linkingResults.filter((item) => item.status === "possible_match").length,
+      player_options: clubPlayers
+        .map((player) => ({
+          id: player.id,
+          full_name: player.fullName,
+          squad_name: player.squadName,
+          position: player.position,
+        }))
+        .sort((left, right) => left.full_name.localeCompare(right.full_name)),
+      linking_preview: linkingResults.map((item: any) => ({
+        csv_name: item.csvName,
+        normalized_name: item.normalizedName,
+        proposed_player_id: item.proposedPlayerId,
+        proposed_player_name: item.proposedPlayerName,
+        method: item.method,
+        status: item.status,
+        reason: item.reason,
+        candidates: (item.candidates || []).map((candidate: any) => ({
+          id: candidate.id,
+          full_name: candidate.fullName,
+          squad_name: candidate.squadName,
+          position: candidate.position,
+        })),
+      })),
     };
+    if (action === "dry_run") return Response.json(summary);
 
-    // ── 9. dry_run: return preview only ────────────────────────────────────
-    if (action === "dry_run") {
-      return Response.json(summary);
+    const sessionGroups = Array.isArray(payload.session_groups) ? payload.session_groups : [];
+    if (!sessionGroups.length) {
+      return Response.json({ error: "Confirmá explícitamente la agrupación de sesiones de la vista previa" }, { status: 400 });
+    }
+    const allNewBlockIds = new Set(blocks.filter((block) => block.new_results > 0).map((block) => block.block_id));
+    const assignment = new Map<string, any>();
+    for (const group of sessionGroups) {
+      if (!group.assessment_date || !group.name || !Array.isArray(group.block_ids)) {
+        return Response.json({ error: "Cada sesión debe tener fecha, nombre y bloques asignados" }, { status: 400 });
+      }
+      for (const blockId of group.block_ids) {
+        if (assignment.has(blockId)) {
+          return Response.json({ error: "Un bloque no puede pertenecer a dos sesiones" }, { status: 400 });
+        }
+        assignment.set(blockId, group);
+      }
+    }
+    const missing = [...allNewBlockIds].filter((blockId) => !assignment.has(blockId));
+    if (missing.length) {
+      return Response.json({ error: `Hay ${missing.length} bloque(s) nuevos sin sesión asignada` }, { status: 400 });
+    }
+    for (const [blockId, group] of assignment) {
+      const block = blocks.find((item) => item.block_id === blockId);
+      if (block && block.assessment_date !== group.assessment_date) {
+        return Response.json({ error: "No se puede mover un bloque a una fecha diferente" }, { status: 400 });
+      }
     }
 
-    // ── 10. confirm: persist ────────────────────────────────────────────────
-    if (action === "confirm") {
-      const batchId = crypto.randomUUID();
-      const orgId = null; // single-club app
-      const squadName = activeSquad.name;
+    const batchId = crypto.randomUUID();
+    createdBatch = await base44.asServiceRole.entities.EvaluationImportBatch.create({
+      batch_id: batchId,
+      status: "importing",
+      ingestion_method: "csv",
+      provider: "vald",
+      source_key: "multisource",
+      organization_id: organizationId,
+      squad_id: squadId,
+      squad_name: activeSquad.name,
+      assessment_date: proposals[0]?.assessment_date,
+      context,
+      session_name: proposals.length === 1 ? proposals[0].name : `${proposals.length} sesiones`,
+      session_groups: sessionGroups,
+      test_keys: [...new Set(parsedRows.map((item) => item.testKey))],
+      total_results: parsedRows.length,
+      total_players: uniqueNames.length,
+      linked_players: summary.linked_players,
+      pending_players: summary.pending_players,
+      collision_players: summary.collision_players,
+      duplicate_results: duplicateCount,
+      retest_results: parsedRows.filter((item) => isRetest(item.row)).length,
+      linking_preview: summary.linking_preview,
+      triggered_by: user.id,
+      dry_run_at: new Date().toISOString(),
+      confirmed_at: new Date().toISOString(),
+    });
 
-      // Use existing session if found and user chose to append, else create new
-      let sessionId: string;
-      let isExistingSession = false;
-      if (existingSession && payload.append_to_existing !== false) {
-        sessionId = existingSession.session_id;
-        isExistingSession = true;
-      } else {
-        sessionId = crypto.randomUUID();
-      }
-
-      // Create ImportBatch
-      const batch = await base44.asServiceRole.entities.EvaluationImportBatch.create({
-        batch_id: batchId,
-        status: "importing",
-        ingestion_method: "csv",
+    const sourceLabels: Record<string, { name: string; product_type: string }> = {
+      forcedecks: { name: "ForceDecks", product_type: "jump" },
+      nordbord: { name: "NordBord", product_type: "strength" },
+      isopush: { name: "ISO Push", product_type: "strength" },
+    };
+    const sourceKeys = [...new Set(parsedRows.map((item) => item.sourceKey))];
+    const missingSources = sourceKeys.filter((key) => !sourceDefinitions.some((source: any) => source.source_key === key));
+    if (missingSources.length) {
+      await bulkCreate(base44, "EvaluationSource", missingSources.map((key, index) => ({
+        source_key: key,
+        name: sourceLabels[key]?.name || key.toUpperCase(),
         provider: "vald",
-        source_key: "forcedecks",
-        organization_id: orgId,
-        squad_id: squadId,
-        squad_name: squadName,
-        assessment_date: assessmentDate,
-        context,
-        session_name: sessionName,
-        test_keys: testKeys,
-        total_results: allRows.length,
-        total_players: csvNames.size,
-        linked_players: linked,
-        pending_players: pending,
-        collision_players: collisions,
-        duplicate_results: duplicateCount,
-        retest_results: retestCount,
-        linking_preview: linkingResults.map((l) => ({
-          csv_name: l.csvName,
-          normalized_name: l.normalizedName,
-          proposed_player_id: l.proposedPlayerId,
-          proposed_player_name: l.proposedPlayerName,
-          method: l.method,
-          status: l.status,
-          reason: l.reason,
-          candidate_count: l.candidateCount,
-        })),
-        triggered_by: user.id,
-        dry_run_at: new Date().toISOString(),
-      });
-
-      // Create ImportFiles
-      const fileIds: string[] = [];
-      for (const fm of fileMetas) {
-        const fileId = crypto.randomUUID();
-        fileIds.push(fileId);
-        await base44.asServiceRole.entities.EvaluationImportFile.create({
-          file_id: fileId,
-          batch_id: batchId,
-          file_name: fm.file_name,
-          source_key: "forcedecks",
-          test_key: fm.test_key,
-          size_bytes: fm.size_bytes,
-          raw_file_sha256: fm.raw_file_sha256,
-          canonical_content_sha256: fm.canonical_content_sha256,
-          encoding: fm.encoding,
-          has_bom: fm.has_bom,
-          line_ending: fm.line_ending,
-          file_url: fm.file_url,
-          row_count: fm.row_count,
-          column_headers: fm.column_headers,
-          imported_by: user.id,
-          imported_at: new Date().toISOString(),
-        });
+        product_type: sourceLabels[key]?.product_type || "other",
+        supports_csv: true,
+        supports_api: false,
+        active: true,
+        display_order: sourceDefinitions.length + index,
+      })));
+    }
+    const uniqueTests = [...new Map(parsedRows.map((item) => [`${item.sourceKey}|${item.testKey}`, { sourceKey: item.sourceKey, testKey: item.testKey }])).values()];
+    const missingTests = uniqueTests.filter(({ sourceKey, testKey }) => !testDefinitions.some((definition: any) => definition.source_key === sourceKey && definition.test_key === testKey));
+    if (missingTests.length) {
+      await bulkCreate(base44, "EvaluationTestDefinition", missingTests.map(({ sourceKey, testKey }, index) => {
+        const defaults = DEFAULT_PRIMARY_CONFIG[testKey];
+        return {
+          source_key: sourceKey,
+          test_key: testKey,
+          name: testKey.toUpperCase(),
+          short_name: testKey.toUpperCase(),
+          side_mode: testKey === "nordic" ? "unilateral" : "bilateral",
+          supports_attempts: true,
+          priority_metrics: [defaults?.primaryMetric, defaults?.secondaryMetric].filter(Boolean),
+          primary_metric_key: defaults?.primaryMetric || "",
+          primary_direction: defaults?.primaryDirection || "higher",
+          secondary_metric_key: defaults?.secondaryMetric || "",
+          secondary_direction: defaults?.secondaryDirection || "higher",
+          config_version: 1,
+          active: true,
+          display_order: testDefinitions.length + index,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        };
+      }));
+    }
+    const observedMetrics = new Map<string, { sourceKey: string; metricKey: string; testKeys: Set<string> }>();
+    for (const item of parsedRows) {
+      for (const header of metricHeaders(item.row)) {
+        if (!observedMetrics.has(`${item.sourceKey}|${header}`)) observedMetrics.set(`${item.sourceKey}|${header}`, { sourceKey: item.sourceKey, metricKey: header, testKeys: new Set() });
+        observedMetrics.get(`${item.sourceKey}|${header}`)!.testKeys.add(item.testKey);
       }
+    }
+    const missingMetrics = [...observedMetrics.values()].filter((observed) => !metricDefinitions.some((definition: any) => definition.source_key === observed.sourceKey && (definition.metric_key === observed.metricKey || definition.csv_column === observed.metricKey)));
+    if (missingMetrics.length) {
+      await bulkCreate(base44, "EvaluationMetricDefinition", missingMetrics.map((observed, index) => {
+        const normalized = normalizeHeader(observed.metricKey);
+        const isAsymmetry = normalized.includes("asym") || normalized.includes("imbalance");
+        const lowerIsBetter = /time|duration|contact/.test(normalized) && !/flight/.test(normalized);
+        return {
+          metric_key: observed.metricKey,
+          metric_label: observed.metricKey,
+          metric_label_en: observed.metricKey,
+          csv_column: observed.metricKey,
+          source_key: observed.sourceKey,
+          test_keys: [...observed.testKeys].sort(),
+          unit: observed.metricKey.match(/[\[(]([^\]\)]+)[\]\)]/)?.[1] || "",
+          direction: isAsymmetry ? "contextual" : lowerIsBetter ? "lower_is_better" : "higher_is_better",
+          value_type: normalized.includes("%") || normalized.includes("percent") ? "percentage" : "number",
+          precision: 3,
+          catalog_version: 1,
+          allows_negative: isAsymmetry,
+          is_asymmetry: isAsymmetry,
+          category: isAsymmetry ? "asymmetry" : /power|watt/.test(normalized) ? "power" : /force|newton/.test(normalized) ? "force" : /velocity|speed/.test(normalized) ? "velocity" : /rsi|reactive/.test(normalized) ? "reactive" : "performance",
+          active: true,
+          display_order: metricDefinitions.length + index,
+          updated_by: user.id,
+          updated_at: new Date().toISOString(),
+        };
+      }));
+    }
 
-      // Create or update EvaluationSession
-      if (!isExistingSession) {
-        await base44.asServiceRole.entities.EvaluationSession.create({
+    const fileRecords = fileMetas.map((meta, fileIndex) => ({
+      file_id: crypto.randomUUID(),
+      batch_id: batchId,
+      file_name: meta.file_name,
+      source_key: meta.source_key,
+      test_key: meta.test_key,
+      detected_dates: meta.detected_dates,
+      detected_test_keys: meta.detected_test_keys,
+      detected_times: meta.detected_times,
+      size_bytes: meta.size_bytes,
+      raw_file_sha256: meta.raw_file_sha256,
+      canonical_content_sha256: meta.canonical_content_sha256,
+      encoding: meta.encoding,
+      has_bom: meta.has_bom,
+      line_ending: meta.line_ending,
+      file_url: meta.file_url,
+      row_count: meta.row_count,
+      column_headers: meta.column_headers,
+      imported_by: user.id,
+      imported_at: new Date().toISOString(),
+      file_index: fileIndex,
+    }));
+    await bulkCreate(base44, "EvaluationImportFile", fileRecords.map(({ file_index, ...record }) => record));
+    const fileIdByIndex = new Map(fileRecords.map((record) => [record.file_index, record.file_id]));
+
+    if (rememberAliases) {
+      for (const [csvName, playerId] of Object.entries(playerOverrides)) {
+        const player = clubPlayers.find((item) => item.id === playerId);
+        if (!player) continue;
+        const playerSources = [...new Set(parsedRows.filter((item) => item.playerName === csvName).map((item) => item.sourceKey))];
+        for (const sourceKey of playerSources) {
+          const alreadyExists = aliasesRaw.some((alias: any) =>
+            alias.alias_normalized === normalizeName(csvName)
+            && alias.player_id === playerId
+            && (!alias.source_key || alias.source_key === sourceKey)
+          );
+          if (alreadyExists) continue;
+          await base44.asServiceRole.entities.EvaluationPlayerAlias.create({
+            alias_name: csvName,
+            alias_normalized: normalizeName(csvName),
+            player_id: playerId,
+            player_name: player.fullName,
+            squad_id: squadId,
+            squad_name: activeSquad.name,
+            organization_id: organizationId,
+            source_key: sourceKey,
+            source: "manual_confirmation",
+            confirmed_by: user.id,
+            confirmed_at: new Date().toISOString(),
+            active: true,
+          });
+        }
+      }
+    }
+
+    const linkingMap = new Map(linkingResults.map((item: any) => [item.csvName, item]));
+    const persistedSessions: any[] = [];
+    const persistedSessionByGroupId = new Map<string, any>();
+    const importedRows: any[] = [];
+
+    for (const group of sessionGroups) {
+      const groupRows = parsedRows.filter((item) => group.block_ids.includes(item.blockId));
+      const newRows = groupRows.filter((item) => !item.duplicate);
+      if (!newRows.length) continue;
+      let session: any = null;
+      if (group.append_to_session_id) {
+        session = existingSessions.find((item: any) => item.session_id === group.append_to_session_id);
+        if (!session || session.squad_id !== squadId || session.assessment_date !== group.assessment_date) {
+          return Response.json({ error: "La sesión elegida para agregar resultados no coincide con plantel y fecha" }, { status: 400 });
+        }
+      }
+      const sessionId = session?.session_id || crypto.randomUUID();
+      const testKeys = [...new Set(groupRows.map((item) => item.testKey))].sort();
+      if (!session) {
+        session = await base44.asServiceRole.entities.EvaluationSession.create({
           session_id: sessionId,
-          organization_id: orgId,
+          organization_id: organizationId,
           squad_id: squadId,
-          squad_name: squadName,
-          assessment_date: assessmentDate,
-          context,
-          name: sessionName,
-          source_keys: ["forcedecks"],
+          squad_name: activeSquad.name,
+          assessment_date: group.assessment_date,
+          assessment_time: group.assessment_time || null,
+          import_group_id: group.group_id || crypto.randomUUID(),
+          context: group.context || context,
+          name: group.name || autoSessionName(group.assessment_date, testKeys),
+          source_keys: [...new Set(groupRows.map((item) => item.sourceKey))],
           test_keys: testKeys,
-          total_players: csvNames.size,
-          total_results: allRows.length,
-          pending_results: pending,
-          retest_results: retestCount,
-          import_status: "completed",
+          total_players: 0,
+          total_results: 0,
+          import_status: "importing",
           created_by: user.id,
           created_at: new Date().toISOString(),
         });
       }
 
-      // ── Create aliases for manually confirmed links ──────────────────────
-      if (rememberAliases) {
-        for (const [csvName, playerId] of Object.entries(playerOverrides)) {
-          if (!playerId) continue;
-          const normalized = normalizeName(csvName);
-          // Check if alias already exists
-          const existing = aliases.find((a) => a.aliasNormalized === normalized && a.playerId === playerId);
-          if (!existing) {
-            try {
-              await base44.asServiceRole.entities.EvaluationPlayerAlias.create({
-                alias_name: csvName,
-                alias_normalized: normalized,
-                player_id: playerId,
-                player_name: dbPlayers.find((p) => p.id === playerId)?.fullName || "",
-                squad_id: squadId,
-                squad_name: squadName,
-                organization_id: orgId,
-                source_key: "forcedecks",
-                source: "manual_confirmation",
-                confirmed_by: user.id,
-                confirmed_at: new Date().toISOString(),
-                active: true,
-              });
-            } catch (e) { /* ignore alias creation errors */ }
-          }
-        }
-      }
-
-      // ── Group rows by player → battery, select primary attempt ───────────
-      const linkingMap = new Map(linkingResults.map((l) => [l.csvName, l]));
-      const batteriesByPlayer = new Map<string, any>();
-      const resultsToCreate: any[] = [];
-      const seenInBatch = new Set<string>();
-      // Group attempts by player+test for primary selection
-      const attemptsByPlayerTest = new Map<string, any[]>();
-
-      for (let i = 0; i < allRows.length; i++) {
-        const item = allRows[i];
-        const csvName = item.row["Name"] || item.row["name"] || item.row["Athlete"] || item.row["athlete"] || "";
-        const linking = linkingMap.get(csvName);
-        const canonicalHash = computeCanonicalRowHash(item.row, metricPrecision);
-
-        // Skip exact duplicates (canonical)
-        if (seenInBatch.has(canonicalHash)) continue;
-        seenInBatch.add(canonicalHash);
-
-        const playerId = linking?.proposedPlayerId || null;
-        const player = playerId ? dbPlayers.find((p) => p.id === playerId) : null;
-        const playerOrgId = player?.organizationId || orgId;
-        const playerSquadId = player?.squadId || squadId;
-        const playerSquadName = player?.squadName || squadName;
-
-        // Build metrics
-        const metrics: Record<string, number> = {};
-        for (const key of Object.keys(item.row)) {
-          if (METADATA_COLS.has(key)) continue;
-          const raw = item.row[key];
-          if (raw === "") continue;
-          let s = String(raw).trim().replace(/\s/g, "");
-          if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
-          else if (s.includes(",") && s.includes(".")) s = s.replace(/,/g, "");
-          const val = parseFloat(s);
-          if (!isNaN(val)) metrics[key] = val;
-        }
-
-        // Build asymmetries
-        const asymmetries: Record<string, { magnitude: number; direction: string | null }> = {};
-        for (const key of Object.keys(item.row)) {
-          if (!key.toLowerCase().includes("asym") && !key.toLowerCase().includes("imbalance")) continue;
-          const raw = item.row[key];
-          if (raw === "") continue;
-          let s = String(raw).trim().replace(/\s/g, "");
-          if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
-          const val = parseFloat(s);
-          if (isNaN(val)) continue;
-          asymmetries[key] = {
-            magnitude: Math.abs(val),
-            direction: val > 0 ? "R" : val < 0 ? "L" : null,
-          };
-        }
-
-        const attemptNum = getAttemptNumber(item.row);
-        const retest = isRetest(item.row);
-        const resultId = crypto.randomUUID();
-
-        // Get or create battery for this player
-        const batteryKey = playerId || csvName;
-        if (!batteriesByPlayer.has(batteryKey)) {
-          batteriesByPlayer.set(batteryKey, {
+      const [existingSessionResults, existingBatteries] = await Promise.all([
+        base44.asServiceRole.entities.EvaluationResult.filter({ session_id: sessionId }, "attempt_number", 5000).catch(() => []),
+        base44.asServiceRole.entities.EvaluationBattery.filter({ session_id: sessionId }, "created_date", 1000).catch(() => []),
+      ]);
+      const batteryByPlayer = new Map(existingBatteries.map((battery: any) => [
+        battery.player_id || `csv:${battery.player_name_csv}`,
+        battery,
+      ]));
+      const batteriesToCreate: any[] = [];
+      for (const item of newRows) {
+        const linking = linkingMap.get(item.playerName);
+        const playerKey = linking?.proposedPlayerId || `csv:${item.playerName}`;
+        if (!batteryByPlayer.has(playerKey)) {
+          const battery = {
             battery_id: crypto.randomUUID(),
             session_id: sessionId,
-            player_id: playerId,
-            player_name_csv: csvName,
-            player_name_normalized: normalizeName(csvName),
-            squad_id: playerSquadId,
-            squad_name: playerSquadName,
-            organization_id: playerOrgId,
-            test_keys: new Set<string>(),
+            player_id: linking?.proposedPlayerId || null,
+            player_name_csv: item.playerName,
+            player_name_normalized: normalizeName(item.playerName),
+            squad_id: squadId,
+            squad_name: activeSquad.name,
+            organization_id: organizationId,
+            test_keys: [],
+            expected_test_keys: testKeys,
+            test_count: 0,
             total_results: 0,
+            complete: false,
             linking_status: linking?.status === "exact_match" ? "linked" : linking?.status === "collision" ? "collision" : "pending",
-            linking_method: linking?.method || null,
+            linking_method: linking?.method || "no_match",
             created_at: new Date().toISOString(),
-          });
+          };
+          batteryByPlayer.set(playerKey, battery);
+          batteriesToCreate.push(battery);
         }
-        const battery = batteriesByPlayer.get(batteryKey);
-        battery.test_keys.add(item.testKey);
-        battery.total_results++;
+      }
+      if (batteriesToCreate.length) await bulkCreate(base44, "EvaluationBattery", batteriesToCreate);
 
-        // Collect attempts for primary selection
-        const attemptKey = `${batteryKey}|${item.testKey}`;
-        if (!attemptsByPlayerTest.has(attemptKey)) attemptsByPlayerTest.set(attemptKey, []);
-        attemptsByPlayerTest.get(attemptKey).push({
-          result_id: resultId,
-          attempt_number: attemptNum,
-          assessment_datetime: item.row["Time"] || item.row["time"] || null,
-          metrics,
-          retest,
-        });
-
-        resultsToCreate.push({
+      const resultsToCreate = newRows.map((item) => {
+        const linking = linkingMap.get(item.playerName);
+        const playerKey = linking?.proposedPlayerId || `csv:${item.playerName}`;
+        const battery = batteryByPlayer.get(playerKey);
+        const resultId = crypto.randomUUID();
+        item.resultId = resultId;
+        return {
           result_id: resultId,
           session_id: sessionId,
           battery_id: battery.battery_id,
           batch_id: batchId,
-          player_id: playerId,
-          player_name_csv: csvName,
-          player_name_normalized: normalizeName(csvName),
-          squad_id: playerSquadId,
-          squad_name: playerSquadName,
-          organization_id: playerOrgId,
-          source_key: "forcedecks",
+          player_id: linking?.proposedPlayerId || null,
+          player_name_csv: item.playerName,
+          player_name_normalized: normalizeName(item.playerName),
+          squad_id: squadId,
+          squad_name: activeSquad.name,
+          organization_id: organizationId,
+          source_key: item.sourceKey,
           test_key: item.testKey,
-          test_side: item.row["Side"] || item.row["side"] || "Bilateral",
-          attempt_number: attemptNum,
-          retest,
-          is_primary: false, // will be set after primary selection
+          test_side: normalizeSide(getField(item.row, ["Side", "Lado"])),
+          attempt_number: getAttemptNumber(item.row),
+          retest: isRetest(item.row),
+          is_primary: false,
+          primary_selection_mode: "automatic",
           primary_reason: "",
-          assessment_date: assessmentDate,
-          metrics,
-          asymmetries,
+          primary_review_required: false,
+          assessment_date: item.assessmentDate,
+          assessment_datetime: item.assessmentTime ? `${item.assessmentDate}T${item.assessmentTime}` : null,
+          metrics: extractMetrics(item.row),
+          asymmetries: extractAsymmetries(item.row),
           raw_row: item.row,
-          row_sha256: canonicalHash,
+          row_sha256: item.canonicalHash,
+          duplicate_precision_version: (item as any).precisionVersion,
+          file_id: fileIdByIndex.get(item.fileIndex),
+          source_row_number: item.rowNumber,
+          source_block_id: item.blockId,
           linking_status: linking?.status === "exact_match" ? "linked" : linking?.status === "collision" ? "collision" : "pending",
-          linking_method: linking?.method || null,
+          linking_method: linking?.method || "no_match",
           quality_status: "ok",
           ingestion_method: "csv",
           provider: "vald",
           sync_status: "local_only",
-          idempotency_key: computeIdempotencyKey(playerOrgId, item.fileName, item.row, metricPrecision),
-          schema_version: 1,
+          idempotency_key: computeIdempotencyKey(organizationId, item.sourceKey, item.row, precisionForRow(metricDefinitions, item.sourceKey, item.testKey, item.row).precision),
+          schema_version: 2,
           created_at: new Date().toISOString(),
-        });
-      }
-
-      // ── Select primary attempt per player+test ───────────────────────────
-      // Load test definitions for primary metric config
-      let testDefs: any[] = [];
-      try {
-        testDefs = await base44.asServiceRole.entities.EvaluationTestDefinition.list("display_order", 50);
-      } catch { /* empty */ }
-      const testDefMap = new Map(testDefs.map((t: any) => [t.test_key, t]));
-
-      const primarySelections = new Map<string, { primaryId: string; reason: string }>();
-      for (const [attemptKey, attempts] of attemptsByPlayerTest) {
-        const testKey = attemptKey.split("|")[1];
-        const testDef = testDefMap.get(testKey);
-        const config: PrimaryMetricConfig = testDef?.priority_metrics?.length
-          ? {
-              primaryMetric: testDef.priority_metrics[0],
-              primaryDirection: (testDef as any).primary_direction || "higher",
-              secondaryMetric: testDef.priority_metrics[1] || null,
-              secondaryDirection: (testDef as any).secondary_direction || "higher",
-            }
-          : DEFAULT_PRIMARY_CONFIG[testKey] || { primaryMetric: "", primaryDirection: "higher", secondaryMetric: null, secondaryDirection: "higher" };
-
-        if (config.primaryMetric) {
-          const selection = selectPrimaryAttempt(attempts, config);
-          if (selection) primarySelections.set(attemptKey, selection);
-        } else {
-          // No config — first non-retest is primary
-          const firstNonRetest = attempts.find((a) => !a.retest) || attempts[0];
-          if (firstNonRetest) primarySelections.set(attemptKey, { primaryId: firstNonRetest.result_id, reason: "Primer intento (sin config de métrica principal)" });
-        }
-      }
-
-      // Apply primary selection
-      for (const r of resultsToCreate) {
-        const attemptKey = `${r.player_id || r.player_name_csv}|${r.test_key}`;
-        const selection = primarySelections.get(attemptKey);
-        if (selection && selection.primaryId === r.result_id) {
-          r.is_primary = true;
-          r.primary_reason = selection.reason;
-        }
-      }
-
-      // Create batteries
-      const batteryIds: string[] = [];
-      for (const battery of batteriesByPlayer.values()) {
-        battery.test_keys = [...battery.test_keys];
-        battery.test_count = battery.test_keys.length;
-        battery.complete = battery.test_keys.length === testKeys.length;
-        batteryIds.push(battery.battery_id);
-        await base44.asServiceRole.entities.EvaluationBattery.create(battery);
-      }
-
-      // Bulk create results
-      const created = await base44.asServiceRole.entities.EvaluationResult.bulkCreate(resultsToCreate);
-
-      // Update batch
-      await base44.asServiceRole.entities.EvaluationImportBatch.update(batch.id, {
-        status: "completed",
-        file_ids: fileIds,
-        session_id: sessionId,
-        battery_ids: batteryIds,
-        completed_at: new Date().toISOString(),
+        };
       });
+      const createdResults = await bulkCreate(base44, "EvaluationResult", resultsToCreate);
+      persistedResultCount += createdResults.length;
+      const allSessionResults = [...existingSessionResults, ...createdResults];
 
-      // Update session with battery counts
-      const completeBatteries = [...batteriesByPlayer.values()].filter((b) => b.complete).length;
-      const sessionFilter = await base44.asServiceRole.entities.EvaluationSession.filter({ session_id: sessionId });
-      const sessionRecord = sessionFilter[0];
-      if (sessionRecord) {
-        const totalResults = (sessionRecord.total_results || 0) + (isExistingSession ? created.length : 0);
-        await base44.asServiceRole.entities.EvaluationSession.update(sessionRecord.id, {
-          total_batteries: (sessionRecord.total_batteries || 0) + batteriesByPlayer.size,
-          complete_batteries: (sessionRecord.complete_batteries || 0) + completeBatteries,
-          incomplete_batteries: (sessionRecord.incomplete_batteries || 0) + (batteriesByPlayer.size - completeBatteries),
-          total_results: isExistingSession ? totalResults : created.length,
-          total_players: isExistingSession ? Math.max(sessionRecord.total_players || 0, csvNames.size) : csvNames.size,
-        });
+      const definitionMap = new Map(testDefinitions.map((definition: any) => [definition.test_key, definition]));
+      const resultGroups = new Map<string, any[]>();
+      for (const result of allSessionResults) {
+        const key = [
+          result.player_id || `csv:${result.player_name_csv}`,
+          result.test_key,
+          result.test_side || "Bilateral",
+        ].join("|");
+        if (!resultGroups.has(key)) resultGroups.set(key, []);
+        resultGroups.get(key)!.push(result);
+      }
+      for (const [, resultGroup] of resultGroups) {
+        const sample = resultGroup[0];
+        const config = primaryConfig(sample.test_key, definitionMap.get(sample.test_key));
+        const automatic = config.primaryMetric
+          ? selectPrimaryAttempt(resultGroup.map((result: any) => ({
+              result_id: result.result_id,
+              attempt_number: result.attempt_number || 1,
+              assessment_datetime: result.assessment_datetime,
+              metrics: result.metrics || {},
+              retest: result.retest,
+            })), config)
+          : null;
+        const automaticResult = resultGroup.find((result: any) => result.result_id === automatic?.primaryId) || resultGroup[0];
+        const manualPrimary = resultGroup.find((result: any) =>
+          result.is_primary && result.primary_selection_mode === "manual"
+        );
+        const selected = manualPrimary || automaticResult;
+        const updates = resultGroup.map((result: any) => ({
+          id: result.id,
+          is_primary: result.id === selected.id,
+          primary_selection_mode: result.id === selected.id
+            ? manualPrimary ? "manual" : "automatic"
+            : result.primary_selection_mode || "automatic",
+          primary_reason: result.id === selected.id
+            ? manualPrimary?.primary_override_reason || automatic?.reason || "Primer intento"
+            : "",
+          primary_review_required: result.id === selected.id && !!manualPrimary && automaticResult.id !== manualPrimary.id,
+          automatic_candidate_result_id: automaticResult.result_id,
+          automatic_candidate_reason: automatic?.reason || "Primer intento",
+        }));
+        await bulkUpdate(base44, "EvaluationResult", updates);
       }
 
-      return Response.json({
-        status: "completed",
-        batch_id: batchId,
-        session_id: sessionId,
-        appended_to_existing: isExistingSession,
-        imported_results: created.length,
-        new_results: newCount,
-        duplicate_results: duplicateCount,
-        total_batteries: batteriesByPlayer.size,
+      const finalResults = await base44.asServiceRole.entities.EvaluationResult.filter({ session_id: sessionId }, "attempt_number", 5000);
+      const finalBatteries = await base44.asServiceRole.entities.EvaluationBattery.filter({ session_id: sessionId }, "created_date", 1000);
+      const batteryUpdates = finalBatteries.map((battery: any) => {
+        const batteryResults = finalResults.filter((result: any) => result.battery_id === battery.battery_id);
+        const presentTests = [...new Set(batteryResults.map((result: any) => result.test_key))].sort();
+        const expectedTests = [...new Set([...(battery.expected_test_keys || []), ...testKeys])].sort();
+        return {
+          id: battery.id,
+          test_keys: presentTests,
+          expected_test_keys: expectedTests,
+          test_count: presentTests.length,
+          total_results: batteryResults.length,
+          complete: expectedTests.every((testKey) => presentTests.includes(testKey)),
+        };
+      });
+      if (batteryUpdates.length) await bulkUpdate(base44, "EvaluationBattery", batteryUpdates);
+      const evaluatedPlayerKeys = new Set(finalResults.map((result: any) => result.player_id || `csv:${result.player_name_csv}`));
+      const completeBatteries = batteryUpdates.filter((battery: any) => battery.complete).length;
+      const sessionUpdate = await base44.asServiceRole.entities.EvaluationSession.update(session.id, {
+        name: group.name || session.name,
+        context: group.context || session.context || context,
+        assessment_time: group.assessment_time || session.assessment_time || null,
+        source_keys: [...new Set([...(session.source_keys || []), ...groupRows.map((item) => item.sourceKey)])],
+        test_keys: [...new Set([...(session.test_keys || []), ...groupRows.map((item) => item.testKey)])].sort(),
+        total_players: evaluatedPlayerKeys.size,
+        total_batteries: batteryUpdates.length,
         complete_batteries: completeBatteries,
-        linked_players: linked,
-        pending_players: pending,
-        collision_players: collisions,
-        retest_results: retestCount,
+        incomplete_batteries: batteryUpdates.length - completeBatteries,
+        total_results: finalResults.length,
+        pending_results: finalResults.filter((result: any) => ["pending", "collision"].includes(result.linking_status)).length,
+        retest_results: finalResults.filter((result: any) => result.retest).length,
+        import_status: "completed",
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      });
+      persistedSessions.push(sessionUpdate);
+      persistedSessionByGroupId.set(group.group_id, sessionUpdate);
+      importedRows.push(...newRows);
+      persistedSessionCount += 1;
+
+      await base44.asServiceRole.entities.EvaluationAuditEvent.create({
+        event_id: crypto.randomUUID(),
+        event_type: "import_confirmed",
+        organization_id: organizationId,
+        squad_id: squadId,
+        session_id: sessionId,
+        reason: session ? "Importación confirmada" : "Sesión creada desde importación",
+        actor_id: user.id,
+        actor_name: user.full_name || user.name || user.email,
+        actor_email: user.email,
+        metadata: {
+          batch_id: batchId,
+          imported_results: newRows.length,
+          duplicate_results: groupRows.filter((item) => item.duplicate).length,
+          block_ids: group.block_ids,
+        },
+        created_at: new Date().toISOString(),
       });
     }
 
-    return Response.json({ error: "action must be dry_run or confirm" }, { status: 400 });
+    const rowRecords = parsedRows.map((item) => {
+      const assignedGroup = assignment.get(item.blockId);
+      const persistedSession = persistedSessionByGroupId.get(assignedGroup?.group_id);
+      return {
+        row_id: crypto.randomUUID(),
+        file_id: fileIdByIndex.get(item.fileIndex),
+        batch_id: batchId,
+        session_id: persistedSession?.session_id || null,
+        source_block_id: item.blockId,
+        assessment_date: item.assessmentDate,
+        assessment_time: item.assessmentTime,
+        row_number: item.rowNumber,
+        row_sha256: item.canonicalHash,
+        raw_content: item.row,
+        normalized_result_id: item.resultId || null,
+        status: item.duplicate ? "duplicate" : item.resultId ? "imported" : "skipped",
+        errors: [],
+        warnings: item.duplicate ? [item.duplicateReason] : [],
+      };
+    });
+    if (rowRecords.length) await bulkCreate(base44, "EvaluationImportRow", rowRecords);
+
+    await base44.asServiceRole.entities.EvaluationImportBatch.update(createdBatch.id, {
+      status: "completed",
+      file_ids: fileRecords.map((record) => record.file_id),
+      session_id: persistedSessions[0]?.session_id || null,
+      session_ids: persistedSessions.map((session) => session.session_id),
+      battery_ids: [],
+      completed_at: new Date().toISOString(),
+    });
+
+    return Response.json({
+      status: "completed",
+      batch_id: batchId,
+      sessions: persistedSessions.map((session) => ({
+        session_id: session.session_id,
+        assessment_date: session.assessment_date,
+        name: session.name,
+        total_results: session.total_results,
+        total_players: session.total_players,
+      })),
+      imported_results: importedRows.length,
+      duplicate_results: duplicateCount,
+      linked_players: summary.linked_players,
+      pending_players: summary.pending_players,
+      collision_players: summary.collision_players,
+    });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    if (createdBatch && base44) {
+      try {
+        await base44.asServiceRole.entities.EvaluationImportBatch.update(createdBatch.id, {
+          status: persistedResultCount || persistedSessionCount ? "partial" : "failed",
+          error_message: (error as any)?.message || "Error interno",
+          completed_at: new Date().toISOString(),
+        });
+      } catch { /* keep original error */ }
+    }
+    if (persistedResultCount || persistedSessionCount) {
+      return Response.json({
+        error: `La importación quedó parcial: ${(error as any)?.message || "error interno"}. Revisá el lote antes de reintentar.`,
+        status: "partial",
+        batch_id: createdBatch?.batch_id || null,
+        persisted_results: persistedResultCount,
+        persisted_sessions: persistedSessionCount,
+      }, { status: 500 });
+    }
+    return evaluationErrorResponse(error);
   }
 }
