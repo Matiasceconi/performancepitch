@@ -163,7 +163,6 @@ export default async function (req: Request): Promise<Response> {
     const action = String(payload.action || "dry_run");
     const squadId = payload.squad_id || null;
     const files: FileInput[] = payload.files || [];
-    const fallbackDate = payload.fallback_date || payload.assessment_date || null;
     const context = String(payload.context || "");
     const playerOverrides: Record<string, string> = payload.player_overrides || {};
     const rememberAliases = payload.remember_aliases !== false;
@@ -216,9 +215,9 @@ export default async function (req: Request): Promise<Response> {
       const times = new Set<string>();
 
       rows.forEach((row, rowIndex) => {
-        const assessmentDate = assessmentDateFromRow(row) || fallbackDate;
+        const assessmentDate = assessmentDateFromRow(row);
         if (!assessmentDate) {
-          throw new Error(`${file.file_name}, fila ${rowIndex + 2}: no contiene fecha y no se indicó una fecha de respaldo`);
+          throw new Error(`${file.file_name}, fila ${rowIndex + 2}: no contiene una fecha válida en el CSV (columnas admitidas: Date, Assessment Date, Test Date o Fecha)`);
         }
         const assessmentTime = assessmentTimeFromRow(row);
         const rowTestKey = testKeyFromRow(row);
