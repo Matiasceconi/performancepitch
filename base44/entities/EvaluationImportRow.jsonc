@@ -22,6 +22,19 @@
       "type": "string",
       "description": "Hash SHA-256 de la fila completa"
     },
+    "session_id": {
+      "type": "string"
+    },
+    "source_block_id": {
+      "type": "string"
+    },
+    "assessment_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "assessment_time": {
+      "type": "string"
+    },
     "raw_content": {
       "type": "object",
       "description": "Contenido original de la fila (clave-valor)"
