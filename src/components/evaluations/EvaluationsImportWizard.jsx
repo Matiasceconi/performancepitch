@@ -42,7 +42,6 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
   const [selectedBlocks, setSelectedBlocks] = useState({});
   const [playerOverrides, setPlayerOverrides] = useState({});
   const [rememberAliases, setRememberAliases] = useState(true);
-  const [groupingConfirmed, setGroupingConfirmed] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
   const [dragOver, setDragOver] = useState(false);
@@ -74,7 +73,6 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
       setSessionGroups(buildGroups(data, context));
       setPlayerOverrides({});
       setSelectedBlocks({});
-      setGroupingConfirmed(false);
       setStep(2);
     } catch (e) {
       setError(e.message || "No se pudieron analizar los archivos");
@@ -83,7 +81,6 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
 
   function updateGroup(groupId, patch) {
     setSessionGroups((previous) => previous.map((group) => group.group_id === groupId ? { ...group, ...patch } : group));
-    setGroupingConfirmed(false);
   }
 
   function toggleBlock(groupId, blockId) {
@@ -113,15 +110,10 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
       newGroup,
     ]);
     setSelectedBlocks((previous) => ({ ...previous, [group.group_id]: [] }));
-    setGroupingConfirmed(false);
     setError("");
   }
 
   async function handleConfirm() {
-    if (!groupingConfirmed) {
-      setError("Confirmá que revisaste la agrupación antes de importar.");
-      return;
-    }
     if (sessionGroups.some((group) => !group.name.trim() || !group.block_ids.length)) {
       setError("Cada sesión debe tener nombre y al menos un bloque.");
       return;
@@ -156,8 +148,8 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
     {step === 1 && <>
       <div onDragOver={(event) => { event.preventDefault(); setDragOver(true); }} onDragLeave={() => setDragOver(false)} onDrop={(event) => { event.preventDefault(); setDragOver(false); handleFiles(event.dataTransfer.files); }} onClick={() => inputRef.current?.click()} className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragOver ? "border-blue-500 bg-blue-500/5" : "border-zinc-700 hover:border-zinc-600"}`}>
         <Upload size={28} className="text-zinc-500 mx-auto mb-2" />
-        <p className="text-sm text-zinc-300 font-medium">Arrastrá uno o varios CSV</p>
-        <p className="text-xs text-zinc-600 mt-1">La fecha, hora, prueba e intentos se detectan fila por fila</p>
+        <p className="text-sm text-zinc-300 font-medium">Arrastrá un CSV</p>
+        <p className="text-xs text-zinc-600 mt-1">Un solo archivo es suficiente. Podés sumar otros CSV de forma opcional.</p>
         <input ref={inputRef} type="file" accept=".csv" multiple className="hidden" onChange={(event) => { handleFiles(event.target.files); event.target.value = ""; }} />
       </div>
       {!!files.length && <div className="space-y-2">{files.map((file, index) => <div key={`${file.name}:${index}`} className="flex items-center justify-between p-3 bg-zinc-950/50 border border-zinc-800 rounded-lg"><div className="flex items-center gap-2 min-w-0"><FileCheck2 size={16} className="text-emerald-400 shrink-0" /><span className="text-sm text-white truncate">{file.name}</span><span className="text-xs text-zinc-500">{Math.ceil(file.size / 1024)} KB</span></div><button onClick={() => setFiles((previous) => previous.filter((_, itemIndex) => itemIndex !== index))} className="p-1 text-zinc-500 hover:text-red-400"><X size={14} /></button></div>)}</div>}
@@ -165,14 +157,14 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
         <div className="flex items-start gap-3 rounded-xl border border-blue-500/25 bg-blue-500/10 p-3"><Calendar size={18} className="mt-0.5 shrink-0 text-blue-400" /><div><p className="text-xs font-semibold text-blue-200">Fecha automática desde el CSV</p><p className="mt-1 text-xs leading-relaxed text-zinc-400">La fecha y la hora se leen exclusivamente del contenido de cada fila. Si falta una fecha válida, el archivo se detiene para revisión.</p></div></div>
         <div><label className="text-xs text-zinc-500 block mb-1">Contexto predeterminado</label><select value={context} onChange={(event) => setContext(event.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 text-sm text-white">{CONTEXTS.map((value) => <option key={value} value={value}>{value || "Sin contexto"}</option>)}</select></div>
       </div>
-      <div className="flex items-center justify-between"><p className="text-xs text-zinc-500">{files.length} archivo(s)</p><button onClick={handleDryRun} disabled={!files.length || busy || !activeSquad?.id} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <FileCheck2 size={16} />}{busy ? "Analizando..." : "Analizar y agrupar"}</button></div>
+      <div className="flex items-center justify-between"><p className="text-xs text-zinc-500">{files.length} archivo(s)</p><button onClick={handleDryRun} disabled={!files.length || busy || !activeSquad?.id} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <FileCheck2 size={16} />}{busy ? "Analizando..." : "Analizar CSV"}</button></div>
     </>}
 
     {step === 2 && preview && <>
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-2"><StatBox label="Filas" value={preview.total_results} color="blue" /><StatBox label="Nuevas" value={preview.new_results} color="emerald" /><StatBox label="Duplicadas" value={preview.duplicate_results} color="yellow" /><StatBox label="Jugadores" value={preview.total_players} color="blue" /><StatBox label="Pendientes" value={unresolved} color="red" /></div>
 
       <section className="space-y-3">
-        <div className="flex items-center gap-2"><Layers3 size={17} className="text-blue-400" /><div><h3 className="text-sm font-bold text-white">Sesiones propuestas</h3><p className="text-xs text-zinc-500">Un bloque mantiene juntos todos los intentos de un jugador, prueba, fecha y hora.</p></div></div>
+        <div className="flex items-center gap-2"><Layers3 size={17} className="text-blue-400" /><div><h3 className="text-sm font-bold text-white">Evaluaciones detectadas</h3><p className="text-xs text-zinc-500">El sistema ya agrupó automáticamente la fecha, prueba e intentos encontrados dentro del CSV.</p></div></div>
         {sessionGroups.map((group) => <SessionGroupCard key={group.group_id} group={group} blocks={group.block_ids.map((id) => blockMap.get(id)).filter(Boolean)} selected={selectedBlocks[group.group_id] || []} onToggle={(id) => toggleBlock(group.group_id, id)} onChange={(patch) => updateGroup(group.group_id, patch)} onSplit={() => splitGroup(group)} />)}
       </section>
 
@@ -182,15 +174,15 @@ export default function EvaluationsImportWizard({ onClose, onImported, embedded 
         <label className="flex items-center gap-2 mt-2 text-xs text-zinc-400"><input type="checkbox" checked={rememberAliases} onChange={(event) => setRememberAliases(event.target.checked)} className="accent-blue-500" />Recordar las correcciones manuales como alias auditables</label>
       </section>
 
-      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30"><label className="flex items-start gap-2 text-sm text-blue-200"><input type="checkbox" checked={groupingConfirmed} onChange={(event) => setGroupingConfirmed(event.target.checked)} className="accent-blue-500 mt-1" /><span>Revisé las fechas, nombres, bloques y destinos. Confirmo esta agrupación explícita de sesiones.</span></label></div>
-      <div className="flex justify-between"><button onClick={() => setStep(1)} disabled={busy} className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm">Volver</button><button onClick={handleConfirm} disabled={busy || !groupingConfirmed} className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{busy ? "Importando..." : `Importar en ${sessionGroups.length} sesión(es)`}</button></div>
+      <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/30"><p className="text-sm text-blue-200">La fecha y la prueba fueron detectadas dentro del CSV. Podés importar directamente o ajustar el nombre de la sesión.</p></div>
+      <div className="flex justify-between"><button onClick={() => setStep(1)} disabled={busy} className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm">Volver</button><button onClick={handleConfirm} disabled={busy} className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-50 flex items-center gap-2">{busy ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}{busy ? "Importando..." : sessionGroups.length === 1 ? "Importar evaluación" : `Importar ${sessionGroups.length} evaluaciones`}</button></div>
     </>}
 
     {step === 3 && result && <div className="text-center py-8 space-y-4"><div className="w-16 h-16 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center mx-auto"><CheckCircle2 size={32} className="text-emerald-400" /></div><div><h3 className="text-lg font-bold text-white">Importación completada</h3><p className="text-sm text-zinc-400 mt-1">Se guardaron {result.sessions?.length || 0} sesiones con trazabilidad completa.</p></div><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 max-w-lg mx-auto"><StatBox label="Importados" value={result.imported_results} color="blue" /><StatBox label="Duplicados" value={result.duplicate_results} color="yellow" /><StatBox label="Vinculados" value={result.linked_players} color="emerald" /><StatBox label="Pendientes" value={result.pending_players} color="red" /></div>{result.sessions?.map((session) => <div key={session.session_id} className="max-w-lg mx-auto text-left p-3 rounded-lg bg-zinc-950/50 border border-zinc-800"><p className="text-sm text-white font-medium">{session.name}</p><p className="text-xs text-zinc-500">{session.assessment_date} · {session.total_players} jugadores · {session.total_results} resultados</p></div>)}{onClose && <button onClick={onClose} className="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold">Cerrar</button>}</div>}
   </div>;
 
   if (embedded) return <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">{content}</div>;
-  return <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto"><div className="flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-20"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center"><Upload size={20} className="text-blue-400" /></div><div><h2 className="text-lg font-bold text-white">Importar evaluaciones</h2><p className="text-xs text-zinc-500">Paso {step} de 3 · {activeSquad?.name || "Sin plantel"}</p></div></div>{onClose && <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400"><X size={20} /></button>}</div><div className="p-5">{content}</div></div></div>;
+  return <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"><div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto"><div className="flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-20"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-lg bg-blue-500/15 flex items-center justify-center"><Upload size={20} className="text-blue-400" /></div><div><h2 className="text-lg font-bold text-white">Importar evaluaciones</h2><p className="text-xs text-zinc-500">{step === 1 ? "Subir CSV" : step === 2 ? "Revisar evaluación detectada" : "Importación finalizada"} · {activeSquad?.name || "Sin plantel"}</p></div></div>{onClose && <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400"><X size={20} /></button>}</div><div className="p-5">{content}</div></div></div>;
 }
 
 function SessionGroupCard({ group, blocks, selected, onToggle, onChange, onSplit }) {
