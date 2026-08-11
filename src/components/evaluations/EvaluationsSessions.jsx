@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Calendar, ChevronDown, ChevronRight, Loader2, Inbox, Users, FlaskConical, AlertCircle } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { evaluationsGateway } from "@/lib/evaluationsApi";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function fmtDate(iso) {
@@ -19,15 +19,13 @@ export default function EvaluationsSessions({ onSelectPlayer }) {
   const [playersMap, setPlayersMap] = useState(new Map());
 
   useEffect(() => {
-    base44.entities.Player.list("full_name", 1000)
-      .then((data) => setPlayersMap(new Map((data || []).map((p) => [p.id, p]))))
-      .catch(() => setPlayersMap(new Map()));
-  }, []);
-
-  useEffect(() => {
-    const filter = activeSquad?.id ? { squad_id: activeSquad.id } : {};
-    base44.entities.EvaluationSession.filter(filter, "-assessment_date", 50)
-      .then((data) => setSessions(data || []))
+    if (!activeSquad?.id) return;
+    setLoading(true);
+    evaluationsGateway("sessions", { squad_id: activeSquad.id })
+      .then((data) => {
+        setSessions(data.sessions || []);
+        setPlayersMap(new Map((data.players || []).map((player) => [player.id, player])));
+      })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
   }, [activeSquad?.id]);
@@ -37,8 +35,8 @@ export default function EvaluationsSessions({ onSelectPlayer }) {
     setExpanded(sessionId);
     if (!resultsBySession[sessionId]) {
       try {
-        const results = await base44.entities.EvaluationResult.filter({ session_id: sessionId }, "test_key", 500);
-        setResultsBySession((prev) => ({ ...prev, [sessionId]: results || [] }));
+        const data = await evaluationsGateway("sessions", { squad_id: activeSquad?.id, session_id: sessionId });
+        setResultsBySession((prev) => ({ ...prev, [sessionId]: data.results || [] }));
       } catch { setResultsBySession((prev) => ({ ...prev, [sessionId]: [] })); }
     }
   }
