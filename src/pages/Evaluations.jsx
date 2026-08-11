@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download } from "lucide-react";
-import { base44 } from "@/api/base44Client";
+import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download, Loader2 } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { evaluationsGateway } from "@/lib/evaluationsApi";
 import EvaluationsSummary from "@/components/evaluations/EvaluationsSummary";
 import EvaluationsSessions from "@/components/evaluations/EvaluationsSessions";
 import EvaluationsSquadAnalysis from "@/components/evaluations/EvaluationsSquadAnalysis";
@@ -26,17 +26,39 @@ export default function Evaluations() {
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [exporting, setExporting] = useState(false);
-  const { activeSquad, clubBrand } = useWorkspace();
+  const [capabilities, setCapabilities] = useState(null);
+  const [accessError, setAccessError] = useState("");
+  const { activeSquad } = useWorkspace();
+
+  useEffect(() => {
+    if (!activeSquad?.id) return;
+    let cancelled = false;
+    evaluationsGateway("overview", { squad_id: activeSquad.id })
+      .then((data) => {
+        if (!cancelled) {
+          setCapabilities(data.capabilities || {});
+          setAccessError("");
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) setAccessError(error?.response?.data?.error || error.message || "Sin acceso a Evaluaciones");
+      });
+    return () => { cancelled = true; };
+  }, [activeSquad?.id]);
+
+  useEffect(() => {
+    if (!capabilities) return;
+    if (activeTab === "config" && !capabilities.can_admin) setActiveTab("resumen");
+    if (activeTab === "importaciones" && !capabilities.can_create) setActiveTab("resumen");
+  }, [capabilities, activeTab]);
 
   async function handleExportCSV() {
     setExporting(true);
     try {
-      const filter = activeSquad?.id ? { squad_id: activeSquad.id } : {};
-      const [sessions, results] = await Promise.all([
-        base44.entities.EvaluationSession.filter(filter, "-assessment_date", 200),
-        base44.entities.EvaluationResult.filter(filter, "assessment_date", 2000),
-      ]);
-      const players = await base44.entities.Player.list("full_name", 1000);
+      const data = await evaluationsGateway("export", { squad_id: activeSquad?.id });
+      const sessions = data.sessions || [];
+      const results = data.results || [];
+      const players = data.players || [];
       const playerMap = new Map(players.map((p) => [p.id, p]));
 
       const rows = results.map((r) => {
@@ -119,25 +141,28 @@ export default function Evaluations() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
+          {capabilities?.can_export && <button
             onClick={handleExportCSV}
             disabled={exporting}
             className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-semibold hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
           >
             <Download size={16} /> {exporting ? "Exportando..." : "Exportar CSV"}
-          </button>
-          <button
+          </button>}
+          {capabilities?.can_create && <button
             onClick={() => setShowImport(true)}
             className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors flex items-center gap-2"
           >
             <Upload size={16} /> Importar CSV
-          </button>
+          </button>}
         </div>
       </div>
 
       {/* Tab navigation */}
       <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-800 pb-px">
-        {TABS.map((tab) => {
+        {TABS.filter((tab) =>
+          (tab.key !== "config" || capabilities?.can_admin)
+          && (tab.key !== "importaciones" || capabilities?.can_create)
+        ).map((tab) => {
           const isActive = activeTab === tab.key;
           return (
             <button
@@ -158,16 +183,20 @@ export default function Evaluations() {
 
       {/* Tab content */}
       <div className="min-h-[400px]">
+        {accessError && <div className="p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-sm text-red-300">{accessError}</div>}
+        {!accessError && !capabilities && <div className="py-12 flex justify-center"><Loader2 size={20} className="text-zinc-500 animate-spin" /></div>}
+        {!accessError && capabilities && <>
         {activeTab === "resumen" && <EvaluationsSummary key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
         {activeTab === "sesiones" && <EvaluationsSessions key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
         {activeTab === "plantel" && <EvaluationsSquadAnalysis key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
         {activeTab === "jugadores" && <EvaluationsPlayers key={refreshKey} selectedPlayerId={selectedPlayerId} onSelectPlayer={handleSelectPlayer} />}
-        {activeTab === "importaciones" && <EvaluationsImportWizard embedded onImported={() => setRefreshKey((k) => k + 1)} />}
-        {activeTab === "config" && <EvaluationsConfig />}
+        {activeTab === "importaciones" && capabilities?.can_create && <EvaluationsImportWizard embedded onImported={() => setRefreshKey((k) => k + 1)} />}
+        {activeTab === "config" && capabilities?.can_admin && <EvaluationsConfig />}
+        </>}
       </div>
 
       {/* Import wizard modal */}
-      {showImport && (
+      {showImport && capabilities?.can_create && (
         <EvaluationsImportWizard
           onClose={() => setShowImport(false)}
           onImported={() => {
