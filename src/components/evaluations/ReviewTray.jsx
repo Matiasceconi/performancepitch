@@ -35,11 +35,11 @@ export default function ReviewTray({ items, onSelectPlayer }) {
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-6">
         <div className="flex items-center gap-2 mb-3">
           <AlertCircle size={16} className="text-emerald-400" />
-          <h3 className="text-sm font-bold text-white">Bandeja de revisión prioritaria</h3>
+          <h3 className="text-sm font-bold text-white">Revisión de datos</h3>
         </div>
         <div className="py-6 text-center">
-          <p className="text-emerald-400 text-sm font-medium">Sin señales que requieran revisión</p>
-          <p className="text-zinc-500 text-xs mt-1">Todos los jugadores están dentro de su rango esperado o sin línea de base suficiente</p>
+          <p className="text-emerald-400 text-sm font-medium">Sin datos que requieran revisión</p>
+          <p className="text-zinc-500 text-xs mt-1">Todos los jugadores están vinculados y sin anomalías de calidad</p>
         </div>
       </div>
     );
@@ -50,10 +50,10 @@ export default function ReviewTray({ items, onSelectPlayer }) {
       <div className="flex items-center justify-between p-4 border-b border-zinc-800">
         <div className="flex items-center gap-2">
           <AlertCircle size={16} className="text-orange-400" />
-          <h3 className="text-sm font-bold text-white">Bandeja de revisión prioritaria</h3>
+          <h3 className="text-sm font-bold text-white">Revisión de datos</h3>
           <span className="px-2 py-0.5 rounded bg-orange-500/15 text-orange-300 text-xs font-bold">{items.length}</span>
         </div>
-        <p className="text-xs text-zinc-500 hidden sm:block">Ordenado por gravedad · calidad · magnitud</p>
+        <p className="text-xs text-zinc-500 hidden sm:block">Identidades pendientes · colisiones · calidad · anomalías</p>
       </div>
 
       {/* Desktop: table */}

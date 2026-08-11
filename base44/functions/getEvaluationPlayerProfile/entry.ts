@@ -10,6 +10,9 @@ import {
   determineSignal,
   detectAsymmetrySignal,
   detectAnomaly,
+  calculateRecentChange,
+  classifyChange,
+  type ThresholdConfig,
 } from "../../shared/evaluationBaseline.ts";
 
 export default async function (req: Request): Promise<Response> {
@@ -83,6 +86,22 @@ export default async function (req: Request): Promise<Response> {
     const historicalResults = allPlayerResults.filter((r: any) =>
       r.assessment_date < latestDate && r.is_primary
     );
+
+    // ── 7b. Load previous session results (most recent before latest) ────
+    const previousSession = filteredSessions[1] || null;
+    let previousResults: any[] = [];
+    if (previousSession) {
+      previousResults = allPlayerResults.filter((r: any) =>
+        r.session_id === previousSession.session_id && r.is_primary
+      );
+    }
+    const previousMap = new Map<string, number>();
+    for (const pr of previousResults) {
+      for (const [mk, mv] of Object.entries(pr.metrics || {})) {
+        if (typeof mv !== "number" || !isFinite(mv)) continue;
+        previousMap.set(`${pr.test_key}|${mk}`, mv as number);
+      }
+    }
 
     // Group historical by test_key + metric_key
     const baselineMap = new Map<string, number[]>();
@@ -177,8 +196,17 @@ export default async function (req: Request): Promise<Response> {
         const threshold = thresholds.find(
           (t: any) => t.source_key === r.source_key && t.test_key === r.test_key && t.metric_key === mk
         );
-        const thresholdConfig = threshold
-          ? { moderate: threshold.moderate_threshold, important: threshold.important_threshold, type: threshold.threshold_type }
+        const metricDef = metricDefMap.get(mk);
+        const direction = metricDef?.direction || "higher_is_better";
+        const thresholdConfig: ThresholdConfig | null = threshold
+          ? {
+              moderate: threshold.moderate_threshold,
+              important: threshold.important_threshold,
+              type: threshold.threshold_type,
+              improvement_threshold: threshold.improvement_threshold || null,
+              decline_threshold: threshold.decline_threshold || null,
+              direction: direction as any,
+            }
           : null;
 
         // Signal
@@ -187,17 +215,34 @@ export default async function (req: Request): Promise<Response> {
           ? detectAnomaly(mv, baseline.value, baseline.std)
           : { anomaly: false, reason: "" };
 
+        // Recent change vs previous session
+        const previousValue = previousMap.get(mapKey) || null;
+        const recentChange = calculateRecentChange(mv, previousValue);
+        const classification = classifyChange(
+          { changeAbs: recentChange.changeAbs, hasPrevious: recentChange.hasPrevious },
+          { changeAbs: sig.changeAbs, baselineSufficient: baseline.sufficient },
+          direction as any
+        );
+
         signals.push({
           session_id: r.session_id,
           assessment_date: r.assessment_date,
           test_key: r.test_key,
           metric_key: mk,
+          metric_label: metricDef?.metric_label || mk,
+          unit: metricDef?.unit || "",
+          direction,
           current_value: mv,
+          previous_value: previousValue,
+          has_previous: recentChange.hasPrevious,
+          recent_change_abs: recentChange.changeAbs,
+          recent_change_pct: recentChange.changePct,
           baseline_value: baseline.value,
           change_abs: sig.changeAbs,
           change_pct: sig.changePct,
           z_score_individual: sig.zScoreIndividual,
           signal: sig.signal,
+          classification,
           reason: sig.reason + (anomaly.anomaly ? ` · ${anomaly.reason}` : ""),
           quality_status: r.quality_status,
           retest: r.retest,

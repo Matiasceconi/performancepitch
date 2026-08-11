@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2 } from "lucide-react";
+import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download } from "lucide-react";
+import { base44 } from "@/api/base44Client";
+import { useWorkspace } from "@/lib/WorkspaceContext";
 import EvaluationsSummary from "@/components/evaluations/EvaluationsSummary";
 import EvaluationsSessions from "@/components/evaluations/EvaluationsSessions";
 import EvaluationsSquadAnalysis from "@/components/evaluations/EvaluationsSquadAnalysis";
@@ -23,6 +25,68 @@ export default function Evaluations() {
   const [selectedPlayerId, setSelectedPlayerId] = useState(searchParams.get("player_id") || null);
   const [showImport, setShowImport] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [exporting, setExporting] = useState(false);
+  const { activeSquad, clubBrand } = useWorkspace();
+
+  async function handleExportCSV() {
+    setExporting(true);
+    try {
+      const filter = activeSquad?.id ? { squad_id: activeSquad.id } : {};
+      const [sessions, results] = await Promise.all([
+        base44.entities.EvaluationSession.filter(filter, "-assessment_date", 200),
+        base44.entities.EvaluationResult.filter(filter, "assessment_date", 2000),
+      ]);
+      const players = await base44.entities.Player.list("full_name", 1000);
+      const playerMap = new Map(players.map((p) => [p.id, p]));
+
+      const rows = results.map((r) => {
+        const player = r.player_id ? playerMap.get(r.player_id) : null;
+        const session = sessions.find((s) => s.session_id === r.session_id);
+        return {
+          fecha: r.assessment_date,
+          sesion: session?.name || "",
+          plantel: r.squad_name || "",
+          jugador: player?.full_name || r.player_name_csv || "",
+          posicion: player?.position || "",
+          fuente: r.source_key || "",
+          prueba: r.test_key || "",
+          lado: r.test_side || "",
+          intento: r.attempt_number || 1,
+          retest: r.retest ? "Sí" : "No",
+          principal: r.is_primary ? "Sí" : "No",
+          motivo_principal: r.primary_reason || "",
+          estado_vinculacion: r.linking_status || "",
+          ...r.metrics,
+        };
+      });
+
+      if (!rows.length) { alert("No hay datos para exportar"); return; }
+
+      const headers = [...new Set(rows.flatMap((r) => Object.keys(r)))];
+      const csv = [
+        headers.join(","),
+        ...rows.map((r) => headers.map((h) => {
+          const v = r[h];
+          if (v === null || v === undefined) return "";
+          if (typeof v === "number") return v;
+          const s = String(v).replace(/"/g, '""');
+          return s.includes(",") || s.includes("\n") ? `"${s}"` : s;
+        }).join(","))
+      ].join("\n");
+
+      const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `evaluaciones_${activeSquad?.name || "club"}_${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert("Error al exportar: " + e.message);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   // Sync tab to URL
   useEffect(() => {
@@ -54,12 +118,21 @@ export default function Evaluations() {
             <p className="text-xs text-zinc-500">Evaluaciones multisistema · ForceDecks · NordBord · ISO y más</p>
           </div>
         </div>
-        <button
-          onClick={() => setShowImport(true)}
-          className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors flex items-center gap-2"
-        >
-          <Upload size={16} /> Importar CSV
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCSV}
+            disabled={exporting}
+            className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-sm font-semibold hover:bg-zinc-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <Download size={16} /> {exporting ? "Exportando..." : "Exportar CSV"}
+          </button>
+          <button
+            onClick={() => setShowImport(true)}
+            className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors flex items-center gap-2"
+          >
+            <Upload size={16} /> Importar CSV
+          </button>
+        </div>
       </div>
 
       {/* Tab navigation */}

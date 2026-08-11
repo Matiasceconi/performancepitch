@@ -36,10 +36,10 @@ export default function SummaryMode({ data }) {
             <div className="grid grid-cols-2 gap-2 text-xs">
               <Stat label="Actual" value={fmtVal(s.current_value)} highlight />
               <Stat label="Base" value={baseline.sufficient ? fmtVal(baseline.value) : "Sin base"} />
-              <Stat label="Δ Abs" value={s.change_abs !== null ? fmtVal(s.change_abs) : "—"} tone={s.change_abs > 0 ? "pos" : s.change_abs < 0 ? "neg" : undefined} />
-              <Stat label="Δ %" value={fmtPct(s.change_pct)} tone={s.change_pct > 0 ? "pos" : s.change_pct < 0 ? "neg" : undefined} />
+              <Stat label="Δ vs Base" value={s.change_abs !== null ? fmtVal(s.change_abs) : "—"} tone={s.change_abs > 0 ? "pos" : s.change_abs < 0 ? "neg" : undefined} />
+              <Stat label="Δ% vs Base" value={fmtPct(s.change_pct)} tone={s.change_pct > 0 ? "pos" : s.change_pct < 0 ? "neg" : undefined} />
+              <Stat label="Δ% vs Anterior" value={s.has_previous ? fmtPct(s.recent_change_pct) : "—"} tone={s.recent_change_pct > 0 ? "pos" : s.recent_change_pct < 0 ? "neg" : undefined} />
               <Stat label="Z ind." value={s.z_score_individual !== null ? fmtVal(s.z_score_individual, 2) : "—"} />
-              <Stat label="Calidad" value={s.quality_status} />
             </div>
             <p className="text-xs text-zinc-500 mt-2 pt-2 border-t border-zinc-800/50">{s.reason}</p>
           </div>
