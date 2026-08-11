@@ -12,20 +12,20 @@ import {
   detectAnomaly,
   calculateRecentChange,
   classifyChange,
+  evaluateReferenceChange,
   type ThresholdConfig,
 } from "../../shared/evaluationBaseline.ts";
+import { evaluationErrorResponse, requireEvaluationAccess } from "../../shared/evaluationAccess.ts";
 
 export default async function (req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
-
     const body = await req.json().catch(() => ({}));
     const { player_id, squad_id, period, date_from, date_to, test_keys, metric_keys, compare_session_ids } = body;
 
     if (!player_id) return Response.json({ error: "player_id es requerido" }, { status: 400 });
+    const evaluationAccess = await requireEvaluationAccess(base44, user, squad_id, "view");
 
     // ── 1. Load canonical Player ────────────────────────────────────────────
     const players = await base44.asServiceRole.entities.Player.list("full_name", 1000);
@@ -37,7 +37,7 @@ export default async function (req: Request): Promise<Response> {
     try {
       memberships = await base44.asServiceRole.entities.SquadMembership.list("created_date", 1000);
     } catch { /* entity may not exist */ }
-    const playerMemberships = memberships.filter((m: any) => m.player_id === player_id);
+    const playerMemberships = memberships.filter((m: any) => m.player_id === player_id && m.status !== "inactivo");
     const playerSquadIds = new Set([
       player.squad_id,
       ...playerMemberships.map((m: any) => m.squad_id),
@@ -88,18 +88,15 @@ export default async function (req: Request): Promise<Response> {
     );
 
     // ── 7b. Load previous session results (most recent before latest) ────
-    const previousSession = filteredSessions[1] || null;
-    let previousResults: any[] = [];
-    if (previousSession) {
-      previousResults = allPlayerResults.filter((r: any) =>
-        r.session_id === previousSession.session_id && r.is_primary
-      );
-    }
     const previousMap = new Map<string, number>();
+    const previousResults = allPlayerResults
+      .filter((r: any) => r.assessment_date < latestDate && r.is_primary)
+      .sort((a: any, b: any) => String(b.assessment_date || "").localeCompare(String(a.assessment_date || "")));
     for (const pr of previousResults) {
       for (const [mk, mv] of Object.entries(pr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
-        previousMap.set(`${pr.test_key}|${mk}`, mv as number);
+        const key = `${pr.test_key}|${mk}`;
+        if (!previousMap.has(key)) previousMap.set(key, mv as number);
       }
     }
 
@@ -139,7 +136,7 @@ export default async function (req: Request): Promise<Response> {
     // ── 9. Load thresholds ──────────────────────────────────────────────────
     let thresholds: any[] = [];
     try {
-      thresholds = await base44.asServiceRole.entities.EvaluationThresholdConfig.filter({ active: true });
+      thresholds = await base44.asServiceRole.entities.EvaluationThresholdConfig.filter({ active: true }, "-updated_at", 500);
     } catch { /* empty */ }
 
     // ── 10. Load metric definitions ──────────────────────────────────────────
@@ -155,6 +152,12 @@ export default async function (req: Request): Promise<Response> {
       "created_date",
       200
     );
+
+    const auditEvents = await base44.asServiceRole.entities.EvaluationAuditEvent.filter(
+      { player_id, squad_id: activeSquadId },
+      "-created_at",
+      200,
+    ).catch(() => []);
 
     // ── 12. Load import files for audit (file_name per result) ───────────────
     const fileIds = [...new Set(playerResults.map((r: any) => r.file_id).filter(Boolean))];
@@ -194,7 +197,9 @@ export default async function (req: Request): Promise<Response> {
 
         // Threshold
         const threshold = thresholds.find(
-          (t: any) => t.source_key === r.source_key && t.test_key === r.test_key && t.metric_key === mk
+          (t: any) => t.squad_id === activeSquadId && t.source_key === r.source_key && t.test_key === r.test_key && t.metric_key === mk
+        ) || thresholds.find(
+          (t: any) => !t.squad_id && t.source_key === r.source_key && t.test_key === r.test_key && t.metric_key === mk
         );
         const metricDef = metricDefMap.get(mk);
         const direction = metricDef?.direction || "higher_is_better";
@@ -203,8 +208,8 @@ export default async function (req: Request): Promise<Response> {
               moderate: threshold.moderate_threshold,
               important: threshold.important_threshold,
               type: threshold.threshold_type,
-              improvement_threshold: threshold.improvement_threshold || null,
-              decline_threshold: threshold.decline_threshold || null,
+              improvement_threshold: threshold.improvement_threshold ?? null,
+              decline_threshold: threshold.decline_threshold ?? null,
               direction: direction as any,
             }
           : null;
@@ -216,13 +221,15 @@ export default async function (req: Request): Promise<Response> {
           : { anomaly: false, reason: "" };
 
         // Recent change vs previous session
-        const previousValue = previousMap.get(mapKey) || null;
+        const previousValue = previousMap.get(mapKey) ?? null;
         const recentChange = calculateRecentChange(mv, previousValue);
         const classification = classifyChange(
           { changeAbs: recentChange.changeAbs, hasPrevious: recentChange.hasPrevious },
           { changeAbs: sig.changeAbs, baselineSufficient: baseline.sufficient },
           direction as any
         );
+        const previousComparison = evaluateReferenceChange(mv, previousValue, thresholdConfig, direction as any, baseline.std);
+        const baselineComparison = evaluateReferenceChange(mv, baseline.value, thresholdConfig, direction as any, baseline.std);
 
         signals.push({
           session_id: r.session_id,
@@ -243,6 +250,8 @@ export default async function (req: Request): Promise<Response> {
           z_score_individual: sig.zScoreIndividual,
           signal: sig.signal,
           classification,
+          previous_comparison: previousComparison,
+          baseline_comparison: baselineComparison,
           reason: sig.reason + (anomaly.anomaly ? ` · ${anomaly.reason}` : ""),
           quality_status: r.quality_status,
           retest: r.retest,
@@ -275,6 +284,7 @@ export default async function (req: Request): Promise<Response> {
 
     // ── 14. Build response ───────────────────────────────────────────────────
     return Response.json({
+      capabilities: evaluationAccess.capabilities,
       player: {
         id: player.id,
         full_name: player.full_name,
@@ -320,6 +330,14 @@ export default async function (req: Request): Promise<Response> {
         attempt_number: r.attempt_number,
         retest: r.retest,
         is_primary: r.is_primary,
+        primary_selection_mode: r.primary_selection_mode || "automatic",
+        primary_reason: r.primary_reason || "",
+        primary_override_reason: r.primary_override_reason || "",
+        primary_selected_by: r.primary_selected_by || null,
+        primary_selected_at: r.primary_selected_at || null,
+        primary_review_required: !!r.primary_review_required,
+        automatic_candidate_result_id: r.automatic_candidate_result_id || null,
+        automatic_candidate_reason: r.automatic_candidate_reason || "",
         quality_status: r.quality_status,
         quality_notes: r.quality_notes,
         metrics: r.metrics || {},
@@ -340,11 +358,12 @@ export default async function (req: Request): Promise<Response> {
         source_key: m.source_key,
         test_keys: m.test_keys || [],
       })),
+      audit_events: auditEvents,
       compare_sessions: compare_session_ids
         ? playerResults.filter((r: any) => compare_session_ids.includes(r.session_id))
         : null,
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return evaluationErrorResponse(error);
   }
 }
