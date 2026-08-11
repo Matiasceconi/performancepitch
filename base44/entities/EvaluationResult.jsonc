@@ -84,6 +84,48 @@
       "type": "string",
       "description": "Motivo de selecci\u00f3n como principal (mejor valor, primer intento, etc.)"
     },
+    "primary_selection_mode": {
+      "type": "string",
+      "enum": [
+        "automatic",
+        "manual"
+      ],
+      "default": "automatic",
+      "description": "Indica si la selecci\u00f3n fue autom\u00e1tica o manual"
+    },
+    "primary_selected_by": {
+      "type": "string",
+      "description": "Usuario que realiz\u00f3 la selecci\u00f3n manual"
+    },
+    "primary_selected_at": {
+      "type": "string",
+      "description": "Fecha y hora de la selecci\u00f3n manual"
+    },
+    "primary_override_reason": {
+      "type": "string",
+      "description": "Motivo obligatorio de la selecci\u00f3n manual"
+    },
+    "primary_review_required": {
+      "type": "boolean",
+      "default": false,
+      "description": "Existe un nuevo mejor intento autom\u00e1tico pero se conserva la selecci\u00f3n manual"
+    },
+    "automatic_candidate_result_id": {
+      "type": "string",
+      "description": "Resultado que ser\u00eda principal seg\u00fan la regla autom\u00e1tica vigente"
+    },
+    "automatic_candidate_reason": {
+      "type": "string",
+      "description": "Regla y m\u00e9tricas que determinaron el candidato autom\u00e1tico"
+    },
+    "source_row_number": {
+      "type": "number",
+      "description": "Fila original dentro del CSV, sin contar el encabezado"
+    },
+    "source_block_id": {
+      "type": "string",
+      "description": "Bloque indivisible jugador + prueba + horario usado al dividir sesiones"
+    },
     "assessment_date": {
       "type": "string",
       "format": "date",
@@ -108,6 +150,10 @@
     "row_sha256": {
       "type": "string",
       "description": "Hash SHA-256 de la fila (deduplicaci\u00f3n exacta)"
+    },
+    "duplicate_precision_version": {
+      "type": "string",
+      "description": "Fuente, prueba y versi\u00f3n del cat\u00e1logo usada para la huella"
     },
     "file_id": {
       "type": "string",
