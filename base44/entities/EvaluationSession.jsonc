@@ -27,6 +27,14 @@
       "format": "date",
       "description": "Fecha de la bater\u00eda (YYYY-MM-DD)"
     },
+    "assessment_time": {
+      "type": "string",
+      "description": "Horario identificatorio opcional para sesiones divididas del mismo d\u00eda"
+    },
+    "import_group_id": {
+      "type": "string",
+      "description": "Grupo expl\u00edcitamente confirmado en la vista previa"
+    },
     "context": {
       "type": "string",
       "description": "Contexto configurable (Pretemporada, MD+2, MD-4, Control semanal, Retorno al juego, Evaluaci\u00f3n inicial, Cierre de bloque)"
@@ -111,6 +119,12 @@
     "notes": {
       "type": "string",
       "description": "Observaciones generales"
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
     },
     "created_by": {
       "type": "string",
