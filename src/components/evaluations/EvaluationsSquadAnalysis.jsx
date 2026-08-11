@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Loader2, Inbox, Search, Table, Grid3x3 } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { evaluationsGateway } from "@/lib/evaluationsApi";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import ChangeMap from "@/components/evaluations/ChangeMap";
 
@@ -21,19 +21,15 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
   const [search, setSearch] = useState("");
   const [selectedMetric, setSelectedMetric] = useState(null);
 
-  // Load players in batch (once)
   useEffect(() => {
-    base44.entities.Player.list("full_name", 1000)
-      .then((data) => setPlayersMap(new Map((data || []).map((p) => [p.id, p]))))
-      .catch(() => setPlayersMap(new Map()));
-  }, []);
-
-  useEffect(() => {
-    const filter = activeSquad?.id ? { squad_id: activeSquad.id } : {};
-    base44.entities.EvaluationSession.filter(filter, "-assessment_date", 50)
+    if (!activeSquad?.id) return;
+    setLoading(true);
+    evaluationsGateway("squad_analysis", { squad_id: activeSquad.id })
       .then((data) => {
-        setSessions(data || []);
-        if (data?.length) setSelectedSession(data[0].session_id);
+        setSessions(data.sessions || []);
+        setPlayersMap(new Map((data.players || []).map((player) => [player.id, player])));
+        setResults(data.results || []);
+        if (data.sessions?.length) setSelectedSession(data.sessions[0].session_id);
       })
       .catch(() => setSessions([]))
       .finally(() => setLoading(false));
@@ -42,17 +38,18 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
   useEffect(() => {
     if (!selectedSession) return;
     setLoading(true);
-    base44.entities.EvaluationResult.filter({ session_id: selectedSession }, "test_key", 500)
+    evaluationsGateway("squad_analysis", { squad_id: activeSquad?.id, session_id: selectedSession })
       .then((data) => {
-        setResults(data || []);
+        const nextResults = data.results || [];
+        setResults(nextResults);
         const metrics = new Set();
-        (data || []).forEach((r) => Object.keys(r.metrics || {}).forEach((k) => metrics.add(k)));
+        nextResults.forEach((r) => Object.keys(r.metrics || {}).forEach((k) => metrics.add(k)));
         const sorted = [...metrics].sort();
         if (sorted.length && !selectedMetric) setSelectedMetric(sorted[0]);
       })
       .catch(() => setResults([]))
       .finally(() => setLoading(false));
-  }, [selectedSession]);
+  }, [selectedSession, activeSquad?.id]);
 
   if (loading && !results.length) return <div className="py-10 flex justify-center"><Loader2 size={20} className="text-zinc-500 animate-spin" /></div>;
 
