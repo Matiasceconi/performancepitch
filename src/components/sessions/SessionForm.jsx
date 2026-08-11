@@ -5,6 +5,7 @@ import { isGoalkeeper } from "@/components/squad/squadConstants";
 import moment from "moment";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getMicrocycleDefaults, SESSION_MD_CODES, invokeRebuildPlanning } from "@/components/planning/microcycleSync";
+import { useToast } from "@/components/ui/use-toast";
 
 const MD_CODES = SESSION_MD_CODES;
 const OBJECTIVE_OPTS = ["Tensión", "Volumen", "Activación", "Velocidad", "Recuperación", "Otro"];
@@ -23,6 +24,7 @@ const STATUS_LABELS = {
 
 export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) {
   const { activeSquadId, activeSeasonId } = useWorkspace();
+  const { toast } = useToast();
   const [squads, setSquads] = useState([]);
   const [form, setForm] = useState({
     title: "", session_number: nextSessionNumber || "", date: moment().format("YYYY-MM-DD"),
