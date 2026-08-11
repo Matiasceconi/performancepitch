@@ -22,6 +22,27 @@
       "type": "string",
       "description": "Prueba detectada (ej: cmj, sj, cmrj)"
     },
+    "detected_dates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "detected_test_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "detected_times": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
     "size_bytes": {
       "type": "number",
       "description": "Tama\u00f1o en bytes"
