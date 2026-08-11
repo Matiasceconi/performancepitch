@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Loader2, AlertCircle, Users } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { evaluationPlayerProfile, evaluationsGateway } from "@/lib/evaluationsApi";
 import PlayerSelector from "@/components/evaluations/PlayerSelector";
 import PlayerProfileHeader from "@/components/evaluations/PlayerProfileHeader";
 import PlayerProfileModeSelector from "@/components/evaluations/PlayerProfileModeSelector";
@@ -30,57 +30,8 @@ export default function EvaluationsPlayers({ selectedPlayerId, onSelectPlayer })
     async function loadList() {
       setLoadingList(true);
       try {
-        const [results, players, memberships] = await Promise.all([
-          base44.entities.EvaluationResult.list("assessment_date", 1000),
-          base44.entities.Player.list("full_name", 1000),
-          base44.entities.SquadMembership.list("created_date", 1000).catch(() => []),
-        ]);
-
-        const playerMap = new Map(players.map((p) => [p.id, p]));
-        // Determine squad player IDs
-        const squadPlayerIds = new Set(
-          activeSquad?.id
-            ? memberships.filter((m) => m.squad_id === activeSquad.id).map((m) => m.player_id)
-            : []
-        );
-
-        // Group results by player
-        const byPlayer = new Map();
-        for (const r of results) {
-          const key = r.player_id || `csv:${r.player_name_csv}`;
-          if (!byPlayer.has(key)) {
-            const player = r.player_id ? playerMap.get(r.player_id) : null;
-            byPlayer.set(key, {
-              id: r.player_id || key,
-              realId: r.player_id || null,
-              name: player?.full_name || r.player_name_csv || "Sin vincular",
-              position: player?.position || "—",
-              photoUrl: player?.photo_url || null,
-              linked: !!r.player_id,
-              linkValid: r.player_id ? playerMap.has(r.player_id) : false,
-              tests: new Set(),
-              lastDate: r.assessment_date,
-              resultCount: 0,
-              pendingCount: r.linking_status === "pending" || r.linking_status === "collision" ? 1 : 0,
-            });
-          }
-          const p = byPlayer.get(key);
-          p.tests.add(r.test_key);
-          p.resultCount++;
-          if (r.assessment_date > p.lastDate) p.lastDate = r.assessment_date;
-          if (r.linking_status === "pending" || r.linking_status === "collision") p.pendingCount++;
-        }
-
-        const list = [...byPlayer.values()].map((p) => ({
-          ...p,
-          tests: [...p.tests].sort(),
-        }));
-
-        // Sort: linked first, then by name
-        list.sort((a, b) => {
-          if (a.linked !== b.linked) return b.linked - a.linked;
-          return a.name.localeCompare(b.name);
-        });
+        const data = await evaluationsGateway("players_index", { squad_id: activeSquad?.id });
+        const list = data.players || [];
 
         if (!cancelled) setPlayersList(list);
       } catch (e) {
@@ -107,12 +58,12 @@ export default function EvaluationsPlayers({ selectedPlayerId, onSelectPlayer })
     setLoadingProfile(true);
     setProfileError("");
     try {
-      const resp = await base44.functions.invoke("getEvaluationPlayerProfile", {
+      const data = await evaluationPlayerProfile({
         player_id: pid,
         squad_id: activeSquad?.id,
         period: "all",
       });
-      setProfileData(resp.data);
+      setProfileData(data);
     } catch (e) {
       setProfileError(e.message || "Error al cargar el perfil");
       setProfileData(null);
@@ -190,7 +141,7 @@ export default function EvaluationsPlayers({ selectedPlayerId, onSelectPlayer })
                 {mode === "asimetrias" && <AsymmetryMode data={profileData} />}
                 {mode === "plantel" && <SquadComparisonMode data={profileData} />}
                 {mode === "mapa" && <PersonalChangeMapMode data={profileData} />}
-                {mode === "datos" && <FullDataMode data={profileData} />}
+                {mode === "datos" && <FullDataMode data={profileData} squadId={activeSquad?.id} onPrimaryChanged={() => fetchProfile(selectedPlayerId)} />}
               </div>
             </>
           )}
@@ -269,7 +220,7 @@ export default function EvaluationsPlayers({ selectedPlayerId, onSelectPlayer })
               {mode === "asimetrias" && <AsymmetryMode data={profileData} />}
               {mode === "plantel" && <SquadComparisonMode data={profileData} />}
               {mode === "mapa" && <PersonalChangeMapMode data={profileData} />}
-              {mode === "datos" && <FullDataMode data={profileData} />}
+              {mode === "datos" && <FullDataMode data={profileData} squadId={activeSquad?.id} onPrimaryChanged={() => fetchProfile(selectedPlayerId)} />}
             </div>
           </>
         )}
