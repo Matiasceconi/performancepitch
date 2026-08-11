@@ -44,6 +44,14 @@
       "default": "sd",
       "description": "Tipo de umbral: desviaci\u00f3n est\u00e1ndar, porcentaje, absoluto"
     },
+    "improvement_threshold": {
+      "type": "number",
+      "description": "Umbral espec\u00edfico de mejora en el tipo configurado"
+    },
+    "decline_threshold": {
+      "type": "number",
+      "description": "Umbral espec\u00edfico de ca\u00edda en el tipo configurado"
+    },
     "asymmetry_threshold": {
       "type": "number",
       "description": "Umbral de asimetr\u00eda fuera de rango (ej: 10%)"
@@ -60,6 +68,19 @@
     "created_at": {
       "type": "string",
       "description": "Fecha/hora de creaci\u00f3n"
+    },
+    "version": {
+      "type": "number",
+      "default": 1
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "supersedes_threshold_id": {
+      "type": "string"
     }
   },
   "required": [
