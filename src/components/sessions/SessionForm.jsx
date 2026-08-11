@@ -87,9 +87,9 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
   async function loadSquadPlayers(squadId, date) {
     setLoadingPlayers(true);
     const [allPlayers, memberships, dayStatuses] = await Promise.all([
-      base44.entities.Player.list("-created_date", 500),
-      base44.entities.SquadMembership.filter({ squad_id: squadId, status: "activo" }, "-effective_from", 500),
-      base44.entities.DailySquadStatus.filter({ date }, "-updated_at", 500),
+      base44.entities.Player.list("-created_date", 500).catch(() => []),
+      base44.entities.SquadMembership.filter({ squad_id: squadId, status: "activo" }, "-effective_from", 500).catch(() => []),
+      base44.entities.DailySquadStatus.filter({ date }, "-updated_at", 500).catch(() => []),
     ]);
 
     const playerMap = {};
@@ -182,25 +182,32 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
     const unavailable = squadPlayers.filter(({ ds }) => !AVAILABLE_STATUSES.includes(ds?.status || "disponible"));
 
     const sessionNumber = Number(form.session_number || nextSessionNumber || 1);
-    const session = await base44.entities.TrainingSession.create({
-      ...form,
-      title: `Sesión ${sessionNumber}`,
-      session_number: sessionNumber,
-      microcycle_day: form.match_day_code,
-      weekly_plan_id: planDefaults?.weekly_plan_id || "",
-      weekly_plan_day_id: planDefaults?.weekly_plan_day_id || "",
-      md_manual_override: manualMeta.md,
-      md_source: manualMeta.md ? "manual_override" : (planDefaults?.md_source || "calculated"),
-      md_override_reason: manualMeta.md ? (form.md_override_reason || "") : "",
-      md_reference_match_id: planDefaults?.target_match_id || "",
-      md_calculated_at: new Date().toISOString(),
-      squad_name: squad?.name || "",
-      season_id: activeSeasonId || squad?.season || "",
-      players_available: available.length,
-      players_selected: selectedIds.size,
-      players_absent: unavailable.filter(({ ds }) => ds?.status === "ausente").length,
-      players_differentiated: unavailable.filter(({ ds }) => ds?.status === "diferenciado").length,
-    });
+    let session;
+    try {
+      session = await base44.entities.TrainingSession.create({
+        ...form,
+        title: `Sesión ${sessionNumber}`,
+        session_number: sessionNumber,
+        microcycle_day: form.match_day_code,
+        weekly_plan_id: planDefaults?.weekly_plan_id || "",
+        weekly_plan_day_id: planDefaults?.weekly_plan_day_id || "",
+        md_manual_override: manualMeta.md,
+        md_source: manualMeta.md ? "manual_override" : (planDefaults?.md_source || "calculated"),
+        md_override_reason: manualMeta.md ? (form.md_override_reason || "") : "",
+        md_reference_match_id: planDefaults?.target_match_id || "",
+        md_calculated_at: new Date().toISOString(),
+        squad_name: squad?.name || "",
+        season_id: activeSeasonId || squad?.season || "",
+        players_available: available.length,
+        players_selected: selectedIds.size,
+        players_absent: unavailable.filter(({ ds }) => ds?.status === "ausente").length,
+        players_differentiated: unavailable.filter(({ ds }) => ds?.status === "diferenciado").length,
+      });
+    } catch (error) {
+      setSaving(false);
+      toast({ title: "Error al crear la sesión", description: error?.message || "Intentá nuevamente", variant: "destructive" });
+      return;
+    }
 
     // Save SessionPlayer snapshot for each member
     const spRecords = squadPlayers.map(({ player, ds }) => {
@@ -222,7 +229,11 @@ export default function SessionForm({ onCreated, onCancel, nextSessionNumber }) 
       };
     });
 
-    if (spRecords.length > 0) await base44.entities.SessionPlayer.bulkCreate(spRecords);
+    try {
+      if (spRecords.length > 0) await base44.entities.SessionPlayer.bulkCreate(spRecords);
+    } catch (error) {
+      console.error("Error saving session players:", error);
+    }
 
     // Ejecutar el motor de planificación y recargar la sesión con su vinculación final
     try {

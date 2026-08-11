@@ -64,13 +64,14 @@ export default function SessionDetail({ session, onBack, initialTab = "players",
 
   useEffect(() => {
     base44.entities.SessionPlayer.filter({ session_id: session.id }, "player_name", 200)
-      .then(sp => { setSessionPlayers(sp); setLoading(false); });
+      .then(sp => { setSessionPlayers(sp); setLoading(false); })
+      .catch(() => { setLoading(false); });
   }, [session.id]);
 
   useEffect(() => {
     base44.entities.PhysicalObjective.list("order", 100).then(rows => {
       setPhysicalObjectives(rows.filter(o => o.active !== false && o.hidden !== true).map(o => o.name).filter(Boolean));
-    });
+    }).catch(() => {});
   }, []);
 
   useEffect(() => {

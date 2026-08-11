@@ -49,9 +49,9 @@ export default function SessionGPS({ session, sessionPlayers }) {
 
   useEffect(() => {
     base44.entities.SessionGPSData.filter({ session_id: session.id }, "player_name", 200)
-      .then(rows => setGpsRows(rows));
+      .then(rows => setGpsRows(rows)).catch(() => {});
     base44.entities.Player.list("-created_date", 500)
-      .then(p => setAllPlayers(p.filter(x => x.active !== false)));
+      .then(p => setAllPlayers(p.filter(x => x.active !== false))).catch(() => {});
   }, [session.id]);
 
   // ── Step 1: Parse & preview ───────────────────────────────────────────────
