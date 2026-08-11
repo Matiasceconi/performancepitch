@@ -14,24 +14,27 @@ import {
   calculateSquadZScores,
   calculateRecentChange,
   classifyChange,
+  evaluateReferenceChange,
   type ThresholdConfig,
 } from "../../shared/evaluationBaseline.ts";
+import { evaluationErrorResponse, requireEvaluationAccess } from "../../shared/evaluationAccess.ts";
 
 export default async function (req: Request): Promise<Response> {
   try {
     const base44 = createClientFromRequest(req);
     const user = await base44.auth.me();
-    if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
-    if (user.role !== "admin") return Response.json({ error: "Forbidden" }, { status: 403 });
-
     const body = await req.json().catch(() => ({}));
     const { session_id, squad_id } = body;
+    await requireEvaluationAccess(base44, user, squad_id, "view");
 
     // ── 1. Get latest session (or specified one) ───────────────────────────
     let session: any = null;
     if (session_id) {
       const sessions = await base44.asServiceRole.entities.EvaluationSession.filter({ session_id }, "-assessment_date", 1);
       session = sessions[0] || null;
+      if (session && session.squad_id !== squad_id) {
+        return Response.json({ error: "Sesión fuera del plantel autorizado" }, { status: 403 });
+      }
     } else {
       const sessions = squad_id
         ? await base44.asServiceRole.entities.EvaluationSession.filter({ squad_id }, "-assessment_date", 1)
@@ -108,7 +111,7 @@ export default async function (req: Request): Promise<Response> {
     try {
       memberships = await base44.asServiceRole.entities.SquadMembership.list("created_date", 2000);
     } catch { /* empty */ }
-    const squadPlayerIds = new Set(memberships.filter((m: any) => m.squad_id === session.squad_id).map((m: any) => m.player_id));
+    const squadPlayerIds = new Set(memberships.filter((m: any) => m.squad_id === session.squad_id && m.status !== "inactivo").map((m: any) => m.player_id));
     const squadPlayers = session.squad_id
       ? playersRaw.filter((p: any) => squadPlayerIds.has(p.id) || p.squad_id === session.squad_id)
       : playersRaw;
@@ -116,7 +119,7 @@ export default async function (req: Request): Promise<Response> {
     // ── 7. Load thresholds and metric definitions ──────────────────────────
     let thresholds: any[] = [];
     try {
-      thresholds = await base44.asServiceRole.entities.EvaluationThresholdConfig.filter({ active: true });
+      thresholds = await base44.asServiceRole.entities.EvaluationThresholdConfig.filter({ active: true }, "-updated_at", 500);
     } catch { /* empty */ }
 
     let metricDefs: any[] = [];
@@ -140,12 +143,15 @@ export default async function (req: Request): Promise<Response> {
 
     // ── 9. Build previous session values per player+test+metric ────────────
     const previousMap = new Map<string, number>();
-    for (const pr of previousResults) {
+    const historicalNewestFirst = [...historicalResults].sort((a: any, b: any) =>
+      String(b.assessment_date || "").localeCompare(String(a.assessment_date || ""))
+    );
+    for (const pr of historicalNewestFirst) {
       if (!pr.player_id) continue;
       for (const [mk, mv] of Object.entries(pr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
         const key = `${pr.player_id}|${pr.test_key}|${mk}`;
-        previousMap.set(key, mv);
+        if (!previousMap.has(key)) previousMap.set(key, mv);
       }
     }
 
@@ -180,7 +186,7 @@ export default async function (req: Request): Promise<Response> {
           : { value: null, std: null, sufficient: false, count: 0, config_version: "mean_last_3_v1" };
 
         // Get previous session value
-        const previousValue = playerId ? previousMap.get(baselineKey) || null : null;
+        const previousValue = playerId ? previousMap.get(baselineKey) ?? null : null;
         const recentChange = calculateRecentChange(mv, previousValue);
 
         // Get metric direction
@@ -189,15 +195,17 @@ export default async function (req: Request): Promise<Response> {
 
         // Get thresholds
         const threshold = thresholds.find(
-          (t: any) => t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === mk
+          (t: any) => t.squad_id === session.squad_id && t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === mk
+        ) || thresholds.find(
+          (t: any) => !t.squad_id && t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === mk
         );
         const thresholdConfig: ThresholdConfig | null = threshold
           ? {
               moderate: threshold.moderate_threshold,
               important: threshold.important_threshold,
               type: threshold.threshold_type,
-              improvement_threshold: threshold.improvement_threshold || null,
-              decline_threshold: threshold.decline_threshold || null,
+              improvement_threshold: threshold.improvement_threshold ?? null,
+              decline_threshold: threshold.decline_threshold ?? null,
               direction: direction as any,
             }
           : null;
@@ -214,7 +222,9 @@ export default async function (req: Request): Promise<Response> {
         let asymmetryFlag = null;
         for (const [ak, av] of Object.entries(cr.asymmetries || {})) {
           const aThreshold = thresholds.find(
-            (t: any) => t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === ak
+            (t: any) => t.squad_id === session.squad_id && t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === ak
+          ) || thresholds.find(
+            (t: any) => !t.squad_id && t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === ak
           );
           const aResult = detectAsymmetrySignal((av as any).magnitude, aThreshold?.asymmetry_threshold || 10);
           if (aResult.flagged) {
@@ -229,6 +239,26 @@ export default async function (req: Request): Promise<Response> {
           { changeAbs: signal.changeAbs, baselineSufficient: baseline.sufficient },
           direction as any
         );
+        const previousComparison = evaluateReferenceChange(
+          mv,
+          previousValue,
+          thresholdConfig,
+          direction as any,
+          baseline.std,
+        );
+        const baselineComparison = evaluateReferenceChange(
+          mv,
+          baseline.value,
+          thresholdConfig,
+          direction as any,
+          baseline.std,
+        );
+        const relevantOutcomes = [previousComparison, baselineComparison]
+          .filter((comparison) => comparison.relevant)
+          .map((comparison) => comparison.outcome);
+        const isMixedRelevant = relevantOutcomes.includes("improvement") && relevantOutcomes.includes("decline");
+        const isImprovementRelevant = relevantOutcomes.includes("improvement") && !relevantOutcomes.includes("decline");
+        const isDeclineRelevant = relevantOutcomes.includes("decline") && !relevantOutcomes.includes("improvement");
 
         const baseItem = {
           player_id: playerId,
@@ -253,7 +283,9 @@ export default async function (req: Request): Promise<Response> {
           change_pct: signal.changePct,
           z_score_individual: signal.zScoreIndividual,
           signal: signal.signal,
-          classification: classification,
+          classification: { ...classification, is_mixed: isMixedRelevant || classification.is_mixed },
+          previous_comparison: previousComparison,
+          baseline_comparison: baselineComparison,
           reason: signal.reason + (anomaly.anomaly ? ` · ${anomaly.reason}` : "") + (asymmetryFlag ? ` · ${asymmetryFlag.reason}` : ""),
           quality_status: cr.quality_status,
           linking_status: cr.linking_status,
@@ -266,6 +298,8 @@ export default async function (req: Request): Promise<Response> {
         const hasSignal =
           signal.signal === "moderate" ||
           signal.signal === "important" ||
+          previousComparison.relevant ||
+          baselineComparison.relevant ||
           anomaly.anomaly ||
           asymmetryFlag !== null ||
           cr.quality_status !== "ok" ||
@@ -278,6 +312,7 @@ export default async function (req: Request): Promise<Response> {
             anomaly.anomaly ? 3 :
             asymmetryFlag ? 2 :
             signal.signal === "moderate" ? 2 :
+            previousComparison.relevant || baselineComparison.relevant ? 2 :
             cr.quality_status === "error" ? 2 :
             cr.linking_status === "collision" ? 1 :
             cr.linking_status === "pending" ? 1 : 0;
@@ -285,7 +320,7 @@ export default async function (req: Request): Promise<Response> {
         }
 
         // Add to improvements/declines/mixed
-        if (classification.is_mixed) {
+        if (isMixedRelevant) {
           if (!mixedSignalsMap.has(playerId)) {
             mixedSignalsMap.set(playerId, {
               player_id: playerId,
@@ -296,7 +331,7 @@ export default async function (req: Request): Promise<Response> {
             });
           }
           mixedSignalsMap.get(playerId).metrics.push(baseItem);
-        } else if (classification.is_improvement && (signal.signal === "moderate" || signal.signal === "important")) {
+        } else if (isImprovementRelevant) {
           if (!improvementsMap.has(playerId)) {
             improvementsMap.set(playerId, {
               player_id: playerId,
@@ -307,7 +342,7 @@ export default async function (req: Request): Promise<Response> {
             });
           }
           improvementsMap.get(playerId).metrics.push(baseItem);
-        } else if (classification.is_decline && (signal.signal === "moderate" || signal.signal === "important")) {
+        } else if (isDeclineRelevant) {
           if (!declinesMap.has(playerId)) {
             declinesMap.set(playerId, {
               player_id: playerId,
@@ -347,6 +382,8 @@ export default async function (req: Request): Promise<Response> {
             z_score_individual: signal.zScoreIndividual,
             signal: signal.signal,
             classification: classification,
+            previous_comparison: previousComparison,
+            baseline_comparison: baselineComparison,
             test_key: cr.test_key,
             metric_key: mk,
             assessment_date: cr.assessment_date,
@@ -443,6 +480,6 @@ export default async function (req: Request): Promise<Response> {
       })),
     });
   } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return evaluationErrorResponse(error);
   }
 }
