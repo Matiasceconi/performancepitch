@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Upload, FileCheck2, AlertCircle, CheckCircle2, Loader2, X, Info, Calendar, Scissors, Users, Layers3 } from "lucide-react";
+import { Upload, FileCheck2, AlertCircle, CheckCircle2, Loader2, X, Calendar, Scissors, Users, Layers3 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { importEvaluations } from "@/lib/evaluationsApi";
