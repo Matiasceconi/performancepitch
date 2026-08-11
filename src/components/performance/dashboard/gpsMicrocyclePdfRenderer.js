@@ -1,9 +1,17 @@
 import moment from "moment";
 import "moment/locale/es.js";
 import { jsPDF } from "jspdf";
-import { fmt } from "./gpsMicrocycleReportUtils.js";
 
 moment.locale("es");
+
+function fmt(value, unit = "") {
+  if (value == null || Number.isNaN(Number(value))) return "—";
+  const number = Number(value);
+  const shown = unit === "km/h" || unit === "u/min" || unit === "%" || number < 100
+    ? number.toFixed(1)
+    : Math.round(number).toLocaleString("es-AR");
+  return `${shown} ${unit}`.trim();
+}
 
 const CLUB_LOGO_URL = "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/36f6c4008_defensa.png";
 const PAGE = { w: 297, h: 210, m: 12, contentBottom: 193 };
