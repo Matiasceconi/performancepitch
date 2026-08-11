@@ -1,34 +1,41 @@
 import React, { useState, useEffect } from "react";
 import { Settings2, Loader2, Plus, Check, X, Edit2, Trash2, Search, Tag, Gauge, Users, BookOpen } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { evaluationsGateway } from "@/lib/evaluationsApi";
 
 export default function EvaluationsConfig() {
+  const { activeSquad } = useWorkspace();
   const [sources, setSources] = useState([]);
   const [testDefs, setTestDefs] = useState([]);
   const [metricDefs, setMetricDefs] = useState([]);
   const [thresholds, setThresholds] = useState([]);
   const [aliases, setAliases] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState("sources");
 
-  useEffect(() => {
-    Promise.all([
-      base44.entities.EvaluationSource.list("display_order", 50).catch(() => []),
-      base44.entities.EvaluationTestDefinition.list("display_order", 50).catch(() => []),
-      base44.entities.EvaluationMetricDefinition.list("display_order", 200).catch(() => []),
-      base44.entities.EvaluationThresholdConfig.filter({ active: true }).catch(() => []),
-      base44.entities.EvaluationPlayerAlias.list("alias_name", 200).catch(() => []),
-    ]).then(([s, t, m, th, a]) => {
-      setSources(s || []);
-      setTestDefs(t || []);
-      setMetricDefs(m || []);
-      setThresholds(th || []);
-      setAliases(a || []);
-    }).finally(() => setLoading(false));
-  }, []);
+  async function loadConfig() {
+    if (!activeSquad?.id) return;
+    setLoading(true);
+    setError("");
+    try {
+      const data = await evaluationsGateway("config", { squad_id: activeSquad.id });
+      setSources(data.sources || []);
+      setTestDefs(data.test_definitions || []);
+      setMetricDefs(data.metric_definitions || []);
+      setThresholds(data.thresholds || []);
+      setAliases(data.aliases || []);
+    } catch (e) {
+      setError(e.message || "No se pudo cargar la configuración");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(() => { loadConfig(); }, [activeSquad?.id]);
 
   if (loading) return <div className="py-10 flex justify-center"><Loader2 size={20} className="text-zinc-500 animate-spin" /></div>;
+  if (error) return <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">{error}</div>;
 
   const SECTIONS = [
     { key: "sources", label: "Fuentes", icon: BookOpen },
@@ -57,10 +64,10 @@ export default function EvaluationsConfig() {
       </div>
 
       {activeSection === "sources" && <SourcesSection sources={sources} />}
-      {activeSection === "tests" && <TestsSection testDefs={testDefs} />}
-      {activeSection === "metrics" && <MetricsSection metricDefs={metricDefs} />}
-      {activeSection === "thresholds" && <ThresholdsSection thresholds={thresholds} testDefs={testDefs} metricDefs={metricDefs} />}
-      {activeSection === "aliases" && <AliasesSection aliases={aliases} />}
+      {activeSection === "tests" && <TestsSection testDefs={testDefs} metricDefs={metricDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
+      {activeSection === "metrics" && <MetricsSection metricDefs={metricDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
+      {activeSection === "thresholds" && <ThresholdsSection thresholds={thresholds} testDefs={testDefs} metricDefs={metricDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
+      {activeSection === "aliases" && <AliasesSection aliases={aliases} squadId={activeSquad?.id} />}
     </div>
   );
 }
@@ -101,7 +108,41 @@ function SourcesSection({ sources }) {
   );
 }
 
-function TestsSection({ testDefs }) {
+function TestsSection({ testDefs, metricDefs, squadId, onReload }) {
+  const [editing, setEditing] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({});
+
+  function startEdit(test) {
+    setEditing(test.id);
+    setForm({
+      test_key: test.test_key,
+      source_key: test.source_key,
+      name: test.name,
+      short_name: test.short_name || test.test_key?.toUpperCase(),
+      side_mode: test.side_mode || "bilateral",
+      supports_attempts: test.supports_attempts !== false,
+      priority_metrics: test.priority_metrics || [],
+      primary_metric_key: test.primary_metric_key || test.priority_metrics?.[0] || "",
+      primary_direction: test.primary_direction || "higher",
+      secondary_metric_key: test.secondary_metric_key || test.priority_metrics?.[1] || "",
+      secondary_direction: test.secondary_direction || "higher",
+      asymmetry_metrics: test.asymmetry_metrics || [],
+      active: test.active !== false,
+      display_order: test.display_order || 0,
+    });
+  }
+
+  async function saveRule() {
+    setSaving(true);
+    try {
+      await evaluationsGateway("save_test_definition", { squad_id: squadId, id: editing, definition: form });
+      setEditing(null);
+      await onReload();
+    } catch (e) { alert("Error: " + e.message); }
+    finally { setSaving(false); }
+  }
+
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
       <div className="flex items-center justify-between mb-4">
@@ -123,6 +164,8 @@ function TestsSection({ testDefs }) {
               </div>
               <p className="text-sm text-white mt-1.5">{t.name}</p>
               <p className="text-xs text-zinc-500">{t.side_mode} · {t.supports_attempts ? "Multi-intento" : "Single"}</p>
+              <p className="text-[11px] text-zinc-400 mt-2">Mejor intento: <span className="text-white">{t.primary_metric_key || t.priority_metrics?.[0] || "primer intento"}</span> · {t.primary_direction === "lower" ? "menor" : "mayor"}</p>
+              {t.secondary_metric_key && <p className="text-[10px] text-zinc-500">Desempate: {t.secondary_metric_key} · {t.secondary_direction === "lower" ? "menor" : "mayor"}</p>}
               {t.priority_metrics?.length > 0 && (
                 <div className="mt-1.5 flex items-center gap-1 flex-wrap">
                   <span className="text-[10px] text-zinc-600">Principal:</span>
@@ -131,17 +174,60 @@ function TestsSection({ testDefs }) {
                   ))}
                 </div>
               )}
+              <button onClick={() => startEdit(t)} className="mt-3 px-2.5 py-1.5 rounded bg-zinc-800 text-zinc-300 text-xs hover:bg-zinc-700 flex items-center gap-1.5"><Edit2 size={12} /> Editar regla</button>
             </div>
           ))}
+        </div>
+      )}
+      {editing && (
+        <div className="mt-5 pt-5 border-t border-zinc-800">
+          <h4 className="text-sm font-bold text-white mb-3">Regla auditable del mejor intento</h4>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <RuleMetricSelect label="Métrica principal" value={form.primary_metric_key} onChange={(value) => setForm({ ...form, primary_metric_key: value })} metricDefs={metricDefs} />
+            <DirectionSelect label="Dirección principal" value={form.primary_direction} onChange={(value) => setForm({ ...form, primary_direction: value })} />
+            <RuleMetricSelect label="Métrica de desempate" value={form.secondary_metric_key} onChange={(value) => setForm({ ...form, secondary_metric_key: value })} metricDefs={metricDefs} optional />
+            <DirectionSelect label="Dirección de desempate" value={form.secondary_direction} onChange={(value) => setForm({ ...form, secondary_direction: value })} />
+          </div>
+          <p className="text-xs text-zinc-500 mt-2">Si ambas métricas empatan, prevalece la menor hora y luego el menor número de intento. Cada guardado incrementa la versión de configuración.</p>
+          <div className="flex gap-2 mt-3">
+            <button onClick={saveRule} disabled={saving || !form.primary_metric_key} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold disabled:opacity-50">{saving ? "Guardando..." : "Guardar nueva versión"}</button>
+            <button onClick={() => setEditing(null)} className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs">Cancelar</button>
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function MetricsSection({ metricDefs }) {
+function RuleMetricSelect({ label, value, onChange, metricDefs, optional }) {
+  return <div><label className="text-xs text-zinc-500 block mb-1">{label}</label><select value={value || ""} onChange={(e) => onChange(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"><option value="">{optional ? "Sin desempate" : "Seleccionar..."}</option>{metricDefs.filter((metric) => metric.active !== false).map((metric) => <option key={metric.id} value={metric.metric_key}>{metric.metric_label || metric.metric_key}</option>)}</select></div>;
+}
+
+function DirectionSelect({ label, value, onChange }) {
+  return <div><label className="text-xs text-zinc-500 block mb-1">{label}</label><select value={value || "higher"} onChange={(e) => onChange(e.target.value)} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"><option value="higher">Mayor es mejor</option><option value="lower">Menor es mejor</option></select></div>;
+}
+
+function MetricsSection({ metricDefs, squadId, onReload }) {
   const [search, setSearch] = useState("");
+  const [editing, setEditing] = useState(null);
+  const [form, setForm] = useState({});
+  const [saving, setSaving] = useState(false);
   const filtered = search ? metricDefs.filter((m) => (m.metric_label || m.metric_key || "").toLowerCase().includes(search.toLowerCase())) : metricDefs;
+
+  function startEdit(metric) {
+    setEditing(metric.id);
+    setForm({ metric_label: metric.metric_label || metric.metric_key, unit: metric.unit || "", direction: metric.direction || "higher_is_better", precision: Number.isInteger(metric.precision) ? metric.precision : 3, active: metric.active !== false });
+  }
+
+  async function saveMetric() {
+    setSaving(true);
+    try {
+      await evaluationsGateway("save_metric_definition", { squad_id: squadId, id: editing, definition: form });
+      setEditing(null);
+      await onReload();
+    } catch (e) { alert("Error: " + e.message); }
+    finally { setSaving(false); }
+  }
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
@@ -169,7 +255,9 @@ function MetricsSection({ metricDefs }) {
                 <th className="text-left p-2 font-semibold">Tipo</th>
                 <th className="text-left p-2 font-semibold">Dirección</th>
                 <th className="text-left p-2 font-semibold">Categoría</th>
+                <th className="text-center p-2 font-semibold">Precisión</th>
                 <th className="text-center p-2 font-semibold">Activa</th>
+                <th className="text-center p-2 font-semibold"></th>
               </tr>
             </thead>
             <tbody>
@@ -182,31 +270,31 @@ function MetricsSection({ metricDefs }) {
                   <td className="p-2 text-zinc-300">{m.value_type || "—"}</td>
                   <td className="p-2 text-zinc-300">{m.direction || "—"}</td>
                   <td className="p-2 text-zinc-300">{m.category || "—"}</td>
+                  <td className="p-2 text-center text-zinc-300">{Number.isInteger(m.precision) ? m.precision : 3}</td>
                   <td className="p-2 text-center">{m.active ? <Check size={14} className="text-emerald-400 inline" /> : <X size={14} className="text-zinc-500 inline" />}</td>
+                  <td className="p-2 text-center"><button onClick={() => startEdit(m)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400"><Edit2 size={13} /></button></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      {editing && <div className="mt-4 pt-4 border-t border-zinc-800"><h4 className="text-sm font-bold text-white mb-3">Editar métrica y regla de huella</h4><div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3"><div><label className="text-xs text-zinc-500 block mb-1">Etiqueta</label><input value={form.metric_label} onChange={(e) => setForm({ ...form, metric_label: e.target.value })} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div><div><label className="text-xs text-zinc-500 block mb-1">Unidad</label><input value={form.unit} onChange={(e) => setForm({ ...form, unit: e.target.value })} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div><div><label className="text-xs text-zinc-500 block mb-1">Dirección</label><select value={form.direction} onChange={(e) => setForm({ ...form, direction: e.target.value })} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"><option value="higher_is_better">Mayor es mejor</option><option value="lower_is_better">Menor es mejor</option><option value="range">Rango esperado</option><option value="contextual">Contextual</option><option value="none">Sin dirección</option></select></div><div><label className="text-xs text-zinc-500 block mb-1">Decimales de duplicado</label><input type="number" min="0" max="8" value={form.precision} onChange={(e) => setForm({ ...form, precision: Number(e.target.value) })} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div><label className="flex items-center gap-2 text-xs text-zinc-400 self-end pb-2"><input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="accent-blue-500" />Activa</label></div><p className="text-xs text-zinc-500 mt-2">La precisión sólo normaliza la huella canónica para deduplicar; el valor original y su signo nunca se alteran.</p><div className="flex gap-2 mt-3"><button onClick={saveMetric} disabled={saving} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold disabled:opacity-50">{saving ? "Guardando..." : "Guardar versión"}</button><button onClick={() => setEditing(null)} className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs">Cancelar</button></div></div>}
     </div>
   );
 }
 
-function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs }) {
+function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs, squadId, onReload }) {
   const [thresholds, setThresholds] = useState(initialThresholds);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: 10 });
 
+  useEffect(() => { setThresholds(initialThresholds); }, [initialThresholds]);
+
   async function saveThreshold() {
     try {
-      if (editing) {
-        await base44.entities.EvaluationThresholdConfig.update(editing.id, { ...form, active: true });
-      } else {
-        await base44.entities.EvaluationThresholdConfig.create({ threshold_id: crypto.randomUUID(), ...form, active: true });
-      }
-      const refreshed = await base44.entities.EvaluationThresholdConfig.filter({ active: true });
-      setThresholds(refreshed || []);
+      await evaluationsGateway("save_threshold", { squad_id: squadId, id: editing?.id || null, threshold: form });
+      await onReload();
       setEditing(null);
       setForm({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: 10 });
     } catch (e) { alert("Error: " + e.message); }
@@ -215,7 +303,7 @@ function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs
   async function deleteThreshold(id) {
     if (!confirm("¿Eliminar este umbral?")) return;
     try {
-      await base44.entities.EvaluationThresholdConfig.delete(id);
+      await evaluationsGateway("delete_threshold", { squad_id: squadId, id });
       setThresholds((prev) => prev.filter((t) => t.id !== id));
     } catch (e) { alert("Error: " + e.message); }
   }
@@ -303,13 +391,13 @@ function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs
   );
 }
 
-function AliasesSection({ aliases: initialAliases }) {
+function AliasesSection({ aliases: initialAliases, squadId }) {
   const [aliases, setAliases] = useState(initialAliases);
   const [search, setSearch] = useState("");
 
   async function toggleAlias(alias) {
     try {
-      await base44.entities.EvaluationPlayerAlias.update(alias.id, { active: !alias.active });
+      await evaluationsGateway("toggle_alias", { squad_id: squadId, id: alias.id });
       setAliases((prev) => prev.map((a) => a.id === alias.id ? { ...a, active: !a.active } : a));
     } catch (e) { alert("Error: " + e.message); }
   }
@@ -317,7 +405,7 @@ function AliasesSection({ aliases: initialAliases }) {
   async function deleteAlias(id) {
     if (!confirm("¿Eliminar este alias definitivamente?")) return;
     try {
-      await base44.entities.EvaluationPlayerAlias.delete(id);
+      await evaluationsGateway("delete_alias", { squad_id: squadId, id });
       setAliases((prev) => prev.filter((a) => a.id !== id));
     } catch (e) { alert("Error: " + e.message); }
   }
