@@ -42,6 +42,7 @@ export const MODULES = [
   { id: "cuerpo_tecnico", label: "Cuerpo Técnico", path: "/team" },
   { id: "configuracion", label: "Configuración", path: "/admin" },
   { id: "accesos_jugadores", label: "Accesos de jugadores", path: "/player-access" },
+  { id: "evaluaciones", label: "Evaluaciones", path: "/evaluations" },
 ];
 
 export const PAGES = [

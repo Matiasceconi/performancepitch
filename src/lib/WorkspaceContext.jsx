@@ -52,6 +52,7 @@ const PATH_AREA_MAP = {
   "/players": "cuerpo_tecnico",
   "/field-library": "cuerpo_tecnico",
   "/strength-library": "cuerpo_tecnico",
+  "/evaluations": "rendimiento_fisico",
   "/admin": "administracion",
   "/squad-manager": "administracion",
   "/users-access": "administracion",
