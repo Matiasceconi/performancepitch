@@ -57,6 +57,15 @@
       "default": "number",
       "description": "Tipo de valor"
     },
+    "precision": {
+      "type": "number",
+      "description": "Cantidad de decimales usada s\u00f3lo para la huella de duplicados"
+    },
+    "catalog_version": {
+      "type": "number",
+      "default": 1,
+      "description": "Versi\u00f3n del cat\u00e1logo fuente + prueba + m\u00e9trica"
+    },
     "allows_negative": {
       "type": "boolean",
       "default": false,
@@ -98,6 +107,12 @@
       "type": "number",
       "default": 0,
       "description": "Orden de visualizaci\u00f3n"
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
     }
   },
   "required": [
