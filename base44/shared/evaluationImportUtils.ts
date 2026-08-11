@@ -1,611 +1,378 @@
 import { createHash } from "node:crypto";
 
-/**
- * Normaliza un nombre: lowercase, sin acentos, espacios colapsados.
- */
 export function normalizeName(name: string): string {
-  return (name || "")
+  return String(name || "")
     .toLowerCase()
     .trim()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9\s'-]/g, " ")
+    .replace(/\s+/g, " ");
+}
+
+export function normalizeHeader(value: string): string {
+  return String(value || "")
+    .replace(/^\uFEFF/, "")
+    .trim()
+    .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/\s+/g, " ");
 }
 
-/**
- * Parsea una línea CSV respetando comillas.
- */
-function parseCsvLine(line: string): string[] {
-  const result: string[] = [];
-  let cur = "";
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i];
+function detectDelimiter(line: string): string {
+  const candidates = [",", ";", "\t"];
+  let best = ",";
+  let bestCount = -1;
+  for (const delimiter of candidates) {
+    let count = 0;
+    let quoted = false;
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') quoted = !quoted;
+      else if (!quoted && line[i] === delimiter) count++;
+    }
+    if (count > bestCount) { best = delimiter; bestCount = count; }
+  }
+  return best;
+}
+
+function parseCsvRecords(text: string, delimiter: string): string[][] {
+  const records: string[][] = [];
+  let row: string[] = [];
+  let field = "";
+  let quoted = false;
+  const clean = String(text || "").replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  for (let i = 0; i < clean.length; i++) {
+    const ch = clean[i];
     if (ch === '"') {
-      // Doble comilla escapada
-      if (inQuotes && line[i + 1] === '"') { cur += '"'; i++; continue; }
-      inQuotes = !inQuotes;
-      continue;
+      if (quoted && clean[i + 1] === '"') { field += '"'; i++; }
+      else quoted = !quoted;
+    } else if (ch === delimiter && !quoted) {
+      row.push(field);
+      field = "";
+    } else if (ch === "\n" && !quoted) {
+      row.push(field);
+      if (row.some((value) => String(value).trim() !== "")) records.push(row);
+      row = [];
+      field = "";
+    } else {
+      field += ch;
     }
-    if (ch === "," && !inQuotes) {
-      result.push(cur);
-      cur = "";
-      continue;
-    }
-    cur += ch;
   }
-  result.push(cur);
-  return result.map((s) => s.trim());
+  row.push(field);
+  if (row.some((value) => String(value).trim() !== "")) records.push(row);
+  return records;
 }
 
-/**
- * Parsea texto CSV a array de objetos.
- * Maneja BOM, CRLF/LF, comillas y campos vacíos al final.
- */
 export function parseCsv(text: string): Record<string, string>[] {
-  const clean = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").replace(/^\uFEFF/, "");
-  const lines = clean.split("\n").filter((l) => l.trim());
-  if (lines.length < 2) return [];
-  const headers = parseCsvLine(lines[0]);
-  const rows: Record<string, string>[] = [];
-  for (let i = 1; i < lines.length; i++) {
-    const vals = parseCsvLine(lines[i]);
-    const obj: Record<string, string> = {};
-    headers.forEach((h, idx) => {
-      obj[h] = vals[idx] !== undefined ? vals[idx] : "";
-    });
-    rows.push(obj);
-  }
-  return rows;
+  const clean = String(text || "").replace(/^\uFEFF/, "");
+  const firstLine = clean.split(/\r?\n/, 1)[0] || "";
+  const records = parseCsvRecords(clean, detectDelimiter(firstLine));
+  if (records.length < 2) return [];
+  const headers = records[0].map((header, index) => String(header || `column_${index + 1}`).trim());
+  return records.slice(1).map((values) => {
+    const row: Record<string, string> = {};
+    headers.forEach((header, index) => { row[header] = String(values[index] ?? "").trim(); });
+    return row;
+  });
 }
 
-/**
- * Calcula hashes raw y canonical de un archivo.
- */
+export function getField(row: Record<string, string>, aliases: string[]): string {
+  const wanted = new Set(aliases.map(normalizeHeader));
+  const key = Object.keys(row).find((header) => wanted.has(normalizeHeader(header)));
+  return key ? String(row[key] || "").trim() : "";
+}
+
+export function normalizeDate(value: string): string | null {
+  const input = String(value || "").trim();
+  if (!input) return null;
+  const iso = input.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+  if (iso) return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
+  const latam = input.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})/);
+  if (latam) {
+    const year = latam[3].length === 2 ? `20${latam[3]}` : latam[3];
+    return `${year}-${latam[2].padStart(2, "0")}-${latam[1].padStart(2, "0")}`;
+  }
+  const parsed = new Date(input);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString().slice(0, 10);
+}
+
+export function normalizeTime(value: string): string | null {
+  const input = String(value || "").trim().toUpperCase();
+  if (!input) return null;
+  const match = input.match(/^(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(AM|PM)?$/);
+  if (!match) return input.toLowerCase();
+  let hour = Number(match[1]);
+  const minute = Number(match[2]);
+  const second = Number(match[3] || 0);
+  if (match[4] === "PM" && hour < 12) hour += 12;
+  if (match[4] === "AM" && hour === 12) hour = 0;
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
+}
+
+export function assessmentDateFromRow(row: Record<string, string>): string | null {
+  return normalizeDate(getField(row, ["Date", "Assessment Date", "Test Date", "Fecha", "Fecha de prueba"]));
+}
+
+export function assessmentTimeFromRow(row: Record<string, string>): string | null {
+  return normalizeTime(getField(row, ["Time", "Assessment Time", "Test Time", "Hora", "Hora de prueba"]));
+}
+
+export function athleteNameFromRow(row: Record<string, string>): string {
+  return getField(row, ["Name", "Athlete", "Athlete Name", "Player", "Player Name", "Nombre", "Jugador"]);
+}
+
 export function calculateFileHashes(buf: ArrayBuffer): {
-  rawFileSha256: string;
-  canonicalContentSha256: string;
-  sizeBytes: number;
-  hasBOM: boolean;
-  lineEnding: string;
-  encoding: string;
+  rawFileSha256: string; canonicalContentSha256: string; sizeBytes: number;
+  hasBOM: boolean; lineEnding: string; encoding: string;
 } {
   const buffer = Buffer.from(buf);
-  const rawHash = createHash("sha256").update(buffer).digest("hex");
+  const rawFileSha256 = createHash("sha256").update(buffer).digest("hex");
   const hasBOM = buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf;
-  let text = buffer.toString("utf8");
-  if (hasBOM) text = text.replace(/^\uFEFF/, "");
-  const hasCRLF = text.includes("\r\n");
-  const canonical = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
-  const canonicalHash = createHash("sha256").update(canonical, "utf8").digest("hex");
+  const raw = buffer.toString("utf8").replace(/^\uFEFF/, "");
+  const canonical = raw.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   return {
-    rawFileSha256: rawHash,
-    canonicalContentSha256: canonicalHash,
+    rawFileSha256,
+    canonicalContentSha256: createHash("sha256").update(canonical, "utf8").digest("hex"),
     sizeBytes: buffer.length,
     hasBOM,
-    lineEnding: hasCRLF ? "CRLF" : "LF",
+    lineEnding: raw.includes("\r\n") ? "CRLF" : "LF",
     encoding: "UTF-8",
   };
 }
 
-/**
- * Normaliza un valor numérico para comparación canónica.
- * - Convierte coma decimal a punto
- * - Redondea según precisión del catálogo (default 2 decimales)
- * - "10", "10.0", "10,00" → 10.00
- */
-function canonicalNumber(raw: string, precision: number = 2): string {
-  if (raw === undefined || raw === null || raw === "") return "";
-  // Coma decimal → punto
-  let s = String(raw).trim().replace(/\s/g, "");
-  // Si tiene coma y no tiene punto, asumir coma decimal
-  if (s.includes(",") && !s.includes(".")) {
-    s = s.replace(",", ".");
-  } else if (s.includes(",") && s.includes(".")) {
-    // Coma como separador de miles → remover
-    s = s.replace(/,/g, "");
-  }
-  const n = parseFloat(s);
-  if (isNaN(n)) return s; // no es número — conservar string normalizado
-  return n.toFixed(precision);
+export function parseNumeric(rawValue: unknown): number | null {
+  const input = String(rawValue ?? "").trim();
+  if (!input) return null;
+  const compact = input.replace(/\s+(L|R)$/i, "").replace(/%/g, "").replace(/\s/g, "");
+  let normalized = compact;
+  if (/^-?\d{1,3}(\.\d{3})+,\d+$/.test(compact)) normalized = compact.replace(/\./g, "").replace(",", ".");
+  else if (/^-?\d+,\d+$/.test(compact)) normalized = compact.replace(",", ".");
+  const value = Number(normalized);
+  return Number.isFinite(value) ? value : null;
 }
 
-/**
- * Normaliza una fecha/hora para comparación canónica.
- * "2026-08-10" y "10/08/2026" → "2026-08-10"
- */
-function canonicalDate(raw: string): string {
+function decimalPlaces(rawValue: unknown): number {
+  const input = String(rawValue ?? "").trim().replace(/\s+(L|R)$/i, "").replace(/%/g, "");
+  const match = input.match(/[.,](\d+)$/);
+  return match ? match[1].length : 0;
+}
+
+function canonicalScalar(
+  header: string,
+  rawValue: unknown,
+  precisionByHeader: Record<string, number>,
+): string | number | null {
+  const raw = String(rawValue ?? "").trim().replace(/\s+/g, " ");
   if (!raw) return "";
-  const s = String(raw).trim();
-  // ISO: YYYY-MM-DD
-  const isoMatch = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}`;
-  // DD/MM/YYYY
-  const dmyMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
-  if (dmyMatch) {
-    const d = dmyMatch[1].padStart(2, "0");
-    const m = dmyMatch[2].padStart(2, "0");
-    return `${dmyMatch[3]}-${m}-${d}`;
+  const normalizedHeader = normalizeHeader(header);
+  if (["date", "assessment date", "test date", "fecha", "fecha de prueba"].includes(normalizedHeader)) {
+    return normalizeDate(raw) || raw.toLowerCase();
   }
-  return s;
+  if (["time", "assessment time", "test time", "hora", "hora de prueba"].includes(normalizedHeader)) {
+    return normalizeTime(raw) || raw.toLowerCase();
+  }
+  const numeric = parseNumeric(raw);
+  if (numeric !== null) {
+    const configured = precisionByHeader[header] ?? precisionByHeader[normalizedHeader];
+    const precision = Number.isInteger(configured) ? configured : decimalPlaces(raw);
+    const rounded = Number(numeric.toFixed(Math.max(0, Math.min(8, precision))));
+    const direction = raw.match(/\s+(L|R)$/i)?.[1]?.toUpperCase();
+    return direction ? `${rounded}|${direction}` : rounded;
+  }
+  return raw.toLocaleLowerCase("es");
 }
 
-/**
- * Normaliza un nombre de columna para comparación.
- */
-function canonicalKey(key: string): string {
-  return (key || "").toLowerCase().trim().replace(/\s+/g, "_");
-}
-
-/**
- * Calcula el hash SHA-256 CANÓNICO de una fila completa.
- * Normaliza formato (no valores): espacios, mayúsculas/minúsculas,
- * fechas/horas equivalentes, coma/punto decimal.
- * Métricas numéricas se redondean según precisión del catálogo.
- */
-export function computeCanonicalRowHash(
+export function canonicalizeRow(
   row: Record<string, string>,
-  metricPrecision: Record<string, number> = {}
+  precisionByHeader: Record<string, number> = {},
+): Record<string, string | number | null> {
+  return Object.keys(row)
+    .sort((a, b) => normalizeHeader(a).localeCompare(normalizeHeader(b)))
+    .reduce((acc, header) => {
+      acc[normalizeHeader(header)] = canonicalScalar(header, row[header], precisionByHeader);
+      return acc;
+    }, {} as Record<string, string | number | null>);
+}
+
+export function computeRowHash(
+  row: Record<string, string>,
+  precisionByHeader: Record<string, number> = {},
 ): string {
-  const normalized: Record<string, string> = {};
-  for (const key of Object.keys(row)) {
-    const ck = canonicalKey(key);
-    const raw = row[key];
-    if (raw === undefined || raw === null || raw === "") {
-      normalized[ck] = "";
-      continue;
-    }
-    // Si es una columna de fecha/hora, normalizar
-    const lowerKey = ck;
-    if (lowerKey === "date" || lowerKey === "fecha") {
-      normalized[ck] = canonicalDate(raw);
-    } else if (lowerKey === "time" || lowerKey === "hora") {
-      normalized[ck] = String(raw).trim();
-    } else {
-      // Intentar tratar como número
-      const precision = metricPrecision[key] ?? metricPrecision[ck] ?? 2;
-      normalized[ck] = canonicalNumber(raw, precision);
-    }
-  }
-  const stable = JSON.stringify(
-    Object.keys(normalized).sort().reduce((acc, k) => {
-      acc[k] = normalized[k];
-      return acc;
-    }, {} as Record<string, string>)
-  );
-  return createHash("sha256").update(stable, "utf8").digest("hex");
+  return createHash("sha256").update(JSON.stringify(canonicalizeRow(row, precisionByHeader)), "utf8").digest("hex");
 }
 
-/**
- * Calcula el hash SHA-256 literal de una fila (deduplicación exacta legacy).
- * @deprecated Usar computeCanonicalRowHash para idempotencia real.
- */
-export function computeRowHash(row: Record<string, string>): string {
-  const stable = JSON.stringify(
-    Object.keys(row).sort().reduce((acc, k) => {
-      acc[k] = row[k];
-      return acc;
-    }, {} as Record<string, string>)
-  );
-  return createHash("sha256").update(stable, "utf8").digest("hex");
-}
-
-/**
- * Calcula idempotency key: organización + archivo + fila canónica.
- */
 export function computeIdempotencyKey(
   organizationId: string | null,
-  fileName: string,
+  sourceKey: string,
   row: Record<string, string>,
-  metricPrecision: Record<string, number> = {}
+  precisionByHeader: Record<string, number> = {},
 ): string {
-  const rowHash = computeCanonicalRowHash(row, metricPrecision);
-  const stable = JSON.stringify({
-    org: organizationId || "default",
-    file: fileName,
-    row_hash: rowHash,
-  });
-  return createHash("sha256").update(stable, "utf8").digest("hex");
+  return createHash("sha256").update(JSON.stringify({
+    organization_id: organizationId || "default",
+    source_key: sourceKey,
+    row: canonicalizeRow(row, precisionByHeader),
+  }), "utf8").digest("hex");
 }
 
-export interface PlayerInfo {
-  id: string;
-  fullName: string;
-  normalized: string;
-  squadId: string | null;
-  squadName: string | null;
-  organizationId: string | null;
-  position: string | null;
+export function detectSourceKey(headers: string[]): string {
+  const normalized = headers.map(normalizeHeader);
+  if (normalized.includes("test type") && normalized.some((h) => h.includes("imp-mom"))) return "forcedecks";
+  if (normalized.some((h) => h.includes("nordbord") || h.includes("nordic force"))) return "nordbord";
+  return "unknown";
 }
 
-export interface AliasInfo {
-  aliasNormalized: string;
-  playerId: string;
-  playerName: string;
-  externalPlayerId: string | null;
-  sourceKey: string | null;
-  organizationId: string | null;
+export function detectTestKey(_fileName: string, testTypeHint?: string): string {
+  const hint = normalizeHeader(testTypeHint || "");
+  if (hint === "cmrj" || hint.includes("rebound")) return "cmrj";
+  if (hint === "cmj" || hint.includes("countermovement jump")) return "cmj";
+  if (hint === "sj" || hint.includes("squat jump")) return "sj";
+  return hint.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "unknown";
 }
 
-export interface LinkingResult {
-  csvName: string;
-  normalizedName: string;
-  proposedPlayerId: string | null;
-  proposedPlayerName: string | null;
-  method: string;
-  status: "exact_match" | "possible_match" | "collision" | "no_match";
-  reason: string;
-  candidateCount: number;
-  candidates?: PlayerInfo[];
+export function testKeyFromRow(row: Record<string, string>): string {
+  return detectTestKey("", getField(row, ["Test Type", "Test", "Assessment", "Prueba", "Tipo de prueba"]));
 }
 
-/**
- * Vincula un nombre del CSV contra la base de jugadores.
- * Orden: alias confirmado → coincidencia exacta normalizada única → posible por apellido (sugerencia) → sin match.
- * NO usa similitud aproximada para vincular automáticamente.
- * La búsqueda es a nivel club (organization), no limitada al plantel.
- */
-export function linkPlayer(
-  csvName: string,
-  dbPlayers: PlayerInfo[],
-  aliases: AliasInfo[],
-  sourceKey?: string | null
-): LinkingResult {
-  const normalized = normalizeName(csvName);
-
-  // 1. Alias confirmado (organization + source_key + alias_normalized)
-  const alias = aliases.find((a) => {
-    if (a.aliasNormalized !== normalized) return false;
-    if (sourceKey && a.sourceKey && a.sourceKey !== sourceKey) return false;
-    return true;
-  });
-  if (alias) {
-    const player = dbPlayers.find((p) => p.id === alias.playerId);
-    if (player) {
-      return {
-        csvName,
-        normalizedName: normalized,
-        proposedPlayerId: player.id,
-        proposedPlayerName: player.fullName,
-        method: alias.externalPlayerId ? "Identidad externa confirmada" : "Alias confirmado",
-        status: "exact_match",
-        reason: alias.externalPlayerId
-          ? "Vinculado por external_player_id confirmado"
-          : "Alias confirmado previamente para esta fuente",
-        candidateCount: 1,
-      };
-    }
-  }
-
-  // 2. Coincidencia exacta normalizada y única dentro del club
-  const exactMatches = dbPlayers.filter((p) => p.normalized === normalized);
-  if (exactMatches.length === 1) {
-    return {
-      csvName,
-      normalizedName: normalized,
-      proposedPlayerId: exactMatches[0].id,
-      proposedPlayerName: exactMatches[0].fullName,
-      method: "exact_name_match",
-      status: "exact_match",
-      reason: "Nombre normalizado idéntico — único candidato en el club",
-      candidateCount: 1,
-    };
-  }
-  if (exactMatches.length > 1) {
-    return {
-      csvName,
-      normalizedName: normalized,
-      proposedPlayerId: null,
-      proposedPlayerName: null,
-      method: "Colisión entre varios candidatos",
-      status: "collision",
-      reason: `${exactMatches.length} jugadores con el mismo nombre normalizado en el club`,
-      candidateCount: exactMatches.length,
-      candidates: exactMatches,
-    };
-  }
-
-  // 3. Posible coincidencia por apellido (SÓLO sugerencia — requiere confirmación manual)
-  const csvParts = normalized.split(" ");
-  const csvLast = csvParts[csvParts.length - 1];
-  const possible = dbPlayers.filter((p) => {
-    const pParts = p.normalized.split(" ");
-    return pParts[pParts.length - 1] === csvLast && csvLast.length >= 3;
-  });
-
-  if (possible.length >= 1) {
-    return {
-      csvName,
-      normalizedName: normalized,
-      proposedPlayerId: null,
-      proposedPlayerName: null,
-      method: "possible_surname_match",
-      status: possible.length === 1 ? "possible_match" : "collision",
-      reason: `Sin coincidencia exacta. ${possible.length} jugador(es) con apellido "${csvLast}" — requiere confirmación manual`,
-      candidateCount: possible.length,
-      candidates: possible,
-    };
-  }
-
-  // 4. Sin correspondencia
-  return {
-    csvName,
-    normalizedName: normalized,
-    proposedPlayerId: null,
-    proposedPlayerName: null,
-    method: "no_match",
-    status: "no_match",
-    reason: "No existe jugador con ese nombre ni apellido coincidente — pendiente de vinculación manual",
-    candidateCount: 0,
-  };
+export function metricHeaders(row: Record<string, string>): string[] {
+  const metadata = new Set([...METADATA_COLS].map(normalizeHeader));
+  return Object.keys(row).filter((header) => !metadata.has(normalizeHeader(header)) && String(row[header] || "").trim() !== "");
 }
 
-/**
- * Detecta si una fila es un retest (columna Rep/Attempt > 1).
- */
-export function isRetest(row: Record<string, string>): boolean {
-  const rep = row["Rep"] || row["rep"] || row["Attempt"] || row["attempt"] || row["Trial"] || row["trial"];
-  if (rep) {
-    const n = parseInt(rep, 10);
-    if (!isNaN(n) && n > 1) return true;
-  }
-  return false;
-}
-
-/**
- * Extrae el número de intento de una fila.
- */
-export function getAttemptNumber(row: Record<string, string>): number {
-  const rep = row["Rep"] || row["rep"] || row["Attempt"] || row["attempt"] || row["Trial"] || row["trial"];
-  if (rep) {
-    const n = parseInt(rep, 10);
-    if (!isNaN(n) && n > 0) return n;
-  }
-  return 1;
-}
-
-/**
- * Columnas de metadatos (no son métricas).
- */
-export const METADATA_COLS = new Set([
-  "Name", "name", "Date", "date", "Test", "test", "Rep", "rep",
-  "Attempt", "attempt", "Side", "side", "Time", "time", "Athlete", "athlete",
-  "Trial", "trial", "Player", "player", "ID", "id",
-]);
-
-/**
- * Extrae métricas de una fila, conservando signo negativo.
- */
-export function extractMetrics(
-  row: Record<string, string>,
-  metricKeys: string[]
-): Record<string, number> {
+export function extractMetrics(row: Record<string, string>, keys = metricHeaders(row)): Record<string, number> {
   const metrics: Record<string, number> = {};
-  for (const key of metricKeys) {
-    const raw = row[key];
-    if (raw === undefined || raw === null || raw === "") continue;
-    // Coma decimal → punto
-    let s = String(raw).trim().replace(/\s/g, "");
-    if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
-    else if (s.includes(",") && s.includes(".")) s = s.replace(/,/g, "");
-    const val = parseFloat(s);
-    if (!isNaN(val)) metrics[key] = val;
+  for (const key of keys) {
+    const value = parseNumeric(row[key]);
+    if (value !== null) metrics[key] = value;
   }
   return metrics;
 }
 
-/**
- * Separa asimetrías en magnitud y dirección.
- */
 export function extractAsymmetries(
   row: Record<string, string>,
-  metricKeys: string[]
+  keys = metricHeaders(row),
 ): Record<string, { magnitude: number; direction: string | null }> {
   const asymmetries: Record<string, { magnitude: number; direction: string | null }> = {};
-  for (const key of metricKeys) {
-    if (!key.toLowerCase().includes("asym") && !key.toLowerCase().includes("imbalance")) continue;
-    const raw = row[key];
-    if (raw === undefined || raw === null || raw === "") continue;
-    let s = String(raw).trim().replace(/\s/g, "");
-    if (s.includes(",") && !s.includes(".")) s = s.replace(",", ".");
-    const val = parseFloat(s);
-    if (isNaN(val)) continue;
-    const direction = val > 0 ? "R" : val < 0 ? "L" : null;
-    asymmetries[key] = { magnitude: Math.abs(val), direction };
+  for (const key of keys) {
+    const lower = normalizeHeader(key);
+    if (!lower.includes("asym") && !lower.includes("imbalance")) continue;
+    const value = parseNumeric(row[key]);
+    if (value === null) continue;
+    const suffix = String(row[key] || "").match(/\s+(L|R)$/i)?.[1]?.toUpperCase() || null;
+    asymmetries[key] = { magnitude: Math.abs(value), direction: suffix };
   }
   return asymmetries;
 }
 
-/**
- * Detecta el test_key desde el contenido del CSV (columnas/métricas), no del nombre del archivo.
- * ForceDecks CSV tiene columnas características por test.
- */
-export function detectTestKeyFromContent(
-  headers: string[],
-  metrics: string[],
-  fileName?: string,
-  testTypeHint?: string
-): string {
-  const allCols = [...headers, ...metrics].map((c) => c.toLowerCase());
+export function getRepetitions(row: Record<string, string>): number | null {
+  const value = parseNumeric(getField(row, ["Reps", "Repetitions", "Repeticiones"]));
+  return value !== null ? Math.max(0, Math.round(value)) : null;
+}
 
-  // CMRJ tiene métricas de reactive strength index modificado y tiempo de contacto
-  if (allCols.some((c) => c.includes("rsi_mod") || c.includes("ground_contact_time") || c.includes("contact_time"))) {
-    if (allCols.some((c) => c.includes("rebound") || c.includes("cmrj"))) return "cmrj";
+export function getAttemptNumber(row: Record<string, string>): number {
+  const value = parseNumeric(getField(row, ["Attempt", "Attempt Number", "Trial", "Intento"]));
+  return value !== null && value > 0 ? Math.round(value) : 1;
+}
+
+export function isRetest(row: Record<string, string>): boolean {
+  const value = getField(row, ["Retest", "Is Retest", "Re-test"]);
+  return /^(1|true|yes|si|sí)$/i.test(value);
+}
+
+export interface PlayerInfo {
+  id: string; fullName: string; normalized: string; squadId: string | null;
+  squadName: string | null; organizationId: string | null; position: string | null;
+}
+
+export interface AliasInfo {
+  aliasNormalized: string; playerId: string; playerName: string;
+  externalPlayerId: string | null; sourceKey: string | null;
+}
+
+export interface LinkingResult {
+  csvName: string; normalizedName: string; proposedPlayerId: string | null;
+  proposedPlayerName: string | null; method: string;
+  status: "exact_match" | "possible_match" | "collision" | "no_match";
+  reason: string; candidateCount: number; candidates?: PlayerInfo[];
+}
+
+export function linkPlayer(csvName: string, dbPlayers: PlayerInfo[], aliases: AliasInfo[], sourceKey = "forcedecks"): LinkingResult {
+  const normalized = normalizeName(csvName);
+  const aliasMatches = aliases.filter((alias) =>
+    alias.aliasNormalized === normalized && (!alias.sourceKey || alias.sourceKey === sourceKey)
+  );
+  if (aliasMatches.length === 1) {
+    const player = dbPlayers.find((item) => item.id === aliasMatches[0].playerId);
+    if (player) return {
+      csvName, normalizedName: normalized, proposedPlayerId: player.id,
+      proposedPlayerName: player.fullName, method: "confirmed_alias", status: "exact_match",
+      reason: "Alias confirmado para esta fuente", candidateCount: 1,
+    };
   }
+  if (aliasMatches.length > 1) return {
+    csvName, normalizedName: normalized, proposedPlayerId: null, proposedPlayerName: null,
+    method: "alias_collision", status: "collision", reason: "El alias activo apunta a más de una identidad",
+    candidateCount: aliasMatches.length,
+  };
 
-  // SJ no tiene countermovement depth
-  if (allCols.some((c) => c.includes("squat_jump") || c.includes("_sj_"))) return "sj";
-  if (allCols.some((c) => c.includes("countermovement") || c.includes("_cmj_"))) return "cmj";
+  const exact = dbPlayers.filter((player) => player.normalized === normalized);
+  if (exact.length === 1) return {
+    csvName, normalizedName: normalized, proposedPlayerId: exact[0].id,
+    proposedPlayerName: exact[0].fullName, method: "exact_name_match", status: "exact_match",
+    reason: "Coincidencia exacta única dentro del club", candidateCount: 1,
+  };
+  if (exact.length > 1) return {
+    csvName, normalizedName: normalized, proposedPlayerId: null, proposedPlayerName: null,
+    method: "exact_name_collision", status: "collision", reason: "Hay varias identidades con el mismo nombre normalizado",
+    candidateCount: exact.length, candidates: exact,
+  };
 
-  // Fallback: hint o nombre
-  return detectTestKey(fileName || "", testTypeHint);
+  const lastName = normalized.split(" ").filter(Boolean).at(-1) || "";
+  const possible = lastName.length >= 3
+    ? dbPlayers.filter((player) => player.normalized.split(" ").at(-1) === lastName)
+    : [];
+  if (possible.length) return {
+    csvName, normalizedName: normalized, proposedPlayerId: null, proposedPlayerName: null,
+    method: "surname_suggestion", status: "possible_match",
+    reason: "Sugerencia por apellido; requiere confirmación manual",
+    candidateCount: possible.length, candidates: possible,
+  };
+  return {
+    csvName, normalizedName: normalized, proposedPlayerId: null, proposedPlayerName: null,
+    method: "no_match", status: "no_match", reason: "Sin coincidencia exacta dentro del club",
+    candidateCount: 0, candidates: [],
+  };
 }
 
-/**
- * Detecta el test_key desde el nombre del archivo o hint.
- */
-export function detectTestKey(fileName: string, testTypeHint?: string): string {
-  const lower = (fileName || "").toLowerCase();
-  if (testTypeHint) {
-    const h = testTypeHint.toLowerCase();
-    if (h.includes("cmrj") || h.includes("rebound")) return "cmrj";
-    if (h.includes("cmj") || h.includes("countermovement")) return "cmj";
-    if (h.includes("sj") || h.includes("squat")) return "sj";
-  }
-  if (lower.includes("cmrj") || lower.includes("rebound")) return "cmrj";
-  if (lower.includes("cmj") || lower.includes("countermovement")) return "cmj";
-  if (lower.includes("sj") || lower.includes("squat")) return "sj";
-  return "unknown";
+export function formatSessionName(date: string, testKeys: string[]): string {
+  const [year, month, day] = date.split("-");
+  const label = [day, month, year].filter(Boolean).join("/");
+  return `${label} · ${[...new Set(testKeys)].map((key) => key.toUpperCase()).sort().join(" + ")}`;
 }
 
-/**
- * Detecta la fecha desde el contenido del CSV.
- * Busca columna Date/date con valor YYYY-MM-DD o DD/MM/YYYY.
- */
-export function detectDateFromContent(rows: Record<string, string>[]): string | null {
-  if (!rows.length) return null;
-  const firstRow = rows[0];
-  const dateCol = Object.keys(firstRow).find((k) => {
-    const lk = k.toLowerCase();
-    return lk === "date" || lk === "fecha" || lk === "test_date" || lk === "assessment_date";
-  });
-  if (dateCol && firstRow[dateCol]) {
-    const d = canonicalDate(firstRow[dateCol]);
-    if (d) return d;
-  }
-  return null;
-}
+export const METADATA_COLS = new Set([
+  "Name", "Athlete", "Athlete Name", "Player", "Player Name", "Nombre", "Jugador",
+  "ExternalId", "External ID", "Test Type", "Test", "Assessment", "Date", "Time",
+  "Assessment Date", "Assessment Time", "Rep", "Reps", "Repetitions", "Attempt",
+  "Attempt Number", "Trial", "Side", "Tags", "Retest", "Is Retest",
+]);
 
-/**
- * Detecta la hora desde el contenido del CSV.
- */
-export function detectTimeFromContent(rows: Record<string, string>[]): string | null {
-  if (!rows.length) return null;
-  const firstRow = rows[0];
-  const timeCol = Object.keys(firstRow).find((k) => {
-    const lk = k.toLowerCase();
-    return lk === "time" || lk === "hora" || lk === "test_time";
-  });
-  if (timeCol && firstRow[timeCol]) return firstRow[timeCol].trim();
-  return null;
-}
-
-/**
- * Genera nombre automático de sesión: DD/MM/AAAA · PRUEBA + PRUEBA
- */
-export function autoSessionName(assessmentDate: string, testKeys: string[]): string {
-  if (!assessmentDate) return "Batería sin fecha";
-  const parts = assessmentDate.split("-");
-  if (parts.length !== 3) return `Batería ${assessmentDate}`;
-  const dd = parts[2];
-  const mm = parts[1];
-  const yyyy = parts[0];
-  const testPart = (testKeys || []).map((t) => t.toUpperCase()).join(" + ");
-  return testPart ? `${dd}/${mm}/${yyyy} · ${testPart}` : `${dd}/${mm}/${yyyy}`;
-}
-
-/**
- * Calcula estadísticas básicas de un array de números.
- */
-export function calculateStats(values: number[]): {
-  mean: number;
-  median: number;
-  std: number;
-  cv: number;
-  count: number;
-} {
-  if (!values.length) return { mean: 0, median: 0, std: 0, cv: 0, count: 0 };
-  const sorted = [...values].sort((a, b) => a - b);
-  const mean = values.reduce((s, v) => s + v, 0) / values.length;
-  const variance = values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / values.length;
+export function calculateStats(values: number[]): { mean: number; median: number; std: number; cv: number; count: number } {
+  const finite = values.filter(Number.isFinite);
+  if (!finite.length) return { mean: 0, median: 0, std: 0, cv: 0, count: 0 };
+  const sorted = [...finite].sort((a, b) => a - b);
+  const mean = finite.reduce((sum, value) => sum + value, 0) / finite.length;
+  const variance = finite.reduce((sum, value) => sum + (value - mean) ** 2, 0) / finite.length;
   const std = Math.sqrt(variance);
-  const median =
-    sorted.length % 2 === 0
-      ? (sorted[sorted.length / 2 - 1] + sorted[sorted.length / 2]) / 2
-      : sorted[Math.floor(sorted.length / 2)];
-  const cv = mean !== 0 ? (std / Math.abs(mean)) * 100 : 0;
-  return { mean, median, std, cv, count: values.length };
+  const middle = Math.floor(sorted.length / 2);
+  const median = sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+  return { mean, median, std, cv: mean ? (std / Math.abs(mean)) * 100 : 0, count: finite.length };
 }
 
-/**
- * Calcula Z-score.
- */
 export function zScore(value: number, mean: number, std: number): number | null {
-  if (std === 0 || !isFinite(std)) return null;
-  return (value - mean) / std;
+  return std && Number.isFinite(std) ? (value - mean) / std : null;
 }
 
-/**
- * Calcula cambio porcentual evitando división por cero.
- */
 export function pctChange(current: number, baseline: number): number | null {
-  if (baseline === 0 || !isFinite(baseline)) return null;
-  return ((current - baseline) / Math.abs(baseline)) * 100;
-}
-
-// ── Primary attempt selection ─────────────────────────────────────────────
-
-export interface PrimaryMetricConfig {
-  primaryMetric: string;
-  primaryDirection: "higher" | "lower";
-  secondaryMetric: string | null;
-  secondaryDirection: "higher" | "lower";
-}
-
-/**
- * Selecciona el intento principal de forma determinística:
- * 1. Mejor valor en métrica principal
- * 2. Desempate por métrica secundaria
- * 3. Desempate por primer intento (horario o orden CSV)
- */
-export function selectPrimaryAttempt(
-  attempts: Array<{
-    result_id: string;
-    attempt_number: number;
-    assessment_datetime?: string;
-    metrics: Record<string, number>;
-    retest: boolean;
-  }>,
-  config: PrimaryMetricConfig
-): { primaryId: string; reason: string } | null {
-  if (!attempts.length) return null;
-  // Filtrar retests para selección automática (los retests no son primarios automáticos)
-  const candidates = attempts.filter((a) => !a.retest);
-  if (!candidates.length) {
-    // Si todos son retests, usar el primero
-    const first = attempts[0];
-    return { primaryId: first.result_id, reason: "Único intento disponible (retest)" };
-  }
-
-  const isBetter = (a: number, b: number, direction: "higher" | "lower") =>
-    direction === "higher" ? a > b : a < b;
-
-  // Ordenar por: métrica principal → métrica secundaria → primer intento
-  const sorted = [...candidates].sort((a, b) => {
-    const aPrimary = a.metrics[config.primaryMetric];
-    const bPrimary = b.metrics[config.primaryMetric];
-    if (aPrimary != null && bPrimary != null && aPrimary !== bPrimary) {
-      return isBetter(bPrimary, aPrimary, config.primaryDirection) ? 1 : -1;
-    }
-    // Métrica secundaria
-    if (config.secondaryMetric) {
-      const aSec = a.metrics[config.secondaryMetric];
-      const bSec = b.metrics[config.secondaryMetric];
-      if (aSec != null && bSec != null && aSec !== bSec) {
-        return isBetter(bSec, aSec, config.secondaryDirection) ? 1 : -1;
-      }
-    }
-    // Primer intento por horario o orden
-    if (a.assessment_datetime && b.assessment_datetime) {
-      return a.assessment_datetime.localeCompare(b.assessment_datetime);
-    }
-    return a.attempt_number - b.attempt_number;
-  });
-
-  const winner = sorted[0];
-  const reason = config.secondaryMetric
-    ? `Mejor ${config.primaryMetric}${config.primaryDirection === "higher" ? " (mayor)" : " (menor)"} · desempate ${config.secondaryMetric}`
-    : `Mejor ${config.primaryMetric}${config.primaryDirection === "higher" ? " (mayor)" : " (menor)"}`;
-
-  return { primaryId: winner.result_id, reason };
+  return baseline && Number.isFinite(baseline) ? ((current - baseline) / Math.abs(baseline)) * 100 : null;
 }
