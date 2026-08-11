@@ -15,22 +15,35 @@ export function sameTeam(left, right) {
   return a === b || a.includes(b) || b.includes(a);
 }
 
-export function getReservaCompetition(competitions = []) {
-  return (competitions || []).find(
+function getReservaCompetitions(competitions = []) {
+  return (competitions || []).filter(
     (competition) =>
       competition?.division === "reserva" &&
       competition?.provider_competition_id &&
       competition?.active !== false
-  ) || null;
+  );
+}
+
+export function getReservaCompetition(competitions = []) {
+  return getReservaCompetitions(competitions)[0] || null;
+}
+
+function competitionForFixture(competitions, fixture) {
+  const tournament = normalizeTeamName(fixture?.tournament || fixture?.round);
+  return competitions.find((competition) => {
+    const label = normalizeTeamName(`${competition?.name || ""} ${competition?.short_name || ""}`);
+    return tournament && label.includes(tournament);
+  }) || competitions[0] || null;
 }
 
 export function getUpcomingReservaFixtures({ fixtures = [], competitions = [], teamName = "", now = new Date() } = {}) {
-  const competition = getReservaCompetition(competitions);
-  if (!competition) return [];
+  const reservaCompetitions = getReservaCompetitions(competitions);
+  if (!reservaCompetitions.length) return [];
 
+  const providerIds = new Set(reservaCompetitions.map((competition) => competition.provider_competition_id));
   const nowMs = now instanceof Date ? now.getTime() : new Date(now).getTime();
   const upcoming = (fixtures || [])
-    .filter((fixture) => fixture?.competitionId === competition.provider_competition_id)
+    .filter((fixture) => providerIds.has(fixture?.competitionId))
     .filter((fixture) => fixture?.status === "scheduled")
     .filter((fixture) => sameTeam(fixture?.homeTeam, teamName) || sameTeam(fixture?.awayTeam, teamName))
     .filter((fixture) => {
@@ -39,7 +52,10 @@ export function getUpcomingReservaFixtures({ fixtures = [], competitions = [], t
     })
     .sort((left, right) => new Date(left?.date).getTime() - new Date(right?.date).getTime());
 
-  return upcoming.map((fixture) => ({ ...fixture, competitionRecord: competition }));
+  return upcoming.map((fixture) => ({
+    ...fixture,
+    competitionRecord: competitionForFixture(reservaCompetitions, fixture),
+  }));
 }
 
 export function getNextReservaFixture(args = {}) {
