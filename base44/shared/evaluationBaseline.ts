@@ -22,7 +22,8 @@ export function calculateBaseline(
   if (historicalValues.length < minSessions) {
     return { value: null, std: null, sufficient: false, count: historicalValues.length, config_version: "mean_last_3_v1" };
   }
-  const stats = calculateStats(historicalValues);
+  const recentValues = historicalValues.slice(-3);
+  const stats = calculateStats(recentValues);
   return {
     value: stats.mean,
     std: stats.std,
@@ -39,6 +40,77 @@ export interface ThresholdConfig {
   improvement_threshold?: number | null;
   decline_threshold?: number | null;
   direction?: "higher_is_better" | "lower_is_better" | "range" | "contextual" | "none";
+}
+
+export interface ReferenceChange {
+  available: boolean;
+  reference_value: number | null;
+  change_abs: number | null;
+  change_pct: number | null;
+  outcome: "improvement" | "decline" | "neutral" | "unavailable";
+  relevant: boolean;
+  threshold_value: number | null;
+  threshold_type: "percentage" | "absolute" | "sd" | null;
+}
+
+export function evaluateReferenceChange(
+  currentValue: number,
+  referenceValue: number | null,
+  threshold: ThresholdConfig | null,
+  direction: "higher_is_better" | "lower_is_better" | "range" | "contextual" | "none" = "higher_is_better",
+  referenceStd: number | null = null,
+): ReferenceChange {
+  if (referenceValue === null || !Number.isFinite(referenceValue)) {
+    return {
+      available: false,
+      reference_value: null,
+      change_abs: null,
+      change_pct: null,
+      outcome: "unavailable",
+      relevant: false,
+      threshold_value: null,
+      threshold_type: threshold?.type as any || null,
+    };
+  }
+  const changeAbs = currentValue - referenceValue;
+  const changePct = pctChange(currentValue, referenceValue);
+  const directional = direction === "higher_is_better" || direction === "lower_is_better";
+  const improvement = directional && (direction === "lower_is_better" ? changeAbs < 0 : changeAbs > 0);
+  const decline = directional && (direction === "lower_is_better" ? changeAbs > 0 : changeAbs < 0);
+  const outcome = improvement ? "improvement" : decline ? "decline" : "neutral";
+  if (!threshold || outcome === "neutral") {
+    return {
+      available: true,
+      reference_value: referenceValue,
+      change_abs: changeAbs,
+      change_pct: changePct,
+      outcome,
+      relevant: false,
+      threshold_value: null,
+      threshold_type: threshold?.type as any || null,
+    };
+  }
+
+  const configured = improvement
+    ? threshold.improvement_threshold ?? threshold.moderate
+    : threshold.decline_threshold ?? threshold.moderate;
+  let magnitude = Math.abs(changeAbs);
+  if (threshold.type === "percentage") magnitude = Math.abs(changePct || 0);
+  else if (threshold.type === "sd") {
+    magnitude = referenceStd && Number.isFinite(referenceStd)
+      ? Math.abs(changeAbs / referenceStd)
+      : 0;
+  }
+  return {
+    available: true,
+    reference_value: referenceValue,
+    change_abs: changeAbs,
+    change_pct: changePct,
+    outcome,
+    relevant: Number.isFinite(configured) && magnitude >= Math.abs(configured),
+    threshold_value: configured,
+    threshold_type: threshold.type as any,
+  };
 }
 
 export interface SignalResult {
@@ -105,9 +177,9 @@ export function determineSignal(
     thresholdUsed = absPct;
     // Usar umbrales direccionales si existen
     if (isImprovement && thresholds.improvement_threshold != null) {
-      severity = absPct >= thresholds.improvement_threshold ? "important" : "moderate";
+      severity = absPct >= thresholds.improvement_threshold ? "important" : "expected";
     } else if (isDecline && thresholds.decline_threshold != null) {
-      severity = absPct >= thresholds.decline_threshold ? "important" : "moderate";
+      severity = absPct >= thresholds.decline_threshold ? "important" : "expected";
     } else {
       severity = absPct >= thresholds.important ? "important" : absPct >= thresholds.moderate ? "moderate" : "expected";
     }
