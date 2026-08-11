@@ -1,0 +1,88 @@
+{
+  "name": "EvaluationAuditEvent",
+  "type": "object",
+  "properties": {
+    "event_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "primary_selected",
+        "primary_restored",
+        "alias_changed",
+        "threshold_versioned",
+        "test_rule_updated",
+        "metric_catalog_updated",
+        "import_confirmed"
+      ]
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string"
+    },
+    "player_id": {
+      "type": "string"
+    },
+    "test_key": {
+      "type": "string"
+    },
+    "target_result_id": {
+      "type": "string"
+    },
+    "previous_result_id": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "actor_id": {
+      "type": "string"
+    },
+    "actor_name": {
+      "type": "string"
+    },
+    "actor_email": {
+      "type": "string"
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "event_id",
+    "event_type",
+    "actor_id",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
