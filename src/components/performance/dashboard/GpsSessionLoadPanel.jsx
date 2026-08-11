@@ -103,7 +103,7 @@ export default function GpsSessionLoadPanel({ sessions, gpsBySession, matchGpsBy
         <h3 className="text-sm font-bold text-zinc-300 uppercase tracking-wider">Seleccionar sesión</h3>
         <div className="flex flex-wrap items-center gap-3">
           <GpsMicrocycleFiltersPanel filters={filters} onApply={setFilters} players={players} gpsSources={allGpsSources} metrics={MICRO_METRICS} />
-          <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} cycleDays={dailySummaries} selectedDates={selectedSessions.map((s) => s.date)} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={chartConfig} rankingConfig={rankingConfig} matchContext={null} cycleRows={cycleRows} />
+          <GpsMicrocyclePdfButton squadName={squadName} season={season} dailySummaries={dailySummaries} highlights={highlights} comparison={comparison} cycleDays={dailySummaries} selectedDates={selectedSessions.map((s) => s.date)} visibleMetrics={selectedChartMetrics} chartMetrics={selectedChartMetrics} chartConfig={chartConfig} rankingConfig={rankingConfig} cycleRows={cycleRows} playerMap={playerMap} />
         </div>
       </div>
 
