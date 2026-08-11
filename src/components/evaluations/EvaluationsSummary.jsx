@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, Calendar, Users, TrendingUp, TrendingDown, Minus, Info, ArrowUp, ArrowDown, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
-import { base44 } from "@/api/base44Client";
 import { useWorkspace } from "@/lib/WorkspaceContext";
+import { evaluationsSummary } from "@/lib/evaluationsApi";
 import ReviewTray from "@/components/evaluations/ReviewTray";
 import ChangeMap from "@/components/evaluations/ChangeMap";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
@@ -35,25 +35,25 @@ export default function EvaluationsSummary({ onSelectPlayer }) {
     setLoading(true);
     setError("");
     try {
-      const resp = await base44.functions.invoke("getEvaluationsSummary", {
+      const summary = await evaluationsSummary({
         session_id: sessionId,
         squad_id: activeSquad?.id,
       });
-      setData(resp.data);
-      if (resp.data?.session && !sessionId) {
-        setSelectedSession(resp.data.session.session_id);
+      setData(summary);
+      if (summary?.session && !sessionId) {
+        setSelectedSession(summary.session.session_id);
       }
-      if (resp.data?.change_map?.metrics?.length && !selectedMetric) {
-        setSelectedMetric(resp.data.change_map.metrics[0]);
+      if (summary?.change_map?.metrics?.length) {
+        setSelectedMetric((current) => summary.change_map.metrics.includes(current) ? current : summary.change_map.metrics[0]);
       }
     } catch (e) {
       setError(e.message || "Error al cargar el resumen");
     } finally {
       setLoading(false);
     }
-  }, [activeSquad?.id, selectedMetric]);
+  }, [activeSquad?.id]);
 
-  useEffect(() => { fetchSummary(selectedSession); }, [fetchSummary]);
+  useEffect(() => { fetchSummary(selectedSession); }, [fetchSummary, selectedSession]);
 
   if (loading) {
     return (
