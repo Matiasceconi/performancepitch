@@ -18,6 +18,7 @@ import YouthCategorySelector from "@/components/club/YouthCategorySelector";
 import YouthStandingsTable from "@/components/club/YouthStandingsTable";
 import { base44 } from "@/api/base44Client";
 import ClubShield from "@/components/club/ClubShield";
+import { getReservaCompetition, getUpcomingReservaFixtures } from "@/lib/nextReservaMatch";
 import {
   resolveActiveStandingsContext,
   extractTournamentsAndZones,
@@ -105,10 +106,8 @@ export default function ClubDashboard() {
 
   const allFixtures = data?.fixtures || [];
 
-  const reservaCompId = useMemo(() => {
-    const c = internalCompetitions.find(c => c.division === "reserva" && c.provider_competition_id);
-    return c?.provider_competition_id || null;
-  }, [internalCompetitions]);
+  const reservaCompetition = useMemo(() => getReservaCompetition(internalCompetitions), [internalCompetitions]);
+  const reservaCompId = reservaCompetition?.provider_competition_id || null;
   const primeraCompId = useMemo(() => {
     const c = internalCompetitions.find(c => c.division === "primera" && c.provider_competition_id);
     return c?.provider_competition_id || null;
@@ -139,7 +138,10 @@ export default function ClubDashboard() {
 
   const dyhRow = filteredStandings.find(s => s.teamName === teamName);
 
-  const upcomingReserva = useMemo(() => allFixtures.filter(f => f.competitionId === reservaCompId && f.status === "scheduled" && (f.homeTeam === teamName || f.awayTeam === teamName)).sort((a, b) => new Date(a.date) - new Date(b.date)), [allFixtures, reservaCompId, teamName]);
+  const upcomingReserva = useMemo(
+    () => getUpcomingReservaFixtures({ fixtures: allFixtures, competitions: internalCompetitions, teamName }),
+    [allFixtures, internalCompetitions, teamName]
+  );
   const nextMatchReserva = upcomingReserva[0];
   const next5Reserva = upcomingReserva.slice(0, 5);
 
