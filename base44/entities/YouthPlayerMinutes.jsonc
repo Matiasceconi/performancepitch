@@ -1,0 +1,82 @@
+{
+  "name": "YouthPlayerMinutes",
+  "type": "object",
+  "properties": {
+    "record_key": {
+      "type": "string",
+      "description": "Clave l\u00f3gica \u00fanica squad_id:season_id:match_date:player_id"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID estable del jugador de Reserva"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador desnormalizado para visualizaci\u00f3n y auditor\u00eda"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "ID del plantel Reserva al momento de la carga"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel desnormalizado"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada a la que pertenece el registro"
+    },
+    "match_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha real del partido de Juveniles"
+    },
+    "minutes": {
+      "type": "integer",
+      "description": "Cantidad de minutos disputados en Juveniles"
+    },
+    "source": {
+      "type": "string",
+      "enum": [
+        "manual_performance_minutes"
+      ],
+      "default": "manual_performance_minutes",
+      "description": "Origen del registro"
+    },
+    "created_by_user_id": {
+      "type": "string",
+      "description": "Usuario que cre\u00f3 el registro"
+    },
+    "created_by_email": {
+      "type": "string",
+      "description": "Email del usuario que cre\u00f3 el registro"
+    },
+    "updated_by_user_id": {
+      "type": "string",
+      "description": "Usuario de la \u00faltima modificaci\u00f3n"
+    },
+    "updated_by_email": {
+      "type": "string",
+      "description": "Email del usuario de la \u00faltima modificaci\u00f3n"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora l\u00f3gica de creaci\u00f3n"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Fecha y hora l\u00f3gica de la \u00faltima modificaci\u00f3n"
+    }
+  },
+  "required": [
+    "record_key",
+    "player_id",
+    "player_name",
+    "squad_id",
+    "season_id",
+    "match_date",
+    "minutes"
+  ]
+}
