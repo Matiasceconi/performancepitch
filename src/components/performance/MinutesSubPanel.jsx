@@ -91,7 +91,6 @@ export default function MinutesSubPanel() {
       {dashboard.tab === "juveniles" && (
         <YouthMinutesTab
           rows={dashboard.youthPlayerRows}
-          filters={dashboard.filters}
           canEdit={canEditYouth}
           canDelete={canDeleteYouth}
           isReserveSquad={dashboard.isReserveSquad}
