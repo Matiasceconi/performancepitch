@@ -3,6 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { useAuth } from "@/lib/AuthContext";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getRecordMinutes, isFinishedMatch } from "@/lib/minutesUtils";
+import { listYouthMinutes } from "@/components/performance/minutes/youthMinutesApi";
 
 const FILTERS_STORAGE_VERSION = 1;
 const FILTERS_STORAGE_PREFIX = "performance_minutes_pinned_filters";
@@ -200,19 +201,20 @@ export default function useMinutesDashboard() {
   const [filtersPinned, setFiltersPinned] = useState(() => loadPinnedFilters(filtersStorageKey, defaultFilters).pinned);
   const [tab, setTab] = useState("summary");
   const [loading, setLoading] = useState(true);
-  const [data, setData] = useState({ players: [], memberships: [], matches: [], minuteRows: [], competitions: [], aliases: [] });
+  const [data, setData] = useState({ players: [], memberships: [], matches: [], minuteRows: [], youthMinuteRows: [], competitions: [], aliases: [] });
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const [minuteRows, matches, players, competitions, aliases, memberships] = await Promise.all([
+    const [minuteRows, matches, players, competitions, aliases, memberships, youthMinuteRows] = await Promise.all([
       base44.entities.MatchPlayerMinutes.list("-updated_date", 5000).catch(() => []),
       base44.entities.MatchReport.list("-date", 1000).catch(() => []),
       base44.entities.Player.list("full_name", 1000).catch(() => []),
       base44.entities.Competitions.list("name", 500).catch(() => []),
       base44.entities.CompetitionAliases.list("alias", 1000).catch(() => []),
       base44.entities.SquadMembership.filter({ status: "activo" }, "player_name", 2000).catch(() => []),
+      listYouthMinutes().catch(() => []),
     ]);
-    setData({ players, memberships, matches, minuteRows, competitions, aliases });
+    setData({ players, memberships, matches, minuteRows, youthMinuteRows, competitions, aliases });
     setLoading(false);
   }, []);
 
@@ -348,6 +350,64 @@ export default function useMinutesDashboard() {
   }, [data.minuteRows, filteredFinishedMatches]);
 
   const playerPool = useMemo(() => buildPlayerPool(data.players, data.memberships, filters.squadId), [data.players, data.memberships, filters.squadId]);
+
+  const selectedSquad = useMemo(
+    () => filters.squadId === "all" ? null : (mySquads || []).find((squad) => squad.id === filters.squadId) || null,
+    [filters.squadId, mySquads]
+  );
+  const isReserveSquad = !!selectedSquad && normalizeText(selectedSquad.name).includes("reserva");
+  const youthEntrySeasonId = filters.seasonId !== "all"
+    ? filters.seasonId
+    : String(selectedSquad?.season || activeSeasonId || new Date().getFullYear());
+
+  const filteredYouthMinuteRows = useMemo(() => {
+    if (!isReserveSquad || !selectedSquad?.id) return [];
+    let rows = (data.youthMinuteRows || [])
+      .filter((row) => row.squad_id === selectedSquad.id)
+      .filter((row) => filters.seasonId === "all" || row.season_id === filters.seasonId);
+
+    if (filters.dateRange === "custom" && filters.dateFrom && filters.dateTo) {
+      rows = rows.filter((row) => row.match_date >= filters.dateFrom && row.match_date <= filters.dateTo);
+    }
+    if (filters.dateRange === "last5" || filters.dateRange === "last10") {
+      const limit = filters.dateRange === "last5" ? 5 : 10;
+      const dates = [...new Set(rows.map((row) => row.match_date).filter(Boolean))]
+        .sort((a, b) => String(b).localeCompare(String(a)))
+        .slice(0, limit);
+      const allowedDates = new Set(dates);
+      rows = rows.filter((row) => allowedDates.has(row.match_date));
+    }
+    return rows;
+  }, [data.youthMinuteRows, filters.seasonId, filters.dateRange, filters.dateFrom, filters.dateTo, isReserveSquad, selectedSquad]);
+
+  const youthPlayerRows = useMemo(() => {
+    if (!isReserveSquad) return [];
+    const rowsByPlayer = filteredYouthMinuteRows.reduce((acc, row) => {
+      acc[row.player_id] = acc[row.player_id] || [];
+      acc[row.player_id].push(row);
+      return acc;
+    }, {});
+    const searchText = normalizeText(filters.search);
+    return playerPool
+      .map((player) => {
+        const detailRows = [...(rowsByPlayer[player.id] || [])]
+          .sort((a, b) => String(b.match_date || "").localeCompare(String(a.match_date || "")));
+        return {
+          player_id: player.id,
+          player_name: player.full_name || `${player.first_name || ""} ${player.last_name || ""}`.trim(),
+          position: player.position || "—",
+          photo_url: player.photo_url || "",
+          squad_id: selectedSquad.id,
+          juvenileMinutes: detailRows.reduce((sum, row) => sum + Number(row.minutes || 0), 0),
+          juvenileMatchesCount: detailRows.length,
+          lastYouthDate: detailRows[0]?.match_date || "",
+          youthDetailRows: detailRows,
+        };
+      })
+      .filter((row) => !searchText || normalizeText(row.player_name).includes(searchText))
+      .sort((a, b) => b.juvenileMinutes - a.juvenileMinutes || String(a.player_name).localeCompare(String(b.player_name)))
+      .map((row, index) => ({ ...row, rank: index + 1 }));
+  }, [filteredYouthMinuteRows, playerPool, filters.search, isReserveSquad, selectedSquad]);
 
   const playerRows = useMemo(() => {
     const rowsByPlayer = filteredMinuteRows.reduce((acc, row) => {
@@ -510,6 +570,10 @@ export default function useMinutesDashboard() {
     availableMinutes,
     playersWithMinutesCount,
     playerRows,
+    youthPlayerRows,
+    isReserveSquad,
+    selectedSquadName: selectedSquad?.name || "",
+    youthEntrySeasonId,
     exportData,
     filterLabels,
   };
