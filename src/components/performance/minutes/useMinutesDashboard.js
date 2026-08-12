@@ -169,7 +169,6 @@ function getMatchStatus(match) {
   const positiveRows = rows.filter((row) => getRecordMinutes(row) > 0);
   const incompleteRows = rows.filter((row) => row.minutes_played == null || row.minutes_played === "" || !getLineupRole(row));
   const finished = match.finished;
-  const pending = finished && (!duration || positiveRows.length === 0 || incompleteRows.length > 0);
   const complete = finished && duration > 0 && positiveRows.length > 0 && incompleteRows.length === 0;
   if (!finished) return { label: "No finalizado", tone: "text-zinc-300", badge: "border-zinc-700 bg-zinc-800/70" };
   if (complete) return { label: "Minutos completos", tone: "text-emerald-300", badge: "border-emerald-500/30 bg-emerald-500/10" };
