@@ -20,7 +20,6 @@ function todayInArgentina() {
 
 export default function YouthMinutesTab({
   rows,
-  filters,
   canEdit,
   canDelete,
   isReserveSquad,
