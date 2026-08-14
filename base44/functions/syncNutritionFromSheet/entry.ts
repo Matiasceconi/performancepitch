@@ -304,8 +304,14 @@ function buildPlayerResolver(players, aliases) {
     if (!player) return;
     const normalized = normalize(alias.normalized_alias || alias.alias_name);
     const token = tokenKey(alias.alias_name || alias.normalized_alias);
-    if (normalized) aliasByName[normalized] = player;
-    if (token && !aliasByToken[token]) aliasByToken[token] = player;
+    if (normalized) {
+      if (!(normalized in aliasByName)) aliasByName[normalized] = player;
+      else if (aliasByName[normalized]?.id !== player.id) aliasByName[normalized] = null;
+    }
+    if (token) {
+      if (!(token in aliasByToken)) aliasByToken[token] = player;
+      else if (aliasByToken[token]?.id !== player.id) aliasByToken[token] = null;
+    }
   });
 
   return function resolve(originalName, explicitId = '', dni = '') {
@@ -313,10 +319,22 @@ function buildPlayerResolver(players, aliases) {
     if (dni && byDni[dni]) return byDni[dni];
     const normalized = normalize(originalName);
     const token = tokenKey(originalName);
-    if (aliasByName[normalized]) return aliasByName[normalized];
     if (byName[normalized]) return byName[normalized];
-    if (aliasByToken[token]) return aliasByToken[token];
     if (byToken[token]) return byToken[token];
+    if (aliasByName[normalized]) return aliasByName[normalized];
+    if (aliasByToken[token]) return aliasByToken[token];
+    const abbreviatedParts = normalized.split(/\s+/).filter(Boolean);
+    if (abbreviatedParts.length === 2 && abbreviatedParts.some((part) => part.length === 1)) {
+      const initial = abbreviatedParts.find((part) => part.length === 1);
+      const surname = abbreviatedParts.find((part) => part.length > 1);
+      const abbreviatedMatches = players.filter((player) => {
+        const nameParts = normalize(player.full_name || `${player.first_name || ''} ${player.last_name || ''}`)
+          .split(/\s+/)
+          .filter(Boolean);
+        return nameParts.includes(surname) && nameParts.some((part) => part.startsWith(initial));
+      });
+      if (abbreviatedMatches.length === 1) return abbreviatedMatches[0];
+    }
     const fuzzy = candidates
       .map((candidate) => ({
         player: candidate.player,
