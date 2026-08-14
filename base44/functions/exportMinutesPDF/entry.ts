@@ -1,25 +1,55 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 import { jsPDF } from 'npm:jspdf@4.0.0';
 
-const BRAND = {
-  name: 'Defensa y Justicia',
-  logoUrl: 'https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/36f6c4008_defensa.png',
-  green: [0, 132, 61],
-  greenDark: [0, 90, 52],
-  greenDeep: [0, 61, 37],
-  yellow: [255, 212, 0],
-  ink: [17, 24, 39],
-  muted: [107, 114, 128],
-  line: [216, 222, 210],
-  panel: [246, 247, 243],
-  white: [255, 255, 255],
+const DEFAULT_BRAND = {
+  name: 'Club',
+  logoUrl: '',
+  primary: '#1E293B',
+  secondary: '#475569',
+  accent: '#0EA5E9',
 };
 
-const TOTALS = {
-  reserva: 1727,
-  juveniles: 1252,
-  amistosos: 182,
-};
+function hexToRgb(value, fallback) {
+  const clean = String(value || fallback || '#0F172A').replace('#', '');
+  const valid = /^[0-9a-fA-F]{6}$/.test(clean)
+    ? clean
+    : String(fallback || '#0F172A').replace('#', '');
+  return [0, 2, 4].map((index) => parseInt(valid.slice(index, index + 2), 16));
+}
+
+function darkenRgb(color, factor = 0.22) {
+  return color.map((channel) => Math.round(channel * (1 - factor)));
+}
+
+function resolveExportBrand(profile, squad) {
+  const primary = hexToRgb(profile?.brand_primary || squad?.brand_primary, DEFAULT_BRAND.primary);
+  const secondary = profile?.brand_secondary || squad?.brand_secondary
+    ? hexToRgb(profile?.brand_secondary || squad?.brand_secondary, DEFAULT_BRAND.secondary)
+    : darkenRgb(primary);
+  const accent = hexToRgb(profile?.brand_accent || squad?.brand_accent, DEFAULT_BRAND.accent);
+  return {
+    name: profile?.official_name || squad?.club_name || DEFAULT_BRAND.name,
+    logoUrl: profile?.shield_url || profile?.horizontal_logo_url || squad?.club_logo_url || DEFAULT_BRAND.logoUrl,
+    green: primary,
+    greenDark: secondary,
+    greenDeep: darkenRgb(secondary, 0.3),
+    yellow: accent,
+    ink: [15, 23, 42],
+    muted: [100, 116, 139],
+    line: [226, 232, 240],
+    panel: [248, 250, 252],
+    white: [255, 255, 255],
+  };
+}
+
+function slugify(value) {
+  return safeText(value, 'club')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'club';
+}
 
 function norm(value) {
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
@@ -66,11 +96,11 @@ function setColor(doc, color, mode = 'text') {
   else doc.setTextColor(color[0], color[1], color[2]);
 }
 
-function addProgress(doc, x, y, w, value, total) {
+function addProgress(doc, x, y, w, value, total, brand) {
   const width = Math.min(w, Math.max(0, w * (pct(value, total) / 100)));
   setColor(doc, [229, 231, 235], 'fill');
   doc.roundedRect(x, y, w, 2.2, 1, 1, 'F');
-  setColor(doc, pct(value, total) >= 70 ? BRAND.green : pct(value, total) >= 40 ? BRAND.yellow : [245, 158, 11], 'fill');
+  setColor(doc, pct(value, total) >= 70 ? brand.green : pct(value, total) >= 40 ? brand.yellow : [245, 158, 11], 'fill');
   doc.roundedRect(x, y, width, 2.2, 1, 1, 'F');
 }
 
@@ -84,16 +114,32 @@ Deno.serve(async (req) => {
     const squadId = body?.squadId || '';
     const torneoId = body?.torneoId || 'all';
 
-    const [records, players, matches] = await Promise.all([
+    const [records, players, matches, profiles, squads] = await Promise.all([
       base44.asServiceRole.entities.MinutesRecord.list('-created_date', 1000),
       base44.asServiceRole.entities.Player.list('-created_date', 500),
       base44.asServiceRole.entities.MatchReport.list('-date', 500),
+      base44.asServiceRole.entities.InstitutionProfile.filter({ active: true }, '-updated_at', 10),
+      base44.asServiceRole.entities.Squad.list('name', 100),
     ]);
 
     const playerMap = Object.fromEntries(players.map((player) => [player.id, player]));
     const activeMatches = matches.filter((match) => match.status !== 'archivado' && (!squadId || match.squad_id === squadId));
     const activeMatchMap = Object.fromEntries(activeMatches.map((match) => [match.id, match]));
-    const squadName = safeText(activeMatches.find((match) => match.squad_name)?.squad_name, 'Plantel activo');
+    const selectedSquad = squadId
+      ? squads.find((squad) => squad.id === squadId) || null
+      : null;
+    const institutionProfile = profiles[0] || null;
+    const brand = resolveExportBrand(institutionProfile, selectedSquad);
+    const squadName = squadId
+      ? safeText(selectedSquad?.name || activeMatches.find((match) => match.squad_name)?.squad_name, 'Plantel activo')
+      : 'Todos los planteles';
+    const availableByBucket = activeMatches.reduce((totals, match) => {
+      const duration = Number(match.total_duration_minutes || match.duration_minutes || 0);
+      if (!Number.isFinite(duration) || duration <= 0) return totals;
+      const bucket = tournamentBucket(match.competition || match.competition_name);
+      totals[bucket] += duration;
+      return totals;
+    }, { reserva: 0, juveniles: 0, amistosos: 0 });
 
     const seen = new Set();
     const consolidated = {};
@@ -141,7 +187,7 @@ Deno.serve(async (req) => {
     const pageW = 297;
     const pageH = 210;
     const margin = 12;
-    const logo = await loadImage(BRAND.logoUrl);
+    const logo = await loadImage(brand.logoUrl);
     const photoCache = {};
 
     const columns = [
@@ -158,40 +204,40 @@ Deno.serve(async (req) => {
     ];
 
     function drawHeader(page = 1) {
-      setColor(doc, BRAND.greenDeep, 'fill');
+      setColor(doc, brand.greenDeep, 'fill');
       doc.rect(0, 0, pageW, 28, 'F');
-      setColor(doc, BRAND.yellow, 'fill');
+      setColor(doc, brand.yellow, 'fill');
       doc.rect(0, 27, pageW, 2, 'F');
       if (logo) {
         try { doc.addImage(logo.bytes, logo.format, margin, 5, 17, 17); } catch (_) {}
       }
-      setColor(doc, BRAND.white);
+      setColor(doc, brand.white);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(17);
       doc.text('Exportación de minutos jugados', 34, 12);
       doc.setFontSize(9);
       doc.setFont('helvetica', 'normal');
-      doc.text(`${BRAND.name} · ${squadName} · ${torneoId === 'all' ? 'Todos los torneos' : torneoId}`, 34, 18);
+      doc.text(`${brand.name} · ${squadName} · ${torneoId === 'all' ? 'Todos los torneos' : torneoId}`, 34, 18);
       doc.text(`Generado: ${new Date().toLocaleDateString('es-AR')} · Página ${page}`, pageW - margin, 12, { align: 'right' });
     }
 
     function drawSummary() {
       const cards = [
-        { label: 'Jugadores', value: data.length, color: BRAND.green },
-        { label: 'Minutos Reserva', value: minutes(totalsUsed.reserva), color: BRAND.greenDark },
+        { label: 'Jugadores', value: data.length, color: brand.green },
+        { label: 'Minutos Reserva', value: minutes(totalsUsed.reserva), color: brand.greenDark },
         { label: 'Minutos Juveniles', value: minutes(totalsUsed.juveniles), color: [245, 158, 11] },
-        { label: 'Minutos Totales', value: minutes(totalsUsed.total), color: BRAND.ink },
+        { label: 'Minutos Totales', value: minutes(totalsUsed.total), color: brand.ink },
       ];
       cards.forEach((card, index) => {
         const x = margin + index * 68;
-        setColor(doc, BRAND.panel, 'fill');
-        setColor(doc, BRAND.line, 'draw');
+        setColor(doc, brand.panel, 'fill');
+        setColor(doc, brand.line, 'draw');
         doc.roundedRect(x, 36, 62, 18, 4, 4, 'FD');
         setColor(doc, card.color);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(13);
         doc.text(String(card.value), x + 5, 45);
-        setColor(doc, BRAND.muted);
+        setColor(doc, brand.muted);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(7.5);
         doc.text(card.label.toUpperCase(), x + 5, 50);
@@ -199,9 +245,9 @@ Deno.serve(async (req) => {
     }
 
     function drawTableHeader(y) {
-      setColor(doc, BRAND.greenDark, 'fill');
+      setColor(doc, brand.greenDark, 'fill');
       doc.roundedRect(margin, y, pageW - margin * 2, 8, 2, 2, 'F');
-      setColor(doc, BRAND.white);
+      setColor(doc, brand.white);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7);
       columns.forEach((col) => {
@@ -218,9 +264,9 @@ Deno.serve(async (req) => {
           return;
         } catch (_) {}
       }
-      setColor(doc, BRAND.green, 'fill');
+      setColor(doc, brand.green, 'fill');
       doc.circle(x + 4, y + 4, 4, 'F');
-      setColor(doc, BRAND.yellow);
+      setColor(doc, brand.yellow);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(6);
       doc.text(initial, x + 4, y + 5.2, { align: 'center' });
@@ -233,7 +279,7 @@ Deno.serve(async (req) => {
       }
       setColor(doc, [229, 231, 235], 'draw');
       doc.line(margin, y + 9, pageW - margin, y + 9);
-      setColor(doc, BRAND.ink);
+      setColor(doc, brand.ink);
       doc.setFontSize(7.2);
       doc.setFont('helvetica', 'bold');
       doc.text(String(index + 1), columns[0].x + columns[0].w / 2, y + 5.5, { align: 'center' });
@@ -242,39 +288,39 @@ Deno.serve(async (req) => {
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.4);
       doc.text(safeText(player.player_name), columns[2].x + 1, y + 3.8, { maxWidth: columns[2].w - 2 });
-      setColor(doc, BRAND.muted);
+      setColor(doc, brand.muted);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(6.3);
       doc.text(player.jersey_number ? `#${player.jersey_number}` : '—', columns[2].x + 1, y + 7.5);
       doc.text(safeText(player.position, '—'), columns[3].x + 1, y + 5.5, { maxWidth: columns[3].w - 2 });
 
-      setColor(doc, BRAND.ink);
+      setColor(doc, brand.ink);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(7.2);
       doc.text(String(player.partidos_count || 0), columns[4].x + columns[4].w / 2, y + 5.5, { align: 'center' });
 
       const metricCells = [
-        { col: 5, value: player.reserva, total: TOTALS.reserva },
-        { col: 6, value: player.juveniles, total: TOTALS.juveniles },
-        { col: 7, value: player.amistosos, total: TOTALS.amistosos },
+        { col: 5, value: player.reserva, total: availableByBucket.reserva },
+        { col: 6, value: player.juveniles, total: availableByBucket.juveniles },
+        { col: 7, value: player.amistosos, total: availableByBucket.amistosos },
       ];
       metricCells.forEach((cell) => {
         const col = columns[cell.col];
-        setColor(doc, BRAND.ink);
+        setColor(doc, brand.ink);
         doc.setFont('helvetica', 'bold');
         doc.text(minutes(cell.value), col.x + col.w / 2, y + 3.7, { align: 'center' });
-        setColor(doc, BRAND.muted);
+        setColor(doc, brand.muted);
         doc.setFont('helvetica', 'normal');
         doc.setFontSize(5.8);
         doc.text(`${pct(cell.value, cell.total)}%`, col.x + col.w / 2, y + 7.2, { align: 'center' });
-        addProgress(doc, col.x + 3, y + 8, col.w - 6, cell.value, cell.total);
+        addProgress(doc, col.x + 3, y + 8, col.w - 6, cell.value, cell.total, brand);
       });
 
-      setColor(doc, BRAND.greenDark);
+      setColor(doc, brand.greenDark);
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(8);
       doc.text(minutes(player.total), columns[8].x + columns[8].w / 2, y + 5.5, { align: 'center' });
-      setColor(doc, BRAND.ink);
+      setColor(doc, brand.ink);
       doc.setFontSize(7.2);
       doc.text(`${pct(player.total, Math.max(1, totalsUsed.total))}%`, columns[9].x + columns[9].w / 2, y + 5.5, { align: 'center' });
     }
@@ -303,7 +349,7 @@ Deno.serve(async (req) => {
       y += 10.5;
     });
 
-    setColor(doc, BRAND.muted);
+    setColor(doc, brand.muted);
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(7);
     doc.text('Los porcentajes se calculan sobre los minutos disponibles por competencia y el total exportado.', margin, pageH - 8);
@@ -313,7 +359,7 @@ Deno.serve(async (req) => {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': 'attachment; filename=minutos-jugados-defensa-y-justicia.pdf'
+        'Content-Disposition': 'attachment; filename=minutos-jugados-' + slugify(brand.name) + '.pdf'
       }
     });
   } catch (error) {
