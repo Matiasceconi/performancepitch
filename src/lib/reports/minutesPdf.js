@@ -1,6 +1,8 @@
 import { jsPDF } from "jspdf";
 import moment from "moment";
 import { resolveInstitutionBrand } from "@/lib/clubBrandResolver";
+import pdfFontRegularUrl from "@/assets/fonts/DejaVuSans.ttf?url";
+import pdfFontBoldUrl from "@/assets/fonts/DejaVuSans-Bold.ttf?url";
 
 const PAGE = {
   width: 297,
@@ -11,6 +13,7 @@ const PAGE = {
 };
 
 const imageCache = new Map();
+const fontCache = new Map();
 
 function safeText(value, fallback = "—") {
   const text = String(value ?? "").replace(/\s+/g, " ").trim();
@@ -42,9 +45,46 @@ function setColor(doc, method, color) {
   doc[method](rgb[0], rgb[1], rgb[2]);
 }
 
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function loadFontBase64(url) {
+  if (!fontCache.has(url)) {
+    fontCache.set(url, (async () => {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("No se pudo cargar la tipografía del PDF");
+      return arrayBufferToBase64(await response.arrayBuffer());
+    })());
+  }
+  return fontCache.get(url);
+}
+
+async function registerPdfFonts(doc) {
+  try {
+    const [regular, bold] = await Promise.all([
+      loadFontBase64(pdfFontRegularUrl),
+      loadFontBase64(pdfFontBoldUrl),
+    ]);
+    doc.addFileToVFS("DejaVuSans.ttf", regular);
+    doc.addFileToVFS("DejaVuSans-Bold.ttf", bold);
+    doc.addFont("DejaVuSans.ttf", "DejaVuSans", "normal");
+    doc.addFont("DejaVuSans-Bold.ttf", "DejaVuSans", "bold");
+    doc.__minutesFontFamily = "DejaVuSans";
+  } catch {
+    doc.__minutesFontFamily = "courier";
+  }
+}
+
 function setText(doc, color, size, style = "normal") {
   setColor(doc, "setTextColor", color);
-  doc.setFont("helvetica", style);
+  doc.setFont(doc.__minutesFontFamily || "courier", style);
   doc.setFontSize(size);
   doc.setCharSpace(0);
 }
@@ -251,6 +291,7 @@ export async function generateMinutesPdf(input = {}) {
   const showSeason = profile.show_season !== false;
   const showExportDate = profile.show_export_date !== false;
   const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4", compress: true });
+  await registerPdfFonts(doc);
   const contentWidth = PAGE.width - PAGE.margin * 2;
   const primaryText = brand.colors.onPrimary || "#FFFFFF";
   const footerText = safeText(profile.export_footer_text, "Documento operativo del cuerpo técnico");
