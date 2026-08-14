@@ -1,5 +1,5 @@
 // Resolvedor de marca dinámico para exportaciones multiclub.
-// Orden de respaldo: InstitutionProfile → Squad (plantel activo) → paleta neutra.
+// Orden de respaldo: InstitutionProfile → datos institucionales del Squad → paleta neutra.
 // Mantiene compatibilidad con nombres legacy (green, greenDark, yellow, gold, etc.)
 // para no romper los PDF existentes mientras se migran.
 
@@ -14,15 +14,14 @@ const NEUTRAL = {
   white: "#FFFFFF",
 };
 
-// Paleta legada de Defensa y Justicia (clubBrand.js) usada solo como respaldo
-// de migración cuando no existe InstitutionProfile ni datos en Squad.
-const LEGACY_FALLBACK = {
-  name: "Defensa y Justicia",
-  shortName: "DyJ",
-  logoUrl: "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png",
-  primary: "#00843D",
-  secondary: "#005A34",
-  accent: "#FFD400",
+// Respaldo deliberadamente neutro: nunca debe atribuir la exportación a otro club.
+const GENERIC_FALLBACK = {
+  name: "Club",
+  shortName: "CLUB",
+  logoUrl: "",
+  primary: NEUTRAL.primary,
+  secondary: NEUTRAL.secondary,
+  accent: NEUTRAL.accent,
 };
 
 function hexToRgb(hex) {
@@ -84,17 +83,17 @@ export function resolveInstitutionBrand(institution = null, squad = {}) {
     institution = null;
   }
 
-  const instPrimary = institution?.brand_primary || squad?.brand_primary || LEGACY_FALLBACK.primary;
-  const instSecondary = institution?.brand_secondary || squad?.brand_secondary || LEGACY_FALLBACK.secondary;
-  const instAccent = institution?.brand_accent || squad?.brand_accent || LEGACY_FALLBACK.accent;
+  const instPrimary = institution?.brand_primary || squad?.brand_primary || GENERIC_FALLBACK.primary;
+  const instSecondary = institution?.brand_secondary || squad?.brand_secondary || GENERIC_FALLBACK.secondary;
+  const instAccent = institution?.brand_accent || squad?.brand_accent || GENERIC_FALLBACK.accent;
 
   const primary = instPrimary || NEUTRAL.primary;
   const secondary = instSecondary || NEUTRAL.secondary;
   const accent = instAccent || NEUTRAL.accent;
 
-  const name = institution?.official_name || squad?.club_name || squad?.name || LEGACY_FALLBACK.name;
-  const shortName = institution?.short_name || institution?.abbreviation || squad?.club_short_name || (name).slice(0, 3).toUpperCase() || LEGACY_FALLBACK.shortName;
-  const logoUrl = institution?.shield_url || institution?.horizontal_logo_url || squad?.club_logo_url || LEGACY_FALLBACK.logoUrl;
+  const name = institution?.official_name || squad?.club_name || GENERIC_FALLBACK.name;
+  const shortName = institution?.short_name || institution?.abbreviation || squad?.club_short_name || name.slice(0, 4).toUpperCase() || GENERIC_FALLBACK.shortName;
+  const logoUrl = institution?.shield_url || institution?.horizontal_logo_url || squad?.club_logo_url || GENERIC_FALLBACK.logoUrl;
   const season = institution?.default_season || squad?.season || "";
   const squadName = squad?.name || "Plantel";
 
