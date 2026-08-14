@@ -348,6 +348,12 @@ async function upsert(entity, payload, keyField, byKey, byRow, seenIds) {
   return 'created';
 }
 
+async function forEachInChunks(items, batchSize, handler) {
+  for (let index = 0; index < items.length; index += batchSize) {
+    await Promise.all(items.slice(index, index + batchSize).map(handler));
+  }
+}
+
 async function findSyncState(base44) {
   const states = await base44.asServiceRole.entities.NutritionSyncState.filter(
     { source_file_id: SOURCE_FILE_ID },
@@ -466,13 +472,13 @@ Deno.serve(async (req) => {
     const now = new Date().toISOString();
     const seasonId = String(targetSquad.season || existingState?.target_season_id || '');
 
-    for (const item of skinfoldExtract.rows) {
+    await forEachInChunks(skinfoldExtract.rows, 12, async (item) => {
       try {
         const player = resolvePlayer(item.originalName);
         if (!player) {
           counters.unresolved_assessments++;
           if (unresolvedSamples.length < 20) unresolvedSamples.push({ sheet: SKINFOLD_LOGICAL, row: item.rowNumber, name: item.originalName });
-          continue;
+          return;
         }
         const key = `${player.id}|${item.fecha}|seguimiento_pliegues`;
         const payload = {
@@ -521,15 +527,15 @@ Deno.serve(async (req) => {
       } catch (_error) {
         counters.errors++;
       }
-    }
+    });
 
-    for (const item of weightExtract.rows) {
+    await forEachInChunks(weightExtract.rows, 12, async (item) => {
       try {
         const player = resolvePlayer(item.originalName);
         if (!player) {
           counters.unresolved_assessments++;
           if (unresolvedSamples.length < 20) unresolvedSamples.push({ sheet: WEIGHT_LOGICAL, row: item.rowNumber, name: item.originalName });
-          continue;
+          return;
         }
         const key = `${player.id}|${item.fecha}|seguimiento_peso`;
         const payload = {
@@ -573,15 +579,15 @@ Deno.serve(async (req) => {
       } catch (_error) {
         counters.errors++;
       }
-    }
+    });
 
-    for (const item of readingExtract.rows) {
+    await forEachInChunks(readingExtract.rows, 12, async (item) => {
       try {
         const player = resolvePlayer(item.originalName);
         if (!player) {
           counters.unresolved_interpretations++;
           if (unresolvedSamples.length < 20) unresolvedSamples.push({ sheet: READING_LOGICAL, row: item.rowNumber, name: item.originalName });
-          continue;
+          return;
         }
         const current = lastDefined(item.cuts);
         const previous = previousDefined(item.cuts);
@@ -641,7 +647,7 @@ Deno.serve(async (req) => {
       } catch (_error) {
         counters.errors++;
       }
-    }
+    });
 
     let recordsMarkedMissing = 0;
     for (const record of existingAssessments) {
