@@ -1,0 +1,16 @@
+{
+  "name": "syncNutritionFromSheet",
+  "entry": "entry.ts",
+  "automations": [
+    {
+      "name": "Sincronización horaria de Nutrición",
+      "description": "Actualiza Informe de lectura, Seguimiento de pliegues y Seguimiento de peso desde Antros grupales.xlsx.",
+      "type": "scheduled",
+      "schedule_mode": "recurring",
+      "schedule_type": "simple",
+      "repeat_unit": "hours",
+      "repeat_interval": 1,
+      "is_active": true
+    }
+  ]
+}
