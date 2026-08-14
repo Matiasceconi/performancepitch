@@ -18,7 +18,7 @@ const SUB_TABS = [
 
 export default function MinutesSubPanel() {
   const dashboard = useMinutesDashboard();
-  const { isAdmin, can } = useWorkspace();
+  const { isAdmin, can, clubBrand, institutionProfile, activeSquad } = useWorkspace();
   const [pendingOpen, setPendingOpen] = useState(false);
   const [importOpen, setImportOpen] = useState(false);
   const canImport = isAdmin || can?.("edit", "/performance/minutes") || can?.("admin", "/performance/minutes");
@@ -26,7 +26,12 @@ export default function MinutesSubPanel() {
   const canDeleteYouth = isAdmin || can?.("delete", "/performance/minutes") || can?.("admin", "/performance/minutes");
 
   async function handleExport() {
-    await generateMinutesPdf(dashboard.exportData);
+    await generateMinutesPdf({
+      ...dashboard.exportData,
+      brand: clubBrand,
+      institutionProfile,
+      squad: activeSquad,
+    });
   }
 
   if (dashboard.loading) {
