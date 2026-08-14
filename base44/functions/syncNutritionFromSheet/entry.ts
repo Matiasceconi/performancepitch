@@ -417,6 +417,7 @@ Deno.serve(async (req) => {
       && existingState?.source_modified_time === metadata.modifiedTime
       && existingState?.last_sync_result?.schema_version === 3) {
       const unchangedResult = {
+        ...(existingState.last_sync_result || {}),
         success: true,
         unchanged: true,
         schema_version: 3,
