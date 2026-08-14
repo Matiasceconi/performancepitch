@@ -167,6 +167,34 @@
     "nutrition_assessment_id": {
       "type": "string",
       "description": "ID directo de la evaluaci\u00f3n antropom\u00e9trica vinculada (NutritionAssessment)"
+    },
+    "club_id": {
+      "type": "string",
+      "description": "ID del club propietario del jugador"
+    },
+    "talla": {
+      "type": "number",
+      "description": "Talla informada en la lectura"
+    },
+    "zona_media_mm": {
+      "type": "number",
+      "description": "Suma de pliegues supraespinal y abdominal"
+    },
+    "first_cut_sumatoria_6p": {
+      "type": "number",
+      "description": "Sumatoria del primer corte"
+    },
+    "third_cut_sumatoria_6p": {
+      "type": "number",
+      "description": "Sumatoria del tercer corte"
+    },
+    "fourth_cut_sumatoria_6p": {
+      "type": "number",
+      "description": "Sumatoria del cuarto corte"
+    },
+    "difference_from_limit": {
+      "type": "number",
+      "description": "Diferencia entre sumatoria actual y limite individual"
     }
   },
   "required": [
