@@ -33,6 +33,45 @@
     "last_sync_result": {
       "type": "object",
       "description": "Resumen de la \u00faltima sincronizaci\u00f3n"
+    },
+    "target_squad_id": {
+      "type": "string",
+      "description": "Plantel de destino de la sincronizacion"
+    },
+    "target_squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel de destino"
+    },
+    "target_season_id": {
+      "type": "string",
+      "description": "Temporada de destino"
+    },
+    "sync_interval_minutes": {
+      "type": "number",
+      "description": "Intervalo de sincronizacion automatica"
+    },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "idle",
+        "syncing",
+        "up_to_date",
+        "completed_with_warnings",
+        "error"
+      ],
+      "description": "Estado actual de la sincronizacion"
+    },
+    "last_error": {
+      "type": "string",
+      "description": "Ultimo error de sincronizacion"
+    },
+    "last_checked_at": {
+      "type": "string",
+      "description": "Ultima vez que se reviso el archivo origen"
+    },
+    "next_sync_at": {
+      "type": "string",
+      "description": "Proxima revision prevista"
     }
   },
   "required": [
