@@ -1,17 +1,17 @@
 // Helper para cargar y sembrar el único perfil institucional activo.
-// Orden de migración: datos de Squad con branding → paleta legada de clubBrand.js.
+// Orden de migración: datos institucionales de Squad → identidad neutra para completar en Administración.
 // No crea duplicados: si ya existe un perfil activo, lo devuelve.
 
 import { base44 } from "@/api/base44Client";
 
-const LEGACY_SEED = {
-  official_name: "Defensa y Justicia",
-  short_name: "DyJ",
-  abbreviation: "DYJ",
-  shield_url: "https://media.base44.com/images/public/6a3bc03033558cd65ec27f53/4379a507a_defensa.png",
-  brand_primary: "#00843D",
-  brand_secondary: "#005A34",
-  brand_accent: "#FFD400",
+const GENERIC_SEED = {
+  official_name: "Club",
+  short_name: "Club",
+  abbreviation: "CLUB",
+  shield_url: "",
+  brand_primary: "#1E293B",
+  brand_secondary: "#475569",
+  brand_accent: "#0EA5E9",
   language: "Español",
   timezone: "America/Argentina/Buenos_Aires",
   date_format: "DD/MM/YYYY",
@@ -37,7 +37,7 @@ export async function loadOrSeedInstitutionProfile() {
       return existing[0];
     }
     // Sembrar: buscar el primer squad con datos de branding
-    let seed = { ...LEGACY_SEED };
+    let seed = { ...GENERIC_SEED };
     try {
       const squads = await base44.entities.Squad.filter({ active: true }, "name", 50);
       const branded = squads.find(s => s.club_name || s.brand_primary || s.club_logo_url);
