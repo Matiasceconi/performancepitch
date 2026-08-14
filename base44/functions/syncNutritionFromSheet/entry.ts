@@ -351,24 +351,26 @@ function buildPlayerResolver(players, aliases) {
   };
 }
 
-async function upsert(entity, payload, keyField, byKey, byRow, seenIds) {
+function stageUpsert(payload, keyField, byKey, byRow, seenIds, creates, updates) {
   const key = payload[keyField];
   const existing = byKey[key] || byRow[payload.source_sheet_row_id];
   if (existing) {
-    await entity.update(existing.id, payload);
+    updates.push({ id: existing.id, ...payload });
     byKey[key] = { ...existing, ...payload };
     seenIds.add(existing.id);
     return 'updated';
   }
-  const created = await entity.create({ ...payload, created_at: new Date().toISOString() });
-  byKey[key] = created;
-  seenIds.add(created.id);
+  creates.push({ ...payload, created_at: new Date().toISOString() });
+  byKey[key] = payload;
   return 'created';
 }
 
-async function forEachInChunks(items, batchSize, handler) {
-  for (let index = 0; index < items.length; index += batchSize) {
-    await Promise.all(items.slice(index, index + batchSize).map(handler));
+async function bulkWrite(entity, creates, updates, chunkSize = 100) {
+  for (let index = 0; index < creates.length; index += chunkSize) {
+    await entity.bulkCreate(creates.slice(index, index + chunkSize));
+  }
+  for (let index = 0; index < updates.length; index += chunkSize) {
+    await entity.bulkUpdate(updates.slice(index, index + chunkSize));
   }
 }
 
@@ -487,10 +489,14 @@ Deno.serve(async (req) => {
     const unresolvedSamples = [];
     const seenAssessmentIds = new Set();
     const seenInterpretationIds = new Set();
+    const assessmentsToCreate = [];
+    const assessmentsToUpdate = [];
+    const interpretationsToCreate = [];
+    const interpretationsToUpdate = [];
     const now = new Date().toISOString();
     const seasonId = String(targetSquad.season || existingState?.target_season_id || '');
 
-    await forEachInChunks(skinfoldExtract.rows, 12, async (item) => {
+    skinfoldExtract.rows.forEach((item) => {
       try {
         const player = resolvePlayer(item.originalName);
         if (!player) {
@@ -533,13 +539,14 @@ Deno.serve(async (req) => {
           updated_at: now,
         };
         Object.keys(payload).forEach((keyName) => payload[keyName] === undefined && delete payload[keyName]);
-        const status = await upsert(
-          base44.asServiceRole.entities.NutritionAssessment,
+        const status = stageUpsert(
           payload,
           'nutrition_assessment_key',
           assessmentByKey,
           assessmentByRow,
           seenAssessmentIds,
+          assessmentsToCreate,
+          assessmentsToUpdate,
         );
         counters[status === 'created' ? 'assessments_created' : 'assessments_updated']++;
       } catch (_error) {
@@ -547,7 +554,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    await forEachInChunks(weightExtract.rows, 12, async (item) => {
+    weightExtract.rows.forEach((item) => {
       try {
         const player = resolvePlayer(item.originalName);
         if (!player) {
@@ -585,13 +592,14 @@ Deno.serve(async (req) => {
           updated_at: now,
         };
         Object.keys(payload).forEach((keyName) => payload[keyName] === undefined && delete payload[keyName]);
-        const status = await upsert(
-          base44.asServiceRole.entities.NutritionAssessment,
+        const status = stageUpsert(
           payload,
           'nutrition_assessment_key',
           assessmentByKey,
           assessmentByRow,
           seenAssessmentIds,
+          assessmentsToCreate,
+          assessmentsToUpdate,
         );
         counters[status === 'created' ? 'assessments_created' : 'assessments_updated']++;
       } catch (_error) {
@@ -599,7 +607,7 @@ Deno.serve(async (req) => {
       }
     });
 
-    await forEachInChunks(readingExtract.rows, 12, async (item) => {
+    readingExtract.rows.forEach((item) => {
       try {
         const player = resolvePlayer(item.originalName);
         if (!player) {
@@ -653,19 +661,31 @@ Deno.serve(async (req) => {
           updated_at: now,
         };
         Object.keys(payload).forEach((keyName) => payload[keyName] === undefined && delete payload[keyName]);
-        const status = await upsert(
-          base44.asServiceRole.entities.NutritionInterpretation,
+        const status = stageUpsert(
           payload,
           'nutrition_interpretation_key',
           interpretationByKey,
           interpretationByRow,
           seenInterpretationIds,
+          interpretationsToCreate,
+          interpretationsToUpdate,
         );
         counters[status === 'created' ? 'interpretations_created' : 'interpretations_updated']++;
       } catch (_error) {
         counters.errors++;
       }
     });
+
+    await bulkWrite(
+      base44.asServiceRole.entities.NutritionAssessment,
+      assessmentsToCreate,
+      assessmentsToUpdate,
+    );
+    await bulkWrite(
+      base44.asServiceRole.entities.NutritionInterpretation,
+      interpretationsToCreate,
+      interpretationsToUpdate,
+    );
 
     let recordsMarkedMissing = 0;
     for (const record of existingAssessments) {
