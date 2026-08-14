@@ -154,6 +154,54 @@
     "edited_at": {
       "type": "string",
       "description": "Fecha/hora de edici\u00f3n manual"
+    },
+    "club_id": {
+      "type": "string",
+      "description": "ID del club propietario del jugador"
+    },
+    "source_group": {
+      "type": "string",
+      "description": "Grupo del jugador informado en la planilla"
+    },
+    "triceps": {
+      "type": "number",
+      "description": "Pliegue triceps en milimetros"
+    },
+    "subescapular": {
+      "type": "number",
+      "description": "Pliegue subescapular en milimetros"
+    },
+    "supraespinal": {
+      "type": "number",
+      "description": "Pliegue supraespinal en milimetros"
+    },
+    "abdominal": {
+      "type": "number",
+      "description": "Pliegue abdominal en milimetros"
+    },
+    "muslo": {
+      "type": "number",
+      "description": "Pliegue de muslo en milimetros"
+    },
+    "pantorrilla": {
+      "type": "number",
+      "description": "Pliegue de pantorrilla en milimetros"
+    },
+    "zona_media_mm": {
+      "type": "number",
+      "description": "Suma de pliegues supraespinal y abdominal"
+    },
+    "peso_optimo": {
+      "type": "number",
+      "description": "Umbral de peso optimo definido en la planilla"
+    },
+    "peso_observacion": {
+      "type": "number",
+      "description": "Umbral de peso para observacion"
+    },
+    "peso_limite": {
+      "type": "number",
+      "description": "Limite superior de peso"
     }
   },
   "required": [
