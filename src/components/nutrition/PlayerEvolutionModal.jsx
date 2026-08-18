@@ -9,6 +9,7 @@ import {
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import { exportPlayerEvolutionPdf } from "@/lib/reports/nutritionPdf";
+import { renderChartsToPng } from "@/lib/reports/chartToPng";
 
 const METRICS = [
   { key: "peso", label: "Peso", unit: "kg", color: "#60a5fa" },
@@ -103,7 +104,10 @@ export default function PlayerEvolutionModal({ player, assessments, squadName, s
   async function handleExport() {
     setExporting(true);
     try {
-      await exportPlayerEvolutionPdf({ player, assessments: sorted, squadName, seasonLabel });
+      const charts = sorted.length > 1 ? await renderChartsToPng(sorted) : {};
+      await exportPlayerEvolutionPdf({ player, assessments: sorted, squadName, seasonLabel, charts });
+    } catch (e) {
+      console.error("Error exportando evolución:", e);
     } finally {
       setExporting(false);
     }

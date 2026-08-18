@@ -290,6 +290,7 @@ export async function exportPlayerEvolutionPdf({
   assessments,
   squadName,
   seasonLabel,
+  charts = {},
 }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
   const logo = await imageToDataUrl(CLUB_BRAND.logoUrl);
@@ -364,6 +365,47 @@ export async function exportPlayerEvolutionPdf({
     drawTableRow(doc, { cols, row, index, y, margin, contentW, pageW });
     y += 8;
   });
+
+  // ── Charts page ───────────────────────────────────────────────────────
+  const chartMetrics = [
+    { key: "peso", label: "Peso (kg)" },
+    { key: "sumatoria_6p", label: "Sumatoria 6 Pliegues (mm)" },
+    { key: "porcentaje_grasa", label: "% Grasa" },
+    { key: "kg_masa_muscular", label: "Masa Muscular (kg)" },
+  ];
+  const hasCharts = chartMetrics.some((m) => charts[m.key]);
+  if (hasCharts) {
+    doc.addPage();
+    let cy = margin + 8;
+    setColor(doc, "setTextColor", CLUB_BRAND.colors.greenDeep);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(12);
+    doc.text("Evolución gráfica", margin, cy);
+    cy += 8;
+    const chartW = (contentW - 6) / 2;
+    const chartH = chartW * 0.5;
+    chartMetrics.forEach((m, i) => {
+      if (!charts[m.key]) return;
+      if (i > 0 && i % 2 === 0 && cy + chartH > pageH - margin - 10) {
+        doc.addPage();
+        cy = margin + 8;
+      }
+      const col = i % 2;
+      const x = margin + col * (chartW + 6);
+      if (col === 0 && i % 2 === 0 && cy + chartH > pageH - margin - 10) {
+        doc.addPage();
+        cy = margin + 8;
+      }
+      setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(9);
+      doc.text(m.label, x, cy);
+      try {
+        doc.addImage(charts[m.key], "PNG", x, cy + 2, chartW, chartH);
+      } catch {}
+      if (col === 1) cy += chartH + 12;
+    });
+  }
 
   const totalPages = doc.getNumberOfPages();
   for (let pg = 1; pg <= totalPages; pg++) {
