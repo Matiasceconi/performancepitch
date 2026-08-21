@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Loader2, FileText, Save, Download, Send, X } from "lucide-react";
+import { Loader2, FileText, Save, Download, Send, X, TrendingUp } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
-import { REPORT_METRICS, fmtMetric, buildMatchOptionsFromData, buildAnalysisFromOptions } from "@/lib/matchReportData";
+import { REPORT_METRICS, fmtMetric, buildMatchOptionsFromData, buildAnalysisFromOptions, buildEvolutionData } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 import MatchBlockCard from "@/components/matchReports/MatchBlockCard";
+import { Line, LineChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 const RANGE_OPTIONS = [
   { key: "last1", label: "Último partido" },
@@ -33,6 +34,7 @@ export default function GpsPlayerMatchAnalysis({ player, matchReports, matchGpsB
   const [exporting, setExporting] = useState(false);
   const [saving, setSaving] = useState(false);
   const [savedReportId, setSavedReportId] = useState(null);
+  const [evolutionMetric, setEvolutionMetric] = useState("total_distance");
 
   useEffect(() => {
     if (!player?.id) return;
@@ -232,6 +234,43 @@ export default function GpsPlayerMatchAnalysis({ player, matchReports, matchGpsB
           </table>
         </div>
       </div>
+
+      {/* Evolución dinámica por métrica */}
+      {reportData && reportData.selected.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <TrendingUp size={16} className="text-emerald-400" />
+            <h3 className="text-sm font-bold text-white">Evolución por métrica</h3>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {REPORT_METRICS.map((m) => (
+              <button
+                key={m.key}
+                onClick={() => setEvolutionMetric(m.key)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${evolutionMetric === m.key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}`}
+              >
+                {m.label}
+              </button>
+            ))}
+          </div>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={buildEvolutionData(reportData, evolutionMetric)} margin={{ left: -10, right: 12, top: 5, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+              <XAxis dataKey="shortDate" tick={{ fill: "#a1a1aa", fontSize: 11 }} stroke="#3f3f46" />
+              <YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} stroke="#3f3f46" width={48} />
+              <Tooltip
+                contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 12 }}
+                formatter={(v) => fmtMetric(v, REPORT_METRICS.find((m) => m.key === evolutionMetric)?.decimals ?? 0)}
+              />
+              <ReferenceLine y={reportData.personalAvg[evolutionMetric]} stroke="#52525b" strokeDasharray="5 5" label={{ value: "Prom.", fill: "#71717a", fontSize: 10, position: "insideTopRight" }} />
+              <Line type="monotone" dataKey={evolutionMetric} stroke="#22c55e" strokeWidth={2.5} dot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }} activeDot={{ r: 6 }} />
+            </LineChart>
+          </ResponsiveContainer>
+          <p className="text-[11px] text-zinc-500 mt-2">
+            {REPORT_METRICS.find((m) => m.key === evolutionMetric)?.label} · {reportData.selected.length} {reportData.selected.length === 1 ? "partido" : "partidos"} · línea punteada = promedio personal
+          </p>
+        </div>
+      )}
 
       {/* Per-match blocks (puntual view) */}
       {reportData && reportData.selected.length > 0 && (
