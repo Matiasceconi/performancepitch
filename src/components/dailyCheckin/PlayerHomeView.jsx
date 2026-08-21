@@ -46,6 +46,7 @@ export default function PlayerHomeView({ data, onOpenWellness, onOpenRpe, onOpen
       <div className="pt-4">
         <h1 className="text-2xl font-black text-white">Hola, {firstName}</h1>
         <p className="text-zinc-500 text-sm mt-1 capitalize">{fmtDate(data?.today)} · Tu día</p>
+        <p className="text-[10px] text-zinc-700 mt-1">DEBUG: latest_report = {latestReport ? "SÍ" : "NO"} · keys = {data ? Object.keys(data).join(",") : "sin data"}</p>
       </div>
 
       {/* A. Cronograma del día */}
