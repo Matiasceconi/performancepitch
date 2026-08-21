@@ -1,0 +1,124 @@
+{
+  "name": "PlayerMatchReport",
+  "type": "object",
+  "properties": {
+    "title": {
+      "type": "string",
+      "description": "T\u00edtulo visible del informe"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "single_match",
+        "multi_match"
+      ],
+      "description": "Tipo de informe: un partido o varios"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "published",
+        "archived"
+      ],
+      "default": "draft",
+      "description": "Estado del informe"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "ID del jugador"
+    },
+    "player_name": {
+      "type": "string",
+      "description": "Nombre del jugador (desnormalizado)"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel"
+    },
+    "squad_name": {
+      "type": "string",
+      "description": "Nombre del plantel (desnormalizado)"
+    },
+    "season_id": {
+      "type": "string",
+      "description": "Temporada"
+    },
+    "match_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "IDs de MatchReport incluidos en el informe"
+    },
+    "match_labels": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Etiquetas visibles de los partidos (desnormalizado)"
+    },
+    "match_dates": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Fechas de los partidos incluidos"
+    },
+    "staff_comment": {
+      "type": "string",
+      "description": "Comentario opcional del \u00e1rea de Rendimiento"
+    },
+    "metrics_snapshot": {
+      "type": "object",
+      "description": "Resumen de KPIs principales para vista r\u00e1pida en listados"
+    },
+    "created_by": {
+      "type": "string",
+      "description": "Usuario creador"
+    },
+    "created_at": {
+      "type": "string",
+      "description": "Fecha/hora de creaci\u00f3n"
+    },
+    "published_at": {
+      "type": "string",
+      "description": "Fecha/hora de publicaci\u00f3n para el jugador"
+    },
+    "updated_at": {
+      "type": "string",
+      "description": "Fecha/hora de \u00faltima actualizaci\u00f3n"
+    }
+  },
+  "required": [
+    "title",
+    "report_type",
+    "player_id",
+    "squad_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

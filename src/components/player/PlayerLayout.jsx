@@ -1,12 +1,13 @@
 import React from 'react';
 import { Outlet, NavLink, useNavigate } from 'react-router-dom';
-import { Home, HeartPulse, Gauge, History, LogOut } from 'lucide-react';
+import { Home, HeartPulse, Gauge, History, FileText, LogOut } from 'lucide-react';
 import { useAuth } from '@/lib/AuthContext';
 
 const NAV = [
   { to: '/player', label: 'Inicio', icon: Home, end: true },
   { to: '/player/wellness', label: 'Wellness', icon: HeartPulse, end: false },
   { to: '/player/rpe', label: 'RPE', icon: Gauge, end: false },
+  { to: '/player/reports', label: 'Informes', icon: FileText, end: false },
   { to: '/player/history', label: 'Mis respuestas', icon: History, end: false },
 ];
 
