@@ -174,6 +174,15 @@ export default async function(req) {
     }
     strengthUpcoming.sort((a, b) => a.workout_date.localeCompare(b.workout_date));
 
+    // ── D. Último informe publicado (no eliminado) ────────────────────────
+    const allPlayerReports = await base44.asServiceRole.entities.PlayerMatchReport.filter(
+      { player_id: playerId, status: 'published' },
+      '-published_at',
+      5
+    ).catch(() => []);
+    const activeReports = allPlayerReports.filter(r => !r.deleted_at);
+    const latestReport = activeReports[0] || null;
+
     return Response.json({
       ok: true,
       player_first_name: tokenRecord.player_first_name || player.first_name || '',
@@ -186,6 +195,15 @@ export default async function(req) {
         today: strengthToday,
         upcoming: strengthUpcoming,
       },
+      latest_report: latestReport ? {
+        id: latestReport.id,
+        title: latestReport.title,
+        report_type: latestReport.report_type,
+        match_labels: latestReport.match_labels || [],
+        match_dates: latestReport.match_dates || [],
+        match_ids: latestReport.match_ids || [],
+        published_at: latestReport.published_at,
+      } : null,
     });
   } catch (error) {
     console.error('getPlayerDailyHome error:', error);

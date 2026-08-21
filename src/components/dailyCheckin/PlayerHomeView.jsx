@@ -1,5 +1,5 @@
 import React from 'react';
-import { Calendar, ClipboardList, CheckCircle2, Gauge, Dumbbell, Lock, Clock, MapPin, Video, Heart, ArrowRight, Trophy } from 'lucide-react';
+import { Calendar, ClipboardList, CheckCircle2, Gauge, Dumbbell, Lock, Clock, MapPin, Video, Heart, ArrowRight, Trophy, FileText } from 'lucide-react';
 
 const EVENT_ICONS = {
   Entrenamiento: Video, Partido: Trophy, Gimnasio: Dumbbell, Cancha: MapPin, Comida: Heart, Descanso: Clock, Viaje: MapPin, Video: Video, Reunión: ClipboardList,
@@ -27,7 +27,7 @@ function fmtDate(d) {
   return date.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' });
 }
 
-export default function PlayerHomeView({ data, onOpenWellness, onOpenRpe, onOpenStrength, onLogout }) {
+export default function PlayerHomeView({ data, onOpenWellness, onOpenRpe, onOpenStrength, onOpenReport, onLogout }) {
   const schedule = data?.schedule || [];
   const wellnessDone = data?.wellness?.status === 'completed';
   const rpeSessions = data?.rpe_sessions || [];
@@ -37,6 +37,8 @@ export default function PlayerHomeView({ data, onOpenWellness, onOpenRpe, onOpen
   const hasRpe = rpeSessions.length > 0 || rpeCompleted.length > 0;
   const rpePending = rpeSessions.length > 0;
   const firstName = data?.player_first_name || '';
+  const latestReport = data?.latest_report;
+  const isNewReport = latestReport && !JSON.parse(localStorage.getItem("pp_viewed_reports") || "[]").includes(latestReport.id);
 
   return (
     <div className="min-h-screen bg-zinc-950 max-w-md mx-auto p-5 space-y-7 pb-8">
@@ -137,6 +139,30 @@ export default function PlayerHomeView({ data, onOpenWellness, onOpenRpe, onOpen
           </div>
         )}
       </section>
+
+      {/* Informes de rendimiento */}
+      {latestReport && (
+        <section>
+          <h2 className="text-sm font-bold text-zinc-400 uppercase tracking-wide mb-3 flex items-center gap-2"><FileText size={15} /> Informes de rendimiento</h2>
+          <button onClick={onOpenReport} className="w-full text-left p-4 rounded-2xl bg-zinc-900 border border-zinc-800 hover:border-emerald-500/40 active:scale-[0.98] transition-all">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-emerald-500/10 flex items-center justify-center shrink-0"><FileText size={22} className="text-emerald-400" /></div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-white text-sm">Último informe de rendimiento</h3>
+                  {isNewReport && <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-zinc-950 text-[10px] font-black">Nuevo</span>}
+                </div>
+                <p className="text-xs text-zinc-500 mt-0.5">{latestReport.match_labels?.[0] || latestReport.title}</p>
+                <p className="text-[11px] text-zinc-600 mt-0.5">
+                  {latestReport.match_dates?.[0] ? new Date(latestReport.match_dates[0] + "T00:00:00").toLocaleDateString("es-AR") : ""}
+                  {latestReport.report_type === "multi_match" ? ` · ${latestReport.match_ids?.length || 0} partidos` : ""}
+                </p>
+              </div>
+              <ArrowRight size={16} className="text-zinc-600 shrink-0" />
+            </div>
+          </button>
+        </section>
+      )}
 
       {/* C. Fuerza complementaria */}
       <section>

@@ -8,9 +8,10 @@ import PlayerHomeView from '@/components/dailyCheckin/PlayerHomeView';
 import ComplementaryWorkoutView from '@/components/dailyCheckin/ComplementaryWorkoutView';
 import ComplementaryRpeForm from '@/components/dailyCheckin/ComplementaryRpeForm';
 import ComplementaryNotDoneForm from '@/components/dailyCheckin/ComplementaryNotDoneForm';
+import PlayerReportsView from '@/components/dailyCheckin/PlayerReportsView';
 
 export default function IngresoJugador() {
-  const [step, setStep] = useState('dni'); // dni | home | wellness | rpe | strength_view | strength_rpe | strength_not_done
+  const [step, setStep] = useState('dni'); // dni | home | wellness | rpe | strength_view | strength_rpe | strength_not_done | reports
   const [dni, setDni] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -177,6 +178,15 @@ export default function IngresoJugador() {
     );
   }
 
+  // ── Step: Reports ───────────────────────────────────────────────────────
+  if (step === 'reports') {
+    return (
+      <div className="min-h-screen bg-zinc-950">
+        <PlayerReportsView token={tokenRef.current} onBack={() => setStep('home')} />
+      </div>
+    );
+  }
+
   // ── Step: Home ──────────────────────────────────────────────────────────
   if (loading) {
     return <div className="min-h-screen flex items-center justify-center bg-zinc-950"><div className="w-8 h-8 border-4 border-zinc-700 border-t-emerald-400 rounded-full animate-spin" /></div>;
@@ -190,6 +200,7 @@ export default function IngresoJugador() {
         onOpenWellness={() => setStep('wellness')}
         onOpenRpe={(s) => { setSelectedRpe(s); setStep('rpe'); }}
         onOpenStrength={(c) => { setSelectedStrength(c); setStrengthExec(c.execution_id ? { id: c.execution_id, status: c.status, rpe: c.rpe } : null); setStep('strength_view'); }}
+        onOpenReport={() => setStep('reports')}
         onLogout={logout}
       />
     </>

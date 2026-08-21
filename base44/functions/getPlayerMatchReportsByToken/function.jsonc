@@ -1,0 +1,4 @@
+{
+  "name": "getPlayerMatchReportsByToken",
+  "entry": "entry.ts"
+}
