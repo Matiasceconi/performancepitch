@@ -91,6 +91,14 @@
     "updated_at": {
       "type": "string",
       "description": "Fecha/hora de \u00faltima actualizaci\u00f3n"
+    },
+    "deleted_at": {
+      "type": "string",
+      "description": "Fecha/hora de eliminaci\u00f3n l\u00f3gica (soft delete). Si est\u00e1 seteado, el reporte no es visible para staff ni para jugador."
+    },
+    "deleted_by": {
+      "type": "string",
+      "description": "Usuario que elimin\u00f3 el reporte"
     }
   },
   "required": [

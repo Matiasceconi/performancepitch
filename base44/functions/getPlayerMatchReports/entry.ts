@@ -13,11 +13,13 @@ export default async function(req) {
     const playerId = access.player_id;
 
     // Reportes publicados del jugador (RLS admin-only, usamos service role)
-    const reports = await base44.asServiceRole.entities.PlayerMatchReport.filter(
+    // Filtrar deleted_at == null (soft delete)
+    const allReports = await base44.asServiceRole.entities.PlayerMatchReport.filter(
       { player_id: playerId, status: 'published' },
       '-published_at',
       100
     );
+    const reports = allReports.filter(r => !r.deleted_at);
 
     // Datos del jugador
     const player = await base44.asServiceRole.entities.Player.get(playerId).catch(() => null);

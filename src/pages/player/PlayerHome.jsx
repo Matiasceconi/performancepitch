@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
-import { HeartPulse, Gauge, CheckCircle2, AlertTriangle, Calendar } from 'lucide-react';
+import { HeartPulse, Gauge, CheckCircle2, AlertTriangle, Calendar, FileText, ArrowRight } from 'lucide-react';
 
 const WEEKDAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const MONTHS = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
@@ -45,6 +45,8 @@ export default function PlayerHome() {
   const todayWellness = data?.todayWellness;
   const pendingRpe = data?.pendingRpe || [];
   const lastResponse = data?.lastResponse;
+  const latestReport = data?.latestReport;
+  const isNewReport = latestReport && !JSON.parse(localStorage.getItem("pp_viewed_reports") || "[]").includes(latestReport.id);
 
   return (
     <div className="p-5 space-y-5">
@@ -107,6 +109,25 @@ export default function PlayerHome() {
           </div>
         )}
       </div>
+
+      {/* Último informe de rendimiento */}
+      {latestReport && (
+        <Link to="/player/reports" className="block rounded-2xl border border-zinc-800 bg-zinc-900 p-5 hover:border-emerald-500/30 transition-colors">
+          <div className="flex items-center gap-2 mb-2">
+            <FileText size={18} className="text-emerald-400" />
+            <h2 className="font-bold text-white">Último informe de rendimiento</h2>
+            {isNewReport && <span className="ml-auto px-2 py-0.5 rounded-full bg-emerald-500 text-zinc-950 text-[10px] font-black">Nuevo</span>}
+          </div>
+          <p className="text-sm text-zinc-300">{latestReport.match_labels?.[0] || latestReport.title}</p>
+          <p className="text-xs text-zinc-500 mt-0.5">
+            {latestReport.match_dates?.[0] ? new Date(latestReport.match_dates[0] + "T00:00:00").toLocaleDateString("es-AR") : ""}
+            {latestReport.report_type === "multi_match" ? ` · ${latestReport.match_ids?.length || 0} partidos` : ""}
+          </p>
+          <div className="flex items-center gap-1.5 mt-3 text-emerald-400 text-sm font-semibold">
+            Ver informe <ArrowRight size={14} />
+          </div>
+        </Link>
+      )}
 
       {/* Última respuesta */}
       {lastResponse && (
