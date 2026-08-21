@@ -76,3 +76,21 @@ export async function renderEvolutionChartPng(data, metricKey, color, width = 56
     width, height
   );
 }
+
+export async function renderMiniBarChartPng({ data, color, average, width = 280, height = 140 }) {
+  return renderChart(
+    <ResponsiveContainer width={1} height={1}>
+      <BarChart data={data} margin={{ top: 6, right: 8, left: 0, bottom: 4 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" vertical={false} />
+        <XAxis dataKey="label" tick={{ fill: "#6b7280", fontSize: 9 }} interval={0} angle={-15} textAnchor="end" height={20} />
+        <YAxis tick={{ fill: "#6b7280", fontSize: 9 }} width={32} />
+        <Tooltip />
+        {average != null && (
+          <ReferenceLine y={average} stroke="#9ca3af" strokeDasharray="4 2" label={{ value: "Prom.", fill: "#9ca3af", fontSize: 8, position: "right" }} />
+        )}
+        <Bar dataKey="value" fill={color} radius={[4, 4, 0, 0]} />
+      </BarChart>
+    </ResponsiveContainer>,
+    width, height
+  );
+}

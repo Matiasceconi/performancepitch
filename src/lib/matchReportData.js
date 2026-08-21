@@ -304,3 +304,61 @@ export function buildInsight(kpi, reportData) {
   if (Math.abs(pct) < 3) return "En línea con el promedio personal";
   return `${sign}${pct}% vs promedio personal`;
 }
+
+const COMPARISON_METRIC_KEYS = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
+
+const INTENSITY_METRIC_DEFS = [
+  { key: "player_load", label: "Player Load", unit: "au", color: "#14b8a6" },
+  { key: "acc_3", label: "ACC +3", unit: "n°", color: "#a855f7" },
+  { key: "dec_3", label: "DEC -3", unit: "n°", color: "#ec4899" },
+  { key: "rhie_bouts", label: "RHIE", unit: "n°", color: "#f97316" },
+];
+
+function matchShortLabel(match) {
+  if (match.date) return new Date(match.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" });
+  return match.rival || "P";
+}
+
+// Datos para grilla de comparación de métricas clave (multi-partido)
+export function buildMultiComparisonData(reportData) {
+  const { selected } = reportData;
+  return COMPARISON_METRIC_KEYS.map((key) => {
+    const metric = REPORT_METRICS.find((m) => m.key === key);
+    const data = selected.map((s) => ({
+      label: matchShortLabel(s.match),
+      value: Number(s.gpsRow[key] || 0),
+    }));
+    return { metric, data };
+  });
+}
+
+// Datos para grilla de intensidad y carga (multi-partido)
+export function buildIntensityData(reportData) {
+  const { selected } = reportData;
+  return INTENSITY_METRIC_DEFS.map((metricDef) => {
+    const data = selected.map((s) => ({
+      label: matchShortLabel(s.match),
+      value: Number(s.gpsRow[metricDef.key] || 0),
+    }));
+    return { metric: metricDef, data };
+  }).filter((item) => item.data.some((d) => d.value > 0));
+}
+
+// Datos para grilla de distribución de métricas (partido único)
+export function buildSingleDistributionData(reportData) {
+  const { selected, personalAvg } = reportData;
+  if (!selected.length) return [];
+  const last = selected[selected.length - 1];
+  const keys = ["total_distance", "m_min", "distance_25", "smax", "player_load"];
+  return keys.map((key) => {
+    const metric = REPORT_METRICS.find((m) => m.key === key);
+    return {
+      key,
+      label: metric.label,
+      unit: metric.unit,
+      color: metric.color,
+      value: Number(last.gpsRow[key] || 0),
+      average: Number(personalAvg[key] || 0),
+    };
+  });
+}
