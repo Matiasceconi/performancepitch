@@ -94,6 +94,21 @@ export async function renderLastMatchVsAvgChartPng(data, width = 560, height = 2
   );
 }
 
+export async function renderZoneDistributionChartPng(data, width = 400, height = 240) {
+  return renderChart(
+    <ResponsiveContainer width={1} height={1}>
+      <BarChart data={data} layout="vertical" margin={{ top: 8, right: 40, left: 8, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+        <XAxis type="number" tick={{ fill: "#6b7280", fontSize: 10 }} />
+        <YAxis type="category" dataKey="metric" tick={{ fill: "#374151", fontSize: 10 }} width={100} />
+        <Tooltip />
+        <Bar dataKey="value" fill="#00843D" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>,
+    width, height
+  );
+}
+
 export async function renderMiniBarChartPng({ data, color, average, width = 280, height = 140 }) {
   return renderChart(
     <ResponsiveContainer width={1} height={1}>

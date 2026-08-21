@@ -371,3 +371,22 @@ export function buildLastMatchVsAvgData(reportData) {
     };
   });
 }
+
+// Métricas de zonas de velocidad e intensidad para un partido puntual
+const ZONE_METRICS = [
+  { key: "distance_19_8", label: "D >19.8 km/h", unit: "m" },
+  { key: "distance_25", label: "D >25 km/h", unit: "m" },
+  { key: "sprints", label: "Sprints", unit: "n°" },
+  { key: "acc_3", label: "ACC +3", unit: "n°" },
+  { key: "dec_3", label: "DEC -3", unit: "n°" },
+  { key: "rhie_bouts", label: "RHIE", unit: "n°" },
+];
+
+// Datos para gráfico de zonas de velocidad/intensidad (partido puntual, sin comparación)
+export function buildZoneDistributionData(gpsRow) {
+  return ZONE_METRICS.map((z) => ({
+    metric: z.label,
+    unit: z.unit,
+    value: Number(gpsRow[z.key] || 0),
+  }));
+}
