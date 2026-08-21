@@ -163,6 +163,14 @@ export function buildAnalysisFromOptions({ player, matchOptions, selectedMatchId
   });
   personalAvg.pl_min = avg(historicalRows.map((r) => r.pl_min));
 
+  // Promedio de los últimos 5 partidos (referencia para comparar el último partido)
+  const lastFiveRows = matchOptions.slice(0, 5).map((o) => o.gpsRow);
+  const lastFiveAvg = {};
+  REPORT_METRICS.forEach((m) => {
+    lastFiveAvg[m.key] = avg(lastFiveRows.map((r) => r[m.key]));
+  });
+  lastFiveAvg.pl_min = avg(lastFiveRows.map((r) => r.pl_min));
+
   const seasonBests = {};
   REPORT_METRICS.forEach((m) => {
     const vals = historicalRows.map((r) => Number(r[m.key])).filter((v) => Number.isFinite(v));
@@ -176,6 +184,7 @@ export function buildAnalysisFromOptions({ player, matchOptions, selectedMatchId
     competitionProfile,
     selected,
     personalAvg,
+    lastFiveAvg,
     historicalRows,
     seasonBests,
     smaxSorted,
@@ -205,32 +214,15 @@ export function buildMatchOptionsFromData({ matchReports, matchGpsByMatch, minut
 
 // Calcula KPIs principales con comparación vs promedio personal
 export function buildKpis(reportData) {
-  const { selected, personalAvg, competitionProfile, isMulti } = reportData;
+  const { selected, lastFiveAvg, personalAvg, competitionProfile } = reportData;
   if (!selected.length) return [];
 
-  if (isMulti) {
-    const avgRow = {};
-    REPORT_METRICS.forEach((m) => {
-      avgRow[m.key] = avg(selected.map((s) => s.gpsRow[m.key]));
-    });
-    return KPI_KEYS.map((key) => {
-      const metric = REPORT_METRICS.find((m) => m.key === key);
-      const value = avgRow[key];
-      const base = personalAvg[key] || competitionProfile?.[metric.profile];
-      return {
-        ...metric,
-        value,
-        base,
-        pct: pctVs(value, base),
-      };
-    });
-  }
-
+  // KPIs siempre muestran el último partido, comparado vs promedio de últimos 5
   const last = selected[selected.length - 1];
   return KPI_KEYS.map((key) => {
     const metric = REPORT_METRICS.find((m) => m.key === key);
     const value = last.gpsRow[key];
-    const base = personalAvg[key] || competitionProfile?.[metric.profile];
+    const base = (lastFiveAvg && lastFiveAvg[key]) || personalAvg[key] || competitionProfile?.[metric.profile];
     return {
       ...metric,
       value,
@@ -359,6 +351,23 @@ export function buildSingleDistributionData(reportData) {
       color: metric.color,
       value: Number(last.gpsRow[key] || 0),
       average: Number(personalAvg[key] || 0),
+    };
+  });
+}
+
+// Datos para gráfico "Último partido vs promedio de 5"
+export function buildLastMatchVsAvgData(reportData) {
+  const { selected, lastFiveAvg, personalAvg } = reportData;
+  if (!selected.length) return [];
+  const last = selected[selected.length - 1];
+  const keys = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
+  return keys.map((key) => {
+    const metric = REPORT_METRICS.find((m) => m.key === key);
+    return {
+      metric: metric.label,
+      unit: metric.unit,
+      "Último partido": Number(last.gpsRow[key] || 0),
+      "Promedio 5": Number((lastFiveAvg && lastFiveAvg[key]) || personalAvg[key] || 0),
     };
   });
 }

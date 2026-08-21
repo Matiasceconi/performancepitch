@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
-import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend } from "recharts";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
-import { REPORT_METRICS, fmtMetric, buildKpis, buildComparisonData, buildEvolutionData, buildComparisonTable, buildInsight } from "@/lib/matchReportData";
+import { REPORT_METRICS, fmtMetric, buildKpis, buildComparisonData, buildEvolutionData, buildComparisonTable, buildInsight, buildLastMatchVsAvgData } from "@/lib/matchReportData";
 import { CLUB_BRAND } from "@/lib/clubBrand";
 
 export default function MatchReportPreview({ reportData, staffComment, onCommentChange, evolutionMetricKey, onEvolutionMetricChange }) {
@@ -10,6 +10,9 @@ export default function MatchReportPreview({ reportData, staffComment, onComment
   const compData = buildComparisonData(reportData);
   const table = buildComparisonTable(reportData);
   const match = selected[0]?.match;
+  const evoData = buildEvolutionData(reportData, evolutionMetricKey);
+  const lastVsAvgData = buildLastMatchVsAvgData(reportData);
+  const lastMatchIndex = isMulti ? table.rows.length - 2 : 0;
 
   return (
     <div className="space-y-4">
@@ -58,6 +61,9 @@ export default function MatchReportPreview({ reportData, staffComment, onComment
               <p className="text-[10px] text-zinc-500 uppercase font-semibold truncate">{kpi.label}</p>
               <p className="text-2xl font-black text-white mt-1">{fmtMetric(kpi.value, kpi.decimals)}</p>
               <p className="text-[10px] text-zinc-500">{kpi.unit}</p>
+              {kpi.base != null && (
+                <p className="text-[10px] text-zinc-500 mt-0.5">vs prom. 5: {fmtMetric(kpi.base, kpi.decimals)}</p>
+              )}
               {insight && (
                 <p className={`text-[10px] font-bold mt-1 ${isPositive ? "text-emerald-400" : "text-red-400"}`}>{insight}</p>
               )}
@@ -90,14 +96,44 @@ export default function MatchReportPreview({ reportData, staffComment, onComment
             </select>
           </div>
           <ResponsiveContainer width="100%" height={280}>
-            <LineChart data={buildEvolutionData(reportData, evolutionMetricKey)} margin={{ left: 0, right: 16 }}>
+            <LineChart data={evoData} margin={{ left: 0, right: 16 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
               <XAxis dataKey="shortDate" tick={{ fill: "#71717a", fontSize: 10 }} />
               <YAxis tick={{ fill: "#71717a", fontSize: 10 }} width={44} />
               <Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, color: "#fff" }} />
               <ReferenceLine y={reportData.personalAvg[evolutionMetricKey]} stroke="#71717a" strokeDasharray="5 5" />
-              <Line type="monotone" dataKey={evolutionMetricKey} stroke={REPORT_METRICS.find((m) => m.key === evolutionMetricKey)?.color || "#22c55e"} strokeWidth={2.5} dot={{ r: 4, fill: REPORT_METRICS.find((m) => m.key === evolutionMetricKey)?.color || "#22c55e", strokeWidth: 0 }} />
+              <Line
+                type="monotone"
+                dataKey={evolutionMetricKey}
+                stroke={REPORT_METRICS.find((m) => m.key === evolutionMetricKey)?.color || "#22c55e"}
+                strokeWidth={2.5}
+                dot={(props) => {
+                  const { cx, cy, index } = props;
+                  const isLast = index === evoData.length - 1;
+                  return isLast
+                    ? <circle cx={cx} cy={cy} r={6} fill="#fbbf24" stroke="#fff" strokeWidth={2} />
+                    : <circle cx={cx} cy={cy} r={4} fill={REPORT_METRICS.find((m) => m.key === evolutionMetricKey)?.color || "#22c55e"} strokeWidth={0} />;
+                }}
+              />
             </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
+      {/* Último partido vs promedio */}
+      {lastVsAvgData.length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+          <h3 className="text-sm font-bold text-white mb-3">Último partido vs promedio de 5</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={lastVsAvgData} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
+              <XAxis type="number" tick={{ fill: "#71717a", fontSize: 10 }} />
+              <YAxis type="category" dataKey="metric" tick={{ fill: "#d4d4d8", fontSize: 11 }} width={110} />
+              <Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, color: "#fff" }} />
+              <Legend />
+              <Bar dataKey="Último partido" fill="#00843D" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="Promedio 5" fill="#52525b" radius={[0, 6, 6, 0]} />
+            </BarChart>
           </ResponsiveContainer>
         </div>
       )}
@@ -120,7 +156,7 @@ export default function MatchReportPreview({ reportData, staffComment, onComment
               {table.rows.map((row, i) => {
                 const isAvg = row.label === "PROMEDIO";
                 return (
-                  <tr key={i} className={`border-b border-zinc-800/40 ${isAvg ? "bg-emerald-500/10" : ""}`}>
+                  <tr key={i} className={`border-b border-zinc-800/40 ${isAvg ? "bg-emerald-500/10" : i === lastMatchIndex ? "bg-amber-500/10 border-l-2 border-l-amber-500" : ""}`}>
                     <td className="p-2.5 text-white font-medium">
                       {isAvg ? "PROMEDIO" : `${row.label} · ${row.date ? new Date(row.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : ""}`}
                     </td>

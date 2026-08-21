@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Loader2, FileText, Save, Download, Send, X, ChevronDown } from "lucide-react";
-import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Line, LineChart } from "recharts";
+import { Bar, BarChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis, Line, LineChart, Legend } from "recharts";
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import {
   REPORT_METRICS, KPI_KEYS, fmtMetric, pctVs,
   buildMatchOptionsFromData, buildAnalysisFromOptions,
-  buildKpis, buildInsight,
+  buildKpis, buildInsight, buildLastMatchVsAvgData,
 } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
@@ -98,23 +98,20 @@ export default function GpsPlayerMatchAnalysis({
 
   const kpis = reportData ? buildKpis(reportData) : [];
 
-  // KPIs extendidos: Partidos, Minutos + métricas
+  // KPIs: último partido vs promedio de últimos 5
   const extendedKpis = useMemo(() => {
     if (!reportData) return [];
-    const { selected } = reportData;
-    const totalMinutes = selected.reduce((s, m) => s + (m.minutesPlayed || 0), 0);
-    const avgMinutes = selected.length ? totalMinutes / selected.length : 0;
+    const { selected, lastFiveAvg, personalAvg } = reportData;
+    const last = selected[selected.length - 1];
     const metricKpis = KPI_KEYS.map((key) => {
       const metric = REPORT_METRICS.find((m) => m.key === key);
-      const values = selected.map((s) => s.gpsRow[key]);
-      const nums = values.filter((v) => Number.isFinite(Number(v))).map(Number);
-      const value = nums.length ? nums.reduce((a, b) => a + b, 0) / nums.length : 0;
-      const base = reportData.personalAvg[key] || competitionProfile?.[metric.profile];
+      const value = Number(last.gpsRow[key] || 0);
+      const base = (lastFiveAvg && lastFiveAvg[key]) || personalAvg[key] || competitionProfile?.[metric.profile];
       return { ...metric, value, base, pct: pctVs(value, base) };
     });
     return [
       { key: "_matches", label: "Partidos", value: selected.length, unit: "", decimals: 0 },
-      { key: "_minutes", label: "Minutos", value: Math.round(avgMinutes), unit: "'", decimals: 0 },
+      { key: "_minutes", label: "Minutos", value: last?.minutesPlayed ?? 0, unit: "'", decimals: 0 },
       ...metricKpis,
     ];
   }, [reportData, competitionProfile]);
@@ -292,20 +289,26 @@ export default function GpsPlayerMatchAnalysis({
         <span className="text-xs text-zinc-500 ml-1">· {selectedMatchIds.length} seleccionados</span>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
-        {extendedKpis.map((kpi) => (
-          <div key={kpi.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
-            <p className="text-[10px] text-zinc-500 uppercase font-semibold truncate">{kpi.label}</p>
-            <p className="text-xl font-black text-white mt-1">{fmtMetric(kpi.value, kpi.decimals)}</p>
-            {kpi.unit && <p className="text-[10px] text-zinc-500">{kpi.unit}</p>}
-            {kpi.pct != null && (
-              <p className={`text-[10px] font-bold mt-0.5 ${kpi.pct > 0 ? "text-emerald-400" : kpi.pct < 0 ? "text-red-400" : "text-zinc-500"}`}>
-                {kpi.pct > 0 ? "+" : ""}{kpi.pct}%
-              </p>
-            )}
-          </div>
-        ))}
+      {/* KPIs del último partido */}
+      <div>
+        <p className="text-xs text-zinc-500 font-semibold uppercase mb-2">Métricas del último partido vs promedio de 5</p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2.5">
+          {extendedKpis.map((kpi) => (
+            <div key={kpi.key} className="bg-zinc-900 border border-zinc-800 rounded-xl p-3">
+              <p className="text-[10px] text-zinc-500 uppercase font-semibold truncate">{kpi.label}</p>
+              <p className="text-xl font-black text-white mt-1">{fmtMetric(kpi.value, kpi.decimals)}</p>
+              {kpi.unit && <p className="text-[10px] text-zinc-500">{kpi.unit}</p>}
+              {kpi.base != null && kpi.key !== "_matches" && kpi.key !== "_minutes" && (
+                <p className="text-[10px] text-zinc-500 mt-0.5">vs prom. 5: {fmtMetric(kpi.base, kpi.decimals)}</p>
+              )}
+              {kpi.pct != null && (
+                <p className={`text-[10px] font-bold mt-0.5 ${kpi.pct > 0 ? "text-emerald-400" : kpi.pct < 0 ? "text-red-400" : "text-zinc-500"}`}>
+                  {kpi.pct > 0 ? "+" : ""}{kpi.pct}%
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Evolution chart */}
@@ -331,13 +334,43 @@ export default function GpsPlayerMatchAnalysis({
               {competitionProfile?.[evolutionMetric?.profile] && (
                 <ReferenceLine y={competitionProfile[evolutionMetric.profile]} stroke="#3b82f6" strokeDasharray="3 3" label={{ value: "Perfil", fill: "#3b82f6", fontSize: 9, position: "left" }} />
               )}
-              <Line type="monotone" dataKey={evolutionMetricKey} stroke={evolutionMetric?.color || "#22c55e"} strokeWidth={2.5} dot={{ r: 4, fill: evolutionMetric?.color || "#22c55e", strokeWidth: 0 }} />
+              <Line
+                type="monotone"
+                dataKey={evolutionMetricKey}
+                stroke={evolutionMetric?.color || "#22c55e"}
+                strokeWidth={2.5}
+                dot={(props) => {
+                  const { cx, cy, index } = props;
+                  const isLast = index === evolutionData.length - 1;
+                  return isLast
+                    ? <circle cx={cx} cy={cy} r={6} fill="#fbbf24" stroke="#fff" strokeWidth={2} />
+                    : <circle cx={cx} cy={cy} r={4} fill={evolutionMetric?.color || "#22c55e"} strokeWidth={0} />;
+                }}
+              />
             </LineChart>
           </ResponsiveContainer>
         ) : (
           <p className="text-zinc-500 text-sm text-center py-8">Seleccioná partidos para ver la evolución</p>
         )}
       </div>
+
+      {/* Last match vs average */}
+      {reportData && buildLastMatchVsAvgData(reportData).length > 0 && (
+        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
+          <h3 className="text-sm font-bold text-white mb-3">Último partido vs promedio de 5</h3>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={buildLastMatchVsAvgData(reportData)} layout="vertical" margin={{ left: 8, right: 16 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
+              <XAxis type="number" tick={{ fill: "#71717a", fontSize: 10 }} />
+              <YAxis type="category" dataKey="metric" tick={{ fill: "#d4d4d8", fontSize: 11 }} width={110} />
+              <Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, color: "#fff" }} />
+              <Legend />
+              <Bar dataKey="Último partido" fill="#00843D" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="Promedio 5" fill="#52525b" radius={[0, 6, 6, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Match table with checkboxes */}
       <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">

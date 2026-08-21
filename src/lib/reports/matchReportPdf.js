@@ -1,7 +1,7 @@
 import jsPDF from "jspdf";
 import { CLUB_BRAND } from "@/lib/clubBrand";
-import { REPORT_METRICS, fmtMetric, buildKpis, buildComparisonData, buildEvolutionData, buildComparisonTable, buildInsight, buildMultiComparisonData, buildIntensityData, buildSingleDistributionData } from "@/lib/matchReportData";
-import { renderComparisonChartPng, renderEvolutionChartPng, renderMiniBarChartPng } from "./matchReportCharts.jsx";
+import { REPORT_METRICS, fmtMetric, buildKpis, buildComparisonData, buildEvolutionData, buildComparisonTable, buildInsight, buildMultiComparisonData, buildIntensityData, buildSingleDistributionData, buildLastMatchVsAvgData } from "@/lib/matchReportData";
+import { renderComparisonChartPng, renderEvolutionChartPng, renderMiniBarChartPng, renderLastMatchVsAvgChartPng } from "./matchReportCharts.jsx";
 
 const PAGE_W = 210;
 const PAGE_H = 297;
@@ -103,7 +103,7 @@ function drawKpis(doc, reportData, y) {
   const kpis = buildKpis(reportData);
   if (!kpis.length) return y;
   const cardW = (PAGE_W - 2 * MARGIN - 3 * 4) / 4;
-  const cardH = 26;
+  const cardH = 30;
   kpis.slice(0, 8).forEach((kpi, i) => {
     const col = i % 4;
     const row = Math.floor(i / 4);
@@ -125,13 +125,17 @@ function drawKpis(doc, reportData, y) {
     doc.setFontSize(7);
     setColor(doc, "setTextColor", "#9ca3af");
     doc.text(kpi.unit, x + 3, cy + 19);
+    if (kpi.base != null) {
+      doc.setFontSize(6.5);
+      doc.text(`vs prom.5: ${fmtMetric(kpi.base, kpi.decimals)}`, x + 3, cy + 23);
+    }
     const insight = buildInsight(kpi, reportData);
     if (insight) {
       const isPositive = insight.includes("marca") ? true : kpi.pct > 0;
       setColor(doc, "setTextColor", isPositive ? "#00843D" : "#dc2626");
       doc.setFont("helvetica", "bold");
       doc.setFontSize(6.5);
-      doc.text(insight, x + 3, cy + 24);
+      doc.text(insight, x + 3, cy + 27);
     }
   });
   const rows = Math.ceil(Math.min(kpis.length, 8) / 4);
@@ -177,8 +181,9 @@ function drawTable(doc, reportData, y) {
   rows.forEach((row, ri) => {
     if (y + rowH > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
     const isAvg = row.label === "PROMEDIO";
-    if (ri % 2 === 0 || isAvg) {
-      const fill = isAvg ? [230, 240, 230] : [246, 247, 243];
+    const isLastMatch = !isAvg && ri === (reportData.isMulti ? rows.length - 2 : 0);
+    if (ri % 2 === 0 || isAvg || isLastMatch) {
+      const fill = isAvg ? [230, 240, 230] : isLastMatch ? [255, 237, 160] : [246, 247, 243];
       doc.setFillColor(fill[0], fill[1], fill[2]);
       doc.rect(MARGIN, y, PAGE_W - 2 * MARGIN, rowH, "F");
     }
@@ -265,30 +270,39 @@ function drawMiniChartGrid(doc, items, y, cols, chartH, gapX, gapY) {
 export async function exportMatchReportPdf({ reportData, reportMeta, staffComment, evolutionMetricKey }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
-  // PÁGINA 1 — Encabezado + Jugador + KPIs
+  // PÁGINA 1 — Encabezado + Jugador + KPIs + Evolución
   drawHeader(doc, reportData, reportMeta);
   let y = drawPlayerBlock(doc, reportData);
   y = drawKpis(doc, reportData, y);
 
-  // PÁGINA 2 — Gráficos
+  const contentW = PAGE_W - 2 * MARGIN;
+  const metric = REPORT_METRICS.find((m) => m.key === evolutionMetricKey) || REPORT_METRICS[0];
+
+  // Gráfico de evolución en página 1
+  y = drawSectionTitle(doc, `Evolución · ${metric.label} (${metric.unit})`, y);
+  const evoData = buildEvolutionData(reportData, evolutionMetricKey);
+  const evoPng = await renderEvolutionChartPng(evoData, evolutionMetricKey, metric.color);
+  if (evoPng) { try { doc.addImage(evoPng, "PNG", MARGIN, y, contentW, 50); } catch {} }
+  y += 56;
+
+  // PÁGINA 2 — Último partido vs promedio + Comparación + Tabla + Comentario
   doc.addPage();
   y = 18;
   y = drawSectionTitle(doc, "ANÁLISIS GPS", y);
   y += 2;
 
+  // Gráfico — Último partido vs promedio de 5
+  const lastVsAvgData = buildLastMatchVsAvgData(reportData);
+  if (lastVsAvgData.length > 0) {
+    y = drawSectionTitle(doc, "Último partido vs promedio de 5", y);
+    const lastVsAvgPng = await renderLastMatchVsAvgChartPng(lastVsAvgData);
+    if (lastVsAvgPng) { try { doc.addImage(lastVsAvgPng, "PNG", MARGIN, y, contentW, 60); } catch {} }
+    y += 66;
+  }
+
+  // Gráfico — Comparación de métricas clave entre partidos (solo multi-partido)
   const { isMulti } = reportData;
-  const contentW = PAGE_W - 2 * MARGIN;
-
   if (isMulti) {
-    // Gráfico 1 — Evolución de la métrica principal
-    const metric = REPORT_METRICS.find((m) => m.key === evolutionMetricKey) || REPORT_METRICS[0];
-    const evoData = buildEvolutionData(reportData, evolutionMetricKey);
-    const evoPng = await renderEvolutionChartPng(evoData, evolutionMetricKey, metric.color);
-    y = drawSectionTitle(doc, `Evolución · ${metric.label} (${metric.unit})`, y);
-    if (evoPng) { try { doc.addImage(evoPng, "PNG", MARGIN, y, contentW, 55); } catch {} }
-    y += 61;
-
-    // Gráfico 2 — Comparación de métricas clave (grilla 3×2)
     const comparisonItems = await Promise.all(
       buildMultiComparisonData(reportData).map(async (item) => ({
         metric: item.metric,
@@ -296,49 +310,16 @@ export async function exportMatchReportPdf({ reportData, reportMeta, staffCommen
       }))
     );
     y = drawSectionTitle(doc, "Comparación de métricas clave", y);
-    y = drawMiniChartGrid(doc, comparisonItems, y, 3, 36, 4, 6);
+    y = drawMiniChartGrid(doc, comparisonItems, y, 3, 34, 4, 5);
     y += 4;
-
-    // Gráfico 3 — Intensidad y carga (grilla 2×2)
-    const intensityItems = await Promise.all(
-      buildIntensityData(reportData).map(async (item) => ({
-        metric: item.metric,
-        png: await renderMiniBarChartPng({ data: item.data, color: item.metric.color }),
-      }))
-    );
-    if (intensityItems.length > 0) {
-      y = drawSectionTitle(doc, "Intensidad y carga", y);
-      y = drawMiniChartGrid(doc, intensityItems, y, 2, 33, 4, 6);
-    }
-  } else {
-    // Gráfico 1 — Partido vs promedio personal
-    const compData = buildComparisonData(reportData);
-    const compPng = await renderComparisonChartPng(compData);
-    y = drawSectionTitle(doc, "Partido vs promedio personal", y);
-    if (compPng) { try { doc.addImage(compPng, "PNG", MARGIN, y, contentW, 75); } catch {} }
-    y += 81;
-
-    // Gráfico 2 — Distribución de métricas clave (grilla 3×2)
-    const distItems = await Promise.all(
-      buildSingleDistributionData(reportData).map(async (item) => ({
-        metric: { label: item.label, unit: item.unit },
-        png: await renderMiniBarChartPng({
-          data: [{ label: "Partido", value: item.value }],
-          color: item.color,
-          average: item.average,
-        }),
-      }))
-    );
-    y = drawSectionTitle(doc, "Distribución de métricas clave", y);
-    y = drawMiniChartGrid(doc, distItems, y, 3, 38, 4, 6);
   }
 
-  // PÁGINA 3 — Tabla + Comentario
-  doc.addPage();
-  y = 18;
-  y = drawSectionTitle(doc, "DETALLE DE MÉTRICAS", y);
-  y += 4;
+  // Tabla de métricas
+  y = drawSectionTitle(doc, "Detalle de métricas", y);
+  y += 2;
   y = drawTable(doc, reportData, y);
+
+  // Comentario del staff
   y = drawComment(doc, staffComment, y);
 
   drawFooter(doc);

@@ -77,6 +77,23 @@ export async function renderEvolutionChartPng(data, metricKey, color, width = 56
   );
 }
 
+export async function renderLastMatchVsAvgChartPng(data, width = 560, height = 260) {
+  return renderChart(
+    <ResponsiveContainer width={1} height={1}>
+      <BarChart data={data} layout="vertical" margin={{ top: 8, right: 60, left: 8, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" horizontal={false} />
+        <XAxis type="number" tick={{ fill: "#6b7280", fontSize: 10 }} />
+        <YAxis type="category" dataKey="metric" tick={{ fill: "#374151", fontSize: 11 }} width={120} />
+        <Tooltip />
+        <Legend />
+        <Bar dataKey="Último partido" fill="#00843D" radius={[0, 4, 4, 0]} />
+        <Bar dataKey="Promedio 5" fill="#9ca3af" radius={[0, 4, 4, 0]} />
+      </BarChart>
+    </ResponsiveContainer>,
+    width, height
+  );
+}
+
 export async function renderMiniBarChartPng({ data, color, average, width = 280, height = 140 }) {
   return renderChart(
     <ResponsiveContainer width={1} height={1}>
