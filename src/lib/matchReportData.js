@@ -149,6 +149,60 @@ export async function buildMatchReportData({ playerId, matchIds }) {
   };
 }
 
+// Construye datos de análisis directamente desde opciones pre-cargadas (sin llamadas extra)
+export function buildAnalysisFromOptions({ player, matchOptions, selectedMatchIds, competitionProfile }) {
+  const selected = matchOptions
+    .filter((o) => selectedMatchIds.includes(o.match.id))
+    .sort((a, b) => (a.match.date || "").localeCompare(b.match.date || ""));
+
+  const historicalRows = matchOptions.map((o) => o.gpsRow);
+
+  const personalAvg = {};
+  REPORT_METRICS.forEach((m) => {
+    personalAvg[m.key] = avg(historicalRows.map((r) => r[m.key]));
+  });
+  personalAvg.pl_min = avg(historicalRows.map((r) => r.pl_min));
+
+  const seasonBests = {};
+  REPORT_METRICS.forEach((m) => {
+    const vals = historicalRows.map((r) => Number(r[m.key])).filter((v) => Number.isFinite(v));
+    seasonBests[m.key] = vals.length ? Math.max(...vals) : null;
+  });
+
+  const smaxSorted = [...historicalRows].sort((a, b) => Number(b.smax || 0) - Number(a.smax || 0));
+
+  return {
+    player,
+    competitionProfile,
+    selected,
+    personalAvg,
+    historicalRows,
+    seasonBests,
+    smaxSorted,
+    isMulti: selected.length > 1,
+  };
+}
+
+// Construye opciones de partido desde datos pre-cargados del dashboard
+export function buildMatchOptionsFromData({ matchReports, matchGpsByMatch, minutesRows, playerId }) {
+  const minutesByMatch = new Map((minutesRows || []).map((r) => [r.match_id, r]));
+  return matchReports
+    .map((match) => {
+      const rows = (matchGpsByMatch[match.id] || []).filter((r) => r.player_id === playerId);
+      if (!rows.length) return null;
+      const normalized = withPlMin(normalizeMatchGpsRows(match, rows, {})[0] || {});
+      const minutes = minutesByMatch.get(match.id);
+      return {
+        match,
+        hasGps: true,
+        gpsRow: normalized,
+        minutesPlayed: minutes?.minutes_played ?? null,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => (b.match.date || "").localeCompare(a.match.date || ""));
+}
+
 // Calcula KPIs principales con comparación vs promedio personal
 export function buildKpis(reportData) {
   const { selected, personalAvg, competitionProfile, isMulti } = reportData;

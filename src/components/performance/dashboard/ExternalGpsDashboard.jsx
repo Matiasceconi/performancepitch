@@ -13,7 +13,6 @@ import GpsKinesiologyLoadTab from "./GpsKinesiologyLoadTab";
 import GpsTeamProfilePanel from "./GpsTeamProfilePanel";
 import GpsSessionAnalyticsFilters from "./GpsSessionAnalyticsFilters";
 import GpsSessionsAdvancedTable from "./GpsSessionsAdvancedTable";
-import MatchReportsTab from "@/components/matchReports/MatchReportsTab";
 
 
 function positionGroup(position, player) {
@@ -443,7 +442,6 @@ export default function ExternalGpsDashboard() {
     { id: "individual-player", label: "Individual" },
     { id: "individual", label: "Perfil competitivo individual" },
     { id: "team", label: "Perfil del equipo" },
-    { id: "match-reports", label: "Reportes individuales" },
   ];
 
   return (
@@ -510,10 +508,12 @@ export default function ExternalGpsDashboard() {
       {activeTab === "individual-player" && (
         <GpsIndividualPlayerTab
           players={rosterPlayers}
-          gpsBySession={gpsBySession}
-          sessions={sessions}
-          playerMap={playerMap}
+          matchReports={matchReports}
+          matchGpsByMatch={matchGpsByMatch}
           competitionProfiles={competitionProfiles}
+          squadName={selectedSquad?.name}
+          squadId={selectedSquadId}
+          seasonId={selectedSeason}
         />
       )}
 
@@ -540,7 +540,6 @@ export default function ExternalGpsDashboard() {
         />
       )}
 
-      {activeTab === "match-reports" && <MatchReportsTab />}
     </div>
   );
 }
