@@ -53,7 +53,7 @@ function cleanPayload(payload: any) {
     staff_comment: String(payload.staff_comment || ""),
     metrics_snapshot: payload.metrics_snapshot || {},
     report_snapshot: payload.report_snapshot,
-    report_version: 3,
+    report_version: 4,
   };
 }
 
