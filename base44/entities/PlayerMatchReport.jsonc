@@ -82,7 +82,7 @@
     },
     "report_version": {
       "type": "number",
-      "default": 3,
+      "default": 4,
       "description": "Versi\u00f3n del formato del snapshot"
     },
     "created_by": {
