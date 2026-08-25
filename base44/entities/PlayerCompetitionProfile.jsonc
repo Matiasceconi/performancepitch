@@ -16,7 +16,7 @@
     },
     "matches_used": {
       "type": "number",
-      "description": "Cantidad de partidos con +80' usados en el c\u00e1lculo"
+      "description": "Cantidad de partidos con m\u00e1s de 80 minutos usados en el c\u00e1lculo"
     },
     "avg_total_distance": {
       "type": "number",
