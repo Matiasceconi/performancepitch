@@ -157,27 +157,8 @@ function PlayerReportViewer({ report, player, onClose }) {
         <h2 className="text-base font-bold text-white flex-1 truncate">{report.title}</h2>
         <button onClick={onClose} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400"><X size={20} /></button>
       </div>
-      <div className="p-4 space-y-4 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 rounded-2xl p-4 text-white">
-          <p className="text-emerald-100 text-xs font-semibold uppercase">Informe individual de rendimiento</p>
-          <h2 className="text-xl font-black mt-0.5">{player?.full_name}</h2>
-          <p className="text-emerald-100 text-sm">{[player?.position, player?.squad_name, player?.division].filter(Boolean).join(" · ")}</p>
-          <p className="text-emerald-50 text-xs mt-1">{reportData.selected.length} {reportData.selected.length === 1 ? "partido" : "partidos"} analizado{reportData.selected.length === 1 ? "" : "s"}</p>
-        </div>
-
-        {/* Per-match blocks (puntual, sin comparación) */}
-        {reportData.selected.map((matchData) => (
-          <MatchBlockCard key={matchData.match.id} matchData={matchData} />
-        ))}
-
-        {/* Comentario del staff */}
-        {report.staff_comment && (
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-            <h3 className="text-xs font-bold text-white mb-1.5">Comentario del área de Rendimiento</h3>
-            <p className="text-sm text-zinc-300 leading-relaxed">{report.staff_comment}</p>
-          </div>
-        )}
+      <div className="p-4 max-w-5xl mx-auto">
+        <MatchReportPreview reportData={reportData} staffComment={report.staff_comment} readOnly />
       </div>
     </div>
   );
