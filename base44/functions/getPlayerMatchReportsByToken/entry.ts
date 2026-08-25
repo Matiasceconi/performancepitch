@@ -54,7 +54,6 @@ export default async function(req) {
         staff_comment: report.staff_comment || '',
         match_labels: report.match_labels || [],
         match_dates: report.match_dates || [],
-        match_ids: report.match_ids || [],
         published_at: report.published_at,
         published_by: report.published_by || '',
         report_snapshot: report.report_snapshot || null,
