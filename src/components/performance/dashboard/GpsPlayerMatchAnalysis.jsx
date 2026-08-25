@@ -1,16 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, BarChart3, CalendarDays, Download, FileSpreadsheet, FileText, Gauge, Loader2, Save, Send, Sparkles, TrendingUp, X } from "lucide-react";
-import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 import MatchReportConfigPanel from "@/components/matchReports/MatchReportConfigPanel";
+import MatchEvolutionChart from "@/components/matchReports/MatchEvolutionChart";
 import {
   DEFAULT_MATCH_REPORT_CONFIG,
   REPORT_METRICS,
   buildAnalysisFromOptions,
   buildCompetitionProfileFromOptions,
-  buildEvolutionData,
   buildMatchOptionsFromData,
   buildReportSnapshot,
   fmtMetric,
@@ -73,6 +72,7 @@ export default function GpsPlayerMatchAnalysis({
   const [rangeMode, setRangeMode] = useState("last5");
   const [selectedMatchIds, setSelectedMatchIds] = useState([]);
   const [evolutionMetric, setEvolutionMetric] = useState("m_min");
+  const [evolutionStyle, setEvolutionStyle] = useState("line");
   const [showPreview, setShowPreview] = useState(false);
   const [staffComment, setStaffComment] = useState("");
   const [reportConfig, setReportConfig] = useState(DEFAULT_MATCH_REPORT_CONFIG);
@@ -283,8 +283,9 @@ export default function GpsPlayerMatchAnalysis({
       {view === "evolution" && reportData && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
           <div className="mb-4 flex items-center gap-2"><TrendingUp size={17} className="text-emerald-400" /><div><h3 className="font-bold text-white">Evolución reciente</h3><p className="text-xs text-zinc-500">Tendencia de los partidos seleccionados{hasProfile ? " y referencia del perfil competitivo." : "."}</p></div></div>
-          <div className="mb-5 flex flex-wrap gap-1.5">{REPORT_METRICS.map((metric) => <button key={metric.key} onClick={() => setEvolutionMetric(metric.key)} className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${evolutionMetric === metric.key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300"}`}>{metric.label}</button>)}</div>
-          <ResponsiveContainer width="100%" height={340}><LineChart data={buildEvolutionData(reportData, evolutionMetric)} margin={{ left: 0, right: 18, top: 10, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} /><XAxis dataKey="shortDate" tick={{ fill: "#a1a1aa", fontSize: 11 }} /><YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} width={55} /><Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 10 }} />{hasProfile && <ReferenceLine y={profileValue(evolutionMetric)} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "Perfil competitivo", fill: "#7dd3fc", fontSize: 10 }} />}<Line type="monotone" dataKey={evolutionMetric} stroke="#22c55e" strokeWidth={3} dot={{ r: 4, fill: "#22c55e" }} /></LineChart></ResponsiveContainer>
+          <div className="mb-3 flex flex-wrap gap-1.5">{REPORT_METRICS.map((metric) => <button key={metric.key} onClick={() => setEvolutionMetric(metric.key)} className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${evolutionMetric === metric.key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300"}`}>{metric.label}</button>)}</div>
+          <div className="mb-4 flex items-center gap-2"><span className="text-[10px] font-bold uppercase tracking-wide text-zinc-600">Estilo</span>{[["line", "Línea"], ["area", "Área"], ["bar", "Barras"]].map(([key, label]) => <button key={key} onClick={() => setEvolutionStyle(key)} className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${evolutionStyle === key ? "bg-sky-500/20 text-sky-300" : "bg-zinc-800 text-zinc-400"}`}>{label}</button>)}</div>
+          <MatchEvolutionChart selected={reportData.selected} chart={{ metric: evolutionMetric, style: evolutionStyle }} competitionProfile={reportData.competitionProfile} />
         </div>
       )}
 
