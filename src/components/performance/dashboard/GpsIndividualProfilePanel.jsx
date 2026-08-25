@@ -12,7 +12,7 @@ export default function GpsIndividualProfilePanel({ players, competitionProfiles
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-xl font-bold text-white">Perfil individual por microciclo</h2>
-          <p className="text-zinc-500 text-sm mt-1">Promedios por día MD comparados contra el perfil competitivo real de partido +80’.</p>
+          <p className="text-zinc-500 text-sm mt-1">Promedios por día MD comparados contra el perfil competitivo real calculado solo con partidos de más de 80 minutos.</p>
         </div>
         <GpsRecalculateProfilesButton squadId={squadId} seasonId={seasonId} onDone={onReload} />
       </div>
