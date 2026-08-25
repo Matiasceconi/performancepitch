@@ -1,211 +1,124 @@
-import React, { useState, useEffect, useCallback } from "react";
-import { Download, Send, Eye, Loader2, Inbox, X, MoreVertical, Trash2, EyeOff, FileText } from "lucide-react";
+import React, { useCallback, useEffect, useState } from "react";
+import { Download, Eye, EyeOff, FileText, Inbox, Loader2, Send, Trash2, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { buildMatchReportData } from "@/lib/matchReportData";
+import { buildMatchReportData, reportDataFromSnapshot } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 
-const STATUS_CONFIG = {
-  draft: ["bg-zinc-500/15 text-zinc-400 border-zinc-500/30", "Borrador"],
-  published: ["bg-emerald-500/15 text-emerald-300 border-emerald-500/30", "Publicado"],
-  archived: ["bg-zinc-700/15 text-zinc-500 border-zinc-700/30", "Archivado"],
+const STATUS = {
+  draft: ["Borrador", "border-zinc-700 bg-zinc-800 text-zinc-300"],
+  published: ["Publicado", "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"],
+  archived: ["Archivado", "border-zinc-800 bg-zinc-900 text-zinc-500"],
 };
 
-export default function GpsPlayerMatchReports({ playerId, squadId, seasonId }) {
+function formatDate(value) {
+  if (!value) return "—";
+  return new Date(value).toLocaleDateString("es-AR");
+}
+
+export default function GpsPlayerMatchReports({ playerId, squadId }) {
   const [reports, setReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [viewing, setViewing] = useState(null);
-  const [menuOpen, setMenuOpen] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
-  const [actionLoading, setActionLoading] = useState(false);
+  const [busy, setBusy] = useState("");
+  const [error, setError] = useState("");
 
   const load = useCallback(async () => {
-    if (!playerId) return;
+    if (!playerId || !squadId) return;
     setLoading(true);
+    setError("");
     try {
-      const rows = await base44.entities.PlayerMatchReport.filter({ player_id: playerId }, "-created_at", 100);
-      setReports(rows.filter((r) => !r.deleted_at));
-    } catch {
+      const response = await base44.functions.invoke("managePlayerMatchReport", {
+        operation: "list",
+        player_id: playerId,
+        squad_id: squadId,
+      });
+      const result = response.data || response;
+      if (result.error) throw new Error(result.error);
+      setReports(result.reports || []);
+    } catch (cause) {
       setReports([]);
+      setError(cause?.response?.data?.error || cause.message || "No se pudieron cargar los informes.");
     } finally {
       setLoading(false);
     }
-  }, [playerId]);
+  }, [playerId, squadId]);
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => {
-    function handleClickOutside() { setMenuOpen(null); }
-    if (menuOpen) {
-      document.addEventListener("click", handleClickOutside);
-      return () => document.removeEventListener("click", handleClickOutside);
+  async function dataFor(report) {
+    const frozen = reportDataFromSnapshot(report.report_snapshot);
+    return frozen || buildMatchReportData({ playerId: report.player_id, matchIds: report.match_ids || [] });
+  }
+
+  async function view(report) {
+    setBusy(`view-${report.id}`);
+    try {
+      setViewing({ report, data: await dataFor(report) });
+    } catch (cause) {
+      setError(cause.message || "No se pudo abrir el informe.");
+    } finally {
+      setBusy("");
     }
-  }, [menuOpen]);
-
-  async function handleView(report) {
-    try {
-      const data = await buildMatchReportData({ playerId: report.player_id, matchIds: report.match_ids || [] });
-      setViewing({ report, data });
-      setMenuOpen(null);
-    } catch (e) { console.error(e); }
   }
 
-  async function handleDownload(report) {
-    setMenuOpen(null);
+  async function download(report) {
+    setBusy(`pdf-${report.id}`);
     try {
-      const data = await buildMatchReportData({ playerId: report.player_id, matchIds: report.match_ids || [] });
+      const data = await dataFor(report);
       await exportMatchReportPdf({ reportData: data, reportMeta: { title: report.title }, staffComment: report.staff_comment });
-    } catch (e) { console.error(e); }
+    } finally {
+      setBusy("");
+    }
   }
 
-  async function handleTogglePublish(report) {
-    setMenuOpen(null);
-    setActionLoading(true);
+  async function action(operation, report) {
+    setBusy(`${operation}-${report.id}`);
+    setError("");
     try {
-      if (report.status === "published") {
-        await base44.entities.PlayerMatchReport.update(report.id, { status: "draft", published_at: null });
-      } else {
-        await base44.entities.PlayerMatchReport.update(report.id, { status: "published", published_at: new Date().toISOString() });
-      }
-      load();
-    } catch (e) { console.error(e); }
-    finally { setActionLoading(false); }
+      const response = await base44.functions.invoke("managePlayerMatchReport", { operation, id: report.id });
+      const result = response.data || response;
+      if (result.error) throw new Error(result.error);
+      if (viewing?.report?.id === report.id) setViewing(null);
+      await load();
+    } catch (cause) {
+      setError(cause?.response?.data?.error || cause.message || "No se pudo completar la acción.");
+    } finally {
+      setBusy("");
+    }
   }
 
-  async function handleDelete(report) {
-    setActionLoading(true);
-    try {
-      await base44.entities.PlayerMatchReport.update(report.id, {
-        deleted_at: new Date().toISOString(),
-        status: "archived",
-      });
-      setConfirmDelete(null);
-      load();
-    } catch (e) { console.error(e); }
-    finally { setActionLoading(false); }
-  }
-
-  if (loading) return <div className="py-12 flex justify-center"><Loader2 size={20} className="text-zinc-500 animate-spin" /></div>;
-
-  if (reports.length === 0) {
-    return (
-      <div className="py-12 text-center">
-        <Inbox size={28} className="text-zinc-600 mx-auto mb-2" />
-        <p className="text-zinc-500 text-sm">Sin reportes guardados para este jugador.</p>
-        <p className="text-zinc-600 text-xs mt-1">Generá uno desde la pestaña Análisis.</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="flex h-56 items-center justify-center"><Loader2 className="animate-spin text-emerald-400" /></div>;
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {reports.map((r) => {
-          const [cls, label] = STATUS_CONFIG[r.status] || STATUS_CONFIG.draft;
-          const isPublished = r.status === "published";
-          return (
-            <div key={r.id} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 relative">
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-bold text-white truncate">{r.title}</p>
-                  <p className="text-xs text-zinc-500">{r.report_type === "multi_match" ? "Multi-partido" : "Un partido"}</p>
+      <div className="space-y-4">
+        <div className="flex items-end justify-between"><div><h2 className="text-lg font-black text-white">Informes del jugador</h2><p className="text-xs text-zinc-500">Borradores, publicaciones y trazabilidad de cambios.</p></div><span className="text-xs text-zinc-500">{reports.length} informes</span></div>
+        {error && <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-300">{error}</div>}
+        {!reports.length ? (
+          <div className="rounded-2xl border border-dashed border-zinc-800 py-16 text-center"><Inbox className="mx-auto mb-3 text-zinc-700" /><p className="text-sm font-semibold text-zinc-400">Todavía no hay informes</p><p className="mt-1 text-xs text-zinc-600">Generalo desde Resumen, Partidos, Evolución o Comparación.</p></div>
+        ) : (
+          <div className="grid gap-3 lg:grid-cols-2">
+            {reports.map((report) => {
+              const cfg = STATUS[report.status] || STATUS.draft;
+              const isBusy = busy.endsWith(report.id);
+              return <article key={report.id} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+                <div className="flex items-start justify-between gap-3"><div className="min-w-0"><div className="mb-2 flex flex-wrap items-center gap-2"><span className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${cfg[1]}`}>{cfg[0]}</span>{report.report_version >= 2 && <span className="text-[10px] text-sky-400">Snapshot v{report.report_version}</span>}</div><h3 className="truncate text-sm font-bold text-white">{report.title}</h3><p className="mt-1 text-xs text-zinc-500">{report.match_ids?.length || 0} {report.match_ids?.length === 1 ? "partido" : "partidos"} · actualizado {formatDate(report.updated_at || report.created_at || report.updated_date)}</p></div><FileText className="shrink-0 text-emerald-400" size={18} /></div>
+                <div className="mt-3 flex flex-wrap gap-1.5">{(report.match_labels || []).slice(0, 3).map((label) => <span key={label} className="rounded-md bg-zinc-800 px-2 py-1 text-[10px] text-zinc-400">{label}</span>)}</div>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button onClick={() => view(report)} disabled={isBusy} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === `view-${report.id}` ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />} Ver</button>
+                  <button onClick={() => download(report)} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === `pdf-${report.id}` ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF</button>
+                  <button onClick={() => action(report.status === "published" ? "unpublish" : "publish", report)} disabled={isBusy} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold ${report.status === "published" ? "bg-amber-500/10 text-amber-300" : "bg-emerald-600 text-white"}`}>{report.status === "published" ? <EyeOff size={14} /> : <Send size={14} />}{report.status === "published" ? "Ocultar" : "Publicar"}</button>
+                  <button onClick={() => window.confirm("¿Eliminar este informe?") && action("delete", report)} disabled={isBusy} className="rounded-lg bg-red-500/10 p-2 text-red-300"><Trash2 size={14} /></button>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`px-2 py-0.5 rounded text-[10px] font-semibold border ${cls}`}>{label}</span>
-                  <div className="relative">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === r.id ? null : r.id); }}
-                      className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400"
-                    >
-                      <MoreVertical size={16} />
-                    </button>
-                    {menuOpen === r.id && (
-                      <div className="absolute right-0 top-full mt-1 w-44 bg-zinc-800 border border-zinc-700 rounded-xl shadow-xl z-30 py-1">
-                        <button onClick={() => handleView(r)} className="w-full px-3 py-2 text-left text-xs text-zinc-200 hover:bg-zinc-700 flex items-center gap-2">
-                          <Eye size={13} /> Ver
-                        </button>
-                        <button onClick={() => handleDownload(r)} className="w-full px-3 py-2 text-left text-xs text-zinc-200 hover:bg-zinc-700 flex items-center gap-2">
-                          <Download size={13} /> Descargar PDF
-                        </button>
-                        <button onClick={() => handleTogglePublish(r)} disabled={actionLoading} className="w-full px-3 py-2 text-left text-xs text-zinc-200 hover:bg-zinc-700 flex items-center gap-2 disabled:opacity-50">
-                          {isPublished ? <><EyeOff size={13} /> Despublicar</> : <><Send size={13} /> Publicar</>}
-                        </button>
-                        <div className="border-t border-zinc-700 my-1" />
-                        <button onClick={() => { setMenuOpen(null); setConfirmDelete(r); }} className="w-full px-3 py-2 text-left text-xs text-red-400 hover:bg-zinc-700 flex items-center gap-2">
-                          <Trash2 size={13} /> Eliminar
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-1 mb-3">
-                {(r.match_labels || []).slice(0, 3).map((l, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 text-[10px]">{l}</span>
-                ))}
-                {(r.match_labels || []).length > 3 && <span className="px-1.5 py-0.5 text-zinc-500 text-[10px]">+{r.match_labels.length - 3}</span>}
-              </div>
-              <div className="flex items-center gap-2">
-                <button onClick={() => handleView(r)} className="flex-1 px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold flex items-center justify-center gap-1.5 hover:bg-zinc-700">
-                  <Eye size={13} /> Ver
-                </button>
-                <button onClick={() => handleDownload(r)} className="px-2.5 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 hover:bg-zinc-700">
-                  <Download size={13} /> PDF
-                </button>
-                {r.status === "draft" && (
-                  <button onClick={() => handleTogglePublish(r)} disabled={actionLoading} className="px-2.5 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-50">
-                    <Send size={13} /> Publicar
-                  </button>
-                )}
-              </div>
-            </div>
-          );
-        })}
+              </article>;
+            })}
+          </div>
+        )}
       </div>
 
       {viewing && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-5 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-20">
-              <h2 className="text-lg font-bold text-white">{viewing.report.title}</h2>
-              <button onClick={() => setViewing(null)} className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400"><X size={20} /></button>
-            </div>
-            <div className="p-5">
-              <MatchReportPreview
-                reportData={viewing.data}
-                staffComment={viewing.report.staff_comment || ""}
-                onCommentChange={() => {}}
-              />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Delete confirmation */}
-      {confirmDelete && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-sm p-5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-10 h-10 rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center">
-                <Trash2 size={18} className="text-red-400" />
-              </div>
-              <h3 className="text-base font-bold text-white">Eliminar reporte</h3>
-            </div>
-            <p className="text-sm text-zinc-400 mb-4">
-              {confirmDelete.status === "published"
-                ? "Este reporte está disponible en el portal del jugador. Al eliminarlo dejará de estar visible para el futbolista."
-                : "¿Eliminar este reporte?"}
-            </p>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setConfirmDelete(null)} className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 text-zinc-200 text-sm font-semibold hover:bg-zinc-700">
-                Cancelar
-              </button>
-              <button onClick={() => handleDelete(confirmDelete)} disabled={actionLoading} className="flex-1 px-4 py-2.5 rounded-lg bg-red-600 text-white text-sm font-bold hover:bg-red-500 disabled:opacity-50 flex items-center justify-center gap-2">
-                {actionLoading ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />} Eliminar reporte
-              </button>
-            </div>
-          </div>
-        </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm"><div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950"><div className="sticky top-0 z-10 flex items-center justify-between border-b border-zinc-800 bg-zinc-950/95 p-4"><div><h2 className="font-bold text-white">{viewing.report.title}</h2><p className="text-xs text-zinc-500">Vista congelada del informe</p></div><button onClick={() => setViewing(null)} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800"><X size={18} /></button></div><div className="p-4"><MatchReportPreview reportData={viewing.data} staffComment={viewing.report.staff_comment} readOnly /></div></div></div>
       )}
     </>
   );
