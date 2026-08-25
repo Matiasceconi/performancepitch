@@ -1,6 +1,7 @@
 import jsPDF from "jspdf";
 import { CLUB_BRAND } from "@/lib/clubBrand";
-import { REPORT_METRICS, fmtMetric, pctVs, buildZoneDistributionData } from "@/lib/matchReportData";
+import { REPORT_METRICS, fmtMetric, pctVs, buildZoneDistributionData, normalizeMatchReportConfig } from "@/lib/matchReportData";
+import { getShieldForName } from "@/lib/clubShields";
 import { renderZoneDistributionChartPng } from "./matchReportCharts.jsx";
 
 const PAGE_W = 210;
@@ -134,7 +135,63 @@ function drawKpiSummary(doc, reportData, y) {
   return y + 36;
 }
 
-function drawMatchBlock(doc, matchData, zonePng, y, contentW) {
+function drawEvolution(doc, reportData, config, y) {
+  const selected = reportData.selected || [];
+  if (selected.length < 2) return y;
+  if (y + 65 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
+  const metric = REPORT_METRICS.find((item) => item.key === config.evolutionMetric) || REPORT_METRICS[1];
+  const profile = reportData.competitionProfile;
+  const profileValue = Number(profile?.[metric.profile] || 0);
+  const values = selected.map((item) => Number(item.gpsRow?.[metric.key] || 0));
+  const minutes = selected.map((item) => Number(item.minutesPlayed ?? item.gpsRow?.duration_minutes ?? 0));
+  const maxMetric = Math.max(...values, profileValue, 1);
+  const maxMinutes = Math.max(...minutes, 90, 1);
+  const chartX = MARGIN + 10;
+  const chartY = y + 11;
+  const chartW = PAGE_W - 2 * MARGIN - 20;
+  const chartH = 40;
+  const step = chartW / selected.length;
+
+  setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text(`Evolución de minutos y ${metric.label}`, MARGIN, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  setColor(doc, "setTextColor", "#6b7280");
+  doc.text(`Barras: minutos · línea verde: ${metric.label} (${metric.unit}) · referencia celeste: perfil competitivo`, MARGIN, y + 5);
+
+  doc.setDrawColor(216, 222, 210);
+  doc.rect(chartX, chartY, chartW, chartH);
+  if (profileValue > 0) {
+    const py = chartY + chartH - (profileValue / maxMetric) * chartH;
+    doc.setDrawColor(56, 189, 248);
+    doc.setLineDashPattern([2, 2], 0);
+    doc.line(chartX, py, chartX + chartW, py);
+    doc.setLineDashPattern([], 0);
+  }
+
+  const points = [];
+  selected.forEach((item, index) => {
+    const centerX = chartX + step * index + step / 2;
+    const barH = (minutes[index] / maxMinutes) * chartH;
+    doc.setFillColor(82, 82, 91);
+    doc.rect(centerX - Math.min(5, step * 0.25), chartY + chartH - barH, Math.min(10, step * 0.5), barH, "F");
+    const pointY = chartY + chartH - (values[index] / maxMetric) * chartH;
+    points.push([centerX, pointY]);
+    doc.setFontSize(6);
+    setColor(doc, "setTextColor", "#6b7280");
+    const label = item.match?.date ? new Date(item.match.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : String(index + 1);
+    doc.text(label, centerX, chartY + chartH + 4, { align: "center" });
+  });
+  doc.setDrawColor(0, 132, 61);
+  doc.setLineWidth(0.8);
+  for (let index = 1; index < points.length; index += 1) doc.line(points[index - 1][0], points[index - 1][1], points[index][0], points[index][1]);
+  points.forEach(([x, pointY]) => { doc.setFillColor(0, 132, 61); doc.circle(x, pointY, 1.4, "F"); });
+  return chartY + chartH + 10;
+}
+
+function drawMatchBlock(doc, matchData, zonePng, y, contentW, showZoneChart = true) {
   const { match, gpsRow, minutesPlayed } = matchData;
   const blockH = 68;
 
@@ -146,7 +203,11 @@ function drawMatchBlock(doc, matchData, zonePng, y, contentW) {
   setColor(doc, "setTextColor", "#FFFFFF");
   doc.setFont("helvetica", "bold");
   doc.setFontSize(9);
-  doc.text(`vs ${match.rival || "Rival"}`, MARGIN + 2, y + 6);
+  const rivalShield = match.rival_logo_url || getShieldForName(match.rival);
+  if (rivalShield) {
+    try { doc.addImage(rivalShield, "PNG", MARGIN + 1, y + 1, 7, 7, undefined, "FAST"); } catch {}
+  }
+  doc.text(`vs ${match.rival || "Rival"}`, MARGIN + (rivalShield ? 10 : 2), y + 6);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
   const dateStr = match.date ? new Date(match.date + "T00:00:00").toLocaleDateString("es-AR") : "—";
@@ -164,7 +225,7 @@ function drawMatchBlock(doc, matchData, zonePng, y, contentW) {
   y += 11;
 
   // Two columns: metrics table (left) + zone chart (right)
-  const tableW = contentW * 0.42;
+  const tableW = showZoneChart ? contentW * 0.42 : contentW;
   const chartX = MARGIN + tableW + 4;
   const chartW = contentW - tableW - 4;
 
@@ -173,7 +234,7 @@ function drawMatchBlock(doc, matchData, zonePng, y, contentW) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   doc.text("Métricas GPS", MARGIN, y);
-  doc.text("Zonas de velocidad e intensidad", chartX, y);
+  if (showZoneChart) doc.text("Zonas de velocidad e intensidad", chartX, y);
   y += 3;
 
   // Metrics table rows
@@ -200,7 +261,7 @@ function drawMatchBlock(doc, matchData, zonePng, y, contentW) {
   const tableH = REPORT_METRICS.length * rowH;
 
   // Zone chart
-  if (zonePng) {
+  if (showZoneChart && zonePng) {
     try { doc.addImage(zonePng, "PNG", chartX, y, chartW, tableH); } catch {}
   }
 
@@ -245,27 +306,28 @@ function drawFooter(doc) {
   }
 }
 
-export async function exportMatchReportPdf({ reportData, reportMeta, staffComment }) {
+export async function exportMatchReportPdf({ reportData, reportMeta, staffComment, reportConfig }) {
   const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
 
+  const config = normalizeMatchReportConfig(reportConfig || reportData?.reportConfig);
   drawHeader(doc, reportData, reportMeta);
   let y = drawPlayerBlock(doc, reportData);
   y += 4;
-  y = drawKpiSummary(doc, reportData, y);
-  y += 3;
+  if (config.showKpis) {
+    y = drawKpiSummary(doc, reportData, y);
+    y += 3;
+  }
+  if (config.showMinutesEvolution) y = drawEvolution(doc, reportData, config, y);
 
   const contentW = PAGE_W - 2 * MARGIN;
+  const zonePngs = config.showMatchDetails && config.showZoneCharts
+    ? await Promise.all(reportData.selected.map((matchData) => renderZoneDistributionChartPng(buildZoneDistributionData(matchData.gpsRow), 400, 240)))
+    : reportData.selected.map(() => null);
 
-  // Pre-render zone charts in parallel
-  const zonePngs = await Promise.all(
-    reportData.selected.map((matchData) =>
-      renderZoneDistributionChartPng(buildZoneDistributionData(matchData.gpsRow), 400, 240)
-    )
-  );
-
-  // One block per selected match
-  for (let i = 0; i < reportData.selected.length; i++) {
-    y = drawMatchBlock(doc, reportData.selected[i], zonePngs[i], y, contentW);
+  if (config.showMatchDetails) {
+    for (let i = 0; i < reportData.selected.length; i++) {
+      y = drawMatchBlock(doc, reportData.selected[i], zonePngs[i], y, contentW, config.showZoneCharts);
+    }
   }
 
   // Staff comment
