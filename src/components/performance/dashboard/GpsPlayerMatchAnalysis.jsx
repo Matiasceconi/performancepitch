@@ -7,6 +7,7 @@ import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 import {
   REPORT_METRICS,
   buildAnalysisFromOptions,
+  buildCompetitionProfileFromOptions,
   buildEvolutionData,
   buildMatchOptionsFromData,
   buildReportSnapshot,
@@ -59,7 +60,6 @@ export default function GpsPlayerMatchAnalysis({
   player,
   matchReports,
   matchGpsByMatch,
-  competitionProfile,
   squadName,
   squadId,
   seasonId,
@@ -102,14 +102,20 @@ export default function GpsPlayerMatchAnalysis({
     setSelectedMatchIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   };
 
+  const competitiveProfile = useMemo(() => buildCompetitionProfileFromOptions(matchOptions), [matchOptions]);
   const reportData = useMemo(() => selectedMatchIds.length
-    ? buildAnalysisFromOptions({ player, matchOptions, selectedMatchIds, competitionProfile })
+    ? buildAnalysisFromOptions({ player, matchOptions, selectedMatchIds, competitionProfile: competitiveProfile })
     : null,
-  [player, matchOptions, selectedMatchIds, competitionProfile]);
+  [player, matchOptions, selectedMatchIds, competitiveProfile]);
 
   const latest = reportData?.selected?.[reportData.selected.length - 1] || null;
-  const previous = reportData?.selected?.[reportData.selected.length - 2] || null;
-  const baseline = reportData?.lastFiveAvg || {};
+  const profile = reportData?.competitionProfile || null;
+  const profileMatches = Number(profile?.matches_used || 0);
+  const hasProfile = profileMatches > 0;
+  const profileValue = (key) => {
+    const definition = metricDef(key);
+    return hasProfile && definition?.profile ? profile[definition.profile] : null;
+  };
   const age = calcAge(player?.birth_date);
 
   function title() {
@@ -204,7 +210,7 @@ export default function GpsPlayerMatchAnalysis({
             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-500">
               <span>{matchOptions.length} partidos con GPS</span><span>·</span>
               <span>{selectedMatchIds.length} seleccionados</span><span>·</span>
-              <span>Línea de base: 3 partidos previos</span>
+              {hasProfile && <span>Perfil competitivo: {profileMatches} {profileMatches === 1 ? "partido" : "partidos"} de más de 80'</span>}
             </div>
           </div>
           <button onClick={() => { setShowPreview(true); setMessage(""); }} disabled={!reportData} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500 disabled:opacity-40">
