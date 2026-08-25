@@ -163,13 +163,14 @@ export function buildAnalysisFromOptions({ player, matchOptions, selectedMatchId
   });
   personalAvg.pl_min = avg(historicalRows.map((r) => r.pl_min));
 
-  // Promedio de los últimos 5 partidos (referencia para comparar el último partido)
-  const lastFiveRows = matchOptions.slice(0, 5).map((o) => o.gpsRow);
+  // Línea de base: media de las 3 sesiones válidas anteriores, sin incluir la actual.
+  // matchOptions llega ordenado de más reciente a más antiguo.
+  const baselineRows = matchOptions.slice(1, 4).map((o) => o.gpsRow);
   const lastFiveAvg = {};
   REPORT_METRICS.forEach((m) => {
-    lastFiveAvg[m.key] = avg(lastFiveRows.map((r) => r[m.key]));
+    lastFiveAvg[m.key] = avg(baselineRows.map((r) => r[m.key]));
   });
-  lastFiveAvg.pl_min = avg(lastFiveRows.map((r) => r.pl_min));
+  lastFiveAvg.pl_min = avg(baselineRows.map((r) => r.pl_min));
 
   const seasonBests = {};
   REPORT_METRICS.forEach((m) => {
@@ -389,4 +390,94 @@ export function buildZoneDistributionData(gpsRow) {
     unit: z.unit,
     value: Number(gpsRow[z.key] || 0),
   }));
+}
+
+function averageRows(rows) {
+  const result = {};
+  REPORT_METRICS.forEach((metric) => {
+    result[metric.key] = avg(rows.map((row) => row?.[metric.key]));
+  });
+  result.pl_min = avg(rows.map((row) => row?.pl_min));
+  return result;
+}
+
+function snapshotClone(value) {
+  return JSON.parse(JSON.stringify(value ?? null));
+}
+
+// Congela exactamente lo que vio el staff al guardar/publicar. El portal y el PDF
+// consumen esta misma estructura para evitar que un informe histórico cambie.
+export function buildReportSnapshot(reportData) {
+  const selected = (reportData?.selected || []).map((item) => ({
+    match: snapshotClone(item.match),
+    gpsRow: snapshotClone(withPlMin(item.gpsRow || {})),
+    minutesPlayed: item.minutesPlayed ?? null,
+    hasGps: item.hasGps !== false,
+  }));
+  return {
+    version: 2,
+    generated_at: new Date().toISOString(),
+    player: snapshotClone(reportData?.player),
+    competitionProfile: snapshotClone(reportData?.competitionProfile),
+    selected,
+    personalAvg: snapshotClone(reportData?.personalAvg || averageRows(selected.map((item) => item.gpsRow))),
+    lastFiveAvg: snapshotClone(reportData?.lastFiveAvg || {}),
+    seasonBests: snapshotClone(reportData?.seasonBests || {}),
+    isMulti: selected.length > 1,
+  };
+}
+
+export function reportDataFromSnapshot(snapshot, fallbackPlayer = null) {
+  if (!snapshot || !Array.isArray(snapshot.selected)) return null;
+  const selected = snapshot.selected
+    .map((item) => ({
+      ...item,
+      gpsRow: withPlMin(item.gpsRow || {}),
+      hasGps: item.hasGps !== false,
+    }))
+    .sort((a, b) => (a.match?.date || "").localeCompare(b.match?.date || ""));
+  const rows = selected.map((item) => item.gpsRow);
+  return {
+    player: snapshot.player || fallbackPlayer,
+    competitionProfile: snapshot.competitionProfile || null,
+    selected,
+    personalAvg: snapshot.personalAvg || averageRows(rows),
+    lastFiveAvg: snapshot.lastFiveAvg || averageRows(rows.slice(Math.max(0, rows.length - 4), -1)),
+    historicalRows: rows,
+    seasonBests: snapshot.seasonBests || {},
+    smaxSorted: [...rows].sort((a, b) => Number(b.smax || 0) - Number(a.smax || 0)),
+    isMulti: selected.length > 1,
+  };
+}
+
+// Compatibilidad para informes anteriores al snapshot v2.
+export function adaptPublishedReport(report, player) {
+  const frozen = reportDataFromSnapshot(report?.report_snapshot, player);
+  if (frozen) return frozen;
+
+  const selected = (report?.matches || [])
+    .filter((item) => item?.hasGps && item?.gpsRow && item?.match)
+    .map((item) => {
+      const normalized = normalizeMatchGpsRows(item.match, [item.gpsRow], {})[0] || item.gpsRow;
+      return {
+        match: item.match,
+        gpsRow: withPlMin(normalized),
+        minutesPlayed: item.minutesPlayed ?? null,
+        hasGps: true,
+      };
+    })
+    .sort((a, b) => (a.match.date || "").localeCompare(b.match.date || ""));
+
+  const rows = selected.map((item) => item.gpsRow);
+  return {
+    player,
+    competitionProfile: null,
+    selected,
+    personalAvg: averageRows(rows),
+    lastFiveAvg: averageRows(rows.slice(Math.max(0, rows.length - 4), -1)),
+    historicalRows: rows,
+    seasonBests: {},
+    smaxSorted: [...rows].sort((a, b) => Number(b.smax || 0) - Number(a.smax || 0)),
+    isMulti: selected.length > 1,
+  };
 }
