@@ -1,314 +1,288 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Loader2, FileText, Save, Download, Send, X, TrendingUp } from "lucide-react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, BarChart3, CalendarDays, Download, FileText, Gauge, Loader2, Save, Send, Sparkles, TrendingUp, X } from "lucide-react";
+import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
-import { REPORT_METRICS, fmtMetric, buildMatchOptionsFromData, buildAnalysisFromOptions, buildEvolutionData } from "@/lib/matchReportData";
-import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
-import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 import MatchBlockCard from "@/components/matchReports/MatchBlockCard";
-import { Line, LineChart, CartesianGrid, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
+import {
+  REPORT_METRICS,
+  buildAnalysisFromOptions,
+  buildEvolutionData,
+  buildMatchOptionsFromData,
+  buildReportSnapshot,
+  fmtMetric,
+  pctVs,
+} from "@/lib/matchReportData";
+import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
 
 const RANGE_OPTIONS = [
-  { key: "last1", label: "Último partido" },
-  { key: "last5", label: "Últimos 5" },
-  { key: "last10", label: "Últimos 10" },
-  { key: "season", label: "Temporada" },
+  ["last1", "Último"],
+  ["last5", "Últimos 5"],
+  ["last10", "Últimos 10"],
+  ["season", "Temporada"],
 ];
 
-function calcAge(birthDate) {
-  if (!birthDate) return null;
+const GROUPS = [
+  { title: "Volumen", icon: Activity, keys: ["total_distance", "player_load"] },
+  { title: "Intensidad", icon: Gauge, keys: ["m_min", "pl_min"] },
+  { title: "Alta velocidad", icon: TrendingUp, keys: ["distance_19_8", "distance_25", "sprints", "smax"] },
+  { title: "Neuromuscular", icon: BarChart3, keys: ["acc_3", "dec_3"] },
+];
+
+const PL_MIN = { key: "pl_min", label: "PL/min", unit: "au/min", decimals: 2 };
+
+function metricDef(key) {
+  return key === "pl_min" ? PL_MIN : REPORT_METRICS.find((metric) => metric.key === key);
+}
+
+function deltaTone(pct) {
+  if (pct == null) return "text-zinc-500";
+  if (Math.abs(pct) <= 5) return "text-sky-300";
+  return pct > 0 ? "text-emerald-300" : "text-amber-300";
+}
+
+function formatDate(value) {
+  return value ? new Date(value + "T00:00:00").toLocaleDateString("es-AR") : "—";
+}
+
+function calcAge(value) {
+  if (!value) return null;
   const today = new Date();
-  const birth = new Date(birthDate);
+  const birth = new Date(value);
   let age = today.getFullYear() - birth.getFullYear();
-  if (today.getMonth() < birth.getMonth() || (today.getMonth() === birth.getMonth() && today.getDate() < birth.getDate())) age -= 1;
+  if (today < new Date(today.getFullYear(), birth.getMonth(), birth.getDate())) age -= 1;
   return age;
 }
 
-export default function GpsPlayerMatchAnalysis({ player, matchReports, matchGpsByMatch, competitionProfile, squadName, squadId, seasonId }) {
+export default function GpsPlayerMatchAnalysis({
+  view = "summary",
+  player,
+  matchReports,
+  matchGpsByMatch,
+  competitionProfile,
+  squadName,
+  squadId,
+  seasonId,
+}) {
   const [matchOptions, setMatchOptions] = useState([]);
-  const [loadingOptions, setLoadingOptions] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [rangeMode, setRangeMode] = useState("last5");
   const [selectedMatchIds, setSelectedMatchIds] = useState([]);
+  const [evolutionMetric, setEvolutionMetric] = useState("m_min");
   const [showPreview, setShowPreview] = useState(false);
   const [staffComment, setStaffComment] = useState("");
-  const [exporting, setExporting] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [savedReportId, setSavedReportId] = useState(null);
-  const [evolutionMetric, setEvolutionMetric] = useState("total_distance");
+  const [busy, setBusy] = useState("");
+  const [message, setMessage] = useState("");
 
   useEffect(() => {
     if (!player?.id) return;
-    setLoadingOptions(true);
+    setLoading(true);
+    setMessage("");
     base44.entities.MatchPlayerMinutes.filter({ player_id: player.id }, "-match_date", 500)
       .then((minutesRows) => {
         const options = buildMatchOptionsFromData({ matchReports, matchGpsByMatch, minutesRows, playerId: player.id });
         setMatchOptions(options);
-        const defaultIds = options.slice(0, 5).map((o) => o.match.id);
-        setSelectedMatchIds(defaultIds);
+        setSelectedMatchIds(options.slice(0, 5).map((option) => option.match.id));
         setRangeMode("last5");
+        setSavedReportId(null);
       })
       .catch(() => setMatchOptions([]))
-      .finally(() => setLoadingOptions(false));
+      .finally(() => setLoading(false));
   }, [player?.id, matchReports, matchGpsByMatch]);
 
   const applyRange = useCallback((mode) => {
     setRangeMode(mode);
-    if (mode === "last1") setSelectedMatchIds(matchOptions.slice(0, 1).map((o) => o.match.id));
-    else if (mode === "last5") setSelectedMatchIds(matchOptions.slice(0, 5).map((o) => o.match.id));
-    else if (mode === "last10") setSelectedMatchIds(matchOptions.slice(0, 10).map((o) => o.match.id));
-    else if (mode === "season") setSelectedMatchIds(matchOptions.map((o) => o.match.id));
+    const limit = mode === "last1" ? 1 : mode === "last5" ? 5 : mode === "last10" ? 10 : matchOptions.length;
+    setSelectedMatchIds(matchOptions.slice(0, limit).map((option) => option.match.id));
   }, [matchOptions]);
 
-  function toggleMatch(matchId) {
+  const toggleMatch = (id) => {
     setRangeMode("custom");
-    setSelectedMatchIds((prev) => prev.includes(matchId) ? prev.filter((id) => id !== matchId) : [...prev, matchId]);
+    setSelectedMatchIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
+  };
+
+  const reportData = useMemo(() => selectedMatchIds.length
+    ? buildAnalysisFromOptions({ player, matchOptions, selectedMatchIds, competitionProfile })
+    : null,
+  [player, matchOptions, selectedMatchIds, competitionProfile]);
+
+  const latest = reportData?.selected?.[reportData.selected.length - 1] || null;
+  const previous = reportData?.selected?.[reportData.selected.length - 2] || null;
+  const baseline = reportData?.lastFiveAvg || {};
+  const age = calcAge(player?.birth_date);
+
+  function title() {
+    if (!reportData) return "Informe individual";
+    if (reportData.isMulti) return `Informe Individual · ${player.full_name} · ${reportData.selected.length} partidos`;
+    return `Informe Individual · ${player.full_name} · vs ${latest?.match?.rival || "Rival"} · ${latest?.match?.date || ""}`;
   }
 
-  const reportData = useMemo(() => {
-    if (!player || selectedMatchIds.length === 0) return null;
-    return buildAnalysisFromOptions({ player, matchOptions, selectedMatchIds, competitionProfile });
-  }, [player, matchOptions, selectedMatchIds, competitionProfile]);
-
-  const generateLabel = useMemo(() => {
-    if (selectedMatchIds.length === 0) return "Generar reporte";
-    if (rangeMode === "custom") return `Generar reporte · ${selectedMatchIds.length} ${selectedMatchIds.length === 1 ? "partido" : "partidos"}`;
-    const rangeLabel = RANGE_OPTIONS.find((r) => r.key === rangeMode)?.label || "";
-    return `Generar reporte · ${rangeLabel}`;
-  }, [selectedMatchIds, rangeMode]);
-
-  function handleGenerate() {
-    setSavedReportId(null);
-    setStaffComment("");
-    setShowPreview(true);
+  function payload() {
+    const snapshot = buildReportSnapshot(reportData);
+    return {
+      title: title(),
+      player_id: player.id,
+      player_name: player.full_name,
+      squad_id: squadId,
+      squad_name: squadName,
+      season_id: seasonId || "",
+      staff_comment: staffComment,
+      report_snapshot: snapshot,
+      metrics_snapshot: {
+        latest_match: latest?.match || null,
+        minutes: latest?.minutesPlayed ?? null,
+        values: Object.fromEntries(REPORT_METRICS.map((metric) => [metric.key, latest?.gpsRow?.[metric.key] ?? null])),
+      },
+    };
   }
 
-  function buildTitle() {
-    if (!reportData) return "Informe";
-    const name = reportData.player?.full_name || "Jugador";
-    if (reportData.isMulti) return `Informe Individual · ${name} · ${reportData.selected.length} partidos`;
-    const m = reportData.selected[0]?.match;
-    return `Informe Individual · ${name} · vs ${m?.rival || "Rival"} · ${m?.date || ""}`;
-  }
-
-  async function handleSaveDraft() {
-    setSaving(true);
+  async function saveDraft() {
+    setBusy("save");
+    setMessage("");
     try {
-      const payload = {
-        title: buildTitle(),
-        report_type: reportData.isMulti ? "multi_match" : "single_match",
-        status: "draft",
-        player_id: player.id,
-        player_name: player.full_name,
-        squad_id: squadId,
-        squad_name: squadName,
-        season_id: seasonId || "",
-        match_ids: selectedMatchIds,
-        match_labels: reportData.selected.map((s) => `vs ${s.match.rival} (${s.match.date})`),
-        match_dates: reportData.selected.map((s) => s.match.date),
-        staff_comment: staffComment,
-      };
-      const record = await base44.entities.PlayerMatchReport.create(payload);
-      setSavedReportId(record.id);
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
+      const response = await base44.functions.invoke("managePlayerMatchReport", {
+        operation: "save",
+        id: savedReportId,
+        payload: payload(),
+      });
+      const result = response.data || response;
+      if (result.error) throw new Error(result.error);
+      setSavedReportId(result.report?.id);
+      setMessage("Borrador guardado con sus datos congelados.");
+    } catch (error) {
+      setMessage(error?.response?.data?.error || error.message || "No se pudo guardar el informe.");
+    } finally {
+      setBusy("");
+    }
   }
 
-  async function handlePublish() {
-    setSaving(true);
+  async function publish() {
+    setBusy("publish");
+    setMessage("");
     try {
-      const payload = {
-        title: buildTitle(),
-        report_type: reportData.isMulti ? "multi_match" : "single_match",
-        status: "published",
-        player_id: player.id,
-        player_name: player.full_name,
-        squad_id: squadId,
-        squad_name: squadName,
-        season_id: seasonId || "",
-        match_ids: selectedMatchIds,
-        match_labels: reportData.selected.map((s) => `vs ${s.match.rival} (${s.match.date})`),
-        match_dates: reportData.selected.map((s) => s.match.date),
-        staff_comment: staffComment,
-        published_at: new Date().toISOString(),
-      };
-      if (savedReportId) {
-        await base44.entities.PlayerMatchReport.update(savedReportId, { ...payload, status: "published", published_at: new Date().toISOString() });
-      } else {
-        const record = await base44.entities.PlayerMatchReport.create(payload);
-        setSavedReportId(record.id);
+      let reportId = savedReportId;
+      if (!reportId) {
+        const response = await base44.functions.invoke("managePlayerMatchReport", { operation: "save", payload: payload() });
+        const result = response.data || response;
+        if (result.error) throw new Error(result.error);
+        reportId = result.report?.id;
+        setSavedReportId(reportId);
       }
-    } catch (e) { console.error(e); }
-    finally { setSaving(false); }
+      const response = await base44.functions.invoke("managePlayerMatchReport", { operation: "publish", id: reportId });
+      const result = response.data || response;
+      if (result.error) throw new Error(result.error);
+      setMessage("Informe publicado. El jugador ya puede verlo en su portal.");
+    } catch (error) {
+      setMessage(error?.response?.data?.error || error.message || "No se pudo publicar el informe.");
+    } finally {
+      setBusy("");
+    }
   }
 
-  async function handleDownloadPdf() {
-    setExporting(true);
+  async function downloadPdf() {
+    setBusy("pdf");
     try {
-      await exportMatchReportPdf({ reportData, reportMeta: { title: buildTitle() }, staffComment });
-    } catch (e) { console.error(e); }
-    finally { setExporting(false); }
+      await exportMatchReportPdf({ reportData, reportMeta: { title: title() }, staffComment });
+    } finally {
+      setBusy("");
+    }
   }
 
-  const age = player ? calcAge(player.birth_date) : null;
-
-  if (loadingOptions) {
-    return <div className="flex items-center justify-center h-64"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin" /></div>;
-  }
-
-  if (matchOptions.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-zinc-500 text-sm">No hay partidos con GPS cargado para este jugador.</p>
-      </div>
-    );
-  }
+  if (loading) return <div className="h-64 flex items-center justify-center"><Loader2 className="animate-spin text-emerald-400" /></div>;
+  if (!matchOptions.length) return <div className="py-16 text-center text-sm text-zinc-500">No hay partidos con GPS cargado para este jugador.</div>;
 
   return (
     <div className="space-y-5">
-      {/* Player header */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4 flex items-center gap-4">
-        <PlayerPhoto player={player} className="w-16 h-16 rounded-xl object-cover border border-zinc-700 shrink-0" fallbackClassName="w-16 h-16 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center shrink-0" textClassName="text-xl font-bold text-zinc-500" />
-        <div className="min-w-0 flex-1">
-          <h2 className="text-xl font-black text-white leading-tight truncate">{player?.full_name}</h2>
-          <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-zinc-400 mt-1">
-            <span>{player?.position || "Sin posición"}</span>
-            {squadName && <span>· {squadName}</span>}
-            {player?.jersey_number && <span>· #{player.jersey_number}</span>}
-            {age != null && <span>· {age} años</span>}
+      <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4 lg:p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <PlayerPhoto player={player} className="h-20 w-20 rounded-2xl border border-zinc-700 object-cover" fallbackClassName="h-20 w-20 rounded-2xl border border-zinc-700 bg-zinc-800 flex items-center justify-center" textClassName="text-2xl font-black text-zinc-500" />
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-emerald-400">Carga externa · análisis individual</p>
+            <h2 className="truncate text-2xl font-black text-white">{player.full_name}</h2>
+            <p className="mt-1 text-sm text-zinc-400">{[player.position, squadName, player.jersey_number && `#${player.jersey_number}`, age != null && `${age} años`].filter(Boolean).join(" · ")}</p>
+            <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-500">
+              <span>{matchOptions.length} partidos con GPS</span><span>·</span>
+              <span>{selectedMatchIds.length} seleccionados</span><span>·</span>
+              <span>Línea de base: 3 partidos previos</span>
+            </div>
           </div>
-        </div>
-        <button onClick={handleGenerate} disabled={selectedMatchIds.length === 0} className="px-4 py-2.5 rounded-lg bg-emerald-600 text-white text-sm font-bold flex items-center gap-2 disabled:opacity-50 hover:bg-emerald-500 transition-colors shrink-0">
-          <FileText size={16} /> <span className="hidden sm:inline">{generateLabel}</span><span className="sm:hidden">Reporte</span>
-        </button>
-      </div>
-
-      {/* Match range selector */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-zinc-500 font-semibold uppercase">Partidos:</span>
-        {RANGE_OPTIONS.map((r) => (
-          <button key={r.key} onClick={() => applyRange(r.key)} className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors ${rangeMode === r.key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}`}>
-            {r.label}
+          <button onClick={() => { setShowPreview(true); setMessage(""); }} disabled={!reportData} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500 disabled:opacity-40">
+            <FileText size={17} /> Generar informe
           </button>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-zinc-500">Muestra</span>
+        {RANGE_OPTIONS.map(([key, label]) => (
+          <button key={key} onClick={() => applyRange(key)} className={`rounded-lg px-3 py-1.5 text-xs font-semibold ${rangeMode === key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}`}>{label}</button>
         ))}
-        <span className="text-xs text-zinc-500 ml-1">· {selectedMatchIds.length} seleccionados</span>
+        <span className="text-xs text-zinc-500">{selectedMatchIds.length} partidos</span>
       </div>
 
-      {/* Match table with checkboxes (selector) */}
-      <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-        <div className="flex items-center justify-between p-3 border-b border-zinc-800">
-          <h3 className="text-sm font-bold text-white">Seleccionar partidos</h3>
-          <span className="text-xs text-zinc-400">{selectedMatchIds.length} seleccionado{selectedMatchIds.length === 1 ? "" : "s"}</span>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-zinc-950/50 text-zinc-400 border-b border-zinc-800">
-                <th className="p-2.5 w-8"></th>
-                <th className="text-left p-2.5 font-semibold">Partido</th>
-                <th className="text-right p-2.5 font-semibold">Min</th>
-                {REPORT_METRICS.map((m) => (
-                  <th key={m.key} className="text-right p-2.5 font-semibold whitespace-nowrap">{m.label}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {matchOptions.map((opt) => {
-                const checked = selectedMatchIds.includes(opt.match.id);
-                return (
-                  <tr key={opt.match.id} onClick={() => toggleMatch(opt.match.id)} className={`border-b border-zinc-800/40 cursor-pointer transition-colors ${checked ? "bg-emerald-500/10" : "hover:bg-zinc-800/30"}`}>
-                    <td className="p-2.5 text-center">
-                      <input type="checkbox" checked={checked} onChange={() => toggleMatch(opt.match.id)} onClick={(e) => e.stopPropagation()} className="accent-emerald-500 w-4 h-4" />
-                    </td>
-                    <td className="p-2.5">
-                      <p className="text-white font-medium">vs {opt.match.rival || "Rival"}</p>
-                      <p className="text-zinc-500 text-[10px]">{opt.match.date ? new Date(opt.match.date + "T00:00:00").toLocaleDateString("es-AR") : "—"} · {opt.match.competition || ""}</p>
-                    </td>
-                    <td className="p-2.5 text-right text-zinc-300">{opt.minutesPlayed ?? "—"}</td>
-                    {REPORT_METRICS.map((m) => (
-                      <td key={m.key} className="p-2.5 text-right text-zinc-300 tabular-nums">{fmtMetric(opt.gpsRow[m.key], m.decimals)}</td>
-                    ))}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {latest && view === "summary" && (
+        <>
+          <div className="overflow-hidden rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/80 via-zinc-900 to-zinc-900">
+            <div className="grid gap-5 p-5 lg:grid-cols-[1.1fr_2fr]">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-400">Último partido de la selección</p>
+                <h3 className="mt-2 text-3xl font-black text-white">vs {latest.match.rival || "Rival"}</h3>
+                <p className="mt-1 text-sm text-zinc-400">{formatDate(latest.match.date)} · {latest.match.competition || "Competencia"}</p>
+                <div className="mt-5 flex items-end gap-6">
+                  <div><p className="text-xs text-zinc-500">Resultado</p><p className="text-2xl font-black text-white">{latest.match.our_score ?? "—"} - {latest.match.rival_score ?? "—"}</p></div>
+                  <div><p className="text-xs text-zinc-500">Minutos</p><p className="text-2xl font-black text-emerald-300">{latest.minutesPlayed ?? latest.gpsRow.duration_minutes ?? "—"}'</p></div>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
+                {["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"].map((key) => {
+                  const def = metricDef(key);
+                  const pct = pctVs(latest.gpsRow[key], baseline[key]);
+                  return <div key={key} className="rounded-xl border border-white/5 bg-black/20 p-3"><p className="text-[11px] text-zinc-400">{def.label}</p><p className="mt-1 text-xl font-black text-white">{fmtMetric(latest.gpsRow[key], def.decimals)} <span className="text-[10px] font-medium text-zinc-500">{def.unit}</span></p><p className={`mt-1 text-[11px] font-bold ${deltaTone(pct)}`}>{pct == null ? "Sin base suficiente" : `${pct > 0 ? "+" : ""}${pct}% vs base`}</p></div>;
+                })}
+              </div>
+            </div>
+          </div>
 
-      {/* Evolución dinámica por métrica */}
-      {reportData && reportData.selected.length > 0 && (
-        <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-          <div className="flex items-center gap-2 mb-3">
-            <TrendingUp size={16} className="text-emerald-400" />
-            <h3 className="text-sm font-bold text-white">Evolución por métrica</h3>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {GROUPS.map((group) => {
+              const Icon = group.icon;
+              return <div key={group.title} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="mb-3 flex items-center gap-2"><Icon size={15} className="text-emerald-400" /><h3 className="text-sm font-bold text-white">{group.title}</h3></div><div className="space-y-2">{group.keys.map((key) => { const def = metricDef(key); const pct = pctVs(latest.gpsRow[key], baseline[key]); return <div key={key} className="flex items-end justify-between gap-2 border-t border-zinc-800/70 pt-2"><div><p className="text-[11px] text-zinc-500">{def.label}</p><p className="text-base font-black text-zinc-100">{fmtMetric(latest.gpsRow[key], def.decimals)} <span className="text-[10px] font-medium text-zinc-600">{def.unit}</span></p></div><span className={`text-[10px] font-bold ${deltaTone(pct)}`}>{pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct}%`}</span></div>; })}</div></div>;
+            })}
           </div>
-          <div className="flex flex-wrap gap-1.5 mb-4">
-            {REPORT_METRICS.map((m) => (
-              <button
-                key={m.key}
-                onClick={() => setEvolutionMetric(m.key)}
-                className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-colors ${evolutionMetric === m.key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300 hover:bg-zinc-700"}`}
-              >
-                {m.label}
-              </button>
-            ))}
-          </div>
-          <ResponsiveContainer width="100%" height={260}>
-            <LineChart data={buildEvolutionData(reportData, evolutionMetric)} margin={{ left: -10, right: 12, top: 5, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
-              <XAxis dataKey="shortDate" tick={{ fill: "#a1a1aa", fontSize: 11 }} stroke="#3f3f46" />
-              <YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} stroke="#3f3f46" width={48} />
-              <Tooltip
-                contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8, color: "#fff", fontSize: 12 }}
-                formatter={(v) => fmtMetric(v, REPORT_METRICS.find((m) => m.key === evolutionMetric)?.decimals ?? 0)}
-              />
-              <ReferenceLine y={reportData.personalAvg[evolutionMetric]} stroke="#52525b" strokeDasharray="5 5" label={{ value: "Prom.", fill: "#71717a", fontSize: 10, position: "insideTopRight" }} />
-              <Line type="monotone" dataKey={evolutionMetric} stroke="#22c55e" strokeWidth={2.5} dot={{ r: 4, fill: "#22c55e", strokeWidth: 0 }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
-          <p className="text-[11px] text-zinc-500 mt-2">
-            {REPORT_METRICS.find((m) => m.key === evolutionMetric)?.label} · {reportData.selected.length} {reportData.selected.length === 1 ? "partido" : "partidos"} · línea punteada = promedio personal
-          </p>
+        </>
+      )}
+
+      {view === "matches" && (
+        <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
+          <div className="flex items-center justify-between border-b border-zinc-800 p-4"><div><h3 className="font-bold text-white">Partidos disponibles</h3><p className="text-xs text-zinc-500">Seleccioná uno o varios para analizar y generar el informe.</p></div><CalendarDays size={18} className="text-emerald-400" /></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-xs"><thead className="bg-zinc-950/60 text-zinc-500"><tr><th className="p-3"></th><th className="p-3 text-left">Partido</th><th className="p-3 text-right">Min</th>{REPORT_METRICS.map((metric) => <th key={metric.key} className="p-3 text-right">{metric.label}</th>)}</tr></thead><tbody>{matchOptions.map((option, index) => { const checked = selectedMatchIds.includes(option.match.id); return <tr key={option.match.id} onClick={() => toggleMatch(option.match.id)} className={`cursor-pointer border-t border-zinc-800/70 ${checked ? "bg-emerald-500/10" : "hover:bg-zinc-800/40"}`}><td className="p-3 text-center"><input type="checkbox" checked={checked} onChange={() => toggleMatch(option.match.id)} onClick={(event) => event.stopPropagation()} className="h-4 w-4 accent-emerald-500" /></td><td className="p-3"><p className="font-bold text-white">vs {option.match.rival || "Rival"} {index === 0 && <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] text-emerald-300">ÚLTIMO</span>}</p><p className="text-[10px] text-zinc-500">{formatDate(option.match.date)} · {option.match.competition || ""}</p></td><td className="p-3 text-right font-bold text-zinc-200">{option.minutesPlayed ?? "—"}</td>{REPORT_METRICS.map((metric) => <td key={metric.key} className="p-3 text-right tabular-nums text-zinc-300">{fmtMetric(option.gpsRow[metric.key], metric.decimals)}</td>)}</tr>; })}</tbody></table></div>
         </div>
       )}
 
-      {/* Per-match blocks (puntual view) */}
-      {reportData && reportData.selected.length > 0 && (
-        <div className="space-y-4">
-          <h3 className="text-sm font-bold text-white">Análisis puntual por partido</h3>
-          {reportData.selected.map((matchData) => (
-            <MatchBlockCard key={matchData.match.id} matchData={matchData} />
-          ))}
+      {view === "evolution" && reportData && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="mb-4 flex items-center gap-2"><TrendingUp size={17} className="text-emerald-400" /><div><h3 className="font-bold text-white">Evolución reciente</h3><p className="text-xs text-zinc-500">Tendencia de los partidos seleccionados y línea de base personal.</p></div></div>
+          <div className="mb-5 flex flex-wrap gap-1.5">{REPORT_METRICS.map((metric) => <button key={metric.key} onClick={() => setEvolutionMetric(metric.key)} className={`rounded-lg px-2.5 py-1 text-[11px] font-semibold ${evolutionMetric === metric.key ? "bg-emerald-600 text-white" : "bg-zinc-800 text-zinc-300"}`}>{metric.label}</button>)}</div>
+          <ResponsiveContainer width="100%" height={340}><LineChart data={buildEvolutionData(reportData, evolutionMetric)} margin={{ left: 0, right: 18, top: 10, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} /><XAxis dataKey="shortDate" tick={{ fill: "#a1a1aa", fontSize: 11 }} /><YAxis tick={{ fill: "#a1a1aa", fontSize: 11 }} width={55} /><Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 10 }} /><ReferenceLine y={baseline[evolutionMetric]} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "Base 3 previos", fill: "#7dd3fc", fontSize: 10 }} /><Line type="monotone" dataKey={evolutionMetric} stroke="#22c55e" strokeWidth={3} dot={{ r: 4, fill: "#22c55e" }} /></LineChart></ResponsiveContainer>
         </div>
       )}
 
-      {/* Report preview modal */}
+      {view === "comparison" && latest && (
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
+          <div className="mb-4 flex items-center gap-2"><Sparkles size={17} className="text-emerald-400" /><div><h3 className="font-bold text-white">Comparación contextual</h3><p className="text-xs text-zinc-500">Cambio reciente, tendencia personal y perfil competitivo. Los colores indican posición relativa, no “bueno” o “malo”.</p></div></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[760px] text-xs"><thead><tr className="border-b border-zinc-800 text-zinc-500"><th className="py-3 text-left">Métrica</th><th className="py-3 text-right">Último</th><th className="py-3 text-right">Anterior</th><th className="py-3 text-right">Cambio reciente</th><th className="py-3 text-right">Base 3 previos</th><th className="py-3 text-right">Perfil competitivo</th></tr></thead><tbody>{REPORT_METRICS.map((metric) => { const recentPct = pctVs(latest.gpsRow[metric.key], previous?.gpsRow?.[metric.key]); const profile = competitionProfile?.[metric.profile]; return <tr key={metric.key} className="border-b border-zinc-800/70"><td className="py-3 font-semibold text-zinc-200">{metric.label} <span className="text-[10px] font-normal text-zinc-600">{metric.unit}</span></td><td className="py-3 text-right font-black text-white">{fmtMetric(latest.gpsRow[metric.key], metric.decimals)}</td><td className="py-3 text-right text-zinc-400">{fmtMetric(previous?.gpsRow?.[metric.key], metric.decimals)}</td><td className={`py-3 text-right font-bold ${deltaTone(recentPct)}`}>{recentPct == null ? "—" : `${recentPct > 0 ? "+" : ""}${recentPct}%`}</td><td className="py-3 text-right text-sky-300">{fmtMetric(baseline[metric.key], metric.decimals)}</td><td className="py-3 text-right text-zinc-400">{fmtMetric(profile, metric.decimals)}</td></tr>; })}</tbody></table></div>
+          <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-950/50 p-3 text-xs text-zinc-400">Contexto del último partido: <strong className="text-white">{latest.minutesPlayed ?? latest.gpsRow.duration_minutes ?? "—"} minutos</strong>. Las métricas de volumen deben leerse junto con esa exposición.</div>
+        </div>
+      )}
+
       {showPreview && reportData && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl w-full max-w-4xl max-h-[92vh] overflow-y-auto">
-            <div className="flex items-center justify-between p-4 border-b border-zinc-800 sticky top-0 bg-zinc-900 z-20">
-              <h2 className="text-base font-bold text-white">Vista previa del reporte</h2>
-              <div className="flex items-center gap-2">
-                <button onClick={handleSaveDraft} disabled={saving} className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />} Guardar borrador
-                </button>
-                <button onClick={handleDownloadPdf} disabled={exporting} className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-200 text-xs font-semibold flex items-center gap-1.5 disabled:opacity-50">
-                  {exporting ? <Loader2 size={13} className="animate-spin" /> : <Download size={13} />} PDF
-                </button>
-                <button onClick={handlePublish} disabled={saving} className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold flex items-center gap-1.5 disabled:opacity-50">
-                  {saving ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Publicar
-                </button>
-                <button onClick={() => setShowPreview(false)} className="p-1.5 rounded-lg hover:bg-zinc-800 text-zinc-400"><X size={18} /></button>
-              </div>
-            </div>
-            {savedReportId && (
-              <div className="mx-4 mt-3 flex items-center gap-2 p-2.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs">
-                Reporte guardado. El jugador lo verá en su portal cuando esté publicado.
-              </div>
-            )}
-            <div className="p-4">
-              <MatchReportPreview reportData={reportData} staffComment={staffComment} onCommentChange={setStaffComment} />
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm">
+          <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950">
+            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur"><div><h2 className="font-bold text-white">Informe profesional individual</h2><p className="text-xs text-zinc-500">La vista, el PDF y el portal comparten los mismos datos.</p></div><div className="flex flex-wrap items-center gap-2"><button onClick={saveDraft} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "save" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar</button><button onClick={downloadPdf} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "pdf" ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF</button><button onClick={publish} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white">{busy === "publish" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Publicar</button><button onClick={() => setShowPreview(false)} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800"><X size={18} /></button></div></div>
+            {message && <div className={`mx-4 mt-4 rounded-xl border p-3 text-xs ${message.includes("No se") ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"}`}>{message}</div>}
+            <div className="p-4"><MatchReportPreview reportData={reportData} staffComment={staffComment} onCommentChange={setStaffComment} /></div>
           </div>
         </div>
       )}
