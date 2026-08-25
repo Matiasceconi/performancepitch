@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, BarChart3, CalendarDays, Download, FileText, Gauge, Loader2, Save, Send, Sparkles, TrendingUp, X } from "lucide-react";
+import { Activity, BarChart3, CalendarDays, Download, FileSpreadsheet, FileText, Gauge, Loader2, Save, Send, Sparkles, TrendingUp, X } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
+import MatchReportConfigPanel from "@/components/matchReports/MatchReportConfigPanel";
 import {
+  DEFAULT_MATCH_REPORT_CONFIG,
   REPORT_METRICS,
   buildAnalysisFromOptions,
   buildCompetitionProfileFromOptions,
@@ -15,6 +17,8 @@ import {
   pctVs,
 } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
+import { exportMatchReportExcel } from "@/lib/reports/matchReportExcel";
+import { getShieldForName } from "@/lib/clubShields";
 
 const RANGE_OPTIONS = [
   ["last1", "Último"],
@@ -71,6 +75,7 @@ export default function GpsPlayerMatchAnalysis({
   const [evolutionMetric, setEvolutionMetric] = useState("m_min");
   const [showPreview, setShowPreview] = useState(false);
   const [staffComment, setStaffComment] = useState("");
+  const [reportConfig, setReportConfig] = useState(DEFAULT_MATCH_REPORT_CONFIG);
   const [savedReportId, setSavedReportId] = useState(null);
   const [busy, setBusy] = useState("");
   const [message, setMessage] = useState("");
@@ -125,7 +130,7 @@ export default function GpsPlayerMatchAnalysis({
   }
 
   function payload() {
-    const snapshot = buildReportSnapshot(reportData);
+    const snapshot = buildReportSnapshot(reportData, reportConfig);
     return {
       title: title(),
       player_id: player.id,
@@ -189,7 +194,16 @@ export default function GpsPlayerMatchAnalysis({
   async function downloadPdf() {
     setBusy("pdf");
     try {
-      await exportMatchReportPdf({ reportData, reportMeta: { title: title() }, staffComment });
+      await exportMatchReportPdf({ reportData, reportMeta: { title: title(), squadName }, staffComment, reportConfig });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  function downloadExcel() {
+    setBusy("excel");
+    try {
+      exportMatchReportExcel({ reportData, reportMeta: { title: title(), squadName }, staffComment, reportConfig });
     } finally {
       setBusy("");
     }
@@ -233,7 +247,7 @@ export default function GpsPlayerMatchAnalysis({
             <div className="grid gap-5 p-5 lg:grid-cols-[1.1fr_2fr]">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.16em] text-emerald-400">Último partido de la selección</p>
-                <h3 className="mt-2 text-3xl font-black text-white">vs {latest.match.rival || "Rival"}</h3>
+                <div className="mt-2 flex items-center gap-3">{(latest.match.rival_logo_url || getShieldForName(latest.match.rival)) && <img src={latest.match.rival_logo_url || getShieldForName(latest.match.rival)} alt="" className="h-14 w-14 object-contain" />}<h3 className="text-3xl font-black text-white">vs {latest.match.rival || "Rival"}</h3></div>
                 <p className="mt-1 text-sm text-zinc-400">{formatDate(latest.match.date)} · {latest.match.competition || "Competencia"}</p>
                 <div className="mt-5 flex items-end gap-6">
                   <div><p className="text-xs text-zinc-500">Resultado</p><p className="text-2xl font-black text-white">{latest.match.our_score ?? "—"} - {latest.match.rival_score ?? "—"}</p></div>
@@ -262,7 +276,7 @@ export default function GpsPlayerMatchAnalysis({
       {view === "matches" && (
         <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900">
           <div className="flex items-center justify-between border-b border-zinc-800 p-4"><div><h3 className="font-bold text-white">Partidos disponibles</h3><p className="text-xs text-zinc-500">Seleccioná uno o varios para analizar y generar el informe.</p></div><CalendarDays size={18} className="text-emerald-400" /></div>
-          <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-xs"><thead className="bg-zinc-950/60 text-zinc-500"><tr><th className="p-3"></th><th className="p-3 text-left">Partido</th><th className="p-3 text-right">Min</th>{REPORT_METRICS.map((metric) => <th key={metric.key} className="p-3 text-right">{metric.label}</th>)}</tr></thead><tbody>{matchOptions.map((option, index) => { const checked = selectedMatchIds.includes(option.match.id); return <tr key={option.match.id} onClick={() => toggleMatch(option.match.id)} className={`cursor-pointer border-t border-zinc-800/70 ${checked ? "bg-emerald-500/10" : "hover:bg-zinc-800/40"}`}><td className="p-3 text-center"><input type="checkbox" checked={checked} onChange={() => toggleMatch(option.match.id)} onClick={(event) => event.stopPropagation()} className="h-4 w-4 accent-emerald-500" /></td><td className="p-3"><p className="font-bold text-white">vs {option.match.rival || "Rival"} {index === 0 && <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] text-emerald-300">ÚLTIMO</span>}</p><p className="text-[10px] text-zinc-500">{formatDate(option.match.date)} · {option.match.competition || ""}</p></td><td className="p-3 text-right font-bold text-zinc-200">{option.minutesPlayed ?? "—"}</td>{REPORT_METRICS.map((metric) => <td key={metric.key} className="p-3 text-right tabular-nums text-zinc-300">{fmtMetric(option.gpsRow[metric.key], metric.decimals)}</td>)}</tr>; })}</tbody></table></div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[920px] text-xs"><thead className="bg-zinc-950/60 text-zinc-500"><tr><th className="p-3"></th><th className="p-3 text-left">Partido</th><th className="p-3 text-right">Min</th>{REPORT_METRICS.map((metric) => <th key={metric.key} className="p-3 text-right">{metric.label}</th>)}</tr></thead><tbody>{matchOptions.map((option, index) => { const checked = selectedMatchIds.includes(option.match.id); return <tr key={option.match.id} onClick={() => toggleMatch(option.match.id)} className={`cursor-pointer border-t border-zinc-800/70 ${checked ? "bg-emerald-500/10" : "hover:bg-zinc-800/40"}`}><td className="p-3 text-center"><input type="checkbox" checked={checked} onChange={() => toggleMatch(option.match.id)} onClick={(event) => event.stopPropagation()} className="h-4 w-4 accent-emerald-500" /></td><td className="p-3"><div className="flex items-center gap-2">{(option.match.rival_logo_url || getShieldForName(option.match.rival)) && <img src={option.match.rival_logo_url || getShieldForName(option.match.rival)} alt="" className="h-8 w-8 shrink-0 object-contain" />}<div><p className="font-bold text-white">vs {option.match.rival || "Rival"} {index === 0 && <span className="ml-2 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[9px] text-emerald-300">ÚLTIMO</span>}</p><p className="text-[10px] text-zinc-500">{formatDate(option.match.date)} · {option.match.competition || ""}</p></div></div></td><td className="p-3 text-right font-bold text-zinc-200">{option.minutesPlayed ?? "—"}</td>{REPORT_METRICS.map((metric) => <td key={metric.key} className="p-3 text-right tabular-nums text-zinc-300">{fmtMetric(option.gpsRow[metric.key], metric.decimals)}</td>)}</tr>; })}</tbody></table></div>
         </div>
       )}
 
@@ -285,9 +299,9 @@ export default function GpsPlayerMatchAnalysis({
       {showPreview && reportData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-3 backdrop-blur-sm">
           <div className="max-h-[94vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-zinc-800 bg-zinc-950">
-            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur"><div><h2 className="font-bold text-white">Informe profesional individual</h2><p className="text-xs text-zinc-500">La vista, el PDF y el portal comparten los mismos datos.</p></div><div className="flex flex-wrap items-center gap-2"><button onClick={saveDraft} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "save" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar</button><button onClick={downloadPdf} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "pdf" ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF</button><button onClick={publish} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white">{busy === "publish" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Publicar</button><button onClick={() => setShowPreview(false)} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800"><X size={18} /></button></div></div>
+            <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur"><div><h2 className="font-bold text-white">Informe profesional individual</h2><p className="text-xs text-zinc-500">La vista, el PDF y el portal comparten los mismos datos.</p></div><div className="flex flex-wrap items-center gap-2"><button onClick={saveDraft} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "save" ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Guardar</button><button onClick={downloadPdf} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "pdf" ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF</button><button onClick={downloadExcel} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === "excel" ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Excel</button><button onClick={publish} disabled={!!busy} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-black text-white">{busy === "publish" ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Publicar</button><button onClick={() => setShowPreview(false)} className="rounded-lg p-2 text-zinc-400 hover:bg-zinc-800"><X size={18} /></button></div></div>
             {message && <div className={`mx-4 mt-4 rounded-xl border p-3 text-xs ${message.includes("No se") ? "border-red-500/30 bg-red-500/10 text-red-300" : "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"}`}>{message}</div>}
-            <div className="p-4"><MatchReportPreview reportData={reportData} staffComment={staffComment} onCommentChange={setStaffComment} /></div>
+            <div className="space-y-4 p-4"><MatchReportConfigPanel value={reportConfig} onChange={setReportConfig} /><MatchReportPreview reportData={reportData} staffComment={staffComment} onCommentChange={setStaffComment} reportConfig={reportConfig} /></div>
           </div>
         </div>
       )}
