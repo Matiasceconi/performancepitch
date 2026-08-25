@@ -16,6 +16,19 @@ export const REPORT_METRICS = [
 
 export const KPI_KEYS = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
 
+export const DEFAULT_MATCH_REPORT_CONFIG = {
+  showKpis: true,
+  showMinutesEvolution: true,
+  showProfileComparison: true,
+  showMatchDetails: true,
+  showZoneCharts: true,
+  evolutionMetric: "m_min",
+};
+
+export function normalizeMatchReportConfig(config = {}) {
+  return { ...DEFAULT_MATCH_REPORT_CONFIG, ...(config || {}) };
+}
+
 const avg = (vals) => {
   const nums = vals.filter((v) => Number.isFinite(Number(v))).map(Number);
   return nums.length ? nums.reduce((s, v) => s + v, 0) / nums.length : 0;
@@ -417,7 +430,7 @@ function snapshotClone(value) {
 
 // Congela exactamente lo que vio el staff al guardar/publicar. El portal y el PDF
 // consumen esta misma estructura para evitar que un informe histórico cambie.
-export function buildReportSnapshot(reportData) {
+export function buildReportSnapshot(reportData, reportConfig = DEFAULT_MATCH_REPORT_CONFIG) {
   const selected = (reportData?.selected || []).map((item) => ({
     match: snapshotClone(item.match),
     gpsRow: snapshotClone(withPlMin(item.gpsRow || {})),
@@ -425,8 +438,9 @@ export function buildReportSnapshot(reportData) {
     hasGps: item.hasGps !== false,
   }));
   return {
-    version: 2,
+    version: 3,
     generated_at: new Date().toISOString(),
+    reportConfig: snapshotClone(normalizeMatchReportConfig(reportConfig)),
     player: snapshotClone(reportData?.player),
     competitionProfile: snapshotClone(reportData?.competitionProfile),
     selected,
@@ -450,6 +464,7 @@ export function reportDataFromSnapshot(snapshot, fallbackPlayer = null) {
   return {
     player: snapshot.player || fallbackPlayer,
     competitionProfile: snapshot.competitionProfile || null,
+    reportConfig: normalizeMatchReportConfig(snapshot.reportConfig),
     selected,
     personalAvg: snapshot.personalAvg || averageRows(rows),
     lastFiveAvg: snapshot.lastFiveAvg || averageRows(rows.slice(Math.max(0, rows.length - 4), -1)),
