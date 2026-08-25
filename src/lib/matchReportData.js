@@ -455,7 +455,7 @@ export function buildReportSnapshot(reportData, reportConfig = DEFAULT_MATCH_REP
     hasGps: item.hasGps !== false,
   }));
   return {
-    version: 3,
+    version: 4,
     generated_at: new Date().toISOString(),
     reportConfig: snapshotClone(normalizeMatchReportConfig(reportConfig)),
     player: snapshotClone(reportData?.player),
