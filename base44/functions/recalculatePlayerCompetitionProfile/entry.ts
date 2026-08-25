@@ -44,8 +44,12 @@ Deno.serve(async (req) => {
     let profilesUpdated = 0;
 
     for (const playerId of playerIds) {
-      const rows = await base44.asServiceRole.entities.CatapultReport.filter({ player_id: playerId }, '-date', 500);
-      const matchRows = rows.filter((r) => matchIds.has(r.session_id) && (r.total_duration || 0) >= 80);
+      const [rows, minuteRows] = await Promise.all([
+        base44.asServiceRole.entities.CatapultReport.filter({ player_id: playerId }, '-date', 500),
+        base44.asServiceRole.entities.MatchPlayerMinutes.filter({ player_id: playerId }, '-match_date', 500),
+      ]);
+      const eligibleMatchIds = new Set(minuteRows.filter((row) => Number(row.minutes_played) > 80 && matchIds.has(row.match_id)).map((row) => row.match_id));
+      const matchRows = rows.filter((row) => eligibleMatchIds.has(row.session_id));
 
       if (matchRows.length === 0) continue;
 
@@ -54,7 +58,7 @@ Deno.serve(async (req) => {
 
       await upsert(base44, 'PlayerCompetitionProfile', { player_id: playerId }, {
         squad_id: latestSquadId,
-        matches_used: matchRows.length,
+        matches_used: eligibleMatchIds.size,
         avg_total_distance: avgOf(matchRows, 'total_distance'),
         avg_m_min: avgOf(matchRows, 'meters_per_minute'),
         avg_distance_19_8: avgOf(matchRows, 'distance_hsr'),
