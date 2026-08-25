@@ -35,7 +35,12 @@ export function exportMatchReportExcel({ reportData, reportMeta, staffComment, r
   const profile = reportData?.competitionProfile || null;
   const profileMatches = Number(profile?.matches_used || 0);
   const hasProfile = profileMatches > 0;
-  const evolutionMetric = REPORT_METRICS.find((item) => item.key === config.evolutionMetric) || REPORT_METRICS[1];
+  const evolutionCharts = (config.evolutionCharts || []).map((chart) => ({
+    ...chart,
+    definition: chart.metric === "minutes"
+      ? { key: "minutes", label: "Minutos jugados", unit: "min" }
+      : REPORT_METRICS.find((item) => item.key === chart.metric),
+  })).filter((chart) => chart.definition);
   const player = reportData?.player || {};
   const rows = [
     ["INFORME INDIVIDUAL DE RENDIMIENTO"],
@@ -59,16 +64,15 @@ export function exportMatchReportExcel({ reportData, reportMeta, staffComment, r
   }
 
   if (config.showMinutesEvolution) {
-    addSection(rows, `EVOLUCIÓN DE MINUTOS Y ${evolutionMetric.label.toUpperCase()}`);
-    rows.push(["Fecha", "Rival", "Minutos", evolutionMetric.label, evolutionMetric.unit, "Escudo rival"]);
+    addSection(rows, "EVOLUCIÓN DE CARGA Y RENDIMIENTO");
+    rows.push(["Fecha", "Rival", "Escudo rival", ...evolutionCharts.map((chart) => `${chart.definition.label} (${chart.definition.unit})`)]);
     selected.forEach((item) => rows.push([
       dateLabel(item.match?.date),
       item.match?.rival || "Rival",
-      numeric(item.minutesPlayed ?? item.gpsRow?.duration_minutes),
-      numeric(item.gpsRow?.[evolutionMetric.key]),
-      evolutionMetric.unit,
       item.match?.rival_logo_url || getShieldForName(item.match?.rival),
+      ...evolutionCharts.map((chart) => numeric(chart.metric === "minutes" ? (item.minutesPlayed ?? item.gpsRow?.duration_minutes) : item.gpsRow?.[chart.metric])),
     ]));
+    rows.push(["Estilos", "", "", ...evolutionCharts.map((chart) => chart.style === "bar" ? "Barras" : chart.style === "area" ? "Área" : "Línea")]);
   }
 
   if (config.showProfileComparison && hasProfile && latest) {
@@ -87,7 +91,7 @@ export function exportMatchReportExcel({ reportData, reportMeta, staffComment, r
   rows.push(["Comparación perfil competitivo", config.showProfileComparison ? "Sí" : "No"]);
   rows.push(["Detalle de partidos", config.showMatchDetails ? "Sí" : "No"]);
   rows.push(["Gráficos de velocidad/intensidad", config.showZoneCharts ? "Sí" : "No"]);
-  rows.push(["Métrica de evolución", `${evolutionMetric.label} (${evolutionMetric.unit})`]);
+  evolutionCharts.forEach((chart, index) => rows.push([`Gráfico ${index + 1}`, chart.definition.label, "Estilo", chart.style === "bar" ? "Barras" : chart.style === "area" ? "Área" : "Línea"]));
 
   addSection(rows, "CONCLUSIÓN DEL ÁREA DE RENDIMIENTO");
   rows.push([staffComment || "Sin comentario adicional."]);
