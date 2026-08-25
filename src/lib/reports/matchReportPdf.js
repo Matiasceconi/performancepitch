@@ -138,57 +138,80 @@ function drawKpiSummary(doc, reportData, y) {
 function drawEvolution(doc, reportData, config, y) {
   const selected = reportData.selected || [];
   if (selected.length < 2) return y;
-  if (y + 65 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
-  const metric = REPORT_METRICS.find((item) => item.key === config.evolutionMetric) || REPORT_METRICS[1];
-  const profile = reportData.competitionProfile;
-  const profileValue = Number(profile?.[metric.profile] || 0);
-  const values = selected.map((item) => Number(item.gpsRow?.[metric.key] || 0));
-  const minutes = selected.map((item) => Number(item.minutesPlayed ?? item.gpsRow?.duration_minutes ?? 0));
-  const maxMetric = Math.max(...values, profileValue, 1);
-  const maxMinutes = Math.max(...minutes, 90, 1);
-  const chartX = MARGIN + 10;
-  const chartY = y + 11;
-  const chartW = PAGE_W - 2 * MARGIN - 20;
-  const chartH = 40;
-  const step = chartW / selected.length;
+  const charts = config.evolutionCharts || [];
+  const styleLabel = { line: "Línea", area: "Área", bar: "Barras" };
 
-  setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.text(`Evolución de minutos y ${metric.label}`, MARGIN, y);
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(7);
-  setColor(doc, "setTextColor", "#6b7280");
-  doc.text(`Barras: minutos · línea verde: ${metric.label} (${metric.unit}) · referencia celeste: perfil competitivo`, MARGIN, y + 5);
+  charts.forEach((chart) => {
+    if (y + 76 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
+    const metric = chart.metric === "minutes"
+      ? { key: "minutes", label: "Minutos jugados", unit: "min", decimals: 0, color: "#6b7280" }
+      : REPORT_METRICS.find((item) => item.key === chart.metric) || REPORT_METRICS[1];
+    const values = selected.map((item) => Number(metric.key === "minutes" ? (item.minutesPlayed ?? item.gpsRow?.duration_minutes ?? 0) : (item.gpsRow?.[metric.key] || 0)));
+    const profileValue = metric.profile ? Number(reportData.competitionProfile?.[metric.profile] || 0) : 0;
+    const maxValue = Math.max(...values, profileValue, 1);
+    const chartX = MARGIN + 8;
+    const chartY = y + 10;
+    const chartW = PAGE_W - 2 * MARGIN - 16;
+    const chartH = 36;
+    const step = chartW / selected.length;
+    const points = [];
 
-  doc.setDrawColor(216, 222, 210);
-  doc.rect(chartX, chartY, chartW, chartH);
-  if (profileValue > 0) {
-    const py = chartY + chartH - (profileValue / maxMetric) * chartH;
-    doc.setDrawColor(56, 189, 248);
-    doc.setLineDashPattern([2, 2], 0);
-    doc.line(chartX, py, chartX + chartW, py);
-    doc.setLineDashPattern([], 0);
-  }
-
-  const points = [];
-  selected.forEach((item, index) => {
-    const centerX = chartX + step * index + step / 2;
-    const barH = (minutes[index] / maxMinutes) * chartH;
-    doc.setFillColor(82, 82, 91);
-    doc.rect(centerX - Math.min(5, step * 0.25), chartY + chartH - barH, Math.min(10, step * 0.5), barH, "F");
-    const pointY = chartY + chartH - (values[index] / maxMetric) * chartH;
-    points.push([centerX, pointY]);
-    doc.setFontSize(6);
+    setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(`Evolución · ${metric.label}`, MARGIN, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(7);
     setColor(doc, "setTextColor", "#6b7280");
-    const label = item.match?.date ? new Date(item.match.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : String(index + 1);
-    doc.text(label, centerX, chartY + chartH + 4, { align: "center" });
+    doc.text(`${styleLabel[chart.style] || "Línea"} · ${metric.unit}${profileValue > 0 ? " · referencia celeste: perfil competitivo" : ""}`, MARGIN, y + 5);
+
+    doc.setDrawColor(216, 222, 210);
+    doc.rect(chartX, chartY, chartW, chartH);
+    if (profileValue > 0) {
+      const py = chartY + chartH - (profileValue / maxValue) * chartH;
+      doc.setDrawColor(56, 189, 248);
+      doc.setLineDashPattern([2, 2], 0);
+      doc.line(chartX, py, chartX + chartW, py);
+      doc.setLineDashPattern([], 0);
+    }
+
+    selected.forEach((item, index) => {
+      const centerX = chartX + step * index + step / 2;
+      const pointY = chartY + chartH - (values[index] / maxValue) * chartH;
+      points.push([centerX, pointY]);
+      if (chart.style === "bar") {
+        const barH = chartY + chartH - pointY;
+        doc.setFillColor(0, 132, 61);
+        doc.rect(centerX - Math.min(5, step * 0.25), pointY, Math.min(10, step * 0.5), barH, "F");
+      }
+      const shield = item.match?.rival_logo_url || getShieldForName(item.match?.rival);
+      if (shield) {
+        try { doc.addImage(shield, "PNG", centerX - 3.5, chartY + chartH + 2, 7, 7, undefined, "FAST"); } catch {}
+      }
+      doc.setFontSize(5.5);
+      setColor(doc, "setTextColor", "#6b7280");
+      const date = item.match?.date ? new Date(item.match.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : String(index + 1);
+      doc.text(date, centerX, chartY + chartH + 12, { align: "center" });
+      doc.text(String(item.match?.rival || "Rival").slice(0, 11), centerX, chartY + chartH + 15, { align: "center" });
+    });
+
+    if (chart.style === "area") {
+      doc.setFillColor(209, 240, 220);
+      for (let index = 1; index < points.length; index += 1) {
+        const [x1, y1] = points[index - 1];
+        const [x2, y2] = points[index];
+        doc.lines([[x2 - x1, y2 - y1], [0, chartY + chartH - y2], [x1 - x2, 0]], x1, y1, [1, 1], "F", true);
+      }
+    }
+    if (chart.style !== "bar") {
+      doc.setDrawColor(0, 132, 61);
+      doc.setLineWidth(0.8);
+      for (let index = 1; index < points.length; index += 1) doc.line(points[index - 1][0], points[index - 1][1], points[index][0], points[index][1]);
+      points.forEach(([x, pointY]) => { doc.setFillColor(0, 132, 61); doc.circle(x, pointY, 1.3, "F"); });
+    }
+    y = chartY + chartH + 21;
   });
-  doc.setDrawColor(0, 132, 61);
-  doc.setLineWidth(0.8);
-  for (let index = 1; index < points.length; index += 1) doc.line(points[index - 1][0], points[index - 1][1], points[index][0], points[index][1]);
-  points.forEach(([x, pointY]) => { doc.setFillColor(0, 132, 61); doc.circle(x, pointY, 1.4, "F"); });
-  return chartY + chartH + 10;
+  return y;
 }
 
 function drawProfileComparison(doc, reportData, y) {
