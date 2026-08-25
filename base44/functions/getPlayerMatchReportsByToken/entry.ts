@@ -26,7 +26,7 @@ export default async function(req) {
     for (const report of reports) {
       const matchIds = report.match_ids || [];
       const matches = [];
-      for (const matchId of matchIds) {
+      for (const matchId of (report.report_snapshot?.selected?.length ? [] : matchIds)) {
         const match = await base44.asServiceRole.entities.MatchReport.get(matchId).catch(() => null);
         if (!match) continue;
         const gpsRows = await base44.asServiceRole.entities.CatapultReport.filter(
@@ -56,6 +56,10 @@ export default async function(req) {
         match_dates: report.match_dates || [],
         match_ids: report.match_ids || [],
         published_at: report.published_at,
+        published_by: report.published_by || '',
+        report_snapshot: report.report_snapshot || null,
+        report_version: report.report_version || 1,
+        match_ids: report.match_ids || [],
         matches,
       });
     }
