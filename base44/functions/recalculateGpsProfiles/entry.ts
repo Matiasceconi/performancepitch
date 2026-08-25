@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       const competitionRows = matchGpsRows.filter((r) => r.player_id === playerId && eligibleMatchIds.has(r.session_id));
       if (competitionRows.length) {
         await upsert(base44, 'PlayerCompetitionProfile', { player_id: playerId, squad_id: squadId, season_id: seasonId }, {
-          matches_used: eligibleMatchIds.size,
+          matches_used: new Set(competitionRows.map((row) => row.session_id)).size,
           avg_total_distance: avgOf(competitionRows, 'total_distance'),
           avg_m_min: avgOf(competitionRows, 'meters_per_minute'),
           avg_distance_14_19_8: avgOf(competitionRows, 'distance_14_19_8'),
