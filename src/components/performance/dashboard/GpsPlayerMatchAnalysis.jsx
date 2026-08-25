@@ -209,8 +209,8 @@ export default function GpsPlayerMatchAnalysis({
             <p className="mt-1 text-sm text-zinc-400">{[player.position, squadName, player.jersey_number && `#${player.jersey_number}`, age != null && `${age} años`].filter(Boolean).join(" · ")}</p>
             <div className="mt-2 flex flex-wrap gap-2 text-[11px] text-zinc-500">
               <span>{matchOptions.length} partidos con GPS</span><span>·</span>
-              <span>{selectedMatchIds.length} seleccionados</span><span>·</span>
-              {hasProfile && <span>Perfil competitivo: {profileMatches} {profileMatches === 1 ? "partido" : "partidos"} de más de 80'</span>}
+              <span>{selectedMatchIds.length} seleccionados</span>
+              {hasProfile && <><span>·</span><span>Perfil competitivo: {profileMatches} {profileMatches === 1 ? "partido" : "partidos"} de más de 80'</span></>}
             </div>
           </div>
           <button onClick={() => { setShowPreview(true); setMessage(""); }} disabled={!reportData} className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 py-3 text-sm font-black text-white hover:bg-emerald-500 disabled:opacity-40">
