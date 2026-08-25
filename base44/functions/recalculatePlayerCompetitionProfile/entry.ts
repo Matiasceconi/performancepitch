@@ -54,10 +54,11 @@ Deno.serve(async (req) => {
       if (matchRows.length === 0) continue;
 
       const sortedByDate = [...matchRows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-      const latestSquadId = matchMap[sortedByDate[0]?.session_id]?.squad_id || '';
+      const latestMatch = matchMap[sortedByDate[0]?.session_id] || {};
+      const latestSquadId = latestMatch.squad_id || '';
+      const latestSeasonId = latestMatch.season_id || '';
 
-      await upsert(base44, 'PlayerCompetitionProfile', { player_id: playerId }, {
-        squad_id: latestSquadId,
+      await upsert(base44, 'PlayerCompetitionProfile', { player_id: playerId, squad_id: latestSquadId, season_id: latestSeasonId }, {
         matches_used: new Set(matchRows.map((row) => row.session_id)).size,
         avg_total_distance: avgOf(matchRows, 'total_distance'),
         avg_m_min: avgOf(matchRows, 'meters_per_minute'),
