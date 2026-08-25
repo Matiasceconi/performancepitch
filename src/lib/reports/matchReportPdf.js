@@ -191,6 +191,40 @@ function drawEvolution(doc, reportData, config, y) {
   return chartY + chartH + 10;
 }
 
+function drawProfileComparison(doc, reportData, y) {
+  const latest = reportData.selected?.[reportData.selected.length - 1];
+  const profile = reportData.competitionProfile;
+  if (!latest || Number(profile?.matches_used || 0) < 1) return y;
+  if (y + 38 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
+  const keys = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
+  setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(10);
+  doc.text("Último partido vs perfil competitivo", MARGIN, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  setColor(doc, "setTextColor", "#6b7280");
+  doc.text(`Perfil calculado con ${profile.matches_used} partidos de más de 80 minutos.`, MARGIN, y + 5);
+  y += 10;
+  const cellW = (PAGE_W - 2 * MARGIN - 5) / 3;
+  keys.forEach((key, index) => {
+    const metric = REPORT_METRICS.find((item) => item.key === key);
+    const delta = pctVs(latest.gpsRow?.[key], profile?.[metric.profile]);
+    const x = MARGIN + (index % 3) * (cellW + 2.5);
+    const rowY = y + Math.floor(index / 3) * 11;
+    doc.setFillColor(246, 247, 243);
+    doc.roundedRect(x, rowY, cellW, 9, 1.5, 1.5, "F");
+    setColor(doc, "setTextColor", "#6b7280");
+    doc.setFontSize(6.5);
+    doc.text(metric.label, x + 2, rowY + 3.5);
+    doc.setFont("helvetica", "bold");
+    setColor(doc, "setTextColor", delta == null ? "#6b7280" : delta >= 0 ? "#00843D" : "#b45309");
+    doc.text(delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`, x + cellW - 2, rowY + 6.5, { align: "right" });
+    doc.setFont("helvetica", "normal");
+  });
+  return y + 25;
+}
+
 function drawMatchBlock(doc, matchData, zonePng, y, contentW, showZoneChart = true) {
   const { match, gpsRow, minutesPlayed } = matchData;
   const blockH = 68;
@@ -318,6 +352,7 @@ export async function exportMatchReportPdf({ reportData, reportMeta, staffCommen
     y += 3;
   }
   if (config.showMinutesEvolution) y = drawEvolution(doc, reportData, config, y);
+  if (config.showProfileComparison) y = drawProfileComparison(doc, reportData, y);
 
   const contentW = PAGE_W - 2 * MARGIN;
   const zonePngs = config.showMatchDetails && config.showZoneCharts
