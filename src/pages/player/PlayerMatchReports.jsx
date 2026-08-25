@@ -54,7 +54,7 @@ export default function PlayerMatchReports() {
     setExporting(true);
     try {
       const reportData = adaptReportData(report, data?.player);
-      await exportMatchReportPdf({ reportData, reportMeta: { title: report.title }, staffComment: report.staff_comment });
+      await exportMatchReportPdf({ reportData, reportMeta: { title: report.title }, staffComment: report.staff_comment, reportConfig: reportData.reportConfig });
     } catch (e) {
       console.error(e);
     } finally {
