@@ -1,8 +1,16 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { isGoalkeeper } from "@/components/squad/squadConstants";
 import GpsPlayerMatchSidebar from "./GpsPlayerMatchSidebar";
 import GpsPlayerMatchAnalysis from "./GpsPlayerMatchAnalysis";
 import GpsPlayerMatchReports from "./GpsPlayerMatchReports";
+
+const SECTIONS = [
+  ["summary", "Resumen"],
+  ["matches", "Partidos"],
+  ["evolution", "Evolución"],
+  ["comparison", "Comparación"],
+  ["reports", "Reportes"],
+];
 
 export default function GpsIndividualPlayerTab({
   players,
@@ -14,58 +22,51 @@ export default function GpsIndividualPlayerTab({
   seasonId,
 }) {
   const [selectedPlayerId, setSelectedPlayerId] = useState("");
-  const [subtab, setSubtab] = useState("analysis");
+  const [section, setSection] = useState("summary");
+  const availablePlayers = useMemo(() => players.filter((player) => !isGoalkeeper(player)), [players]);
 
-  // Auto-select first player and reset when squad changes
   useEffect(() => {
-    const availablePlayers = players.filter((p) => !isGoalkeeper(p));
-    if (availablePlayers.length > 0 && !availablePlayers.some((p) => p.id === selectedPlayerId)) {
+    if (availablePlayers.length && !availablePlayers.some((player) => player.id === selectedPlayerId)) {
       setSelectedPlayerId(availablePlayers[0].id);
-    }
-    if (availablePlayers.length === 0) {
+    } else if (!availablePlayers.length) {
       setSelectedPlayerId("");
     }
-  }, [players, selectedPlayerId]);
+  }, [availablePlayers, selectedPlayerId]);
 
-  const selectedPlayer = useMemo(() => players.find((p) => p.id === selectedPlayerId), [players, selectedPlayerId]);
-  const competitionProfile = useMemo(() => competitionProfiles.find((p) => p.player_id === selectedPlayerId), [competitionProfiles, selectedPlayerId]);
+  const selectedPlayer = players.find((player) => player.id === selectedPlayerId);
+  const competitionProfile = competitionProfiles.find((profile) => profile.player_id === selectedPlayerId);
 
-  const availablePlayers = players.filter((p) => !isGoalkeeper(p));
-
-  if (availablePlayers.length === 0) {
-    return (
-      <div className="text-center py-16">
-        <p className="text-zinc-500 text-sm">No hay jugadores en el plantel activo.</p>
-      </div>
-    );
+  if (!availablePlayers.length) {
+    return <div className="py-16 text-center text-sm text-zinc-500">No hay jugadores en el plantel activo.</div>;
   }
 
   return (
-    <div className="flex gap-4">
+    <div className="flex flex-col xl:flex-row gap-4">
       <GpsPlayerMatchSidebar
         players={availablePlayers}
         selectedPlayerId={selectedPlayerId}
-        onSelectPlayer={setSelectedPlayerId}
+        onSelectPlayer={(id) => { setSelectedPlayerId(id); setSection("summary"); }}
       />
       <div className="flex-1 min-w-0 space-y-4">
-        {/* Subtabs */}
-        <div className="flex items-center gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit">
-          <button
-            onClick={() => setSubtab("analysis")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${subtab === "analysis" ? "bg-emerald-600 text-white" : "text-zinc-400 hover:text-white"}`}
-          >
-            Análisis
-          </button>
-          <button
-            onClick={() => setSubtab("reports")}
-            className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${subtab === "reports" ? "bg-emerald-600 text-white" : "text-zinc-400 hover:text-white"}`}
-          >
-            Reportes
-          </button>
+        <div className="overflow-x-auto">
+          <div className="flex min-w-max items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 p-1">
+            {SECTIONS.map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setSection(key)}
+                className={`px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${section === key ? "bg-emerald-600 text-white shadow-sm" : "text-zinc-400 hover:bg-zinc-800 hover:text-white"}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {subtab === "analysis" && selectedPlayer && (
+        {section === "reports" ? (
+          <GpsPlayerMatchReports playerId={selectedPlayer?.id} squadId={squadId} seasonId={seasonId} />
+        ) : selectedPlayer ? (
           <GpsPlayerMatchAnalysis
+            view={section}
             player={selectedPlayer}
             matchReports={matchReports}
             matchGpsByMatch={matchGpsByMatch}
@@ -74,15 +75,7 @@ export default function GpsIndividualPlayerTab({
             squadId={squadId}
             seasonId={seasonId}
           />
-        )}
-
-        {subtab === "reports" && selectedPlayer && (
-          <GpsPlayerMatchReports
-            playerId={selectedPlayer.id}
-            squadId={squadId}
-            seasonId={seasonId}
-          />
-        )}
+        ) : null}
       </div>
     </div>
   );
