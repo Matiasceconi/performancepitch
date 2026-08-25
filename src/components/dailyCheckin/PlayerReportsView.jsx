@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { ChevronLeft, FileText, Download, Eye, Loader2, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
-import { REPORT_METRICS, fmtMetric } from "@/lib/matchReportData";
+import { adaptPublishedReport } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
-import MatchBlockCard from "@/components/matchReports/MatchBlockCard";
+import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 
 const VIEWED_KEY = "pp_viewed_reports";
 
@@ -24,31 +24,7 @@ function markReportViewed(reportId) {
 }
 
 function adaptReportData(report, player) {
-  const selected = report.matches
-    .filter((m) => m.hasGps)
-    .map((m) => ({
-      match: m.match,
-      gpsRow: { ...m.gpsRow, pl_min: m.gpsRow?.player_load && m.gpsRow?.duration_minutes ? m.gpsRow.player_load / m.gpsRow.duration_minutes : null },
-      minutesPlayed: m.minutesPlayed,
-      hasGps: true,
-    }))
-    .sort((a, b) => (a.match.date || "").localeCompare(b.match.date || ""));
-
-  const personalAvg = {};
-  REPORT_METRICS.forEach((m) => {
-    personalAvg[m.key] = selected.length ? selected.reduce((s, s2) => s + Number(s2.gpsRow[m.key] || 0), 0) / selected.length : 0;
-  });
-
-  return {
-    player,
-    competitionProfile: null,
-    selected,
-    personalAvg,
-    historicalRows: selected.map((s) => s.gpsRow),
-    seasonBests: {},
-    smaxSorted: [...selected].sort((a, b) => Number(b.gpsRow.smax || 0) - Number(a.gpsRow.smax || 0)),
-    isMulti: selected.length > 1,
-  };
+  return adaptPublishedReport(report, player);
 }
 
 export default function PlayerReportsView({ token, onBack }) {
