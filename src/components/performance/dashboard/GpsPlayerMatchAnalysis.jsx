@@ -3,7 +3,6 @@ import { Activity, BarChart3, CalendarDays, Download, FileText, Gauge, Loader2, 
 import { CartesianGrid, Line, LineChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { base44 } from "@/api/base44Client";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
-import MatchBlockCard from "@/components/matchReports/MatchBlockCard";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 import {
   REPORT_METRICS,
