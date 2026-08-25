@@ -87,24 +87,8 @@ export default function PlayerReportsView({ token, onBack }) {
             {exporting ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF
           </button>
         </div>
-        <div className="p-4 space-y-4">
-          <div className="bg-gradient-to-r from-emerald-700 to-emerald-600 rounded-2xl p-4 text-white">
-            <p className="text-emerald-100 text-xs font-semibold uppercase">Informe individual de rendimiento</p>
-            <h2 className="text-xl font-black mt-0.5">{data?.player?.full_name}</h2>
-            <p className="text-emerald-100 text-sm">{[data?.player?.position, data?.player?.squad_name, data?.player?.division].filter(Boolean).join(" · ")}</p>
-            <p className="text-emerald-50 text-xs mt-1">{reportData.selected.length} {reportData.selected.length === 1 ? "partido" : "partidos"} analizado{reportData.selected.length === 1 ? "" : "s"}</p>
-          </div>
-
-          {reportData.selected.map((matchData) => (
-            <MatchBlockCard key={matchData.match.id} matchData={matchData} />
-          ))}
-
-          {viewing.staff_comment && (
-            <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-              <h3 className="text-xs font-bold text-white mb-1.5">Comentario del área de Rendimiento</h3>
-              <p className="text-sm text-zinc-300 leading-relaxed">{viewing.staff_comment}</p>
-            </div>
-          )}
+        <div className="p-4">
+          <MatchReportPreview reportData={reportData} staffComment={viewing.staff_comment} readOnly />
         </div>
       </div>
     );
