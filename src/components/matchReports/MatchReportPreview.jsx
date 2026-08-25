@@ -42,6 +42,7 @@ export default function MatchReportPreview({ reportData, staffComment = "", onCo
             <div className="mt-3 flex flex-wrap gap-2 text-xs text-emerald-50">
               <span className="rounded-full bg-white/10 px-2.5 py-1">{selected.length} {selected.length === 1 ? "partido" : "partidos"}</span>
               {latest && <span className="rounded-full bg-white/10 px-2.5 py-1">Último: vs {latest.match?.rival || "Rival"} · {dateLabel(latest.match?.date)}</span>}
+              {hasProfile && <span className="rounded-full bg-white/10 px-2.5 py-1">Perfil competitivo · {profileMatches} {profileMatches === 1 ? "partido" : "partidos"} &gt;80'</span>}
             </div>
           </div>
         </div>
@@ -57,7 +58,7 @@ export default function MatchReportPreview({ reportData, staffComment = "", onCo
             {KPI_KEYS.map((key) => {
               const metric = REPORT_METRICS.find((item) => item.key === key);
               const delta = pctVs(latest.gpsRow?.[key], profileValue(key));
-              return <div key={key} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"><p className="text-[10px] text-zinc-500">{metric.label}</p><p className="mt-1 text-lg font-black text-white">{fmtMetric(latest.gpsRow?.[key], metric.decimals)} <span className="text-[9px] font-medium text-zinc-600">{metric.unit}</span></p>{delta != null && <p className={`mt-1 text-[10px] font-bold ${tone(delta)}`}>${delta > 0 ? "+" : ""}{delta}% vs perfil</p>}</div>;
+              return <div key={key} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"><p className="text-[10px] text-zinc-500">{metric.label}</p><p className="mt-1 text-lg font-black text-white">{fmtMetric(latest.gpsRow?.[key], metric.decimals)} <span className="text-[9px] font-medium text-zinc-600">{metric.unit}</span></p>{delta != null && <p className={`mt-1 text-[10px] font-bold ${tone(delta)}`}>{delta > 0 ? "+" : ""}{delta}% vs perfil</p>}</div>;
             })}
           </div>
         </div>
