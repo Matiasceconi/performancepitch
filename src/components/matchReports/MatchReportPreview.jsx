@@ -64,14 +64,14 @@ export default function MatchReportPreview({ reportData, staffComment = "", onCo
       )}
 
       {selected.length > 1 && (
-        <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+        <div className={`grid gap-4 ${hasProfile ? "lg:grid-cols-[1.2fr_1fr]" : ""}`}>
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
             <div className="mb-3 flex items-center gap-2"><TrendingUp size={16} className="text-emerald-400" /><div><h3 className="text-sm font-bold text-white">Evolución de intensidad</h3><p className="text-[11px] text-zinc-500">m/min en los partidos seleccionados</p></div></div>
-            <ResponsiveContainer width="100%" height={220}><LineChart data={evolution}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} /><XAxis dataKey="shortDate" tick={{ fill: "#a1a1aa", fontSize: 10 }} /><YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} width={40} /><Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8 }} /><ReferenceLine y={lastFiveAvg.m_min} stroke="#38bdf8" strokeDasharray="5 5" /><Line type="monotone" dataKey="m_min" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} /></LineChart></ResponsiveContainer>
+            <ResponsiveContainer width="100%" height={220}><LineChart data={evolution}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} /><XAxis dataKey="shortDate" tick={{ fill: "#a1a1aa", fontSize: 10 }} /><YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} width={40} /><Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 8 }} />{hasProfile && <ReferenceLine y={profileValue("m_min")} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "Perfil competitivo", fill: "#7dd3fc", fontSize: 9 }} />}<Line type="monotone" dataKey="m_min" stroke="#22c55e" strokeWidth={3} dot={{ r: 4 }} /></LineChart></ResponsiveContainer>
           </div>
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-            <div className="mb-3 flex items-center gap-2"><BarChart3 size={16} className="text-emerald-400" /><div><h3 className="text-sm font-bold text-white">Último vs base reciente</h3><p className="text-[11px] text-zinc-500">Media de 3 partidos previos</p></div></div>
-            <div className="space-y-2">{KPI_KEYS.map((key) => { const metric = REPORT_METRICS.find((item) => item.key === key); const delta = pctVs(latest?.gpsRow?.[key], lastFiveAvg?.[key]); return <div key={key} className="flex items-center justify-between border-b border-zinc-800/70 pb-2"><span className="text-xs text-zinc-400">{metric.label}</span><span className={`text-xs font-black ${tone(delta)}`}>{delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`}</span></div>; })}</div>
+          <div className={hasProfile ? "rounded-2xl border border-zinc-800 bg-zinc-900 p-4" : "hidden"}>
+            <div className="mb-3 flex items-center gap-2"><BarChart3 size={16} className="text-emerald-400" /><div><h3 className="text-sm font-bold text-white">Último vs perfil competitivo</h3><p className="text-[11px] text-zinc-500">{profileMatches} {profileMatches === 1 ? "partido" : "partidos"} de más de 80 minutos</p></div></div>
+            <div className="space-y-2">{KPI_KEYS.map((key) => { const metric = REPORT_METRICS.find((item) => item.key === key); const delta = pctVs(latest?.gpsRow?.[key], profileValue(key)); return <div key={key} className="flex items-center justify-between border-b border-zinc-800/70 pb-2"><span className="text-xs text-zinc-400">{metric.label}</span><span className={`text-xs font-black ${tone(delta)}`}>{delta == null ? "—" : `${delta > 0 ? "+" : ""}${delta}%`}</span></div>; })}</div>
           </div>
         </div>
       )}
