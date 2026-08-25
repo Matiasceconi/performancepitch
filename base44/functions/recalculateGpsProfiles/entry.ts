@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
     const [sessions, matches, minutes, matchGpsRows, sessionGpsRows, sessionPlayers, memberships] = await Promise.all([
       base44.asServiceRole.entities.TrainingSession.list('-date', 5000),
       base44.asServiceRole.entities.MatchReport.list('-date', 2000),
-      base44.asServiceRole.entities.MinutesRecord.list('-match_date', 10000),
+      base44.asServiceRole.entities.MatchPlayerMinutes.list('-match_date', 10000),
       base44.asServiceRole.entities.CatapultReport.list('-date', 10000),
       base44.asServiceRole.entities.SessionGPSData.list('-created_date', 10000),
       base44.asServiceRole.entities.SessionPlayer.list('-created_date', 10000),
@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
 
     for (const playerId of playerIds) {
       const eligibleMatchIds = new Set(minutes
-        .filter((m) => m.player_id === playerId && Number(m.minutes) >= 80 && !m.hidden_from_reports && validMatchMap[m.match_id])
+        .filter((m) => m.player_id === playerId && Number(m.minutes_played) > 80 && validMatchMap[m.match_id])
         .map((m) => m.match_id));
 
       const competitionRows = matchGpsRows.filter((r) => r.player_id === playerId && eligibleMatchIds.has(r.session_id));
