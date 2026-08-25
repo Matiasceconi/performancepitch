@@ -150,6 +150,16 @@ export async function buildMatchReportData({ playerId, matchIds }) {
 }
 
 // Construye datos de análisis directamente desde opciones pre-cargadas (sin llamadas extra)
+export function buildCompetitionProfileFromOptions(matchOptions) {
+  const eligible = (matchOptions || []).filter((option) => Number(option.minutesPlayed) > 80);
+  if (!eligible.length) return null;
+  const profile = { matches_used: eligible.length };
+  REPORT_METRICS.forEach((metric) => {
+    profile[metric.profile] = avg(eligible.map((option) => option.gpsRow?.[metric.key]));
+  });
+  return profile;
+}
+
 export function buildAnalysisFromOptions({ player, matchOptions, selectedMatchIds, competitionProfile }) {
   const selected = matchOptions
     .filter((o) => selectedMatchIds.includes(o.match.id))
@@ -223,7 +233,7 @@ export function buildKpis(reportData) {
   return KPI_KEYS.map((key) => {
     const metric = REPORT_METRICS.find((m) => m.key === key);
     const value = last.gpsRow[key];
-    const base = (lastFiveAvg && lastFiveAvg[key]) || personalAvg[key] || competitionProfile?.[metric.profile];
+    const base = competitionProfile?.matches_used > 0 ? competitionProfile?.[metric.profile] : null;
     return {
       ...metric,
       value,
