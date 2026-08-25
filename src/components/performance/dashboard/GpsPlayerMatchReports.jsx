@@ -1,8 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Download, Eye, EyeOff, FileText, Inbox, Loader2, Send, Trash2, X } from "lucide-react";
+import { Download, Eye, EyeOff, FileSpreadsheet, FileText, Inbox, Loader2, Send, Trash2, X } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { buildMatchReportData, reportDataFromSnapshot } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
+import { exportMatchReportExcel } from "@/lib/reports/matchReportExcel";
 import MatchReportPreview from "@/components/matchReports/MatchReportPreview";
 
 const STATUS = {
@@ -66,7 +67,17 @@ export default function GpsPlayerMatchReports({ playerId, squadId }) {
     setBusy(`pdf-${report.id}`);
     try {
       const data = await dataFor(report);
-      await exportMatchReportPdf({ reportData: data, reportMeta: { title: report.title }, staffComment: report.staff_comment });
+      await exportMatchReportPdf({ reportData: data, reportMeta: { title: report.title }, staffComment: report.staff_comment, reportConfig: data.reportConfig });
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function downloadExcel(report) {
+    setBusy(`excel-${report.id}`);
+    try {
+      const data = await dataFor(report);
+      exportMatchReportExcel({ reportData: data, reportMeta: { title: report.title }, staffComment: report.staff_comment, reportConfig: data.reportConfig });
     } finally {
       setBusy("");
     }
@@ -108,6 +119,7 @@ export default function GpsPlayerMatchReports({ playerId, squadId }) {
                 <div className="mt-4 flex flex-wrap gap-2">
                   <button onClick={() => view(report)} disabled={isBusy} className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === `view-${report.id}` ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />} Ver</button>
                   <button onClick={() => download(report)} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === `pdf-${report.id}` ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />} PDF</button>
+                  <button onClick={() => downloadExcel(report)} disabled={isBusy} className="inline-flex items-center gap-1.5 rounded-lg bg-zinc-800 px-3 py-2 text-xs font-semibold text-zinc-200">{busy === `excel-${report.id}` ? <Loader2 size={14} className="animate-spin" /> : <FileSpreadsheet size={14} />} Excel</button>
                   <button onClick={() => action(report.status === "published" ? "unpublish" : "publish", report)} disabled={isBusy} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-bold ${report.status === "published" ? "bg-amber-500/10 text-amber-300" : "bg-emerald-600 text-white"}`}>{report.status === "published" ? <EyeOff size={14} /> : <Send size={14} />}{report.status === "published" ? "Ocultar" : "Publicar"}</button>
                   <button onClick={() => window.confirm("¿Eliminar este informe?") && action("delete", report)} disabled={isBusy} className="rounded-lg bg-red-500/10 p-2 text-red-300"><Trash2 size={14} /></button>
                 </div>
