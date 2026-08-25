@@ -1,8 +1,8 @@
 import React from "react";
 import { BarChart3, MessageSquareText } from "lucide-react";
-import { Bar, CartesianGrid, ComposedChart, Legend, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import MatchBlockCard from "@/components/matchReports/MatchBlockCard";
+import MatchEvolutionChart from "@/components/matchReports/MatchEvolutionChart";
 import { CLUB_BRAND } from "@/lib/clubBrand";
 import { getShieldForName } from "@/lib/clubShields";
 import { fmtMetric, normalizeMatchReportConfig, pctVs, REPORT_METRICS } from "@/lib/matchReportData";
@@ -17,17 +17,10 @@ export default function MatchReportPreview({ reportData, staffComment = "", onCo
   const latest = selected[selected.length - 1];
   const profileMatches = Number(competitionProfile?.matches_used || 0);
   const hasProfile = profileMatches > 0;
-  const metric = REPORT_METRICS.find((item) => item.key === config.evolutionMetric) || REPORT_METRICS[1];
   const profileValue = (key) => {
     const definition = REPORT_METRICS.find((item) => item.key === key);
     return hasProfile ? competitionProfile?.[definition?.profile] : null;
   };
-  const evolution = selected.map((item) => ({
-    label: item.match?.rival || "Rival",
-    date: dateLabel(item.match?.date),
-    minutes: Number(item.minutesPlayed ?? item.gpsRow?.duration_minutes ?? 0),
-    metricValue: Number(item.gpsRow?.[metric.key] || 0),
-  }));
   const latestShield = latest?.match?.rival_logo_url || getShieldForName(latest?.match?.rival);
 
   return (
@@ -49,8 +42,8 @@ export default function MatchReportPreview({ reportData, staffComment = "", onCo
 
       {config.showMinutesEvolution && selected.length > 1 && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <div className="mb-3 flex items-center gap-2"><BarChart3 size={16} className="text-emerald-400" /><div><h3 className="text-sm font-bold text-white">Evolución de minutos y {metric.label}</h3><p className="text-[11px] text-zinc-500">Barras: minutos jugados · línea: {metric.label} ({metric.unit})</p></div></div>
-          <ResponsiveContainer width="100%" height={280}><ComposedChart data={evolution} margin={{ left: 0, right: 10, top: 12, bottom: 5 }}><CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} /><XAxis dataKey="date" tick={{ fill: "#a1a1aa", fontSize: 10 }} /><YAxis yAxisId="minutes" domain={[0, "auto"]} tick={{ fill: "#a1a1aa", fontSize: 10 }} label={{ value: "Minutos", angle: -90, position: "insideLeft", fill: "#71717a", fontSize: 10 }} /><YAxis yAxisId="metric" orientation="right" tick={{ fill: "#a1a1aa", fontSize: 10 }} label={{ value: metric.unit, angle: 90, position: "insideRight", fill: "#71717a", fontSize: 10 }} /><Tooltip contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 10 }} formatter={(value, name) => [fmtMetric(value, name === "Minutos" ? 0 : metric.decimals), name]} /><Legend wrapperStyle={{ fontSize: 11 }} />{hasProfile && <ReferenceLine yAxisId="metric" y={profileValue(metric.key)} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "Perfil", fill: "#7dd3fc", fontSize: 9 }} />}<Bar yAxisId="minutes" dataKey="minutes" name="Minutos" fill="#3f3f46" radius={[5, 5, 0, 0]} /><Line yAxisId="metric" type="monotone" dataKey="metricValue" name={metric.label} stroke="#22c55e" strokeWidth={3} dot={{ r: 4, fill: "#22c55e" }} /></ComposedChart></ResponsiveContainer>
+          <div className="mb-3 flex items-center gap-2"><BarChart3 size={16} className="text-emerald-400" /><div><h3 className="text-sm font-bold text-white">Evolución de carga y rendimiento</h3><p className="text-[11px] text-zinc-500">Cada punto identifica fecha, rival y escudo. Los gráficos respetan la selección y el estilo definidos por el staff.</p></div></div>
+          <div className="space-y-3">{config.evolutionCharts.map((chart, index) => <MatchEvolutionChart key={`${chart.metric}-${index}`} selected={selected} chart={chart} competitionProfile={competitionProfile} compact />)}</div>
         </div>
       )}
 
