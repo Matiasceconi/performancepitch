@@ -243,8 +243,8 @@ export default function GpsPlayerMatchAnalysis({
               <div className="grid grid-cols-2 gap-2 md:grid-cols-3">
                 {["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"].map((key) => {
                   const def = metricDef(key);
-                  const pct = pctVs(latest.gpsRow[key], baseline[key]);
-                  return <div key={key} className="rounded-xl border border-white/5 bg-black/20 p-3"><p className="text-[11px] text-zinc-400">{def.label}</p><p className="mt-1 text-xl font-black text-white">{fmtMetric(latest.gpsRow[key], def.decimals)} <span className="text-[10px] font-medium text-zinc-500">{def.unit}</span></p><p className={`mt-1 text-[11px] font-bold ${deltaTone(pct)}`}>{pct == null ? "Sin base suficiente" : `${pct > 0 ? "+" : ""}${pct}% vs base`}</p></div>;
+                  const pct = pctVs(latest.gpsRow[key], profileValue(key));
+                  return <div key={key} className="rounded-xl border border-white/5 bg-black/20 p-3"><p className="text-[11px] text-zinc-400">{def.label}</p><p className="mt-1 text-xl font-black text-white">{fmtMetric(latest.gpsRow[key], def.decimals)} <span className="text-[10px] font-medium text-zinc-500">{def.unit}</span></p>{pct != null && <p className={`mt-1 text-[11px] font-bold ${deltaTone(pct)}`}>${pct > 0 ? "+" : ""}{pct}% vs perfil competitivo</p>}</div>;
                 })}
               </div>
             </div>
@@ -253,7 +253,7 @@ export default function GpsPlayerMatchAnalysis({
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {GROUPS.map((group) => {
               const Icon = group.icon;
-              return <div key={group.title} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="mb-3 flex items-center gap-2"><Icon size={15} className="text-emerald-400" /><h3 className="text-sm font-bold text-white">{group.title}</h3></div><div className="space-y-2">{group.keys.map((key) => { const def = metricDef(key); const pct = pctVs(latest.gpsRow[key], baseline[key]); return <div key={key} className="flex items-end justify-between gap-2 border-t border-zinc-800/70 pt-2"><div><p className="text-[11px] text-zinc-500">{def.label}</p><p className="text-base font-black text-zinc-100">{fmtMetric(latest.gpsRow[key], def.decimals)} <span className="text-[10px] font-medium text-zinc-600">{def.unit}</span></p></div><span className={`text-[10px] font-bold ${deltaTone(pct)}`}>{pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct}%`}</span></div>; })}</div></div>;
+              return <div key={group.title} className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4"><div className="mb-3 flex items-center gap-2"><Icon size={15} className="text-emerald-400" /><h3 className="text-sm font-bold text-white">{group.title}</h3></div><div className="space-y-2">{group.keys.map((key) => { const def = metricDef(key); const pct = pctVs(latest.gpsRow[key], profileValue(key)); return <div key={key} className="flex items-end justify-between gap-2 border-t border-zinc-800/70 pt-2"><div><p className="text-[11px] text-zinc-500">{def.label}</p><p className="text-base font-black text-zinc-100">{fmtMetric(latest.gpsRow[key], def.decimals)} <span className="text-[10px] font-medium text-zinc-600">{def.unit}</span></p></div>{pct != null && <span className={`text-[10px] font-bold ${deltaTone(pct)}`}>${pct > 0 ? "+" : ""}{pct}%</span>}</div>; })}</div></div>;
             })}
           </div>
         </>
