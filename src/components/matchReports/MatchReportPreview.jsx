@@ -19,9 +19,15 @@ function tone(value) {
 }
 
 export default function MatchReportPreview({ reportData, staffComment = "", onCommentChange, readOnly = false }) {
-  const { player, selected, lastFiveAvg = {} } = reportData;
+  const { player, selected, competitionProfile } = reportData;
   const latest = selected[selected.length - 1];
   const evolution = buildEvolutionData(reportData, "m_min");
+  const profileMatches = Number(competitionProfile?.matches_used || 0);
+  const hasProfile = profileMatches > 0;
+  const profileValue = (key) => {
+    const metric = REPORT_METRICS.find((item) => item.key === key);
+    return hasProfile ? competitionProfile?.[metric?.profile] : null;
+  };
 
   return (
     <div className="space-y-4">
@@ -50,8 +56,8 @@ export default function MatchReportPreview({ reportData, staffComment = "", onCo
           <div className="grid grid-cols-2 gap-2 md:grid-cols-3 lg:grid-cols-6">
             {KPI_KEYS.map((key) => {
               const metric = REPORT_METRICS.find((item) => item.key === key);
-              const delta = pctVs(latest.gpsRow?.[key], lastFiveAvg?.[key]);
-              return <div key={key} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"><p className="text-[10px] text-zinc-500">{metric.label}</p><p className="mt-1 text-lg font-black text-white">{fmtMetric(latest.gpsRow?.[key], metric.decimals)} <span className="text-[9px] font-medium text-zinc-600">{metric.unit}</span></p><p className={`mt-1 text-[10px] font-bold ${tone(delta)}`}>{delta == null ? "Sin base" : `${delta > 0 ? "+" : ""}${delta}% vs base`}</p></div>;
+              const delta = pctVs(latest.gpsRow?.[key], profileValue(key));
+              return <div key={key} className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3"><p className="text-[10px] text-zinc-500">{metric.label}</p><p className="mt-1 text-lg font-black text-white">{fmtMetric(latest.gpsRow?.[key], metric.decimals)} <span className="text-[9px] font-medium text-zinc-600">{metric.unit}</span></p>{delta != null && <p className={`mt-1 text-[10px] font-bold ${tone(delta)}`}>${delta > 0 ? "+" : ""}{delta}% vs perfil</p>}</div>;
             })}
           </div>
         </div>
