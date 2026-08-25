@@ -91,7 +91,9 @@ function drawKpiSummary(doc, reportData, y) {
   if (!latest) return y;
   if (y + 48 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
   const keys = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
-  const baseline = reportData.lastFiveAvg || reportData.personalAvg || {};
+  const profile = reportData.competitionProfile || null;
+  const profileMatches = Number(profile?.matches_used || 0);
+  const hasProfile = profileMatches > 0;
   const cardW = (PAGE_W - 2 * MARGIN - 6) / 3;
 
   setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
@@ -102,7 +104,8 @@ function drawKpiSummary(doc, reportData, y) {
   doc.setFontSize(8);
   setColor(doc, "setTextColor", "#6b7280");
   const date = latest.match?.date ? new Date(latest.match.date + "T00:00:00").toLocaleDateString("es-AR") : "—";
-  doc.text(`${date} · ${latest.minutesPlayed ?? latest.gpsRow?.duration_minutes ?? "—"} minutos · base: 3 partidos previos`, MARGIN, y + 5);
+  const context = `${date} · ${latest.minutesPlayed ?? latest.gpsRow?.duration_minutes ?? "—"} minutos${hasProfile ? ` · perfil competitivo: ${profileMatches} partido${profileMatches === 1 ? "" : "s"} >80'` : ""}`;
+  doc.text(context, MARGIN, y + 5);
   y += 9;
 
   keys.forEach((key, index) => {
@@ -121,10 +124,12 @@ function drawKpiSummary(doc, reportData, y) {
     doc.setFont("helvetica", "bold");
     doc.setFontSize(10);
     doc.text(`${fmtMetric(latest.gpsRow?.[key], metric.decimals)} ${metric.unit}`, x + 2, cardY + 9);
-    const delta = pctVs(latest.gpsRow?.[key], baseline[key]);
-    doc.setFontSize(6.5);
-    setColor(doc, "setTextColor", delta == null ? "#9ca3af" : (delta >= 0 ? "#00843D" : "#b45309"));
-    doc.text(delta == null ? "Sin base" : `${delta > 0 ? "+" : ""}${delta}% vs base`, x + 2, cardY + 12.5);
+    const delta = hasProfile ? pctVs(latest.gpsRow?.[key], profile?.[metric.profile]) : null;
+    if (delta != null) {
+      doc.setFontSize(6.5);
+      setColor(doc, "setTextColor", delta >= 0 ? "#00843D" : "#b45309");
+      doc.text(`${delta > 0 ? "+" : ""}${delta}% vs perfil competitivo`, x + 2, cardY + 12.5);
+    }
   });
   return y + 36;
 }
