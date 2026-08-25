@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
 
       await upsert(base44, 'PlayerCompetitionProfile', { player_id: playerId }, {
         squad_id: latestSquadId,
-        matches_used: eligibleMatchIds.size,
+        matches_used: new Set(matchRows.map((row) => row.session_id)).size,
         avg_total_distance: avgOf(matchRows, 'total_distance'),
         avg_m_min: avgOf(matchRows, 'meters_per_minute'),
         avg_distance_19_8: avgOf(matchRows, 'distance_hsr'),
