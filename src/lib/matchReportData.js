@@ -23,10 +23,27 @@ export const DEFAULT_MATCH_REPORT_CONFIG = {
   showMatchDetails: true,
   showZoneCharts: true,
   evolutionMetric: "m_min",
+  evolutionCharts: [
+    { metric: "minutes", style: "bar" },
+    { metric: "m_min", style: "line" },
+  ],
 };
 
 export function normalizeMatchReportConfig(config = {}) {
-  return { ...DEFAULT_MATCH_REPORT_CONFIG, ...(config || {}) };
+  const merged = { ...DEFAULT_MATCH_REPORT_CONFIG, ...(config || {}) };
+  const validMetrics = new Set(["minutes", ...REPORT_METRICS.map((metric) => metric.key)]);
+  const legacyCharts = [
+    { metric: "minutes", style: "bar" },
+    { metric: merged.evolutionMetric || "m_min", style: "line" },
+  ];
+  const sourceCharts = Array.isArray(config?.evolutionCharts) && config.evolutionCharts.length ? config.evolutionCharts : legacyCharts;
+  const seen = new Set();
+  merged.evolutionCharts = sourceCharts
+    .filter((chart) => validMetrics.has(chart?.metric) && !seen.has(chart.metric) && seen.add(chart.metric))
+    .slice(0, 6)
+    .map((chart) => ({ metric: chart.metric, style: ["line", "area", "bar"].includes(chart.style) ? chart.style : "line" }));
+  if (!merged.evolutionCharts.length) merged.evolutionCharts = legacyCharts;
+  return merged;
 }
 
 const avg = (vals) => {
