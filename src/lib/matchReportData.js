@@ -225,7 +225,7 @@ export function buildMatchOptionsFromData({ matchReports, matchGpsByMatch, minut
 
 // Calcula KPIs principales con comparación vs promedio personal
 export function buildKpis(reportData) {
-  const { selected, lastFiveAvg, personalAvg, competitionProfile } = reportData;
+  const { selected, competitionProfile } = reportData;
   if (!selected.length) return [];
 
   // KPIs siempre muestran el último partido, comparado vs promedio de últimos 5
