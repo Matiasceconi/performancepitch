@@ -1,23 +1,28 @@
 import React from "react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { REPORT_METRICS, fmtMetric, buildZoneDistributionData } from "@/lib/matchReportData";
+import { getShieldForName } from "@/lib/clubShields";
 
-export default function MatchBlockCard({ matchData }) {
+export default function MatchBlockCard({ matchData, showZoneChart = true }) {
   const { match, gpsRow, minutesPlayed } = matchData;
   const zoneData = buildZoneDistributionData(gpsRow);
+  const rivalShield = match?.rival_logo_url || getShieldForName(match?.rival);
 
   return (
     <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
       {/* Match header */}
       <div className="bg-zinc-950/50 px-4 py-3 border-b border-zinc-800">
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-3">
+            {rivalShield && <img src={rivalShield} alt="" className="h-10 w-10 shrink-0 object-contain" />}
+            <div className="min-w-0">
             <p className="text-sm font-bold text-white truncate">vs {match?.rival || "Rival"}</p>
             <p className="text-xs text-zinc-500">
               {match?.date ? new Date(match.date + "T00:00:00").toLocaleDateString("es-AR") : "—"}
               {match?.competition ? ` · ${match.competition}` : ""}
               {match?.location ? ` · ${match.location}` : ""}
             </p>
+            </div>
           </div>
           <div className="flex items-center gap-3 text-xs shrink-0">
             {minutesPlayed != null && <span className="text-zinc-400">{minutesPlayed}'</span>}
@@ -29,7 +34,7 @@ export default function MatchBlockCard({ matchData }) {
       </div>
 
       {/* Metrics table + zone chart */}
-      <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className={`p-4 grid grid-cols-1 ${showZoneChart ? "lg:grid-cols-2" : ""} gap-4`}>
         {/* Metrics table */}
         <div>
           <p className="text-xs text-zinc-500 font-semibold uppercase mb-2">Métricas GPS</p>
@@ -47,7 +52,7 @@ export default function MatchBlockCard({ matchData }) {
         </div>
 
         {/* Zone chart */}
-        <div>
+        {showZoneChart && <div>
           <p className="text-xs text-zinc-500 font-semibold uppercase mb-2">Zonas de velocidad e intensidad</p>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={zoneData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
@@ -61,7 +66,7 @@ export default function MatchBlockCard({ matchData }) {
               <Bar dataKey="value" fill="#00843D" radius={[0, 6, 6, 0]} />
             </BarChart>
           </ResponsiveContainer>
-        </div>
+        </div>}
       </div>
     </div>
   );
