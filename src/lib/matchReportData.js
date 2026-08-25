@@ -497,6 +497,7 @@ export function adaptPublishedReport(report, player) {
   return {
     player,
     competitionProfile: null,
+    reportConfig: normalizeMatchReportConfig(),
     selected,
     personalAvg: averageRows(rows),
     lastFiveAvg: averageRows(rows.slice(Math.max(0, rows.length - 4), -1)),
