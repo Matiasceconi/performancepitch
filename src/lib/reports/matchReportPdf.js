@@ -1,6 +1,6 @@
 import jsPDF from "jspdf";
 import { CLUB_BRAND } from "@/lib/clubBrand";
-import { REPORT_METRICS, fmtMetric, buildZoneDistributionData } from "@/lib/matchReportData";
+import { REPORT_METRICS, fmtMetric, pctVs, buildZoneDistributionData } from "@/lib/matchReportData";
 import { renderZoneDistributionChartPng } from "./matchReportCharts.jsx";
 
 const PAGE_W = 210;
@@ -84,6 +84,49 @@ function drawPlayerBlock(doc, reportData) {
   doc.text("Análisis puntual GPS", rightX, y + 16, { align: "right" });
 
   return y + photoSize + 6;
+}
+
+function drawKpiSummary(doc, reportData, y) {
+  const latest = reportData.selected[reportData.selected.length - 1];
+  if (!latest) return y;
+  if (y + 48 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
+  const keys = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
+  const baseline = reportData.lastFiveAvg || reportData.personalAvg || {};
+  const cardW = (PAGE_W - 2 * MARGIN - 6) / 3;
+
+  setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(11);
+  doc.text(`Partido principal · vs ${latest.match?.rival || "Rival"}`, MARGIN, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  setColor(doc, "setTextColor", "#6b7280");
+  const date = latest.match?.date ? new Date(latest.match.date + "T00:00:00").toLocaleDateString("es-AR") : "—";
+  doc.text(`${date} · ${latest.minutesPlayed ?? latest.gpsRow?.duration_minutes ?? "—"} minutos · base: 3 partidos previos`, MARGIN, y + 5);
+  y += 9;
+
+  keys.forEach((key, index) => {
+    const metric = REPORT_METRICS.find((item) => item.key === key);
+    const col = index % 3;
+    const row = Math.floor(index / 3);
+    const x = MARGIN + col * (cardW + 3);
+    const cardY = y + row * 17;
+    doc.setFillColor(246, 247, 243);
+    doc.roundedRect(x, cardY, cardW, 14, 2, 2, "F");
+    setColor(doc, "setTextColor", "#6b7280");
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    doc.text(metric.label, x + 2, cardY + 4);
+    setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(10);
+    doc.text(`${fmtMetric(latest.gpsRow?.[key], metric.decimals)} ${metric.unit}`, x + 2, cardY + 9);
+    const delta = pctVs(latest.gpsRow?.[key], baseline[key]);
+    doc.setFontSize(6.5);
+    setColor(doc, "setTextColor", delta == null ? "#9ca3af" : (delta >= 0 ? "#00843D" : "#b45309"));
+    doc.text(delta == null ? "Sin base" : `${delta > 0 ? "+" : ""}${delta}% vs base`, x + 2, cardY + 12.5);
+  });
+  return y + 36;
 }
 
 function drawMatchBlock(doc, matchData, zonePng, y, contentW) {
@@ -203,6 +246,8 @@ export async function exportMatchReportPdf({ reportData, reportMeta, staffCommen
   drawHeader(doc, reportData, reportMeta);
   let y = drawPlayerBlock(doc, reportData);
   y += 4;
+  y = drawKpiSummary(doc, reportData, y);
+  y += 3;
 
   const contentW = PAGE_W - 2 * MARGIN;
 
