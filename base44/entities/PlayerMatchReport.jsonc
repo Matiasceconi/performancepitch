@@ -76,6 +76,15 @@
       "type": "object",
       "description": "Resumen de KPIs principales para vista r\u00e1pida en listados"
     },
+    "report_snapshot": {
+      "type": "object",
+      "description": "Versi\u00f3n congelada y normalizada del informe publicado"
+    },
+    "report_version": {
+      "type": "number",
+      "default": 2,
+      "description": "Versi\u00f3n del formato del snapshot"
+    },
     "created_by": {
       "type": "string",
       "description": "Usuario creador"
@@ -87,6 +96,14 @@
     "published_at": {
       "type": "string",
       "description": "Fecha/hora de publicaci\u00f3n para el jugador"
+    },
+    "published_by": {
+      "type": "string",
+      "description": "Usuario que public\u00f3 el informe"
+    },
+    "updated_by": {
+      "type": "string",
+      "description": "Usuario de la \u00faltima modificaci\u00f3n"
     },
     "updated_at": {
       "type": "string",
