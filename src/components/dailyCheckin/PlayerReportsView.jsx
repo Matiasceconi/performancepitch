@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { ChevronLeft, FileText, Download, Eye, Loader2, X } from "lucide-react";
+import { ChevronLeft, FileText, Download, Eye, Loader2 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
 import { adaptPublishedReport } from "@/lib/matchReportData";
 import { exportMatchReportPdf } from "@/lib/reports/matchReportPdf";
