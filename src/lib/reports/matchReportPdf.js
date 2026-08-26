@@ -2,7 +2,6 @@ import jsPDF from "jspdf";
 import { CLUB_BRAND } from "@/lib/clubBrand";
 import { REPORT_METRICS, fmtMetric, pctVs, buildZoneDistributionData, normalizeMatchReportConfig } from "@/lib/matchReportData";
 import { getShieldForName } from "@/lib/clubShields";
-import { renderZoneDistributionChartPng } from "./matchReportCharts.jsx";
 
 const PAGE_W = 210;
 const PAGE_H = 297;
@@ -90,7 +89,7 @@ function drawPlayerBlock(doc, reportData) {
 function drawKpiSummary(doc, reportData, y) {
   const latest = reportData.selected[reportData.selected.length - 1];
   if (!latest) return y;
-  if (y + 48 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
+  if (y + 62 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
   const keys = ["total_distance", "m_min", "distance_19_8", "distance_25", "sprints", "smax"];
   const profile = reportData.competitionProfile || null;
   const profileMatches = Number(profile?.matches_used || 0);
@@ -99,10 +98,10 @@ function drawKpiSummary(doc, reportData, y) {
 
   setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(12);
   doc.text(`Partido principal · vs ${latest.match?.rival || "Rival"}`, MARGIN, y);
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8);
+  doc.setFontSize(8.5);
   setColor(doc, "setTextColor", "#6b7280");
   const date = latest.match?.date ? new Date(latest.match.date + "T00:00:00").toLocaleDateString("es-AR") : "—";
   const context = `${date} · ${latest.minutesPlayed ?? latest.gpsRow?.duration_minutes ?? "—"} minutos${hasProfile ? ` · perfil competitivo: ${profileMatches} partido${profileMatches === 1 ? "" : "s"} >80'` : ""}`;
@@ -114,25 +113,32 @@ function drawKpiSummary(doc, reportData, y) {
     const col = index % 3;
     const row = Math.floor(index / 3);
     const x = MARGIN + col * (cardW + 3);
-    const cardY = y + row * 17;
+    const cardY = y + row * 23;
     doc.setFillColor(246, 247, 243);
-    doc.roundedRect(x, cardY, cardW, 14, 2, 2, "F");
+    doc.roundedRect(x, cardY, cardW, 20, 2.5, 2.5, "F");
     setColor(doc, "setTextColor", "#6b7280");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(6.5);
-    doc.text(metric.label, x + 2, cardY + 4);
+    doc.setFontSize(8);
+    doc.text(metric.label, x + 3, cardY + 5);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text(`${fmtMetric(latest.gpsRow?.[key], metric.decimals)} ${metric.unit}`, x + 2, cardY + 9);
+    doc.setFontSize(17);
+    const valueText = fmtMetric(latest.gpsRow?.[key], metric.decimals);
+    doc.text(valueText, x + 3, cardY + 13);
+    const valueWidth = doc.getTextWidth(valueText);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    setColor(doc, "setTextColor", "#6b7280");
+    doc.text(metric.unit, x + 4 + valueWidth, cardY + 13);
     const delta = hasProfile ? pctVs(latest.gpsRow?.[key], profile?.[metric.profile]) : null;
     if (delta != null) {
-      doc.setFontSize(6.5);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(7.2);
       setColor(doc, "setTextColor", delta >= 0 ? "#00843D" : "#b45309");
-      doc.text(`${delta > 0 ? "+" : ""}${delta}% vs perfil competitivo`, x + 2, cardY + 12.5);
+      doc.text(`${delta > 0 ? "+" : ""}${delta}% vs perfil competitivo`, x + 3, cardY + 18);
     }
   });
-  return y + 36;
+  return y + 49;
 }
 
 function drawEvolution(doc, reportData, config, y) {
@@ -142,31 +148,42 @@ function drawEvolution(doc, reportData, config, y) {
   const styleLabel = { line: "Línea", area: "Área", bar: "Barras" };
 
   charts.forEach((chart) => {
-    if (y + 76 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
+    if (y + 88 > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
     const metric = chart.metric === "minutes"
       ? { key: "minutes", label: "Minutos jugados", unit: "min", decimals: 0, color: "#6b7280" }
       : REPORT_METRICS.find((item) => item.key === chart.metric) || REPORT_METRICS[1];
     const values = selected.map((item) => Number(metric.key === "minutes" ? (item.minutesPlayed ?? item.gpsRow?.duration_minutes ?? 0) : (item.gpsRow?.[metric.key] || 0)));
     const profileValue = metric.profile ? Number(reportData.competitionProfile?.[metric.profile] || 0) : 0;
-    const maxValue = Math.max(...values, profileValue, 1);
+    const rawMax = Math.max(...values, profileValue, 1);
+    const maxValue = rawMax * 1.18;
     const chartX = MARGIN + 8;
     const chartY = y + 10;
     const chartW = PAGE_W - 2 * MARGIN - 16;
-    const chartH = 36;
+    const chartH = 48;
     const step = chartW / selected.length;
     const points = [];
 
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
+    doc.setFontSize(11);
     doc.text(`Evolución · ${metric.label}`, MARGIN, y);
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
+    doc.setFontSize(8);
     setColor(doc, "setTextColor", "#6b7280");
     doc.text(`${styleLabel[chart.style] || "Línea"} · ${metric.unit}${profileValue > 0 ? " · referencia celeste: perfil competitivo" : ""}`, MARGIN, y + 5);
 
     doc.setDrawColor(216, 222, 210);
     doc.rect(chartX, chartY, chartW, chartH);
+    [0.25, 0.5, 0.75].forEach((ratio) => {
+      const gridY = chartY + chartH * ratio;
+      doc.setDrawColor(230, 233, 227);
+      doc.line(chartX, gridY, chartX + chartW, gridY);
+    });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6.5);
+    setColor(doc, "setTextColor", "#6b7280");
+    doc.text(fmtMetric(rawMax, metric.decimals), chartX - 2, chartY + 2, { align: "right" });
+    doc.text("0", chartX - 2, chartY + chartH, { align: "right" });
     if (profileValue > 0) {
       const py = chartY + chartH - (profileValue / maxValue) * chartH;
       doc.setDrawColor(56, 189, 248);
@@ -188,11 +205,11 @@ function drawEvolution(doc, reportData, config, y) {
       if (shield) {
         try { doc.addImage(shield, "PNG", centerX - 3.5, chartY + chartH + 2, 7, 7, undefined, "FAST"); } catch {}
       }
-      doc.setFontSize(5.5);
+      doc.setFontSize(6.5);
       setColor(doc, "setTextColor", "#6b7280");
       const date = item.match?.date ? new Date(item.match.date + "T00:00:00").toLocaleDateString("es-AR", { day: "2-digit", month: "2-digit" }) : String(index + 1);
       doc.text(date, centerX, chartY + chartH + 12, { align: "center" });
-      doc.text(String(item.match?.rival || "Rival").slice(0, 11), centerX, chartY + chartH + 15, { align: "center" });
+      doc.text(String(item.match?.rival || "Rival").slice(0, 12), centerX, chartY + chartH + 16, { align: "center" });
     });
 
     if (chart.style === "area") {
@@ -209,7 +226,18 @@ function drawEvolution(doc, reportData, config, y) {
       for (let index = 1; index < points.length; index += 1) doc.line(points[index - 1][0], points[index - 1][1], points[index][0], points[index][1]);
       points.forEach(([x, pointY]) => { doc.setFillColor(0, 132, 61); doc.circle(x, pointY, 1.3, "F"); });
     }
-    y = chartY + chartH + 21;
+    points.forEach(([x, pointY], index) => {
+      doc.setFillColor(255, 255, 255);
+      const label = fmtMetric(values[index], metric.decimals);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(8);
+      const labelW = doc.getTextWidth(label) + 3;
+      const labelY = Math.max(chartY + 1.5, pointY - 5);
+      doc.roundedRect(x - labelW / 2, labelY - 3.5, labelW, 5, 1, 1, "F");
+      setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+      doc.text(label, x, labelY, { align: "center" });
+    });
+    y = chartY + chartH + 23;
   });
   return y;
 }
