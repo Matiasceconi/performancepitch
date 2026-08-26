@@ -302,12 +302,7 @@ function drawZoneBars(doc, gpsRow, x, y, width, height) {
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
-    doc.text(fmtMetric(value, Number.isInteger(value) ? 0 : 1), x + width, rowY + rowH * 0.66, { align: "right" });
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(6);
-    setColor(doc, "setTextColor", "#6b7280");
-    const valueTextW = doc.getTextWidth(fmtMetric(value, Number.isInteger(value) ? 0 : 1));
-    doc.text(row.unit || "", x + width - valueTextW - 1, rowY + rowH * 0.66, { align: "right" });
+    doc.text(`${fmtMetric(value, Number.isInteger(value) ? 0 : 1)} ${row.unit || ""}`.trim(), x + width, rowY + rowH * 0.66, { align: "right" });
   });
 }
 
