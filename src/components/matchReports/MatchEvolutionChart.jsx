@@ -1,5 +1,5 @@
 import React from "react";
-import { Area, Bar, CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Area, Bar, CartesianGrid, ComposedChart, LabelList, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { getShieldForName } from "@/lib/clubShields";
 import { fmtMetric, REPORT_METRICS } from "@/lib/matchReportData";
 
@@ -63,16 +63,22 @@ export default function MatchEvolutionChart({ selected = [], chart, competitionP
         <span className="rounded-md bg-zinc-800 px-2 py-1 text-[9px] font-bold uppercase text-zinc-400">{STYLE_LABELS[style]}</span>
       </div>
       <ResponsiveContainer width="100%" height={height}>
-        <ComposedChart data={rows} margin={{ left: 0, right: 12, top: 12, bottom: 10 }}>
+        <ComposedChart data={rows} margin={{ left: 0, right: 18, top: 34, bottom: 10 }}>
           <defs><linearGradient id={`evolution-${metric.key}`} x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor={color} stopOpacity={0.45} /><stop offset="95%" stopColor={color} stopOpacity={0.03} /></linearGradient></defs>
           <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
           <XAxis dataKey="axisKey" height={72} interval={0} tick={<MatchAxisTick rows={rows} />} tickLine={false} axisLine={{ stroke: "#52525b" }} />
-          <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} width={52} unit={metric.unit === "m" ? "" : ""} />
+          <YAxis domain={[0, (dataMax) => Math.max(1, Math.ceil(Number(dataMax || 0) * 1.16))]} tick={{ fill: "#a1a1aa", fontSize: 10 }} width={52} unit={metric.unit === "m" ? "" : ""} />
           <Tooltip content={<EvolutionTooltip />} />
           {profileValue > 0 && <ReferenceLine y={profileValue} stroke="#38bdf8" strokeDasharray="5 5" label={{ value: "Perfil competitivo", fill: "#7dd3fc", fontSize: 9 }} />}
-          {style === "bar" && <Bar {...common} radius={[5, 5, 0, 0]} fillOpacity={0.82} />}
-          {style === "area" && <Area {...common} type="monotone" strokeWidth={3} fill={`url(#evolution-${metric.key})`} />}
-          {style === "line" && <Line {...common} type="monotone" strokeWidth={3} dot={{ r: 4, fill: color }} activeDot={{ r: 6 }} />}
+          {style === "bar" && <Bar {...common} radius={[5, 5, 0, 0]} fillOpacity={0.82}>
+            <LabelList dataKey="value" position="top" offset={8} formatter={(value) => fmtMetric(value, metric.decimals)} fill="#f4f4f5" fontSize={12} fontWeight={800} />
+          </Bar>}
+          {style === "area" && <Area {...common} type="monotone" strokeWidth={3} fill={`url(#evolution-${metric.key})`}>
+            <LabelList dataKey="value" position="top" offset={9} formatter={(value) => fmtMetric(value, metric.decimals)} fill="#f4f4f5" fontSize={12} fontWeight={800} />
+          </Area>}
+          {style === "line" && <Line {...common} type="monotone" strokeWidth={3} dot={{ r: 4, fill: color }} activeDot={{ r: 6 }}>
+            <LabelList dataKey="value" position="top" offset={9} formatter={(value) => fmtMetric(value, metric.decimals)} fill="#f4f4f5" fontSize={12} fontWeight={800} />
+          </Line>}
         </ComposedChart>
       </ResponsiveContainer>
     </div>
