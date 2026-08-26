@@ -306,38 +306,55 @@ function drawZoneBars(doc, gpsRow, x, y, width, height) {
   });
 }
 
+function fitText(doc, value, maxWidth) {
+  const text = String(value || "");
+  if (doc.getTextWidth(text) <= maxWidth) return text;
+  let shortened = text;
+  while (shortened.length > 1 && doc.getTextWidth(`${shortened}...`) > maxWidth) shortened = shortened.slice(0, -1);
+  return `${shortened}...`;
+}
+
 function drawMatchBlock(doc, matchData, y, contentW, showZoneChart = true) {
   const { match, gpsRow, minutesPlayed } = matchData;
-  const blockH = 84;
+  const blockH = 94;
 
   if (y + blockH > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
 
   // Match header bar
   doc.setFillColor(0, 90, 52);
-  doc.rect(MARGIN, y, contentW, 9, "F");
+  doc.rect(MARGIN, y, contentW, 11, "F");
   setColor(doc, "setTextColor", "#FFFFFF");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
   const rivalShield = match.rival_logo_url || getShieldForName(match.rival);
   if (rivalShield) {
-    try { doc.addImage(rivalShield, "PNG", MARGIN + 1, y + 1, 7, 7, undefined, "FAST"); } catch {}
+    try { doc.addImage(rivalShield, "PNG", MARGIN + 1.5, y + 1.5, 8, 8, undefined, "FAST"); } catch {}
   }
-  doc.text(`vs ${match.rival || "Rival"}`, MARGIN + (rivalShield ? 10 : 2), y + 6);
+
+  const rivalX = MARGIN + (rivalShield ? 11.5 : 3);
+  const metaX = MARGIN + 58;
+  const scoreX = PAGE_W - MARGIN - 2;
+  const minutesX = scoreX - 22;
+  const headerBaseline = y + 7.2;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(8.5);
+  doc.text(fitText(doc, `vs ${match.rival || "Rival"}`, metaX - rivalX - 4), rivalX, headerBaseline);
+
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
+  doc.setFontSize(6.8);
   const dateStr = match.date ? new Date(match.date + "T00:00:00").toLocaleDateString("es-AR") : "—";
   const meta = [dateStr, match.competition, match.location].filter(Boolean).join(" · ");
-  doc.text(meta, MARGIN + 50, y + 6);
+  doc.text(fitText(doc, meta, minutesX - metaX - 8), metaX, headerBaseline);
+
+  if (minutesPlayed != null) {
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7.5);
+    doc.text(`${minutesPlayed}'`, minutesX, headerBaseline, { align: "right" });
+  }
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8);
   const rightText = `${match.our_score ?? "?"} - ${match.rival_score ?? "?"}`;
-  doc.text(rightText, PAGE_W - MARGIN - 2, y + 6, { align: "right" });
-  if (minutesPlayed != null) {
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.5);
-    doc.text(`${minutesPlayed}'`, PAGE_W - MARGIN - 25, y + 6, { align: "right" });
-  }
-  y += 11;
+  doc.text(rightText, scoreX, headerBaseline, { align: "right" });
+  y += 16;
 
   // Two columns: metrics table (left) + zone chart (right)
   const tableW = showZoneChart ? contentW * 0.46 : contentW;
@@ -347,36 +364,36 @@ function drawMatchBlock(doc, matchData, y, contentW, showZoneChart = true) {
   // Section titles
   setColor(doc, "setTextColor", CLUB_BRAND.colors.greenDeep);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
+  doc.setFontSize(8.5);
   doc.text("Métricas GPS", MARGIN, y);
-  if (showZoneChart) doc.text("Zonas de velocidad e intensidad · valores exactos", chartX, y);
-  y += 3;
+  if (showZoneChart) doc.text("Zonas de velocidad e intensidad", chartX, y);
+  y += 7;
 
   // Metrics table rows
-  const rowH = 6.4;
+  const rowH = 6.6;
   REPORT_METRICS.forEach((m, i) => {
     const rowY = y + i * rowH;
     if (i % 2 === 0) {
       doc.setFillColor(246, 247, 243);
-      doc.rect(MARGIN, rowY - 3, tableW, rowH, "F");
+      doc.rect(MARGIN, rowY - 4.2, tableW, rowH, "F");
     }
     setColor(doc, "setTextColor", "#6b7280");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(8);
+    doc.setFontSize(7.8);
     doc.text(m.label, MARGIN + 1.5, rowY);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10.5);
-    doc.text(fmtMetric(gpsRow[m.key], m.decimals), MARGIN + tableW - 12, rowY, { align: "right" });
+    doc.setFontSize(10);
+    doc.text(fmtMetric(gpsRow[m.key], m.decimals), MARGIN + tableW - 14, rowY, { align: "right" });
     doc.setFont("helvetica", "normal");
     setColor(doc, "setTextColor", "#9ca3af");
-    doc.setFontSize(7);
+    doc.setFontSize(6.5);
     doc.text(m.unit, MARGIN + tableW - 2, rowY, { align: "right" });
   });
   const tableH = REPORT_METRICS.length * rowH;
 
   // Vector chart: always visible in the PDF and includes an exact value label per bar.
-  if (showZoneChart) drawZoneBars(doc, gpsRow, chartX, y - 2.5, chartW, tableH);
+  if (showZoneChart) drawZoneBars(doc, gpsRow, chartX, y - 4.5, chartW, tableH);
 
   y += tableH + 4;
 
@@ -435,8 +452,24 @@ export async function exportMatchReportPdf({ reportData, reportMeta, staffCommen
 
   const contentW = PAGE_W - 2 * MARGIN;
   if (config.showMatchDetails) {
+    let detailPage = doc.getCurrentPageInfo().pageNumber;
+    let blocksOnPage = 0;
     for (let i = 0; i < reportData.selected.length; i++) {
+      if (blocksOnPage >= 2) {
+        doc.addPage();
+        y = MARGIN;
+        detailPage = doc.getCurrentPageInfo().pageNumber;
+        blocksOnPage = 0;
+      }
+      const pageBefore = doc.getCurrentPageInfo().pageNumber;
       y = drawMatchBlock(doc, reportData.selected[i], y, contentW, config.showZoneCharts);
+      const pageAfter = doc.getCurrentPageInfo().pageNumber;
+      if (pageAfter !== pageBefore || pageAfter !== detailPage) {
+        detailPage = pageAfter;
+        blocksOnPage = 1;
+      } else {
+        blocksOnPage += 1;
+      }
     }
   }
 
