@@ -64,7 +64,7 @@ export default function MatchBlockCard({ matchData, showZoneChart = true }) {
                 formatter={(value, name, props) => [`${fmtMetric(value, 0)} ${props.payload.unit}`, "Valor"]}
               />
               <Bar dataKey="value" fill="#00843D" radius={[0, 6, 6, 0]}>
-                <LabelList dataKey="value" position="right" offset={8} formatter={(value, entry) => `${fmtMetric(value, 0)} ${entry?.payload?.unit || ""}`.trim()} fill="#f4f4f5" fontSize={11} fontWeight={800} />
+                <LabelList dataKey="value" position="right" offset={8} formatter={(value) => fmtMetric(value, 0)} fill="#f4f4f5" fontSize={11} fontWeight={800} />
               </Bar>
             </BarChart>
           </ResponsiveContainer>
