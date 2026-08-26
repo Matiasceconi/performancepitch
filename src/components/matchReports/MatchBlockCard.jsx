@@ -1,5 +1,5 @@
 import React from "react";
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import { Bar, BarChart, CartesianGrid, LabelList, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { REPORT_METRICS, fmtMetric, buildZoneDistributionData } from "@/lib/matchReportData";
 import { getShieldForName } from "@/lib/clubShields";
 
@@ -55,15 +55,17 @@ export default function MatchBlockCard({ matchData, showZoneChart = true }) {
         {showZoneChart && <div>
           <p className="text-xs text-zinc-500 font-semibold uppercase mb-2">Zonas de velocidad e intensidad</p>
           <ResponsiveContainer width="100%" height={240}>
-            <BarChart data={zoneData} layout="vertical" margin={{ left: 8, right: 16, top: 4, bottom: 4 }}>
+            <BarChart data={zoneData} layout="vertical" margin={{ left: 8, right: 72, top: 4, bottom: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-              <XAxis type="number" tick={{ fill: "#71717a", fontSize: 10 }} />
+              <XAxis type="number" domain={[0, (dataMax) => Math.max(1, Math.ceil(Number(dataMax || 0) * 1.18))]} tick={{ fill: "#71717a", fontSize: 10 }} />
               <YAxis type="category" dataKey="metric" tick={{ fill: "#d4d4d8", fontSize: 10 }} width={90} />
               <Tooltip
                 contentStyle={{ background: "#09090b", border: "1px solid #27272a", borderRadius: 12, color: "#fff" }}
                 formatter={(value, name, props) => [`${fmtMetric(value, 0)} ${props.payload.unit}`, "Valor"]}
               />
-              <Bar dataKey="value" fill="#00843D" radius={[0, 6, 6, 0]} />
+              <Bar dataKey="value" fill="#00843D" radius={[0, 6, 6, 0]}>
+                <LabelList dataKey="value" position="right" offset={8} formatter={(value, entry) => `${fmtMetric(value, 0)} ${entry?.payload?.unit || ""}`.trim()} fill="#f4f4f5" fontSize={11} fontWeight={800} />
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         </div>}
