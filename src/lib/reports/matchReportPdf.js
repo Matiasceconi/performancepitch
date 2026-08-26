@@ -276,9 +276,44 @@ function drawProfileComparison(doc, reportData, y) {
   return y + 25;
 }
 
-function drawMatchBlock(doc, matchData, zonePng, y, contentW, showZoneChart = true) {
+function drawZoneBars(doc, gpsRow, x, y, width, height) {
+  const rows = buildZoneDistributionData(gpsRow);
+  const maxValue = Math.max(...rows.map((row) => Number(row.value || 0)), 1);
+  const rowH = height / rows.length;
+  const labelW = 24;
+  const valueW = 19;
+  const barX = x + labelW;
+  const barW = width - labelW - valueW - 2;
+
+  rows.forEach((row, index) => {
+    const rowY = y + index * rowH;
+    const value = Number(row.value || 0);
+    setColor(doc, "setTextColor", "#4b5563");
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(7);
+    doc.text(row.metric, x, rowY + rowH * 0.66);
+
+    doc.setFillColor(235, 238, 233);
+    doc.roundedRect(barX, rowY + 1.2, barW, Math.max(3.2, rowH - 2.4), 1.2, 1.2, "F");
+    doc.setFillColor(0, 132, 61);
+    const filledW = value > 0 ? Math.max(1.2, (value / maxValue) * barW) : 0;
+    if (filledW > 0) doc.roundedRect(barX, rowY + 1.2, filledW, Math.max(3.2, rowH - 2.4), 1.2, 1.2, "F");
+
+    setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(8);
+    doc.text(fmtMetric(value, Number.isInteger(value) ? 0 : 1), x + width, rowY + rowH * 0.66, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(6);
+    setColor(doc, "setTextColor", "#6b7280");
+    const valueTextW = doc.getTextWidth(fmtMetric(value, Number.isInteger(value) ? 0 : 1));
+    doc.text(row.unit || "", x + width - valueTextW - 1, rowY + rowH * 0.66, { align: "right" });
+  });
+}
+
+function drawMatchBlock(doc, matchData, y, contentW, showZoneChart = true) {
   const { match, gpsRow, minutesPlayed } = matchData;
-  const blockH = 68;
+  const blockH = 84;
 
   if (y + blockH > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
 
@@ -310,20 +345,20 @@ function drawMatchBlock(doc, matchData, zonePng, y, contentW, showZoneChart = tr
   y += 11;
 
   // Two columns: metrics table (left) + zone chart (right)
-  const tableW = showZoneChart ? contentW * 0.42 : contentW;
+  const tableW = showZoneChart ? contentW * 0.46 : contentW;
   const chartX = MARGIN + tableW + 4;
   const chartW = contentW - tableW - 4;
 
   // Section titles
   setColor(doc, "setTextColor", CLUB_BRAND.colors.greenDeep);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   doc.text("Métricas GPS", MARGIN, y);
-  if (showZoneChart) doc.text("Zonas de velocidad e intensidad", chartX, y);
+  if (showZoneChart) doc.text("Zonas de velocidad e intensidad · valores exactos", chartX, y);
   y += 3;
 
   // Metrics table rows
-  const rowH = 5;
+  const rowH = 6.4;
   REPORT_METRICS.forEach((m, i) => {
     const rowY = y + i * rowH;
     if (i % 2 === 0) {
@@ -332,23 +367,21 @@ function drawMatchBlock(doc, matchData, zonePng, y, contentW, showZoneChart = tr
     }
     setColor(doc, "setTextColor", "#6b7280");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7);
-    doc.text(m.label, MARGIN + 1, rowY);
+    doc.setFontSize(8);
+    doc.text(m.label, MARGIN + 1.5, rowY);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
+    doc.setFontSize(10.5);
     doc.text(fmtMetric(gpsRow[m.key], m.decimals), MARGIN + tableW - 12, rowY, { align: "right" });
     doc.setFont("helvetica", "normal");
     setColor(doc, "setTextColor", "#9ca3af");
-    doc.setFontSize(6);
+    doc.setFontSize(7);
     doc.text(m.unit, MARGIN + tableW - 2, rowY, { align: "right" });
   });
   const tableH = REPORT_METRICS.length * rowH;
 
-  // Zone chart
-  if (showZoneChart && zonePng) {
-    try { doc.addImage(zonePng, "PNG", chartX, y, chartW, tableH); } catch {}
-  }
+  // Vector chart: always visible in the PDF and includes an exact value label per bar.
+  if (showZoneChart) drawZoneBars(doc, gpsRow, chartX, y - 2.5, chartW, tableH);
 
   y += tableH + 4;
 
@@ -406,13 +439,9 @@ export async function exportMatchReportPdf({ reportData, reportMeta, staffCommen
   if (config.showProfileComparison) y = drawProfileComparison(doc, reportData, y);
 
   const contentW = PAGE_W - 2 * MARGIN;
-  const zonePngs = config.showMatchDetails && config.showZoneCharts
-    ? await Promise.all(reportData.selected.map((matchData) => renderZoneDistributionChartPng(buildZoneDistributionData(matchData.gpsRow), 400, 240)))
-    : reportData.selected.map(() => null);
-
   if (config.showMatchDetails) {
     for (let i = 0; i < reportData.selected.length; i++) {
-      y = drawMatchBlock(doc, reportData.selected[i], zonePngs[i], y, contentW, config.showZoneCharts);
+      y = drawMatchBlock(doc, reportData.selected[i], y, contentW, config.showZoneCharts);
     }
   }
 
