@@ -280,29 +280,35 @@ function drawZoneBars(doc, gpsRow, x, y, width, height) {
   const rows = buildZoneDistributionData(gpsRow);
   const maxValue = Math.max(...rows.map((row) => Number(row.value || 0)), 1);
   const rowH = height / rows.length;
-  const labelW = 24;
-  const valueW = 19;
+  const labelW = 29;
+  const valueW = 22;
   const barX = x + labelW;
-  const barW = width - labelW - valueW - 2;
+  const barW = width - labelW - valueW - 3;
 
   rows.forEach((row, index) => {
     const rowY = y + index * rowH;
     const value = Number(row.value || 0);
-    setColor(doc, "setTextColor", "#4b5563");
+    const color = row.color || "#00843D";
+    const barH = Math.max(5.2, rowH - 2.4);
+
+    setColor(doc, "setTextColor", "#374151");
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7);
-    doc.text(row.metric, x, rowY + rowH * 0.66);
+    doc.setFontSize(7.8);
+    doc.text(row.metric, x, rowY + rowH * 0.67);
 
-    doc.setFillColor(235, 238, 233);
-    doc.roundedRect(barX, rowY + 1.2, barW, Math.max(3.2, rowH - 2.4), 1.2, 1.2, "F");
-    doc.setFillColor(0, 132, 61);
-    const filledW = value > 0 ? Math.max(1.2, (value / maxValue) * barW) : 0;
-    if (filledW > 0) doc.roundedRect(barX, rowY + 1.2, filledW, Math.max(3.2, rowH - 2.4), 1.2, 1.2, "F");
+    doc.setFillColor(232, 236, 232);
+    doc.roundedRect(barX, rowY + 1.2, barW, barH, 1.7, 1.7, "F");
+    const filledW = value > 0 ? Math.max(2.2, (value / maxValue) * barW) : 0;
+    if (filledW > 0) {
+      setColor(doc, "setFillColor", color);
+      doc.roundedRect(barX, rowY + 1.2, filledW, barH, 1.7, 1.7, "F");
+    }
 
+    const label = `${fmtMetric(value, Number.isInteger(value) ? 0 : 1)} ${row.unit || ""}`.trim();
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(8);
-    doc.text(`${fmtMetric(value, Number.isInteger(value) ? 0 : 1)} ${row.unit || ""}`.trim(), x + width, rowY + rowH * 0.66, { align: "right" });
+    doc.setFontSize(9.2);
+    doc.text(label, x + width, rowY + rowH * 0.67, { align: "right" });
   });
 }
 
@@ -316,48 +322,48 @@ function fitText(doc, value, maxWidth) {
 
 function drawMatchBlock(doc, matchData, y, contentW, showZoneChart = true) {
   const { match, gpsRow, minutesPlayed } = matchData;
-  const blockH = 94;
+  const blockH = 116;
 
   if (y + blockH > PAGE_H - MARGIN - 10) { doc.addPage(); y = MARGIN; }
 
   // Match header bar
   doc.setFillColor(0, 90, 52);
-  doc.rect(MARGIN, y, contentW, 11, "F");
+  doc.rect(MARGIN, y, contentW, 13, "F");
   setColor(doc, "setTextColor", "#FFFFFF");
   const rivalShield = match.rival_logo_url || getShieldForName(match.rival);
   if (rivalShield) {
-    try { doc.addImage(rivalShield, "PNG", MARGIN + 1.5, y + 1.5, 8, 8, undefined, "FAST"); } catch {}
+    try { doc.addImage(rivalShield, "PNG", MARGIN + 1.5, y + 2, 9, 9, undefined, "FAST"); } catch {}
   }
 
-  const rivalX = MARGIN + (rivalShield ? 11.5 : 3);
-  const metaX = MARGIN + 58;
+  const rivalX = MARGIN + (rivalShield ? 12.5 : 3);
+  const metaX = MARGIN + 60;
   const scoreX = PAGE_W - MARGIN - 2;
-  const minutesX = scoreX - 22;
-  const headerBaseline = y + 7.2;
+  const minutesX = scoreX - 23;
+  const headerBaseline = y + 8.3;
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(9.8);
   doc.text(fitText(doc, `vs ${match.rival || "Rival"}`, metaX - rivalX - 4), rivalX, headerBaseline);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(6.8);
+  doc.setFontSize(7.4);
   const dateStr = match.date ? new Date(match.date + "T00:00:00").toLocaleDateString("es-AR") : "—";
   const meta = [dateStr, match.competition, match.location].filter(Boolean).join(" · ");
   doc.text(fitText(doc, meta, minutesX - metaX - 8), metaX, headerBaseline);
 
   if (minutesPlayed != null) {
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(7.5);
+    doc.setFontSize(8.4);
     doc.text(`${minutesPlayed}'`, minutesX, headerBaseline, { align: "right" });
   }
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8);
+  doc.setFontSize(9);
   const rightText = `${match.our_score ?? "?"} - ${match.rival_score ?? "?"}`;
   doc.text(rightText, scoreX, headerBaseline, { align: "right" });
-  y += 16;
+  y += 20;
 
   // Two columns: metrics table (left) + zone chart (right)
-  const tableW = showZoneChart ? contentW * 0.46 : contentW;
+  const tableW = showZoneChart ? contentW * 0.48 : contentW;
   const chartX = MARGIN + tableW + 4;
   const chartW = contentW - tableW - 4;
 
