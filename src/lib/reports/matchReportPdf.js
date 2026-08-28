@@ -370,31 +370,31 @@ function drawMatchBlock(doc, matchData, y, contentW, showZoneChart = true) {
   // Section titles
   setColor(doc, "setTextColor", CLUB_BRAND.colors.greenDeep);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(8.5);
+  doc.setFontSize(10);
   doc.text("Métricas GPS", MARGIN, y);
   if (showZoneChart) doc.text("Zonas de velocidad e intensidad", chartX, y);
-  y += 7;
+  y += 8.5;
 
-  // Metrics table rows
-  const rowH = 6.6;
+  // Larger, high-contrast metric rows built for printing.
+  const rowH = 8.1;
   REPORT_METRICS.forEach((m, i) => {
     const rowY = y + i * rowH;
-    if (i % 2 === 0) {
-      doc.setFillColor(246, 247, 243);
-      doc.rect(MARGIN, rowY - 4.2, tableW, rowH, "F");
-    }
-    setColor(doc, "setTextColor", "#6b7280");
+    doc.setFillColor(i % 2 === 0 ? 242 : 248, i % 2 === 0 ? 246 : 249, i % 2 === 0 ? 241 : 247);
+    doc.roundedRect(MARGIN, rowY - 5.3, tableW, rowH - 0.7, 1.2, 1.2, "F");
+    doc.setFillColor(0, 132, 61);
+    doc.roundedRect(MARGIN, rowY - 5.3, 1.5, rowH - 0.7, 0.8, 0.8, "F");
+    setColor(doc, "setTextColor", "#4b5563");
     doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.8);
-    doc.text(m.label, MARGIN + 1.5, rowY);
+    doc.setFontSize(8.8);
+    doc.text(m.label, MARGIN + 3.2, rowY);
     setColor(doc, "setTextColor", CLUB_BRAND.colors.ink);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.text(fmtMetric(gpsRow[m.key], m.decimals), MARGIN + tableW - 14, rowY, { align: "right" });
+    doc.setFontSize(12.2);
+    doc.text(fmtMetric(gpsRow[m.key], m.decimals), MARGIN + tableW - 15, rowY, { align: "right" });
     doc.setFont("helvetica", "normal");
-    setColor(doc, "setTextColor", "#9ca3af");
-    doc.setFontSize(6.5);
-    doc.text(m.unit, MARGIN + tableW - 2, rowY, { align: "right" });
+    setColor(doc, "setTextColor", "#6b7280");
+    doc.setFontSize(7.4);
+    doc.text(m.unit, MARGIN + tableW - 2.5, rowY, { align: "right" });
   });
   const tableH = REPORT_METRICS.length * rowH;
 
