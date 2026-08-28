@@ -344,7 +344,6 @@ const INTENSITY_METRIC_DEFS = [
   { key: "player_load", label: "Player Load", unit: "au", color: "#14b8a6" },
   { key: "acc_3", label: "ACC +3", unit: "n°", color: "#a855f7" },
   { key: "dec_3", label: "DEC -3", unit: "n°", color: "#ec4899" },
-  { key: "rhie_bouts", label: "RHIE", unit: "n°", color: "#f97316" },
 ];
 
 function matchShortLabel(match) {
@@ -415,12 +414,11 @@ export function buildLastMatchVsAvgData(reportData) {
 
 // Métricas de zonas de velocidad e intensidad para un partido puntual
 const ZONE_METRICS = [
-  { key: "distance_19_8", label: "D >19.8 km/h", unit: "m" },
-  { key: "distance_25", label: "D >25 km/h", unit: "m" },
-  { key: "sprints", label: "Sprints", unit: "n°" },
-  { key: "acc_3", label: "ACC +3", unit: "n°" },
-  { key: "dec_3", label: "DEC -3", unit: "n°" },
-  { key: "rhie_bouts", label: "RHIE", unit: "n°" },
+  { key: "distance_19_8", label: "D >19.8 km/h", unit: "m", color: "#0EA5E9" },
+  { key: "distance_25", label: "D >25 km/h", unit: "m", color: "#F59E0B" },
+  { key: "sprints", label: "Sprints", unit: "n°", color: "#EF4444" },
+  { key: "acc_3", label: "ACC +3", unit: "n°", color: "#8B5CF6" },
+  { key: "dec_3", label: "DEC -3", unit: "n°", color: "#EC4899" },
 ];
 
 // Datos para gráfico de zonas de velocidad/intensidad (partido puntual, sin comparación)
@@ -428,6 +426,7 @@ export function buildZoneDistributionData(gpsRow) {
   return ZONE_METRICS.map((z) => ({
     metric: z.label,
     unit: z.unit,
+    color: z.color,
     value: Number(gpsRow[z.key] || 0),
   }));
 }
