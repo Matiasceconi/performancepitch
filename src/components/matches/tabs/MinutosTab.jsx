@@ -69,7 +69,11 @@ export default function MinutosTab({ match, players = [], onRegisterSave, onMatc
         base44.entities.MinutesRecord.filter({ match_id: match.id }, "-created_date", 300).catch(() => []),
       ]);
       const playerMap = callupState.playerMap;
-      const callupPlayers = callupState.savedCallups.map((callup) => ({ player: playerMap.get(callup.player_id), callup })).filter((item) => item.player);
+      const seenIds = new Set();
+      const callupPlayers = callupState.savedCallups
+        .filter((callup) => { if (seenIds.has(callup.player_id)) return false; seenIds.add(callup.player_id); return true; })
+        .map((callup) => ({ player: playerMap.get(callup.player_id), callup }))
+        .filter((item) => item.player);
       setCalledPlayers(callupPlayers.map((item) => item.player));
       setRecords(minuteRows || []);
       setLegacyRecords(oldRows || []);
