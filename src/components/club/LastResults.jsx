@@ -1,12 +1,7 @@
 import React from "react";
 import { Trophy } from "lucide-react";
 import ClubShield from "@/components/club/ClubShield";
-
-function fmtDate(iso) {
-  if (!iso) return "—";
-  try { return new Date(iso).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires", day: "2-digit", month: "short" }); }
-  catch { return iso; }
-}
+import { formatDateOnly, matchDateValue, sameClubName } from "@/lib/clubCompetitionUtils";
 
 const RESULT_CFG = {
   W: { label: "G", cls: "bg-emerald-500 text-white" },
@@ -16,8 +11,8 @@ const RESULT_CFG = {
 
 export default function LastResults({ fixtures, teamName, title = "Últimos Resultados", accent = "text-emerald-400" }) {
   const results = (fixtures || [])
-    .filter((f) => f.status === "finished" && (f.homeTeam === teamName || f.awayTeam === teamName))
-    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .filter((f) => (f.status === "played" || f.status === "finished" || (f.homeScore != null && f.awayScore != null)) && (sameClubName(f.homeTeam, teamName) || sameClubName(f.awayTeam, teamName)))
+    .sort((a, b) => String(matchDateValue(b)).localeCompare(String(matchDateValue(a))))
     .slice(0, 5);
 
   return (
@@ -30,21 +25,21 @@ export default function LastResults({ fixtures, teamName, title = "Últimos Resu
       ) : (
         <div className="space-y-2">
           {results.map((fx, i) => {
-            const isHome = fx.homeTeam === teamName;
+            const isHome = sameClubName(fx.homeTeam, teamName);
             const opponent = isHome ? fx.awayTeam : fx.homeTeam;
             const oppLogo = isHome ? fx.awayLogo : fx.homeLogo;
-            const teamScore = isHome ? fx.homeScore : fx.awayScore;
-            const oppScore = isHome ? fx.awayScore : fx.homeScore;
+            const teamScore = Number(isHome ? fx.homeScore : fx.awayScore);
+            const oppScore = Number(isHome ? fx.awayScore : fx.homeScore);
             const result = teamScore > oppScore ? "W" : teamScore < oppScore ? "L" : "D";
             const cfg = RESULT_CFG[result];
             return (
-              <div key={i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
+              <div key={fx.id || i} className="flex items-center gap-3 p-2.5 rounded-lg bg-zinc-950/50 border border-zinc-800/60">
                 <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${cfg.cls}`}>{cfg.label}</span>
                 <span className="text-xs text-zinc-500 font-medium w-4 shrink-0">{isHome ? "L" : "V"}</span>
-                <ClubShield teamName={opponent} teamLogo={oppLogo} providerTeamId={isHome ? fx.providerTeamIdAway : fx.providerTeamIdHome} size="w-6 h-6" />
+                <ClubShield teamName={opponent} teamLogo={oppLogo} size="w-6 h-6" />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-white truncate">vs {opponent}</p>
-                  <p className="text-xs text-zinc-500">{fx.tournament || "—"} · {fmtDate(fx.date)}</p>
+                  <p className="text-xs text-zinc-500">{fx.round || fx.competition || "—"} · {formatDateOnly(matchDateValue(fx), { compact: true })}</p>
                 </div>
                 <span className="text-sm font-bold text-white shrink-0">{teamScore} - {oppScore}</span>
               </div>
