@@ -252,7 +252,9 @@ export function buildDivisionModel({ standings = [], aliases = [], division = "p
       annualRow: null,
     };
   }
-  const competitionRows = standings.filter((row) => row.competition === competition && (!season || !row.season || String(row.season) === String(season)));
+  const allCompetitionRows = standings.filter((row) => row.competition === competition);
+  const seasonRows = allCompetitionRows.filter((row) => !season || !row.season || String(row.season) === String(season));
+  const competitionRows = seasonRows.length ? seasonRows : allCompetitionRows;
   const currentGroup = pickCurrentGroup(competitionRows, aliases);
   const annualGroup = pickAnnualGroup(competitionRows, aliases);
   const currentRowsRaw = currentGroup === ""
