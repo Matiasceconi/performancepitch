@@ -1,6 +1,7 @@
 import React from "react";
 import FormDots from "@/components/club/FormDots";
 import ClubShield from "@/components/club/ClubShield";
+import { sameClubName } from "@/lib/clubCompetitionUtils";
 
 function positionClass(position, total) {
   if (position <= 4) return "border-l-2 border-emerald-500 bg-emerald-500/[0.04]";
@@ -41,7 +42,7 @@ export default function ClubStandingsTable({ standings, highlightTeam }) {
           </thead>
           <tbody>
             {rows.map((r) => {
-              const isHL = r.teamName === highlightTeam;
+              const isHL = sameClubName(r.teamName, highlightTeam);
               const rowCls = isHL ? "border-l-2 border-emerald-500 bg-emerald-500/10" : positionClass(r.position, total);
               return (
                 <tr key={`${r.teamName}-${r.position}`} className={`border-t border-zinc-800/60 ${rowCls}`}>
