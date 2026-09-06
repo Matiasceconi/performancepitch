@@ -1,6 +1,7 @@
 import React from "react";
 import { Trophy } from "lucide-react";
 import ClubShield from "@/components/club/ClubShield";
+import { sameClubName } from "@/lib/clubCompetitionUtils";
 
 export default function ScorersTable({ scorers, title, accent, type, highlightTeam, showPhoto }) {
   const sorted = [...(scorers || [])].sort((a, b) => (b.goals || 0) - (a.goals || 0)).slice(0, 20);
@@ -10,7 +11,7 @@ export default function ScorersTable({ scorers, title, accent, type, highlightTe
 
   const totalGoals = sorted.reduce((sum, s) => sum + (s.goals || 0), 0);
   const topScorer = sorted[0];
-  const dyhScorers = (scorers || []).filter((s) => (s.teamName || "").includes("Defensa"));
+  const dyhScorers = (scorers || []).filter((s) => sameClubName(s.teamName, highlightTeam));
   const dyhGoals = dyhScorers.reduce((sum, s) => sum + (s.goals || 0), 0);
   const topAssister = [...(scorers || [])].sort((a, b) => (b.assists || 0) - (a.assists || 0))[0];
   const dyhByAssists = [...dyhScorers].sort((a, b) => (b.assists || 0) - (a.assists || 0))[0];
@@ -65,7 +66,7 @@ export default function ScorersTable({ scorers, title, accent, type, highlightTe
           </thead>
           <tbody>
             {sorted.map((s, i) => {
-              const isHL = (s.teamName || "").includes("Defensa");
+              const isHL = sameClubName(s.teamName, highlightTeam);
               return (
                 <tr key={i} className={`border-t border-zinc-800/60 ${isHL ? highlightBg : ""}`}>
                   <td className="text-center p-2 text-zinc-400">{i + 1}</td>
