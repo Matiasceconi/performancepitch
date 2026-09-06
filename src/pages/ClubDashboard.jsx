@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Activity, AlertCircle, CalendarDays, RefreshCw, ShieldCheck,
+  Activity, AlertCircle, RefreshCw, ShieldCheck,
   Target, TrendingUp, Trophy,
 } from "lucide-react";
 import { base44 } from "@/api/base44Client";
