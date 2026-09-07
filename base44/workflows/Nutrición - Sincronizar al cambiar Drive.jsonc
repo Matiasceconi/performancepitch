@@ -1,0 +1,38 @@
+{
+  "name": "Nutrici\u00f3n - Sincronizar al cambiar Drive",
+  "description": "Sincroniza mediciones nutricionales cuando cambia el archivo Antros grupales.xlsx en Google Drive.",
+  "trigger": {
+    "condition": null,
+    "config": {
+      "trigger_type": "connector",
+      "events": [
+        "file.update"
+      ],
+      "integration_type": "googledrive",
+      "resource_id": null
+    }
+  },
+  "definition": {
+    "document": {
+      "dsl": "1.0.0",
+      "name": "nutrici_n_sincronizar_al_cambiar_drive",
+      "version": "1.0",
+      "namespace": "base44"
+    },
+    "do": [
+      {
+        "run_function": {
+          "call": "invoke_backend_function",
+          "with": {
+            "function_name": "syncNutritionFromSheet",
+            "args": {}
+          },
+          "then": "end"
+        }
+      }
+    ]
+  },
+  "x-base44-migrated-from-automation": {
+    "legacy_payload_function": "syncNutritionFromSheet"
+  }
+}
