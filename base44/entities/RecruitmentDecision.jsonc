@@ -1,0 +1,101 @@
+{
+  "name": "RecruitmentDecision",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "meeting_id": {
+      "type": "string"
+    },
+    "prospect_id": {
+      "type": "string"
+    },
+    "prospect_name": {
+      "type": "string"
+    },
+    "recruitment_need_id": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "advance",
+        "hold",
+        "discard",
+        "request_more_info",
+        "market_check",
+        "medical_check",
+        "negotiation"
+      ],
+      "default": "hold"
+    },
+    "target_stage": {
+      "type": "string",
+      "description": "Etapa propuesta; s\u00f3lo se aplica si se confirma expl\u00edcitamente"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "owner_user_id": {
+      "type": "string"
+    },
+    "owner_name": {
+      "type": "string"
+    },
+    "due_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "evidence_report_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "pipeline_change_applied": {
+      "type": "boolean",
+      "default": false
+    },
+    "actor_user_id": {
+      "type": "string"
+    },
+    "actor_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "meeting_id",
+    "prospect_id",
+    "decision",
+    "actor_user_id",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

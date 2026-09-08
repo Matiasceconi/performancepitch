@@ -1,0 +1,103 @@
+{
+  "name": "ShadowSquadSlot",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "slot_key": {
+      "type": "string",
+      "description": "Clave estable del puesto/slot dentro del plan"
+    },
+    "position": {
+      "type": "string"
+    },
+    "role_profile_id": {
+      "type": "string"
+    },
+    "candidate_type": {
+      "type": "string",
+      "enum": [
+        "current_player",
+        "prospect"
+      ],
+      "default": "prospect"
+    },
+    "current_player_id": {
+      "type": "string"
+    },
+    "current_player_name": {
+      "type": "string"
+    },
+    "prospect_id": {
+      "type": "string"
+    },
+    "prospect_name": {
+      "type": "string"
+    },
+    "rank": {
+      "type": "number",
+      "default": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "reference",
+        "first_option",
+        "alternative",
+        "monitor",
+        "remove"
+      ],
+      "default": "alternative"
+    },
+    "recruitment_need_id": {
+      "type": "string"
+    },
+    "rationale": {
+      "type": "string"
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "plan_id",
+    "slot_key",
+    "candidate_type"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

@@ -62,8 +62,36 @@ function averageFit(payload: any) {
   return Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10);
 }
 
+function bucketAverage(bucket: any): number | null {
+  const values = Object.values(bucket || {}).map(Number).filter((value) => Number.isFinite(value) && value >= 0 && value <= 10);
+  if (!values.length) return null;
+  return Math.round((values.reduce((sum, value) => sum + value, 0) / values.length) * 10) / 10;
+}
+
+function reportSummary(report: any) {
+  if (!report) return null;
+  return {
+    id: report.id,
+    observation_date: report.observation_date,
+    recommendation: report.recommendation,
+    fit_score: report.fit_score,
+    confidence_score: report.confidence_score,
+    sample_quality: report.sample_quality,
+    role_profile_id: report.role_profile_id,
+    role_profile_name: report.role_profile_name,
+    summary: report.summary,
+    category_scores: {
+      technical: bucketAverage(report.technical_scores),
+      tactical: bucketAverage(report.tactical_scores),
+      physical: bucketAverage(report.physical_scores),
+      mental: bucketAverage(report.mental_scores),
+      market: bucketAverage(report.market_scores),
+    },
+  };
+}
+
 async function overview(base44: any, organizationId: string, capabilities: any) {
-  const [prospects, needs, assignments, reports, watchlists, watchlistItems, roleProfiles, squads, players, staff] = await Promise.all([
+  const [prospects, needs, assignments, reports, watchlists, watchlistItems, roleProfiles, squads, players, staff, shadowPlans, shadowSlots, meetings, decisions] = await Promise.all([
     base44.asServiceRole.entities.ScoutingProspect.filter({ organization_id: organizationId }, "-updated_at", 1000).catch(() => []),
     base44.asServiceRole.entities.RecruitmentNeed.filter({ organization_id: organizationId }, "-updated_at", 500).catch(() => []),
     base44.asServiceRole.entities.ScoutingAssignment.filter({ organization_id: organizationId }, "-created_at", 1000).catch(() => []),
@@ -74,8 +102,12 @@ async function overview(base44: any, organizationId: string, capabilities: any) 
     base44.asServiceRole.entities.Squad.filter({ active: true }, "name", 100).catch(() => []),
     base44.asServiceRole.entities.Player.filter({ active: true }, "full_name", 3000).catch(() => []),
     assignableUsers(base44),
+    base44.asServiceRole.entities.ShadowSquadPlan.filter({ organization_id: organizationId, status: { $ne: "archived" } }, "-updated_at", 200).catch(() => []),
+    base44.asServiceRole.entities.ShadowSquadSlot.filter({ organization_id: organizationId, status: { $ne: "remove" } }, "rank", 2000).catch(() => []),
+    base44.asServiceRole.entities.RecruitmentMeeting.filter({ organization_id: organizationId, status: { $ne: "archived" } }, "-meeting_date", 300).catch(() => []),
+    base44.asServiceRole.entities.RecruitmentDecision.filter({ organization_id: organizationId }, "-created_at", 2000).catch(() => []),
   ]);
-  return { capabilities, prospects, needs, assignments, reports, watchlists, watchlist_items: watchlistItems, role_profiles: roleProfiles, squads, players, staff };
+  return { capabilities, prospects, needs, assignments, reports, watchlists, watchlist_items: watchlistItems, role_profiles: roleProfiles, squads, players, staff, shadow_plans: shadowPlans, shadow_slots: shadowSlots, meetings, decisions };
 }
 
 async function linkProspectToNeed(base44: any, organizationId: string, prospectId: string, needId: string) {

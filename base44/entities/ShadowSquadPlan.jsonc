@@ -1,0 +1,86 @@
+{
+  "name": "ShadowSquadPlan",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string"
+    },
+    "squad_name": {
+      "type": "string"
+    },
+    "season_id": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "horizon": {
+      "type": "string",
+      "enum": [
+        "current",
+        "next_window",
+        "6_months",
+        "12_months",
+        "24_months"
+      ],
+      "default": "next_window"
+    },
+    "formation": {
+      "type": "string",
+      "description": "Estructura visual, ej. 4-3-3"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "archived"
+      ],
+      "default": "active"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
