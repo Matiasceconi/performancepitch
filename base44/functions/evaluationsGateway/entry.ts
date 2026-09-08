@@ -572,40 +572,54 @@ export default async function (req: Request): Promise<Response> {
     }
 
     if (action === "save_metric_definition") {
-      if (!body.id) return Response.json({ error: "id requerido" }, { status: 400 });
-      const rows = await base44.asServiceRole.entities.EvaluationMetricDefinition.filter({ id: body.id }, "-created_date", 1);
-      const previous = rows[0];
-      if (!previous) return Response.json({ error: "Métrica no encontrada" }, { status: 404 });
       const requested = body.definition || {};
-      const precision = Number(requested.precision);
-      if (!Number.isInteger(precision) || precision < 0 || precision > 8) {
-        return Response.json({ error: "La precisión debe ser un entero entre 0 y 8" }, { status: 400 });
-      }
+      const rows = body.id ? await base44.asServiceRole.entities.EvaluationMetricDefinition.filter({ id: body.id }, "-created_date", 1) : [];
+      const previous = rows[0] || null;
+      if (body.id && !previous) return Response.json({ error: "Métrica no encontrada" }, { status: 404 });
+      const metricKey = String(requested.metric_key || previous?.metric_key || "").trim();
+      const metricLabel = String(requested.metric_label || previous?.metric_label || "").trim();
+      const sourceKey = String(requested.source_key || previous?.source_key || "manual").trim();
+      if (!metricKey || !metricLabel || !sourceKey) return Response.json({ error: "Clave, etiqueta y fuente son obligatorias" }, { status: 400 });
+      const precision = Number(requested.precision ?? previous?.precision ?? 2);
+      if (!Number.isInteger(precision) || precision < 0 || precision > 8) return Response.json({ error: "La precisión debe ser un entero entre 0 y 8" }, { status: 400 });
       const allowedDirections = ["higher_is_better", "lower_is_better", "range", "contextual", "none"];
-      if (!allowedDirections.includes(requested.direction)) {
-        return Response.json({ error: "Dirección no válida" }, { status: 400 });
-      }
-      const updated = await base44.asServiceRole.entities.EvaluationMetricDefinition.update(body.id, {
-        metric_label: String(requested.metric_label || previous.metric_label),
-        unit: String(requested.unit ?? previous.unit ?? ""),
-        direction: requested.direction,
+      const direction = requested.direction || previous?.direction || "higher_is_better";
+      if (!allowedDirections.includes(direction)) return Response.json({ error: "Dirección no válida" }, { status: 400 });
+      const payload = {
+        metric_key: metricKey,
+        metric_label: metricLabel,
+        metric_label_en: String(requested.metric_label_en ?? previous?.metric_label_en ?? ""),
+        csv_column: String(requested.csv_column ?? previous?.csv_column ?? ""),
+        source_key: sourceKey,
+        test_keys: Array.isArray(requested.test_keys) ? requested.test_keys : (previous?.test_keys || []),
+        unit: String(requested.unit ?? previous?.unit ?? ""),
+        direction,
+        value_type: requested.value_type || previous?.value_type || "number",
         precision,
-        catalog_version: Number(previous.catalog_version || 1) + 1,
+        allows_negative: requested.allows_negative ?? previous?.allows_negative ?? false,
+        is_asymmetry: requested.is_asymmetry ?? previous?.is_asymmetry ?? false,
+        category: requested.category || previous?.category || "performance",
+        description: String(requested.description ?? previous?.description ?? ""),
+        performance_domain: String(requested.performance_domain ?? previous?.performance_domain ?? ""),
+        interpretation_role: requested.interpretation_role || previous?.interpretation_role || "outcome",
+        monitoring_priority: Number(requested.monitoring_priority ?? previous?.monitoring_priority ?? 0),
+        reliability_cv: requested.reliability_cv == null || requested.reliability_cv === "" ? previous?.reliability_cv ?? null : Number(requested.reliability_cv),
+        reliability_icc: requested.reliability_icc == null || requested.reliability_icc === "" ? previous?.reliability_icc ?? null : Number(requested.reliability_icc),
         active: requested.active !== false,
+        catalog_version: Number(previous?.catalog_version || 0) + 1,
         updated_by: user.id,
         updated_at: new Date().toISOString(),
-      });
+      };
+      const saved = previous
+        ? await base44.asServiceRole.entities.EvaluationMetricDefinition.update(previous.id, payload)
+        : await base44.asServiceRole.entities.EvaluationMetricDefinition.create(payload);
       await writeAudit(base44, user, {
         event_type: "metric_catalog_updated",
         squad_id: squadId,
-        reason: `Catálogo ${previous.metric_key} v${updated.catalog_version}`,
-        metadata: {
-          metric_id: previous.id,
-          previous: { metric_label: previous.metric_label, unit: previous.unit, direction: previous.direction, precision: previous.precision, catalog_version: previous.catalog_version || 1 },
-          current: { metric_label: updated.metric_label, unit: updated.unit, direction: updated.direction, precision: updated.precision, catalog_version: updated.catalog_version },
-        },
+        reason: `Catálogo ${metricKey} v${saved.catalog_version || 1}`,
+        metadata: { metric_id: saved.id, previous: previous ? { metric_label: previous.metric_label, unit: previous.unit, direction: previous.direction, catalog_version: previous.catalog_version || 1 } : null, current: payload },
       });
-      return Response.json({ definition: updated });
+      return Response.json({ definition: saved });
     }
 
     if (action === "toggle_alias") {
