@@ -10,7 +10,7 @@ import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getPlayerMedicalHistory, createMedicalEpisode } from "@/lib/medicalApi";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
+import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import moment from "moment";
 import "moment/locale/es";
 moment.locale("es");
