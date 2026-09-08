@@ -1,113 +1,30 @@
 import React, { useState } from "react";
-import { base44 } from "@/api/base44Client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/components/ui/use-toast";
-import { STATUS_LABELS } from "./medicalStatusConfig";
+import { updateMedicalEpisode } from "@/lib/medicalApi";
 
-export default function MedicalEpisodeEditModal({ episode, onClose, onSaved }) {
-  const [form, setForm] = useState({
-    categoria_division: episode.categoria_division || "",
-    lesion_consulta: episode.lesion_consulta || "",
-    mmii_afectado: episode.mmii_afectado || "",
-    fecha_inicio_tto: episode.fecha_inicio_tto || "",
-    fecha_final_tto: episode.fecha_final_tto || "",
-    perdida_dias: episode.perdida_dias ?? "",
-    etapa_rhb: episode.etapa_rhb || "",
-    observaciones: episode.observaciones || "",
-    medical_status: episode.medical_status || "lesionado",
-  });
+const AVAILABILITY = [["unavailable","No disponible"],["physiotherapy","Kinesiología"],["individual_field","Campo individual"],["modified_training","Trabajo modificado"],["partial_integration","Integración parcial"],["full_training","Entrenamiento completo"],["available_to_compete","Disponible para competir"]];
+const TYPES = [["injury","Lesión"],["illness","Enfermedad"],["consultation","Consulta"],["discomfort_followup","Molestia / seguimiento"],["control","Control"],["rehabilitation","Rehabilitación"],["return_to_training","Retorno al entrenamiento"]];
+
+export default function MedicalEpisodeEditModal({ episode, squadId, canViewClinical = true, onClose, onSaved }) {
+  const [form, setForm] = useState({ record_type: episode.record_type || "injury", event_date: episode.event_date || episode.fecha_inicio_tto || "", lesion_consulta: episode.lesion_consulta || "", body_region: episode.body_region || "", body_area: episode.body_area || "", laterality: episode.laterality || "unknown", expected_return_date: episode.expected_return_date || "", next_control_date: episode.next_control_date || "", availability: episode.availability || "unavailable", rehab_phase: episode.rehab_phase || "clinical", operational_note: episode.operational_note || "", preliminary_diagnosis: episode.preliminary_diagnosis || "", confirmed_diagnosis: episode.confirmed_diagnosis || "", treatment: episode.treatment || "", studies: episode.studies || "", private_note: episode.private_note || "" });
   const [saving, setSaving] = useState(false);
   const { toast } = useToast();
-
-  async function handleSave(e) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const user = await base44.auth.me();
-      const payload = {
-        ...form,
-        perdida_dias: form.perdida_dias === "" ? undefined : Number(form.perdida_dias),
-        source: "app",
-        edited_by: user?.full_name || user?.email || "Usuario",
-        edited_at: new Date().toISOString(),
-      };
-      Object.keys(payload).forEach((k) => payload[k] === undefined && delete payload[k]);
-      await base44.entities.MedicalEpisode.update(episode.id, payload);
-      await base44.functions.invoke("recalculateMedicalCurrentStatus", {});
-      toast({ title: "Registro actualizado" });
-      onSaved();
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Dialog open onOpenChange={onClose}>
-      <DialogContent className="bg-zinc-900 border-zinc-800 text-white max-w-md max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-white">Editar registro médico — {episode.player_name_original}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Categoría/División</label>
-              <Input value={form.categoria_division} onChange={(e) => setForm((f) => ({ ...f, categoria_division: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">MMII Afectado</label>
-              <Input value={form.mmii_afectado} onChange={(e) => setForm((f) => ({ ...f, mmii_afectado: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Lesión / Consulta *</label>
-            <Input value={form.lesion_consulta} onChange={(e) => setForm((f) => ({ ...f, lesion_consulta: e.target.value }))} required className="bg-zinc-800 border-zinc-700 text-white" />
-          </div>
-          <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Estado</label>
-            <Select value={form.medical_status} onValueChange={(v) => setForm((f) => ({ ...f, medical_status: v }))}>
-              <SelectTrigger className="bg-zinc-800 border-zinc-700 text-white"><SelectValue /></SelectTrigger>
-              <SelectContent className="bg-zinc-800 border-zinc-700">
-                {Object.entries(STATUS_LABELS).map(([v, label]) => (
-                  <SelectItem key={v} value={v} className="text-white">{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Fecha inicio TTO</label>
-              <Input type="date" value={form.fecha_inicio_tto} onChange={(e) => setForm((f) => ({ ...f, fecha_inicio_tto: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Fecha final TTO</label>
-              <Input type="date" value={form.fecha_final_tto} onChange={(e) => setForm((f) => ({ ...f, fecha_final_tto: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Días perdidos</label>
-              <Input type="number" value={form.perdida_dias} onChange={(e) => setForm((f) => ({ ...f, perdida_dias: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
-            </div>
-            <div>
-              <label className="text-xs text-zinc-400 mb-1 block">Etapa RHB</label>
-              <Input value={form.etapa_rhb} onChange={(e) => setForm((f) => ({ ...f, etapa_rhb: e.target.value }))} className="bg-zinc-800 border-zinc-700 text-white" />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs text-zinc-400 mb-1 block">Observaciones</label>
-            <Textarea value={form.observaciones} onChange={(e) => setForm((f) => ({ ...f, observaciones: e.target.value }))} rows={2} className="bg-zinc-800 border-zinc-700 text-white resize-none" />
-          </div>
-          <Button type="submit" disabled={saving} className="w-full bg-white text-zinc-900 hover:bg-zinc-200">
-            {saving ? "Guardando..." : "Guardar cambios"}
-          </Button>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
+  const set = (k,v) => setForm((f)=>({...f,[k]:v}));
+  async function save(e) { e.preventDefault(); setSaving(true); try { await updateMedicalEpisode(squadId, episode.id, form); toast({title:"Registro actualizado"}); onSaved?.(); } catch(err){ toast({title:err?.message||"Error al guardar",variant:"destructive"}); } finally { setSaving(false); } }
+  return <Dialog open onOpenChange={(v)=>!v&&onClose?.()}><DialogContent className="bg-zinc-950 border-zinc-800 text-white max-w-2xl max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>Editar episodio — {episode.player_name_original}</DialogTitle></DialogHeader><form onSubmit={save} className="space-y-4">
+    <div className="grid md:grid-cols-2 gap-3"><Field label="Tipo"><Select value={form.record_type} onValueChange={(v)=>set("record_type",v)}><SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger><SelectContent className="bg-zinc-900 border-zinc-700">{TYPES.map(([v,l])=><SelectItem key={v} value={v} className="text-white">{l}</SelectItem>)}</SelectContent></Select></Field><Field label="Fecha"><Input type="date" value={form.event_date} onChange={(e)=>set("event_date",e.target.value)} className="bg-zinc-900 border-zinc-700" /></Field></div>
+    <Field label="Motivo / resumen"><Input required value={form.lesion_consulta} onChange={(e)=>set("lesion_consulta",e.target.value)} className="bg-zinc-900 border-zinc-700" /></Field>
+    <div className="grid md:grid-cols-3 gap-3"><Field label="Región"><Input value={form.body_region} onChange={(e)=>set("body_region",e.target.value)} className="bg-zinc-900 border-zinc-700" /></Field><Field label="Zona"><Input value={form.body_area} onChange={(e)=>set("body_area",e.target.value)} className="bg-zinc-900 border-zinc-700" /></Field><Field label="Lado"><Select value={form.laterality} onValueChange={(v)=>set("laterality",v)}><SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger><SelectContent className="bg-zinc-900 border-zinc-700"><SelectItem value="left" className="text-white">Izquierdo</SelectItem><SelectItem value="right" className="text-white">Derecho</SelectItem><SelectItem value="bilateral" className="text-white">Bilateral</SelectItem><SelectItem value="midline" className="text-white">Línea media</SelectItem><SelectItem value="not_applicable" className="text-white">No corresponde</SelectItem><SelectItem value="unknown" className="text-white">Sin definir</SelectItem></SelectContent></Select></Field></div>
+    <div className="grid md:grid-cols-2 gap-3"><Field label="Disponibilidad"><Select value={form.availability} onValueChange={(v)=>set("availability",v)}><SelectTrigger className="bg-zinc-900 border-zinc-700"><SelectValue /></SelectTrigger><SelectContent className="bg-zinc-900 border-zinc-700">{AVAILABILITY.map(([v,l])=><SelectItem key={v} value={v} className="text-white">{l}</SelectItem>)}</SelectContent></Select></Field><Field label="Retorno estimado"><Input type="date" value={form.expected_return_date} onChange={(e)=>set("expected_return_date",e.target.value)} className="bg-zinc-900 border-zinc-700" /><p className="text-[10px] text-zinc-600 mt-1">No modifica el alta.</p></Field></div>
+    <Field label="Próximo control"><Input type="date" value={form.next_control_date} onChange={(e)=>set("next_control_date",e.target.value)} className="bg-zinc-900 border-zinc-700" /></Field>
+    <Field label="Información operativa"><Textarea value={form.operational_note} onChange={(e)=>set("operational_note",e.target.value)} rows={2} className="bg-zinc-900 border-zinc-700" /></Field>
+    {canViewClinical && <><div className="grid md:grid-cols-2 gap-3"><Field label="Diagnóstico preliminar"><Textarea value={form.preliminary_diagnosis} onChange={(e)=>set("preliminary_diagnosis",e.target.value)} rows={2} className="bg-zinc-900 border-zinc-700" /></Field><Field label="Diagnóstico confirmado"><Textarea value={form.confirmed_diagnosis} onChange={(e)=>set("confirmed_diagnosis",e.target.value)} rows={2} className="bg-zinc-900 border-zinc-700" /></Field></div><div className="grid md:grid-cols-2 gap-3"><Field label="Tratamiento"><Textarea value={form.treatment} onChange={(e)=>set("treatment",e.target.value)} rows={2} className="bg-zinc-900 border-zinc-700" /></Field><Field label="Estudios"><Textarea value={form.studies} onChange={(e)=>set("studies",e.target.value)} rows={2} className="bg-zinc-900 border-zinc-700" /></Field></div><Field label="Nota médica privada"><Textarea value={form.private_note} onChange={(e)=>set("private_note",e.target.value)} rows={3} className="bg-zinc-900 border-zinc-700" /></Field></>}
+    <div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose} className="border-zinc-700">Cancelar</Button><Button type="submit" disabled={saving} className="bg-white text-zinc-950 hover:bg-zinc-200">{saving?"Guardando…":"Guardar cambios"}</Button></div>
+  </form></DialogContent></Dialog>;
 }
+function Field({label,children}){return <div><label className="text-xs text-zinc-400 mb-1.5 block">{label}</label>{children}</div>}
