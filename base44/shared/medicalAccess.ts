@@ -66,7 +66,9 @@ export async function requireMedicalAccess(base44: any, user: any, squadId: stri
   const isPerformance = PERFORMANCE_ROLE.test(roleText) || areas.has("rendimiento_fisico") || areas.has("cuerpo_tecnico");
   const pageAllowed = (access.allowed_pages || []).includes("/performance/medical") || roles.some((role: any) => (role.allowed_pages || []).includes("/performance/medical"));
 
-  if (isClinical || pageAllowed) merged.can_view = true;
+  // El staff de rendimiento/cuerpo técnico puede consultar la vista operativa
+  // (disponibilidad y restricciones) pero nunca contenido clínico privado.
+  if (isClinical || isPerformance || pageAllowed) merged.can_view = true;
   if (isClinical) {
     merged.can_create = merged.can_create || true;
     merged.can_edit = merged.can_edit || true;
