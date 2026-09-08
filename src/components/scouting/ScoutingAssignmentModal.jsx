@@ -1,0 +1,26 @@
+import React, { useState } from "react";
+import { ClipboardList, X } from "lucide-react";
+import { scoutingGateway } from "@/lib/scoutingApi";
+
+const input="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-zinc-500";
+function Field({label,children}){return <div><label className="text-[11px] text-zinc-500 block mb-1.5">{label}</label>{children}</div>}
+export default function ScoutingAssignmentModal({ prospectId, prospects=[], needs=[], staff=[], onClose, onSaved }){
+ const [form,setForm]=useState({prospect_id:prospectId||"",recruitment_need_id:"",assigned_to_user_id:"",assignment_type:"video",match_date:"",match_label:"",competition:"",video_url:"",instructions:"",due_date:"",priority:"medium"});
+ const [saving,setSaving]=useState(false);const[error,setError]=useState("");
+ function setF(k,v){setForm(f=>({...f,[k]:v}))}
+ async function save(e){e.preventDefault();setError("");const assignee=staff.find(s=>s.id===form.assigned_to_user_id);if(!form.prospect_id||!assignee){setError("Seleccioná prospecto y responsable.");return;}setSaving(true);try{const data=await scoutingGateway("create_assignment",{...form,assigned_to_name:assignee.name});onSaved?.(data.assignment);onClose?.();}catch(err){setError(err.message)}finally{setSaving(false)}}
+ return <div className="fixed inset-0 z-[78] bg-black/80 flex items-center justify-center p-3" onClick={onClose}><form onSubmit={save} onClick={e=>e.stopPropagation()} className="w-full max-w-2xl rounded-2xl border border-zinc-700 bg-zinc-950">
+  <div className="flex items-center justify-between p-5 border-b border-zinc-800"><div className="flex items-center gap-3"><ClipboardList size={19} className="text-violet-400"/><div><h2 className="text-lg font-bold text-white">Asignar observación</h2><p className="text-xs text-zinc-500">Qué mirar, quién lo hace y para cuándo.</p></div></div><button type="button" onClick={onClose} className="text-zinc-500 hover:text-white"><X size={18}/></button></div>
+  <div className="p-5 space-y-4">{error&&<div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-sm text-red-300">{error}</div>}<div className="grid sm:grid-cols-2 gap-3">
+   <Field label="Prospecto"><select value={form.prospect_id} onChange={e=>setF("prospect_id",e.target.value)} className={input}><option value="">Seleccionar...</option>{prospects.filter(p=>p.status!=="archived").map(p=><option key={p.id} value={p.id}>{p.full_name} · {p.current_club_name||"Sin club"}</option>)}</select></Field>
+   <Field label="Responsable"><select value={form.assigned_to_user_id} onChange={e=>setF("assigned_to_user_id",e.target.value)} className={input}><option value="">Seleccionar...</option>{staff.map(s=><option key={s.id} value={s.id}>{s.name}{s.role?` · ${s.role}`:""}</option>)}</select></Field>
+   <Field label="Tipo"><select value={form.assignment_type} onChange={e=>setF("assignment_type",e.target.value)} className={input}><option value="video">Video</option><option value="live_match">Partido en vivo</option><option value="data_review">Revisión de datos</option><option value="background_check">Background / referencias</option><option value="follow_up">Seguimiento</option></select></Field>
+   <Field label="Necesidad"><select value={form.recruitment_need_id} onChange={e=>setF("recruitment_need_id",e.target.value)} className={input}><option value="">Sin necesidad específica</option>{needs.filter(n=>!["filled","cancelled"].includes(n.status)).map(n=><option key={n.id} value={n.id}>{n.title}</option>)}</select></Field>
+   <Field label="Fecha de partido"><input type="date" value={form.match_date} onChange={e=>setF("match_date",e.target.value)} className={input}/></Field><Field label="Vencimiento"><input type="date" value={form.due_date} onChange={e=>setF("due_date",e.target.value)} className={input}/></Field>
+   <Field label="Partido / referencia"><input value={form.match_label} onChange={e=>setF("match_label",e.target.value)} placeholder="Club A vs Club B" className={input}/></Field><Field label="Competición"><input value={form.competition} onChange={e=>setF("competition",e.target.value)} className={input}/></Field>
+   <Field label="Prioridad"><select value={form.priority} onChange={e=>setF("priority",e.target.value)} className={input}><option value="low">Baja</option><option value="medium">Media</option><option value="high">Alta</option><option value="critical">Crítica</option></select></Field><Field label="Video / enlace"><input value={form.video_url} onChange={e=>setF("video_url",e.target.value)} placeholder="https://..." className={input}/></Field>
+  </div><Field label="Instrucciones"><textarea rows={3} value={form.instructions} onChange={e=>setF("instructions",e.target.value)} placeholder="Qué queremos validar específicamente..." className={`${input} resize-none`}/></Field>
+  <div className="flex justify-end gap-2 border-t border-zinc-800 pt-4"><button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-zinc-700 text-sm text-zinc-300">Cancelar</button><button disabled={saving} className="px-4 py-2 rounded-lg bg-white text-zinc-950 text-sm font-semibold disabled:opacity-50">{saving?"Asignando…":"Crear asignación"}</button></div>
+  </div>
+ </form></div>
+}
