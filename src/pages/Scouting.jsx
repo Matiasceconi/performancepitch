@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Binoculars, ClipboardList, FileSearch, Filter, ListChecks, Loader2, Plus, Search, SlidersHorizontal, Target, UsersRound } from "lucide-react";
+import { Binoculars, ClipboardList, ListChecks, Loader2, Plus, Search, SlidersHorizontal, Target, UsersRound } from "lucide-react";
 import { scoutingOverview } from "@/lib/scoutingApi";
 import ProspectFormModal from "@/components/scouting/ProspectFormModal";
 import RecruitmentNeedModal from "@/components/scouting/RecruitmentNeedModal";
