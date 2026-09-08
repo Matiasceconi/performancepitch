@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Loader2, Inbox, Search, Table, Grid3x3 } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
-import { evaluationsGateway } from "@/lib/evaluationsApi";
+import { evaluationsGateway, evaluationsSummary } from "@/lib/evaluationsApi";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import ChangeMap from "@/components/evaluations/ChangeMap";
 
@@ -20,6 +20,7 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
   const [mode, setMode] = useState("table"); // table | map
   const [search, setSearch] = useState("");
   const [selectedMetric, setSelectedMetric] = useState(null);
+  const [canonicalChangeMap, setCanonicalChangeMap] = useState({ players: [], metrics: [] });
 
   useEffect(() => {
     if (!activeSquad?.id) return;
@@ -38,16 +39,19 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
   useEffect(() => {
     if (!selectedSession) return;
     setLoading(true);
-    evaluationsGateway("squad_analysis", { squad_id: activeSquad?.id, session_id: selectedSession })
-      .then((data) => {
+    Promise.all([
+      evaluationsGateway("squad_analysis", { squad_id: activeSquad?.id, session_id: selectedSession }),
+      evaluationsSummary({ squad_id: activeSquad?.id, session_id: selectedSession }),
+    ])
+      .then(([data, summary]) => {
         const nextResults = data.results || [];
         setResults(nextResults);
-        const metrics = new Set();
-        nextResults.forEach((r) => Object.keys(r.metrics || {}).forEach((k) => metrics.add(k)));
-        const sorted = [...metrics].sort();
-        if (sorted.length && !selectedMetric) setSelectedMetric(sorted[0]);
+        const changeMap = summary?.change_map || { players: [], metrics: [] };
+        setCanonicalChangeMap(changeMap);
+        const sorted = changeMap.metrics || [];
+        setSelectedMetric((current) => sorted.includes(current) ? current : (sorted[0] || null));
       })
-      .catch(() => setResults([]))
+      .catch(() => { setResults([]); setCanonicalChangeMap({ players: [], metrics: [] }); })
       .finally(() => setLoading(false));
   }, [selectedSession, activeSquad?.id]);
 
@@ -71,40 +75,10 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
       })
     : primaryResults;
 
-  // Build change map data from results
-  const changeMapPlayers = new Map();
-  for (const r of filtered) {
-    const key = r.player_id || r.player_name_csv;
-    if (!changeMapPlayers.has(key)) {
-      const player = r.player_id ? playersMap.get(r.player_id) : null;
-      changeMapPlayers.set(key, {
-        player_id: r.player_id,
-        player_name: player?.full_name || r.player_name_csv,
-        player_photo_url: player?.photo_url || null,
-        position: player?.position || "—",
-        metrics: {},
-      });
-    }
-    const p = changeMapPlayers.get(key);
-    for (const [mk, mv] of Object.entries(r.metrics || {})) {
-      const mapKey = `${r.test_key}|${mk}`;
-      p.metrics[mapKey] = {
-        current_value: mv,
-        baseline_value: null,
-        baseline_sufficient: false,
-        change_abs: null,
-        change_pct: null,
-        z_score_individual: null,
-        z_score_squad: null,
-        signal: "insufficient",
-        test_key: r.test_key,
-        metric_key: mk,
-        assessment_date: r.assessment_date,
-      };
-    }
-  }
-
-  const allMetrics = [...new Set(results.flatMap((r) => Object.keys(r.metrics || {})))].sort();
+  // El mapa usa exactamente el mismo cálculo canónico del Resumen y del perfil individual.
+  const visiblePlayerIds = new Set(filtered.map((r) => r.player_id).filter(Boolean));
+  const changeMapPlayers = (canonicalChangeMap.players || []).filter((p) => !search || visiblePlayerIds.has(p.player_id));
+  const allMetrics = canonicalChangeMap.metrics || [];
 
   return (
     <div className="space-y-4">
@@ -124,7 +98,10 @@ export default function EvaluationsSquadAnalysis({ onSelectPlayer }) {
       </div>
 
       {mode === "map" ? (
-        <ChangeMap players={[...changeMapPlayers.values()]} metricKey={selectedMetric} allMetrics={allMetrics} onSelectPlayer={onSelectPlayer} />
+        <div className="space-y-3">
+          <div className="flex items-center gap-2"><span className="text-xs text-zinc-500">Métrica:</span><select value={selectedMetric || ""} onChange={(e)=>setSelectedMetric(e.target.value)} className="bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white max-w-[320px]">{allMetrics.map((mk)=><option key={mk} value={mk}>{mk}</option>)}</select></div>
+          <ChangeMap players={changeMapPlayers} metricKey={selectedMetric} allMetrics={allMetrics} onSelectPlayer={onSelectPlayer} />
+        </div>
       ) : (
         <div className="bg-zinc-900 border border-zinc-800 rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
