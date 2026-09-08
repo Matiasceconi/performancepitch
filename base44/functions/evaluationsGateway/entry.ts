@@ -343,6 +343,106 @@ export default async function (req: Request): Promise<Response> {
       });
     }
 
+    if (action === "save_baseline_config") {
+      const form = body.baseline || {};
+      if (!form.source_key || !form.test_key || !form.metric_key) {
+        return Response.json({ error: "Fuente, prueba y métrica son obligatorias" }, { status: 400 });
+      }
+      const allowedPeriods = ["last_n_sessions", "rolling_window", "season", "date_range"];
+      const allowedCalculations = ["mean", "median", "mean_sd", "rolling_mean"];
+      const periodType = allowedPeriods.includes(form.period_type) ? form.period_type : "last_n_sessions";
+      const calculationType = allowedCalculations.includes(form.calculation_type) ? form.calculation_type : "mean";
+      const minSessions = Math.max(2, Number(form.min_sessions || 3));
+      const periodValue = form.period_value == null || form.period_value === "" ? 3 : Math.max(minSessions, Number(form.period_value));
+      const payload = {
+        squad_id: squadId,
+        player_id: form.player_id || null,
+        source_key: String(form.source_key),
+        test_key: String(form.test_key),
+        metric_key: String(form.metric_key),
+        period_type: periodType,
+        period_value: periodValue,
+        min_sessions: minSessions,
+        calculation_type: calculationType,
+        use_primary_only: form.use_primary_only !== false,
+        active: true,
+      };
+      let saved;
+      if (body.id) {
+        const rows = await base44.asServiceRole.entities.EvaluationBaselineConfig.filter({ id: body.id }, "-created_date", 1);
+        const previous = rows[0];
+        if (!previous || (previous.squad_id && previous.squad_id !== squadId)) return Response.json({ error: "Línea base no encontrada" }, { status: 404 });
+        saved = await base44.asServiceRole.entities.EvaluationBaselineConfig.update(previous.id, payload);
+      } else {
+        saved = await base44.asServiceRole.entities.EvaluationBaselineConfig.create({
+          ...payload,
+          config_id: crypto.randomUUID(),
+          created_by: user.id,
+          created_at: new Date().toISOString(),
+        });
+      }
+      await writeAudit(base44, user, {
+        event_type: "baseline_config_updated",
+        squad_id: squadId,
+        player_id: payload.player_id,
+        test_key: payload.test_key,
+        reason: `Línea base ${payload.test_key} · ${payload.metric_key}`,
+        metadata: { config_id: saved.config_id, origin: payload.player_id ? "individual" : "squad", config: payload },
+      });
+      return Response.json({ baseline: saved });
+    }
+
+    if (action === "delete_baseline_config") {
+      if (!body.id) return Response.json({ error: "id requerido" }, { status: 400 });
+      const rows = await base44.asServiceRole.entities.EvaluationBaselineConfig.filter({ id: body.id }, "-created_date", 1);
+      const config = rows[0];
+      if (!config || (config.squad_id && config.squad_id !== squadId)) return Response.json({ error: "Línea base no encontrada" }, { status: 404 });
+      if (!config.squad_id) return Response.json({ error: "La configuración global no se elimina desde un plantel" }, { status: 403 });
+      await base44.asServiceRole.entities.EvaluationBaselineConfig.update(config.id, { active: false });
+      await writeAudit(base44, user, { event_type: "baseline_config_updated", squad_id: squadId, player_id: config.player_id || null, test_key: config.test_key, reason: "Línea base desactivada", metadata: { config_id: config.config_id } });
+      return Response.json({ success: true });
+    }
+
+    if (action === "save_battery_template") {
+      const form = body.template || {};
+      const testKeys = [...new Set((Array.isArray(form.test_keys) ? form.test_keys : []).map((value: any) => String(value)).filter(Boolean))];
+      if (!String(form.name || "").trim() || !testKeys.length) return Response.json({ error: "La batería necesita nombre y al menos una prueba" }, { status: 400 });
+      const payload = {
+        name: String(form.name).trim(),
+        description: String(form.description || ""),
+        squad_id: squadId,
+        purpose: String(form.purpose || "profiling"),
+        test_keys: testKeys,
+        active: form.active !== false,
+        display_order: Number(form.display_order || 0),
+        notes: String(form.notes || ""),
+        updated_by: user.id,
+        updated_at: new Date().toISOString(),
+      };
+      let saved;
+      if (body.id) {
+        const rows = await base44.asServiceRole.entities.EvaluationBatteryTemplate.filter({ id: body.id }, "-created_date", 1);
+        const previous = rows[0];
+        if (!previous || (previous.squad_id && previous.squad_id !== squadId)) return Response.json({ error: "Batería no encontrada" }, { status: 404 });
+        saved = await base44.asServiceRole.entities.EvaluationBatteryTemplate.update(previous.id, payload);
+      } else {
+        saved = await base44.asServiceRole.entities.EvaluationBatteryTemplate.create({ ...payload, template_key: crypto.randomUUID(), created_by: user.id, created_at: new Date().toISOString() });
+      }
+      await writeAudit(base44, user, { event_type: "battery_template_updated", squad_id: squadId, reason: `Batería ${saved.name}`, metadata: { template_id: saved.id, test_keys: saved.test_keys } });
+      return Response.json({ template: saved });
+    }
+
+    if (action === "delete_battery_template") {
+      if (!body.id) return Response.json({ error: "id requerido" }, { status: 400 });
+      const rows = await base44.asServiceRole.entities.EvaluationBatteryTemplate.filter({ id: body.id }, "-created_date", 1);
+      const template = rows[0];
+      if (!template || (template.squad_id && template.squad_id !== squadId)) return Response.json({ error: "Batería no encontrada" }, { status: 404 });
+      if (!template.squad_id) return Response.json({ error: "La plantilla institucional no se elimina desde un plantel" }, { status: 403 });
+      await base44.asServiceRole.entities.EvaluationBatteryTemplate.update(template.id, { active: false, updated_by: user.id, updated_at: new Date().toISOString() });
+      await writeAudit(base44, user, { event_type: "battery_template_updated", squad_id: squadId, reason: `Batería ${template.name} desactivada`, metadata: { template_id: template.id } });
+      return Response.json({ success: true });
+    }
+
     if (action === "save_threshold") {
       const form = body.threshold || {};
       if (!form.source_key || !form.test_key || !form.metric_key) {
