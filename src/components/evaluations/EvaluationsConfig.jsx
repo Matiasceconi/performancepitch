@@ -287,7 +287,7 @@ function MetricsSection({ metricDefs, squadId, onReload }) {
 function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs, squadId, onReload }) {
   const [thresholds, setThresholds] = useState(initialThresholds);
   const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: 10 });
+  const [form, setForm] = useState({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: null });
 
   useEffect(() => { setThresholds(initialThresholds); }, [initialThresholds]);
 
@@ -296,7 +296,7 @@ function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs
       await evaluationsGateway("save_threshold", { squad_id: squadId, id: editing?.id || null, threshold: form });
       await onReload();
       setEditing(null);
-      setForm({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: 10 });
+      setForm({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: null });
     } catch (e) { alert("Error: " + e.message); }
   }
 
@@ -353,12 +353,17 @@ function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs
             <label className="text-xs text-zinc-500 block mb-1">Umbral caída (%)</label>
             <input type="number" step="0.1" value={form.decline_threshold || ""} onChange={(e) => setForm({ ...form, decline_threshold: e.target.value ? parseFloat(e.target.value) : null })} placeholder="Opcional" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" />
           </div>
+          <div>
+            <label className="text-xs text-zinc-500 block mb-1">Umbral asimetría (%)</label>
+            <input type="number" min="0" step="0.1" value={form.asymmetry_threshold ?? ""} onChange={(e) => setForm({ ...form, asymmetry_threshold: e.target.value === "" ? null : parseFloat(e.target.value) })} placeholder="Sin umbral" className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" />
+          </div>
         </div>
+        <p className="text-xs text-zinc-500 mt-2">La asimetría se muestra siempre con magnitud y dirección. Sólo genera una señal cuando configurás explícitamente un umbral para esa prueba y métrica.</p>
         <div className="flex items-center gap-2 mt-3">
           <button onClick={saveThreshold} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold hover:bg-blue-500 flex items-center gap-1.5">
             {editing ? <Check size={14} /> : <Plus size={14} />} {editing ? "Guardar" : "Crear umbral"}
           </button>
-          {editing && <button onClick={() => { setEditing(null); setForm({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: 10 }); }} className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs">Cancelar</button>}
+          {editing && <button onClick={() => { setEditing(null); setForm({ source_key: "forcedecks", test_key: "", metric_key: "", moderate_threshold: 1.0, important_threshold: 1.5, threshold_type: "sd", improvement_threshold: null, decline_threshold: null, asymmetry_threshold: null }); }} className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-300 text-xs">Cancelar</button>}
         </div>
       </div>
 
@@ -379,7 +384,7 @@ function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs
                   {t.decline_threshold != null && <span className="text-xs text-red-400">↓{t.decline_threshold}%</span>}
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={() => { setEditing(t); setForm({ source_key: t.source_key, test_key: t.test_key, metric_key: t.metric_key, moderate_threshold: t.moderate_threshold, important_threshold: t.important_threshold, threshold_type: t.threshold_type, improvement_threshold: t.improvement_threshold, decline_threshold: t.decline_threshold, asymmetry_threshold: t.asymmetry_threshold || 10 }); }} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400"><Edit2 size={14} /></button>
+                  <button onClick={() => { setEditing(t); setForm({ source_key: t.source_key, test_key: t.test_key, metric_key: t.metric_key, moderate_threshold: t.moderate_threshold, important_threshold: t.important_threshold, threshold_type: t.threshold_type, improvement_threshold: t.improvement_threshold, decline_threshold: t.decline_threshold, asymmetry_threshold: t.asymmetry_threshold ?? null }); }} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400"><Edit2 size={14} /></button>
                   <button onClick={() => deleteThreshold(t.id)} className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-red-400"><Trash2 size={14} /></button>
                 </div>
               </div>
