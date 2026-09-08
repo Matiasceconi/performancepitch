@@ -3,7 +3,7 @@ import { base44 } from "@/api/base44Client";
 import { X } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 
-const ALL_ROLES = ["entrenador", "PF", "analista", "médico", "kinesiólogo", "nutricionista", "utilero", "coordinador", "dirigente", "admin"];
+const ALL_ROLES = ["entrenador", "PF", "analista", "médico", "kinesiólogo", "nutricionista", "utilero", "coordinador", "dirigente", "scout", "director_deportivo", "admin"];
 
 export default function StaffForm({ member, squads, onSaved, onClose }) {
   const isEdit = !!member;
