@@ -15,10 +15,12 @@ const ROLE_COLORS = {
   utilero:       "bg-zinc-500/15 text-zinc-300 border-zinc-600",
   coordinador:   "bg-sky-500/15 text-sky-300 border-sky-500/30",
   dirigente:     "bg-pink-500/15 text-pink-300 border-pink-500/30",
+  scout:         "bg-amber-500/15 text-amber-300 border-amber-500/30",
+  director_deportivo: "bg-cyan-500/15 text-cyan-300 border-cyan-500/30",
   admin:         "bg-white/10 text-white border-white/20",
 };
 
-const ALL_ROLES = ["entrenador","PF","analista","médico","kinesiólogo","nutricionista","utilero","coordinador","dirigente","admin"];
+const ALL_ROLES = ["entrenador","PF","analista","médico","kinesiólogo","nutricionista","utilero","coordinador","dirigente","scout","director_deportivo","admin"];
 
 export default function StaffManager() {
   const [members, setMembers] = useState([]);
