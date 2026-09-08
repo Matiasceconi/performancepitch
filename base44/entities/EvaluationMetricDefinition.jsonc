@@ -108,6 +108,35 @@
       "default": 0,
       "description": "Orden de visualizaci\u00f3n"
     },
+    "performance_domain": {
+      "type": "string",
+      "description": "Dominio f\u00edsico para agrupar la m\u00e9trica independientemente de la fuente"
+    },
+    "interpretation_role": {
+      "type": "string",
+      "enum": [
+        "outcome",
+        "strategy",
+        "monitoring",
+        "contextual",
+        "quality"
+      ],
+      "default": "outcome",
+      "description": "Rol interpretativo de la m\u00e9trica"
+    },
+    "monitoring_priority": {
+      "type": "number",
+      "default": 0,
+      "description": "Prioridad para tableros y perfiles"
+    },
+    "reliability_cv": {
+      "type": "number",
+      "description": "CV porcentual documentado para esta m\u00e9trica/protocolo"
+    },
+    "reliability_icc": {
+      "type": "number",
+      "description": "ICC documentado para esta m\u00e9trica/protocolo"
+    },
     "updated_by": {
       "type": "string"
     },
