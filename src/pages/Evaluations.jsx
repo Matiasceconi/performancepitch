@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download, Loader2 } from "lucide-react";
+import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download, Loader2, ClipboardPlus } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { evaluationsGateway } from "@/lib/evaluationsApi";
 import EvaluationsSummary from "@/components/evaluations/EvaluationsSummary";
@@ -9,6 +9,7 @@ import EvaluationsSquadAnalysis from "@/components/evaluations/EvaluationsSquadA
 import EvaluationsPlayers from "@/components/evaluations/EvaluationsPlayers";
 import EvaluationsImportWizard from "@/components/evaluations/EvaluationsImportWizard";
 import EvaluationsConfig from "@/components/evaluations/EvaluationsConfig";
+import ManualEvaluationModal from "@/components/evaluations/ManualEvaluationModal";
 
 const TABS = [
   { key: "resumen", label: "Resumen", icon: ClipboardCheck },
@@ -24,6 +25,7 @@ export default function Evaluations() {
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "resumen");
   const [selectedPlayerId, setSelectedPlayerId] = useState(searchParams.get("player_id") || null);
   const [showImport, setShowImport] = useState(false);
+  const [showManual, setShowManual] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [capabilities, setCapabilities] = useState(null);
@@ -149,6 +151,12 @@ export default function Evaluations() {
             <Download size={16} /> {exporting ? "Exportando..." : "Exportar CSV"}
           </button>}
           {capabilities?.can_create && <button
+            onClick={() => setShowManual(true)}
+            className="px-4 py-2 rounded-lg bg-zinc-800 text-zinc-200 text-sm font-semibold hover:bg-zinc-700 transition-colors flex items-center gap-2"
+          >
+            <ClipboardPlus size={16} /> Carga manual
+          </button>}
+          {capabilities?.can_create && <button
             onClick={() => setShowImport(true)}
             className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-500 transition-colors flex items-center gap-2"
           >
@@ -194,6 +202,16 @@ export default function Evaluations() {
         {activeTab === "config" && capabilities?.can_admin && <EvaluationsConfig />}
         </>}
       </div>
+
+      {showManual && capabilities?.can_create && (
+        <ManualEvaluationModal
+          onClose={() => setShowManual(false)}
+          onSaved={() => {
+            setRefreshKey((k) => k + 1);
+            setActiveTab("resumen");
+          }}
+        />
+      )}
 
       {/* Import wizard modal */}
       {showImport && capabilities?.can_create && (
