@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { base44 } from "@/api/base44Client";
 import { useNavigate } from "react-router-dom";
 import { usePlayerCard360 } from "@/components/player/PlayerCard360Context";
@@ -8,7 +8,7 @@ import moment from "moment";
 import "moment/locale/es";
 import {
   User, Shield, Activity, Zap, Heart, Award, Paperclip, Apple,
-  BarChart2, CheckCircle, TrendingUp, Timer, History as HistoryIcon,
+  BarChart2, CheckCircle, Timer, History as HistoryIcon,
 } from "lucide-react";
 
 import PlayerCard360Header, { resolveBadge } from "@/components/player/PlayerCard360Header";
