@@ -4,7 +4,7 @@ import {
   Video, LayoutDashboard, Menu, X, Map, UsersRound, CalendarDays, Trophy,
   ClipboardList, Settings2, ShieldCheck, BookOpen, Dumbbell, LogOut, User,
   Gauge, HeartPulse, Heart, Apple, Clock, Repeat, PanelLeftClose, PanelLeftOpen,
-  Smartphone, UserRound, Activity
+  Smartphone, UserRound, Activity, Binoculars
 } from "lucide-react";
 import SquadSelector from "@/components/workspace/SquadSelector";
 import UserProfileModal from "@/components/workspace/UserProfileModal";
@@ -35,6 +35,7 @@ const NAV_ITEMS = [
   { label: "Planteles", path: "/squad-manager", icon: UsersRound },
   { label: "Accesos de jugadores", path: "/player-access", icon: UserRound },
   { label: "Evaluaciones", path: "/evaluations", icon: Activity },
+  { label: "Scouting", path: "/scouting", icon: Binoculars },
   { label: "Configuración", path: "/admin", icon: Settings2 },
 ];
 
