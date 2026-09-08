@@ -95,6 +95,91 @@
       "type": "number",
       "default": 0,
       "description": "Orden de visualizaci\u00f3n"
+    },
+    "performance_domain": {
+      "type": "string",
+      "enum": [
+        "jump_power",
+        "speed_acceleration",
+        "change_of_direction",
+        "max_strength",
+        "eccentric_strength",
+        "adductor_groin",
+        "intermittent_fitness",
+        "repeated_sprint",
+        "mobility",
+        "anthropometry",
+        "other"
+      ],
+      "default": "other",
+      "description": "Dominio f\u00edsico principal del test; independiente del proveedor"
+    },
+    "purpose_tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Usos previstos de la prueba"
+    },
+    "protocol_summary": {
+      "type": "string",
+      "description": "Protocolo operativo que debe repetirse para comparar resultados"
+    },
+    "equipment": {
+      "type": "string",
+      "description": "Equipamiento requerido o recomendado"
+    },
+    "surface": {
+      "type": "string",
+      "description": "Superficie o entorno recomendado"
+    },
+    "default_attempts": {
+      "type": "number",
+      "default": 3,
+      "description": "Cantidad de intentos sugerida"
+    },
+    "rest_seconds": {
+      "type": "number",
+      "description": "Recuperaci\u00f3n sugerida entre intentos"
+    },
+    "aggregation_method": {
+      "type": "string",
+      "enum": [
+        "best",
+        "mean",
+        "median",
+        "best_two_mean",
+        "last"
+      ],
+      "default": "best",
+      "description": "Forma de resumir intentos para seguimiento longitudinal"
+    },
+    "familiarization_sessions": {
+      "type": "number",
+      "default": 0,
+      "description": "Sesiones de familiarizaci\u00f3n recomendadas"
+    },
+    "maturity_sensitive": {
+      "type": "boolean",
+      "default": false,
+      "description": "Contextualizar por maduraci\u00f3n biol\u00f3gica en juveniles"
+    },
+    "reliability_icc": {
+      "type": "number",
+      "description": "ICC documentado para el protocolo"
+    },
+    "reliability_cv": {
+      "type": "number",
+      "description": "CV porcentual documentado para el protocolo"
+    },
+    "evidence_note": {
+      "type": "string",
+      "description": "Nota t\u00e9cnica sobre evidencia y limitaciones"
+    },
+    "reference_url": {
+      "type": "string",
+      "description": "Referencia t\u00e9cnica opcional"
     }
   },
   "required": [
