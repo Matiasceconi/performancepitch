@@ -140,6 +140,15 @@ function TestsSection({ testDefs, metricDefs, squadId, onReload }) {
       secondary_metric_key: test.secondary_metric_key || test.priority_metrics?.[1] || "",
       secondary_direction: test.secondary_direction || "higher",
       asymmetry_metrics: test.asymmetry_metrics || [],
+      performance_domain: test.performance_domain || "other",
+      protocol_summary: test.protocol_summary || "",
+      equipment: test.equipment || "",
+      surface: test.surface || "",
+      default_attempts: Number(test.default_attempts || 3),
+      rest_seconds: Number(test.rest_seconds || 0),
+      aggregation_method: test.aggregation_method || "best",
+      maturity_sensitive: !!test.maturity_sensitive,
+      evidence_note: test.evidence_note || "",
       active: test.active !== false,
       display_order: test.display_order || 0,
     });
@@ -200,6 +209,15 @@ function TestsSection({ testDefs, metricDefs, squadId, onReload }) {
             <RuleMetricSelect label="Métrica de desempate" value={form.secondary_metric_key} onChange={(value) => setForm({ ...form, secondary_metric_key: value })} metricDefs={metricDefs} optional />
             <DirectionSelect label="Dirección de desempate" value={form.secondary_direction} onChange={(value) => setForm({ ...form, secondary_direction: value })} />
           </div>
+          <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div><label className="text-xs text-zinc-500 block mb-1">Dominio</label><select value={form.performance_domain} onChange={(e)=>setForm({...form,performance_domain:e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"><option value="jump_power">Salto y potencia</option><option value="speed_acceleration">Velocidad/aceleración</option><option value="change_of_direction">Cambio de dirección</option><option value="max_strength">Fuerza máxima</option><option value="eccentric_strength">Fuerza excéntrica</option><option value="adductor_groin">Aductores/groin</option><option value="intermittent_fitness">Capacidad intermitente</option><option value="repeated_sprint">Repeated sprint</option><option value="other">Otro</option></select></div>
+            <div><label className="text-xs text-zinc-500 block mb-1">Intentos sugeridos</label><input type="number" min="1" max="10" value={form.default_attempts} onChange={(e)=>setForm({...form,default_attempts:Number(e.target.value)})} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div>
+            <div><label className="text-xs text-zinc-500 block mb-1">Recuperación (s)</label><input type="number" min="0" value={form.rest_seconds} onChange={(e)=>setForm({...form,rest_seconds:Number(e.target.value)})} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div>
+            <div><label className="text-xs text-zinc-500 block mb-1">Resumen de intentos</label><select value={form.aggregation_method} onChange={(e)=>setForm({...form,aggregation_method:e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white"><option value="best">Mejor intento</option><option value="mean">Media</option><option value="median">Mediana</option><option value="best_two_mean">Media mejores 2</option><option value="last">Último</option></select></div>
+          </div>
+          <div className="mt-3 grid sm:grid-cols-2 gap-3"><div><label className="text-xs text-zinc-500 block mb-1">Protocolo</label><textarea value={form.protocol_summary} onChange={(e)=>setForm({...form,protocol_summary:e.target.value})} rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-white" /></div><div><label className="text-xs text-zinc-500 block mb-1">Evidencia / limitaciones</label><textarea value={form.evidence_note} onChange={(e)=>setForm({...form,evidence_note:e.target.value})} rows={3} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-2 text-xs text-white" /></div></div>
+          <div className="mt-3 grid sm:grid-cols-2 gap-3"><div><label className="text-xs text-zinc-500 block mb-1">Equipamiento</label><input value={form.equipment} onChange={(e)=>setForm({...form,equipment:e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div><div><label className="text-xs text-zinc-500 block mb-1">Superficie / entorno</label><input value={form.surface} onChange={(e)=>setForm({...form,surface:e.target.value})} className="w-full bg-zinc-800 border border-zinc-700 rounded-lg px-2.5 py-1.5 text-xs text-white" /></div></div>
+          <label className="mt-3 flex items-center gap-2 text-xs text-zinc-400"><input type="checkbox" checked={form.maturity_sensitive} onChange={(e)=>setForm({...form,maturity_sensitive:e.target.checked})} className="accent-blue-500" />Contextualizar por maduración biológica en juveniles</label>
           <p className="text-xs text-zinc-500 mt-2">Si ambas métricas empatan, prevalece la menor hora y luego el menor número de intento. Cada guardado incrementa la versión de configuración.</p>
           <div className="flex gap-2 mt-3">
             <button onClick={saveRule} disabled={saving || !form.primary_metric_key} className="px-4 py-2 rounded-lg bg-blue-600 text-white text-xs font-semibold disabled:opacity-50">{saving ? "Guardando..." : "Guardar nueva versión"}</button>
