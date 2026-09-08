@@ -1,0 +1,82 @@
+{
+  "name": "ScoutingWatchlistItem",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "watchlist_id": {
+      "type": "string"
+    },
+    "prospect_id": {
+      "type": "string"
+    },
+    "recruitment_need_id": {
+      "type": "string"
+    },
+    "order": {
+      "type": "number",
+      "default": 0
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "removed"
+      ],
+      "default": "active"
+    },
+    "note": {
+      "type": "string"
+    },
+    "added_by_id": {
+      "type": "string"
+    },
+    "added_by_name": {
+      "type": "string"
+    },
+    "added_at": {
+      "type": "string"
+    },
+    "removed_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "watchlist_id",
+    "prospect_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

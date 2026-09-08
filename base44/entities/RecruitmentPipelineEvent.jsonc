@@ -1,0 +1,72 @@
+{
+  "name": "RecruitmentPipelineEvent",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "prospect_id": {
+      "type": "string"
+    },
+    "recruitment_need_id": {
+      "type": "string"
+    },
+    "from_stage": {
+      "type": "string"
+    },
+    "to_stage": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "decision_note": {
+      "type": "string"
+    },
+    "evidence_report_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "actor_user_id": {
+      "type": "string"
+    },
+    "actor_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "prospect_id",
+    "to_stage",
+    "actor_user_id",
+    "created_at"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

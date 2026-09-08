@@ -1,0 +1,147 @@
+{
+  "name": "RecruitmentNeed",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel objetivo; puede quedar vac\u00edo para necesidad institucional"
+    },
+    "squad_name": {
+      "type": "string"
+    },
+    "season_id": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string",
+      "description": "Ej. Central zurdo U23"
+    },
+    "position": {
+      "type": "string"
+    },
+    "role_profile_id": {
+      "type": "string"
+    },
+    "priority": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "critical"
+      ],
+      "default": "medium"
+    },
+    "time_horizon": {
+      "type": "string",
+      "enum": [
+        "current_window",
+        "next_window",
+        "6_months",
+        "12_months",
+        "24_months"
+      ],
+      "default": "next_window"
+    },
+    "reason": {
+      "type": "string",
+      "description": "Motivo deportivo: reemplazo, profundidad, venta probable, etc."
+    },
+    "current_player_id": {
+      "type": "string",
+      "description": "Jugador interno cuya plaza/rol sirve de referencia"
+    },
+    "requirements": {
+      "type": "object",
+      "additionalProperties": true,
+      "description": "Restricciones deportivas, f\u00edsicas, de edad y mercado"
+    },
+    "budget_min": {
+      "type": "number"
+    },
+    "budget_max": {
+      "type": "number"
+    },
+    "budget_currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "open",
+        "monitoring",
+        "shortlist_ready",
+        "negotiation",
+        "filled",
+        "cancelled"
+      ],
+      "default": "open"
+    },
+    "prospect_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "owner_user_id": {
+      "type": "string"
+    },
+    "owner_name": {
+      "type": "string"
+    },
+    "target_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "closed_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "title"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

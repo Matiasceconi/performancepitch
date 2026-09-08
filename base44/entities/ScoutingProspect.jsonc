@@ -1,0 +1,237 @@
+{
+  "name": "ScoutingProspect",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n propietaria del prospecto"
+    },
+    "prospect_key": {
+      "type": "string",
+      "description": "Clave estable para deduplicaci\u00f3n interna"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "active",
+        "archived",
+        "converted_to_player"
+      ],
+      "default": "active"
+    },
+    "pipeline_stage": {
+      "type": "string",
+      "enum": [
+        "discovered",
+        "longlist",
+        "watching",
+        "shortlist",
+        "priority",
+        "due_diligence",
+        "negotiation",
+        "signed",
+        "discarded"
+      ],
+      "default": "discovered"
+    },
+    "first_name": {
+      "type": "string"
+    },
+    "last_name": {
+      "type": "string"
+    },
+    "full_name": {
+      "type": "string"
+    },
+    "normalized_name": {
+      "type": "string"
+    },
+    "birth_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "nationality": {
+      "type": "string"
+    },
+    "second_nationality": {
+      "type": "string"
+    },
+    "position": {
+      "type": "string"
+    },
+    "secondary_positions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "role_profile_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "dominant_leg": {
+      "type": "string",
+      "enum": [
+        "right",
+        "left",
+        "both",
+        "unknown"
+      ],
+      "default": "unknown"
+    },
+    "height_cm": {
+      "type": "number"
+    },
+    "weight_kg": {
+      "type": "number"
+    },
+    "photo_url": {
+      "type": "string"
+    },
+    "current_club_name": {
+      "type": "string"
+    },
+    "current_club_id": {
+      "type": "string",
+      "description": "RivalClub.id cuando se vincula"
+    },
+    "current_competition": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "market_value_estimate": {
+      "type": "number"
+    },
+    "market_value_currency": {
+      "type": "string",
+      "default": "USD"
+    },
+    "contract_end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "ownership_status": {
+      "type": "string",
+      "enum": [
+        "owned",
+        "loan",
+        "free_agent",
+        "unknown"
+      ],
+      "default": "unknown"
+    },
+    "agent_name": {
+      "type": "string"
+    },
+    "agent_contact": {
+      "type": "string"
+    },
+    "passport_notes": {
+      "type": "string"
+    },
+    "foreign_player_status": {
+      "type": "string"
+    },
+    "availability_status": {
+      "type": "string",
+      "enum": [
+        "unknown",
+        "available",
+        "potentially_available",
+        "not_available"
+      ],
+      "default": "unknown"
+    },
+    "availability_verified_at": {
+      "type": "string"
+    },
+    "availability_source": {
+      "type": "string"
+    },
+    "source_type": {
+      "type": "string",
+      "enum": [
+        "manual",
+        "provider",
+        "scout_report",
+        "referral",
+        "other"
+      ],
+      "default": "manual"
+    },
+    "source_name": {
+      "type": "string"
+    },
+    "external_ids": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "tags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "internal_notes": {
+      "type": "string"
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_by_id": {
+      "type": "string"
+    },
+    "updated_by_name": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "converted_player_id": {
+      "type": "string"
+    },
+    "converted_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "full_name",
+    "prospect_key"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

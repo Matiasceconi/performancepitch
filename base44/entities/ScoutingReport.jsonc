@@ -1,0 +1,216 @@
+{
+  "name": "ScoutingReport",
+  "type": "object",
+  "properties": {
+    "organization_id": {
+      "type": "string"
+    },
+    "prospect_id": {
+      "type": "string"
+    },
+    "recruitment_need_id": {
+      "type": "string"
+    },
+    "assignment_id": {
+      "type": "string"
+    },
+    "report_type": {
+      "type": "string",
+      "enum": [
+        "video",
+        "live",
+        "data",
+        "background",
+        "composite"
+      ],
+      "default": "video"
+    },
+    "observation_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "match_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "match_label": {
+      "type": "string"
+    },
+    "competition": {
+      "type": "string"
+    },
+    "opponent": {
+      "type": "string"
+    },
+    "minutes_observed": {
+      "type": "number"
+    },
+    "role_profile_id": {
+      "type": "string"
+    },
+    "role_profile_name": {
+      "type": "string"
+    },
+    "technical_scores": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "tactical_scores": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "physical_scores": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "mental_scores": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "market_scores": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "technical_note": {
+      "type": "string"
+    },
+    "tactical_note": {
+      "type": "string"
+    },
+    "physical_note": {
+      "type": "string"
+    },
+    "mental_note": {
+      "type": "string"
+    },
+    "market_note": {
+      "type": "string"
+    },
+    "strengths": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "questions_to_verify": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "clips": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": [],
+      "description": "Evidencia {title,url,minute,tag,note}"
+    },
+    "attachments": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      },
+      "default": []
+    },
+    "recommendation": {
+      "type": "string",
+      "enum": [
+        "strong_recommend",
+        "recommend",
+        "monitor",
+        "doubt",
+        "do_not_recommend"
+      ],
+      "default": "monitor"
+    },
+    "fit_score": {
+      "type": "number",
+      "description": "Score de ajuste 0-100 calculado o ingresado, nunca decisi\u00f3n autom\u00e1tica"
+    },
+    "confidence_score": {
+      "type": "number",
+      "description": "Confianza del informe 0-100"
+    },
+    "sample_quality": {
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high"
+      ],
+      "default": "medium"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "submitted",
+        "reviewed",
+        "archived"
+      ],
+      "default": "submitted"
+    },
+    "author_user_id": {
+      "type": "string"
+    },
+    "author_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    },
+    "reviewed_by_id": {
+      "type": "string"
+    },
+    "reviewed_by_name": {
+      "type": "string"
+    },
+    "reviewed_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "organization_id",
+    "prospect_id",
+    "observation_date",
+    "author_user_id"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}

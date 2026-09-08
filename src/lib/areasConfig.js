@@ -8,6 +8,7 @@ export const AREAS = [
   { id: "kinesiologia",         name: "Kinesiología",         description: "Readaptación y trabajo kinésico",             icon: "HeartPulse" },
   { id: "nutricion",            name: "Nutrición",            description: "Seguimiento nutricional del plantel",         icon: "Apple" },
   { id: "psicologia",           name: "Psicología",           description: "Seguimiento psicológico del plantel",         icon: "Brain" },
+  { id: "scouting",             name: "Scouting y Recruitment", description: "Mercado, prospectos y decisiones de incorporación", icon: "Binoculars" },
   { id: "coordinacion_general", name: "Coordinación General", description: "Visión global de todas las áreas",            icon: "ClipboardList" },
   { id: "administracion",       name: "Administración",       description: "Usuarios, roles, planteles y configuración",  icon: "Settings2" },
 ];
@@ -43,6 +44,7 @@ export const MODULES = [
   { id: "configuracion", label: "Configuración", path: "/admin" },
   { id: "accesos_jugadores", label: "Accesos de jugadores", path: "/player-access" },
   { id: "evaluaciones", label: "Evaluaciones", path: "/evaluations" },
+  { id: "scouting", label: "Scouting & Recruitment", path: "/scouting" },
 ];
 
 export const PAGES = [
