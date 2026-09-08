@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { X, Heart, AlertCircle, Activity, CheckCircle, Clock, FileText, ShieldCheck } from "lucide-react";
+import { X, Heart, Activity, CheckCircle, FileText, ShieldCheck } from "lucide-react";
 import { getPlayerMedicalHistory } from "@/lib/medicalApi";
 
 const AVAILABILITY_LABEL = {
