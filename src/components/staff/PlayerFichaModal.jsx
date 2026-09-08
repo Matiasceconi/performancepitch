@@ -2,6 +2,8 @@ import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
 import { X, Plus, Trash2, Tag, Copy, Check, AlertCircle, User, GitMerge, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
+import { getPlayerMedicalHistory } from "@/lib/medicalApi";
 import moment from "moment";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 import "moment/locale/es";
@@ -68,6 +70,7 @@ export default function PlayerFichaModal({ player, onClose, onEdit }) {
   const [aliasInput, setAliasInput] = useState("");
   const [aliasSource, setAliasSource] = useState("Manual");
   const { toast } = useToast();
+  const { activeSquad } = useWorkspace();
 
   const age = player.birth_date ? moment().diff(moment(player.birth_date), "years") : null;
 
@@ -77,7 +80,7 @@ export default function PlayerFichaModal({ player, onClose, onEdit }) {
 
   useEffect(() => {
     if (activeTab === "disponibilidad") loadAvailabilityData();
-  }, [activeTab, player.id]);
+  }, [activeTab, player.id, activeSquad?.id]);
 
   async function loadAliases() {
     setLoadingAliases(true);
@@ -88,11 +91,19 @@ export default function PlayerFichaModal({ player, onClose, onEdit }) {
 
   async function loadAvailabilityData() {
     setLoadingAvail(true);
-    const [med, mins] = await Promise.all([
-      base44.entities.MedicalRecord.filter({ player_id: player.id }, "-injury_date", 20),
+    const squadId = activeSquad?.id || player.squad_id || null;
+    const [medicalData, mins] = await Promise.all([
+      squadId ? getPlayerMedicalHistory(squadId, player.id).catch(() => ({ episodes: [] })) : Promise.resolve({ episodes: [] }),
       base44.entities.MinutesRecord.filter({ player_id: player.id }, "-match_date", 50),
     ]);
-    setMedicalRecords(med);
+    const mappedMedical = (medicalData?.episodes || []).map((episode) => ({
+      ...episode,
+      diagnosis: episode.confirmed_diagnosis || episode.preliminary_diagnosis || episode.lesion_consulta || episode.operational_note || "Registro médico",
+      injury_date: episode.event_date || episode.fecha_inicio_tto,
+      expected_return: episode.expected_return_date || null,
+      status: episode.medical_clearance_date ? "Alta médica" : (episode.availability || episode.episode_state || "Seguimiento"),
+    }));
+    setMedicalRecords(mappedMedical);
     setMinutesRecords(mins);
     setLoadingAvail(false);
   }
