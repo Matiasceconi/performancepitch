@@ -226,7 +226,7 @@ export default async function (req: Request): Promise<Response> {
           ) || thresholds.find(
             (t: any) => !t.squad_id && t.source_key === cr.source_key && t.test_key === cr.test_key && t.metric_key === ak
           );
-          const aResult = detectAsymmetrySignal((av as any).magnitude, aThreshold?.asymmetry_threshold || 10);
+          const aResult = detectAsymmetrySignal((av as any).magnitude, aThreshold?.asymmetry_threshold ?? null);
           if (aResult.flagged) {
             asymmetryFlag = { metric: ak, magnitude: (av as any).magnitude, direction: (av as any).direction, reason: aResult.reason };
             break;
