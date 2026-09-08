@@ -30,6 +30,8 @@
         "utilero",
         "coordinador",
         "dirigente",
+        "scout",
+        "director_deportivo",
         "admin"
       ],
       "description": "Rol deportivo/laboral"
