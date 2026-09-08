@@ -74,6 +74,55 @@
     "meters_per_minute": {
       "type": "number",
       "description": "Metros por minuto"
+    },
+    "period_breakdown": {
+      "type": "array",
+      "default": [],
+      "description": "Desglose del partido por per\u00edodos detectados en el CSV sin duplicar la fila can\u00f3nica del jugador.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "period_name": {
+            "type": "string"
+          },
+          "period_order": {
+            "type": "number"
+          },
+          "total_duration": {
+            "type": "number"
+          },
+          "total_distance": {
+            "type": "number"
+          },
+          "distance_hsr": {
+            "type": "number"
+          },
+          "sprint_distance": {
+            "type": "number"
+          },
+          "sprint_efforts": {
+            "type": "number"
+          },
+          "accelerations": {
+            "type": "number"
+          },
+          "decelerations": {
+            "type": "number"
+          },
+          "player_load": {
+            "type": "number"
+          },
+          "max_velocity": {
+            "type": "number"
+          },
+          "max_velocity_percentage": {
+            "type": "number"
+          },
+          "meters_per_minute": {
+            "type": "number"
+          }
+        }
+      }
     }
   },
   "required": [
