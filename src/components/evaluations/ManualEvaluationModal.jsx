@@ -19,7 +19,7 @@ export default function ManualEvaluationModal({ onClose, onSaved }) {
   const [selectedMetrics, setSelectedMetrics] = useState([]);
   const [attemptCount, setAttemptCount] = useState(3);
   const [values, setValues] = useState({});
-  const [form, setForm] = useState({ assessment_date: todayBA(), assessment_time: "", context: "", session_name: "", test_key: "" });
+  const [form, setForm] = useState({ assessment_date: todayBA(), assessment_time: "", context: "", session_name: "", test_key: "", test_side: "Bilateral" });
 
   useEffect(() => {
     if (!activeSquad?.id) return;
@@ -41,6 +41,7 @@ export default function ManualEvaluationModal({ onClose, onSaved }) {
 
   useEffect(() => {
     if (!form.test_key) return;
+    setForm((current) => ({ ...current, test_side: test?.side_mode === "unilateral" ? "Left" : "Bilateral" }));
     const priority = (test?.priority_metrics || []).filter((key)=>applicableMetrics.some((m)=>m.metric_key===key));
     const fallback = applicableMetrics.slice(0, Math.max(1, 4-priority.length)).map((m)=>m.metric_key);
     setSelectedMetrics([...new Set([...priority,...fallback])].slice(0,6));
@@ -66,7 +67,7 @@ export default function ManualEvaluationModal({ onClose, onSaved }) {
     if (!form.test_key || !selectedPlayers.length || !selectedMetrics.length) { setError("Seleccioná prueba, jugadores y al menos una métrica."); return; }
     const entries = selectedPlayers.map((playerId) => ({
       player_id: playerId,
-      test_side: test?.side_mode === "unilateral" ? "Bilateral" : "Bilateral",
+      test_side: test?.side_mode === "unilateral" ? form.test_side : "Bilateral",
       attempts: Array.from({length:attemptCount},(_,i)=>({
         attempt_number:i+1,
         metrics:Object.fromEntries(selectedMetrics.map((key)=>[key, values[playerId]?.attempts?.[i]?.metrics?.[key] ?? ""]).filter(([,v])=>v!=="" && v!=null)),
@@ -86,7 +87,7 @@ export default function ManualEvaluationModal({ onClose, onSaved }) {
       <div className="sticky top-0 z-20 flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-950 px-5 py-4"><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 flex items-center justify-center"><ClipboardPlus size={19} className="text-emerald-400"/></div><div><h2 className="text-lg font-bold text-white">Nueva evaluación manual</h2><p className="text-xs text-zinc-500">Usa el mismo catálogo, intentos y regla de mejor intento que las importaciones.</p></div></div><button onClick={onClose} className="p-2 text-zinc-500 hover:text-white"><X size={19}/></button></div>
       {loading ? <div className="py-20 flex justify-center"><div className="w-6 h-6 border-2 border-zinc-700 border-t-white rounded-full animate-spin"/></div> : <div className="p-5 space-y-5">
         {error&&<div className="rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">{error}</div>}
-        <section className="grid md:grid-cols-5 gap-3"><Field label="Fecha"><input type="date" value={form.assessment_date} onChange={(e)=>setForm({...form,assessment_date:e.target.value})} className="input"/></Field><Field label="Hora"><input type="time" value={form.assessment_time} onChange={(e)=>setForm({...form,assessment_time:e.target.value})} className="input"/></Field><Field label="Prueba"><select value={form.test_key} onChange={(e)=>setForm({...form,test_key:e.target.value})} className="input">{tests.map((t)=><option key={t.test_key} value={t.test_key}>{t.name || t.test_key.toUpperCase()}</option>)}</select></Field><Field label="Contexto"><input value={form.context} onChange={(e)=>setForm({...form,context:e.target.value})} placeholder="Ej. MD-3 · control" className="input"/></Field><Field label="Nombre de batería"><input value={form.session_name} onChange={(e)=>setForm({...form,session_name:e.target.value})} placeholder="Automático si queda vacío" className="input"/></Field></section>
+        <section className="grid md:grid-cols-5 gap-3"><Field label="Fecha"><input type="date" value={form.assessment_date} onChange={(e)=>setForm({...form,assessment_date:e.target.value})} className="input"/></Field><Field label="Hora"><input type="time" value={form.assessment_time} onChange={(e)=>setForm({...form,assessment_time:e.target.value})} className="input"/></Field><Field label="Prueba"><select value={form.test_key} onChange={(e)=>setForm({...form,test_key:e.target.value})} className="input">{tests.map((t)=><option key={t.test_key} value={t.test_key}>{t.name || t.test_key.toUpperCase()}</option>)}</select></Field>{test?.side_mode === "unilateral" && <Field label="Lado"><select value={form.test_side} onChange={(e)=>setForm({...form,test_side:e.target.value})} className="input"><option value="Left">Izquierdo</option><option value="Right">Derecho</option></select></Field>}<Field label="Contexto"><input value={form.context} onChange={(e)=>setForm({...form,context:e.target.value})} placeholder="Ej. MD-3 · control" className="input"/></Field><Field label="Nombre de batería"><input value={form.session_name} onChange={(e)=>setForm({...form,session_name:e.target.value})} placeholder="Automático si queda vacío" className="input"/></Field></section>
 
         <section className="rounded-xl border border-zinc-800 bg-zinc-900 p-4"><div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3"><div><p className="text-sm font-semibold text-white">Métricas a cargar</p><p className="text-xs text-zinc-500">Las etiquetas vienen del catálogo; la clave técnica queda detrás.</p></div><div className="flex items-center gap-2"><span className="text-xs text-zinc-500">Intentos por jugador</span><button onClick={()=>setAttemptCount((n)=>Math.max(1,n-1))} className="p-1.5 rounded bg-zinc-800 text-zinc-300"><Minus size={13}/></button><b className="text-white text-sm w-5 text-center">{attemptCount}</b><button onClick={()=>setAttemptCount((n)=>Math.min(6,n+1))} className="p-1.5 rounded bg-zinc-800 text-zinc-300"><Plus size={13}/></button></div></div><div className="flex flex-wrap gap-2 mt-3">{applicableMetrics.map((m)=><button key={m.metric_key} onClick={()=>toggleMetric(m.metric_key)} className={`px-3 py-1.5 rounded-lg border text-xs ${selectedMetrics.includes(m.metric_key)?"border-blue-500/40 bg-blue-500/10 text-blue-200":"border-zinc-800 bg-zinc-950 text-zinc-500"}`}>{m.metric_label || m.metric_key}{m.unit?` (${m.unit})`:""}</button>)}</div>{applicableMetrics.length===0&&<p className="text-xs text-amber-400 mt-2">Esta prueba todavía no tiene métricas configuradas en el catálogo.</p>}</section>
 
