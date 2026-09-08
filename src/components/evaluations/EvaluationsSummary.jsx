@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Loader2, AlertCircle, Calendar, Users, TrendingUp, TrendingDown, Minus, Info, ArrowUp, ArrowDown, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
+import { AlertCircle, Calendar, Users, TrendingUp, TrendingDown, Minus, Info, ArrowUp, ArrowDown, AlertTriangle, ChevronDown, ChevronRight } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { evaluationsSummary } from "@/lib/evaluationsApi";
 import ReviewTray from "@/components/evaluations/ReviewTray";
