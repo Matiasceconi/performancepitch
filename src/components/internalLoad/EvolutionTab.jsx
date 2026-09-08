@@ -25,18 +25,25 @@ export default function EvolutionTab({ wellness, sessionPlayers, sessions, playe
     if (!selectedPlayerId && sortedPlayers.length) setSelectedPlayerId(sortedPlayers[0].id);
   }, [sortedPlayers, selectedPlayerId]);
 
-  const playerWellness = useMemo(() =>
+  const allPlayerWellness = useMemo(() =>
     wellness.filter((w) => w.player_id === selectedPlayerId).sort((a, b) => (a.response_date || '').localeCompare(b.response_date || '')),
     [wellness, selectedPlayerId]);
 
+  // La evolución 1–10 usa exclusivamente Wellness v2. Los registros legacy
+  // se conservan históricamente, pero no se mezclan en promedios ni gráficos.
+  const playerWellness = useMemo(() =>
+    allPlayerWellness.filter((w) => w.wellness_scale_version === 'negative_1_10_v2'),
+    [allPlayerWellness]);
+  const legacyWellnessCount = allPlayerWellness.length - playerWellness.length;
+
   const wellnessChart = useMemo(() => {
     const ma = movingAvg(playerWellness, 'wellness_score');
-    return playerWellness.map((w, i) => ({ date: fmt(w.response_date), wellness: w.wellness_score, media: ma[i] }));
+    return playerWellness.map((w, i) => ({ rawDate: w.response_date, date: fmt(w.response_date), wellness: w.wellness_score, media: ma[i] }));
   }, [playerWellness]);
 
-  const sleepChart = useMemo(() => playerWellness.map((w) => ({ date: fmt(w.response_date), horas: w.sleep_hours })), [playerWellness]);
+  const sleepChart = useMemo(() => playerWellness.map((w) => ({ rawDate: w.response_date, date: fmt(w.response_date), horas: w.sleep_hours })), [playerWellness]);
 
-  const painChart = useMemo(() => playerWellness.map((w) => ({ date: fmt(w.response_date), intensidad: w.has_pain ? w.pain_intensity : 0 })), [playerWellness]);
+  const painChart = useMemo(() => playerWellness.map((w) => ({ rawDate: w.response_date, date: fmt(w.response_date), intensidad: w.has_pain ? w.pain_intensity : 0 })), [playerWellness]);
 
   const playerRpe = useMemo(() => {
     const sessionMap = {};
@@ -45,9 +52,9 @@ export default function EvolutionTab({ wellness, sessionPlayers, sessions, playe
       .filter((sp) => sp.player_id === selectedPlayerId && sp.rpe != null)
       .map((sp) => {
         const s = sessionMap[sp.session_id];
-        return { date: fmt(s?.date), rpe: sp.rpe, internal_load: sp.internal_load, title: s?.title || '' };
+        return { rawDate: s?.date || '', date: fmt(s?.date), rpe: sp.rpe, internal_load: sp.internal_load, title: s?.title || '' };
       })
-      .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+      .sort((a, b) => (a.rawDate || '').localeCompare(b.rawDate || ''));
   }, [sessionPlayers, sessions, selectedPlayerId]);
 
   const rpeChart = useMemo(() => playerRpe.map((r) => ({ date: r.date, rpe: r.rpe, carga: r.internal_load })), [playerRpe]);
@@ -70,10 +77,15 @@ export default function EvolutionTab({ wellness, sessionPlayers, sessions, playe
 
       {!selectedPlayerId ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">Seleccioná un jugador.</div>
-      ) : playerWellness.length === 0 && playerRpe.length === 0 ? (
+      ) : allPlayerWellness.length === 0 && playerRpe.length === 0 ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-8 text-center text-zinc-500">Sin registros para este jugador.</div>
       ) : (
         <>
+          {legacyWellnessCount > 0 && (
+            <div className="rounded-xl border border-zinc-800 bg-zinc-900/70 p-3 text-xs text-zinc-500">
+              {legacyWellnessCount} registro{legacyWellnessCount !== 1 ? 's' : ''} Wellness legacy se conserva{legacyWellnessCount !== 1 ? 'n' : ''} en el historial, pero no se mezcla{legacyWellnessCount !== 1 ? 'n' : ''} con la escala v2 1–10.
+            </div>
+          )}
           {recentAlerts.length > 0 && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
               <div className="flex items-center gap-2 mb-2"><AlertTriangle size={16} className="text-amber-400" /><h3 className="text-sm font-bold text-white">Alertas recientes</h3></div>
@@ -97,7 +109,7 @@ export default function EvolutionTab({ wellness, sessionPlayers, sessions, playe
                 <LineChart data={wellnessChart}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
                   <XAxis dataKey="date" stroke="#71717a" fontSize={10} />
-                  <YAxis domain={[0, 100]} stroke="#71717a" fontSize={10} />
+                  <YAxis domain={[1, 10]} stroke="#71717a" fontSize={10} />
                   <Tooltip contentStyle={{ background: '#18181b', border: '1px solid #3f3f46', borderRadius: 8 }} />
                   <Line type="monotone" dataKey="wellness" stroke="#10b981" strokeWidth={2} dot={{ r: 3 }} name="Wellness" />
                   <Line type="monotone" dataKey="media" stroke="#f59e0b" strokeWidth={2} strokeDasharray="5 5" dot={false} name="Media 7" />
