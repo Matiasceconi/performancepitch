@@ -54,6 +54,7 @@ import ValdPlayers from '@/pages/ValdPlayers';
 import ValdPlayerDetail from '@/pages/ValdPlayerDetail';
 import ValdSettings from '@/pages/ValdSettings';
 import Evaluations from '@/pages/Evaluations';
+import Scouting from '@/pages/Scouting';
 
 // ── Global Error Boundary ─────────────────────────────────────────────────
 class GlobalErrorBoundary extends Component {
@@ -137,6 +138,7 @@ function StaffRoutes() {
             <Route path="/player-access" element={<PlayerAccess />} />
             <Route path="/complementary-strength" element={<ComplementaryStrengthPlans />} />
             <Route path="/evaluations" element={<Evaluations />} />
+            <Route path="/scouting" element={<Scouting />} />
             <Route path="/vald" element={<Navigate to="/evaluations" replace />} />
             <Route path="/vald/players" element={<Navigate to="/evaluations" replace />} />
             <Route path="/vald/players/:id" element={<Navigate to="/evaluations" replace />} />
