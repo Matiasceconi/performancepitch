@@ -7,7 +7,8 @@ import {
   type PlayerInfo,
 } from "../../shared/evaluationImportUtils.ts";
 import {
-  calculateBaseline,
+  calculateConfiguredBaseline,
+  resolveBaselineConfig,
   determineSignal,
   detectAsymmetrySignal,
   detectAnomaly,
@@ -135,7 +136,7 @@ export default async function (req: Request): Promise<Response> {
       if (!playerId) continue;
       for (const [mk, mv] of Object.entries(hr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
-        const key = `${playerId}|${hr.test_key}|${mk}`;
+        const key = `${playerId}|${hr.source_key || ""}|${hr.test_key}|${mk}`;
         if (!baselineMap.has(key)) baselineMap.set(key, { values: [], count: 0 });
         baselineMap.get(key)!.values.push(mv);
       }
@@ -150,10 +151,15 @@ export default async function (req: Request): Promise<Response> {
       if (!pr.player_id) continue;
       for (const [mk, mv] of Object.entries(pr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
-        const key = `${pr.player_id}|${pr.test_key}|${mk}`;
+        const key = `${pr.player_id}|${pr.source_key || ""}|${pr.test_key}|${mk}`;
         if (!previousMap.has(key)) previousMap.set(key, mv);
       }
     }
+
+    let baselineConfigs: any[] = [];
+    try {
+      baselineConfigs = await base44.asServiceRole.entities.EvaluationBaselineConfig.filter({ active: true }, "-created_at", 500);
+    } catch { /* empty */ }
 
     // ── 10. Build review tray, improvements, declines, mixed signals ───────
     const reviewItems: any[] = [];
@@ -181,11 +187,16 @@ export default async function (req: Request): Promise<Response> {
         squadMetricValues.get(squadMetricKey)!.push(mv);
 
         // Get baseline
-        const baselineKey = `${playerId}|${cr.test_key}|${mk}`;
+        const baselineKey = `${playerId}|${cr.source_key || ""}|${cr.test_key}|${mk}`;
         const baselineData = baselineMap.get(baselineKey);
-        const baseline = baselineData
-          ? calculateBaseline(baselineData.values, 3)
-          : { value: null, std: null, sufficient: false, count: 0, config_version: "mean_last_3_v1" };
+        const baselineResolution = resolveBaselineConfig(baselineConfigs, {
+          playerId,
+          squadId: session.squad_id,
+          sourceKey: cr.source_key,
+          testKey: cr.test_key,
+          metricKey: mk,
+        });
+        const baseline = calculateConfiguredBaseline(baselineData?.values || [], baselineResolution);
 
         // Get previous session value
         const previousValue = playerId ? previousMap.get(baselineKey) ?? null : null;
@@ -281,6 +292,10 @@ export default async function (req: Request): Promise<Response> {
           baseline_value: baseline.value,
           baseline_sufficient: baseline.sufficient,
           baseline_sessions: baseline.count,
+          baseline_origin: baseline.origin,
+          baseline_origin_label: baseline.origin_label,
+          baseline_config_version: baseline.config_version,
+          baseline_calculation: baseline.calculation,
           change_abs: signal.changeAbs,
           change_pct: signal.changePct,
           z_score_individual: signal.zScoreIndividual,
@@ -379,6 +394,11 @@ export default async function (req: Request): Promise<Response> {
             recent_change_pct: recentChange.changePct,
             baseline_value: baseline.value,
             baseline_sufficient: baseline.sufficient,
+            baseline_sessions: baseline.count,
+            baseline_origin: baseline.origin,
+            baseline_origin_label: baseline.origin_label,
+            baseline_config_version: baseline.config_version,
+            baseline_calculation: baseline.calculation,
             change_abs: signal.changeAbs,
             change_pct: signal.changePct,
             z_score_individual: signal.zScoreIndividual,
