@@ -4,10 +4,53 @@ import {
   pctChange,
 } from "./evaluationImportUtils.ts";
 
+export interface BaselineConfigRecord {
+  config_id?: string;
+  squad_id?: string | null;
+  player_id?: string | null;
+  source_key?: string | null;
+  test_key?: string | null;
+  metric_key?: string | null;
+  period_type?: "last_n_sessions" | "date_range" | "season" | "rolling_window";
+  period_value?: number | null;
+  min_sessions?: number | null;
+  calculation_type?: "mean" | "median" | "mean_sd" | "rolling_mean";
+  use_primary_only?: boolean;
+  active?: boolean;
+}
+
+export interface ResolvedBaselineConfig {
+  origin: "individual" | "squad" | "system_default";
+  config: BaselineConfigRecord | null;
+  label: string;
+}
+
+export function resolveBaselineConfig(
+  configs: BaselineConfigRecord[],
+  params: { playerId?: string | null; squadId?: string | null; sourceKey?: string | null; testKey: string; metricKey: string },
+): ResolvedBaselineConfig {
+  const candidates = (configs || []).filter((item) => {
+    if (item.active === false) return false;
+    if (item.test_key && item.test_key !== params.testKey) return false;
+    if (item.metric_key && item.metric_key !== params.metricKey) return false;
+    if (item.source_key && params.sourceKey && item.source_key !== params.sourceKey) return false;
+    if (item.player_id && item.player_id !== params.playerId) return false;
+    if (item.squad_id && item.squad_id !== params.squadId) return false;
+    return true;
+  });
+  const ranked = candidates.sort((a, b) => {
+    const score = (item: BaselineConfigRecord) => (item.player_id ? 300 : item.squad_id ? 200 : 100) + (item.source_key ? 10 : 0);
+    return score(b) - score(a);
+  });
+  const selected = ranked[0] || null;
+  if (!selected) return { origin: "system_default", config: null, label: "Sistema · media últimas 3" };
+  if (selected.player_id) return { origin: "individual", config: selected, label: "Configuración individual" };
+  return { origin: "squad", config: selected, label: "Configuración del plantel" };
+}
+
 /**
  * Calcula la línea de base de un jugador para una métrica específica.
- * Usa los N resultados primarios más recientes (excluyendo la sesión actual).
- * Configuración inicial: media de las últimas 3 sesiones válidas, mínimo 3.
+ * Respaldo del sistema: media de las últimas 3 sesiones válidas, mínimo 3.
  */
 export function calculateBaseline(
   historicalValues: number[],
@@ -30,6 +73,63 @@ export function calculateBaseline(
     sufficient: true,
     count: stats.count,
     config_version: "mean_last_3_v1",
+  };
+}
+
+export function calculateConfiguredBaseline(
+  historicalValues: number[],
+  resolved: ResolvedBaselineConfig,
+): {
+  value: number | null;
+  std: number | null;
+  sufficient: boolean;
+  count: number;
+  config_version: string;
+  origin: ResolvedBaselineConfig["origin"];
+  origin_label: string;
+  calculation: string;
+  period_type: string;
+  period_value: number | null;
+} {
+  const cfg = resolved.config;
+  if (!cfg) {
+    const base = calculateBaseline(historicalValues, 3);
+    return { ...base, origin: resolved.origin, origin_label: resolved.label, calculation: "mean", period_type: "last_n_sessions", period_value: 3 };
+  }
+  const minSessions = Math.max(1, Number(cfg.min_sessions || 3));
+  const periodType = cfg.period_type || "last_n_sessions";
+  const requested = Math.max(minSessions, Number(cfg.period_value || minSessions));
+  const selectedValues = ["last_n_sessions", "rolling_window"].includes(periodType)
+    ? historicalValues.slice(-requested)
+    : historicalValues;
+  if (selectedValues.length < minSessions) {
+    return {
+      value: null,
+      std: null,
+      sufficient: false,
+      count: selectedValues.length,
+      config_version: `baseline_config:${cfg.config_id || "custom"}`,
+      origin: resolved.origin,
+      origin_label: resolved.label,
+      calculation: cfg.calculation_type || "mean",
+      period_type: periodType,
+      period_value: cfg.period_value ?? null,
+    };
+  }
+  const stats = calculateStats(selectedValues);
+  const calculation = cfg.calculation_type || "mean";
+  const value = calculation === "median" ? stats.median : stats.mean;
+  return {
+    value,
+    std: stats.std,
+    sufficient: true,
+    count: stats.count,
+    config_version: `baseline_config:${cfg.config_id || "custom"}`,
+    origin: resolved.origin,
+    origin_label: resolved.label,
+    calculation,
+    period_type: periodType,
+    period_value: cfg.period_value ?? null,
   };
 }
 
