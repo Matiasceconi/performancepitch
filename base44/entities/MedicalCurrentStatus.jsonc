@@ -4,11 +4,15 @@
   "properties": {
     "player_id": {
       "type": "string",
-      "description": "ID del jugador"
+      "description": "ID can\u00f3nico del jugador"
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n"
     },
     "squad_id": {
       "type": "string",
-      "description": "Plantel del jugador"
+      "description": "Plantel operativo"
     },
     "current_status": {
       "type": "string",
@@ -21,19 +25,67 @@
         "alta"
       ],
       "default": "disponible",
-      "description": "Estado m\u00e9dico actual del jugador (fuente de verdad para el Dashboard)"
+      "description": "Estado m\u00e9dico de compatibilidad; no representa por s\u00ed solo disponibilidad deportiva"
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "unavailable",
+        "physiotherapy",
+        "individual_field",
+        "modified_training",
+        "partial_integration",
+        "full_training",
+        "available_to_compete"
+      ],
+      "default": "available_to_compete",
+      "description": "Fuente can\u00f3nica de disponibilidad deportiva actual"
+    },
+    "restriction_summary": {
+      "type": "string",
+      "description": "Restricci\u00f3n operativa visible para staff autorizado"
+    },
+    "rehab_phase": {
+      "type": "string",
+      "enum": [
+        "clinical",
+        "rehabilitation",
+        "individual_field",
+        "partial_integration",
+        "full_training",
+        "available"
+      ],
+      "description": "Fase actual de RTP"
     },
     "active_episode_id": {
       "type": "string",
-      "description": "ID del MedicalEpisode activo que determina el estado actual"
+      "description": "MedicalEpisode activo que sostiene el estado actual"
+    },
+    "next_control_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Pr\u00f3ximo control"
+    },
+    "last_follow_up_at": {
+      "type": "string",
+      "description": "Timestamp del \u00faltimo seguimiento"
+    },
+    "medical_clearance_date": {
+      "type": "string",
+      "format": "date",
+      "description": "\u00daltima alta m\u00e9dica expl\u00edcita"
     },
     "updated_at": {
       "type": "string",
-      "description": "Fecha/hora del \u00faltimo rec\u00e1lculo (ISO)"
+      "description": "\u00daltimo cambio"
     },
     "updated_by": {
       "type": "string",
-      "description": "Usuario que actualiz\u00f3 manualmente el estado (si aplica)"
+      "description": "Usuario que actualiz\u00f3"
+    },
+    "updated_by_id": {
+      "type": "string",
+      "description": "ID del usuario que actualiz\u00f3"
     }
   },
   "required": [
