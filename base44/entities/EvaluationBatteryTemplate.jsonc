@@ -1,0 +1,81 @@
+{
+  "name": "EvaluationBatteryTemplate",
+  "type": "object",
+  "properties": {
+    "template_key": {
+      "type": "string",
+      "description": "Clave estable de la bater\u00eda"
+    },
+    "name": {
+      "type": "string",
+      "description": "Nombre visible"
+    },
+    "description": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string",
+      "description": "Plantel; vac\u00edo = plantilla institucional"
+    },
+    "purpose": {
+      "type": "string",
+      "description": "Objetivo de la bater\u00eda"
+    },
+    "test_keys": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": []
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    },
+    "display_order": {
+      "type": "number",
+      "default": 0
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_by": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "template_key",
+    "name"
+  ],
+  "rls": {
+    "read": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "create": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "update": {
+      "user_condition": {
+        "role": "admin"
+      }
+    },
+    "delete": {
+      "user_condition": {
+        "role": "admin"
+      }
+    }
+  }
+}
