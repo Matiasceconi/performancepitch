@@ -108,6 +108,10 @@ export default async function (req: Request): Promise<Response> {
       delete_threshold: "admin",
       save_test_definition: "admin",
       save_metric_definition: "admin",
+      save_baseline_config: "admin",
+      delete_baseline_config: "admin",
+      save_battery_template: "admin",
+      delete_battery_template: "admin",
       toggle_alias: "admin",
       delete_alias: "admin",
       set_primary: "edit",
@@ -160,12 +164,12 @@ export default async function (req: Request): Promise<Response> {
         base44.asServiceRole.entities.Squad.list("name", 300),
         base44.asServiceRole.entities.EvaluationTestDefinition.list("display_order", 300).catch(() => []),
         base44.asServiceRole.entities.EvaluationMetricDefinition.list("display_order", 1000).catch(() => []),
-        base44.asServiceRole.entities.SquadMembership.filter({ squad_id: squadId, status: "activo" }, "created_date", 3000).catch(() => []),
+        base44.asServiceRole.entities.SquadMembership.filter({ squad_id: squadId }, "created_date", 3000).catch(() => []),
         base44.asServiceRole.entities.Player.list("full_name", 3000),
       ]);
       const squad = squads.find((item: any) => item.id === squadId);
       if (!squad) return Response.json({ error: "Plantel no encontrado" }, { status: 404 });
-      const allowedPlayerIds = new Set(memberships.map((m: any) => m.player_id));
+      const allowedPlayerIds = new Set(memberships.filter((m: any) => m.status !== "inactivo").map((m: any) => m.player_id));
       const playerMap = new Map(allPlayers.map((p: any) => [p.id, p]));
       const invalidEntry = entries.find((entry: any) => !entry.player_id || !allowedPlayerIds.has(entry.player_id) || !playerMap.has(entry.player_id));
       if (invalidEntry) return Response.json({ error: "Hay un jugador fuera del plantel seleccionado" }, { status: 400 });
@@ -311,12 +315,14 @@ export default async function (req: Request): Promise<Response> {
     }
 
     if (action === "config") {
-      const [sources, testDefinitions, metricDefinitions, thresholds, aliases] = await Promise.all([
+      const [sources, testDefinitions, metricDefinitions, thresholds, aliases, baselineConfigs, batteryTemplates] = await Promise.all([
         base44.asServiceRole.entities.EvaluationSource.list("display_order", 100).catch(() => []),
         base44.asServiceRole.entities.EvaluationTestDefinition.list("display_order", 100).catch(() => []),
         base44.asServiceRole.entities.EvaluationMetricDefinition.list("display_order", 500).catch(() => []),
         base44.asServiceRole.entities.EvaluationThresholdConfig.filter({ active: true }).catch(() => []),
         base44.asServiceRole.entities.EvaluationPlayerAlias.list("alias_name", 1000).catch(() => []),
+        base44.asServiceRole.entities.EvaluationBaselineConfig.filter({ active: true }, "-created_at", 1000).catch(() => []),
+        base44.asServiceRole.entities.EvaluationBatteryTemplate.filter({ active: true }, "display_order", 300).catch(() => []),
       ]);
       const applicableThresholds = thresholds
         .filter((item: any) => !item.squad_id || item.squad_id === squadId)
@@ -331,6 +337,8 @@ export default async function (req: Request): Promise<Response> {
         test_definitions: testDefinitions,
         metric_definitions: metricDefinitions,
         thresholds: effectiveThresholds,
+        baseline_configs: baselineConfigs.filter((item: any) => !item.squad_id || item.squad_id === squadId),
+        battery_templates: batteryTemplates.filter((item: any) => !item.squad_id || item.squad_id === squadId),
         aliases: aliases.filter((item: any) => !item.squad_id || item.squad_id === squadId),
       });
     }
