@@ -86,9 +86,9 @@ export default function SessionPlayerCard({ sp, photoUrl, onAction, onSaveDetail
         <div className="grid grid-cols-3 gap-1.5 pt-1">
           <input type="number" min={0} max={180} value={minutes} onChange={e => setMinutes(e.target.value)}
             placeholder="Min." className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white focus:outline-none" />
-          <input type="number" min={1} max={10} value={rpe} onChange={e => setRpe(e.target.value)}
+          <input type="number" min={0} max={10} value={rpe} onChange={e => setRpe(e.target.value)}
             placeholder="RPE" className="bg-zinc-900 border border-zinc-700 rounded px-1.5 py-1 text-[11px] text-white focus:outline-none" />
-          <button onClick={() => onSaveDetails(sp, { minutes: parseInt(minutes) || 0, rpe: parseInt(rpe) || undefined, notes })}
+          <button onClick={() => onSaveDetails(sp, { minutes: minutes === "" ? 0 : Number(minutes), rpe: rpe === "" ? null : Number(rpe), notes })}
             className="flex items-center justify-center gap-1 bg-zinc-700 hover:bg-zinc-600 rounded px-1.5 py-1 text-[10px] text-white transition-colors">
             <Save size={11} />
           </button>
