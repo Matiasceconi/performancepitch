@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/components/ui/use-toast";
+import { useWorkspace } from "@/lib/WorkspaceContext";
+import { getPlayerMedicalHistory, createMedicalEpisode } from "@/lib/medicalApi";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { BarChart, Bar, Cell, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line } from "recharts";
@@ -520,29 +522,32 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
     expected_return: "", treatment: "", notes: "",
   });
   const { toast } = useToast();
+  const { activeSquad } = useWorkspace();
 
   useEffect(() => {
     loadMedicalRecords();
     loadGpsData();
-    // Debounced subscribers para evitar rate limit
-    let medicalTimer;
-    const unsubMedical = base44.entities.MedicalRecord.subscribe((event) => {
-      if (event.data?.player_id === player.id || event.old_data?.player_id === player.id) {
-        clearTimeout(medicalTimer);
-        medicalTimer = setTimeout(() => loadMedicalRecords(), 2000);
-      }
-    });
-    return () => {
-      unsubMedical();
-      clearTimeout(medicalTimer);
-    };
-  }, [player.id]);
+  }, [player.id, activeSquad?.id]);
 
   async function loadMedicalRecords() {
     setLoadingRecords(true);
-    const records = await base44.entities.MedicalRecord.filter({ player_id: player.id }, "-injury_date", 100);
-    setMedicalRecords(records);
-    setLoadingRecords(false);
+    try {
+      const squadId = activeSquad?.id || player.squad_id || null;
+      const data = squadId ? await getPlayerMedicalHistory(squadId, player.id) : { episodes: [] };
+      const records = (data?.episodes || []).map((episode) => ({
+        ...episode,
+        diagnosis: episode.confirmed_diagnosis || episode.preliminary_diagnosis || episode.lesion_consulta || episode.operational_note || "Registro médico",
+        injury_date: episode.event_date || episode.fecha_inicio_tto,
+        expected_return: episode.expected_return_date || null,
+        notes: episode.operational_note || episode.description || "",
+        status: episode.medical_clearance_date ? "Alta médica" : episode.availability === "unavailable" ? "Lesionado" : episode.availability === "available_to_compete" ? "Alta médica" : "En recuperación",
+      }));
+      setMedicalRecords(records);
+    } catch {
+      setMedicalRecords([]);
+    } finally {
+      setLoadingRecords(false);
+    }
   }
 
   async function loadGpsData() {
@@ -567,21 +572,30 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
   async function handleAddMedical(e) {
     e.preventDefault();
     try {
-      await base44.entities.MedicalRecord.create({ ...medicalForm, player_id: player.id, player_name: player.full_name });
+      const squadId = activeSquad?.id || player.squad_id || null;
+      if (!squadId) throw new Error("Seleccioná un plantel");
+      await createMedicalEpisode(squadId, {
+        player_id: player.id,
+        record_type: "injury",
+        event_date: medicalForm.injury_date,
+        lesion_consulta: medicalForm.diagnosis,
+        preliminary_diagnosis: medicalForm.diagnosis,
+        expected_return_date: medicalForm.expected_return || null,
+        treatment: medicalForm.treatment || "",
+        operational_note: medicalForm.notes || "",
+        availability: medicalForm.status === "Alta médica" ? "available_to_compete" : medicalForm.status === "Lesionado" ? "unavailable" : "modified_training",
+      });
       toast({ title: "Registro médico agregado" });
       setShowMedicalForm(false);
       setMedicalForm({ diagnosis: "", status: "Lesionado", injury_date: moment().format("YYYY-MM-DD"), expected_return: "", treatment: "", notes: "" });
       await loadMedicalRecords();
-    } catch {
-      toast({ title: "Error al guardar", variant: "destructive" });
+    } catch (error) {
+      toast({ title: "Error al guardar", description: error?.message, variant: "destructive" });
     }
   }
 
-  async function deleteMedical(id) {
-    if (!confirm("¿Eliminar este registro médico?")) return;
-    await base44.entities.MedicalRecord.delete(id);
-    setMedicalRecords((prev) => prev.filter((r) => r.id !== id));
-    toast({ title: "Registro eliminado" });
+  async function deleteMedical() {
+    toast({ title: "El historial médico no se elimina desde la ficha 360", description: "Usá Área Médica para editar/cerrar el episodio conservando la auditoría." });
   }
 
   function toggleSelectMedical(id) {
@@ -594,20 +608,9 @@ export default function PlayerProfileDetail({ player, onClose, onEdit }) {
   }
 
   async function deleteMultipleMedical() {
-    try {
-      const count = selectedMedicalRecords.size;
-      const ids = Array.from(selectedMedicalRecords);
-      for (const id of ids) {
-        await base44.entities.MedicalRecord.delete(id);
-      }
-      setMedicalRecords((prev) => prev.filter((r) => !ids.includes(r.id)));
-      setSelectedMedicalRecords(new Set());
-      setShowDeleteConfirm(false);
-      toast({ title: `${count} registro(s) eliminado(s)` });
-    } catch (error) {
-      console.error("Error al eliminar registros:", error);
-      toast({ title: "Error al eliminar", description: error.message, variant: "destructive" });
-    }
+    setShowDeleteConfirm(false);
+    setSelectedMedicalRecords(new Set());
+    toast({ title: "No se eliminaron registros", description: "Los episodios médicos se conservan por trazabilidad. Gestioná su estado desde Área Médica." });
   }
 
   return (
