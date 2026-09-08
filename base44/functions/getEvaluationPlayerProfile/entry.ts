@@ -6,7 +6,8 @@ import {
   normalizeName,
 } from "../../shared/evaluationImportUtils.ts";
 import {
-  calculateBaseline,
+  calculateConfiguredBaseline,
+  resolveBaselineConfig,
   determineSignal,
   detectAsymmetrySignal,
   detectAnomaly,
@@ -95,7 +96,7 @@ export default async function (req: Request): Promise<Response> {
     for (const pr of previousResults) {
       for (const [mk, mv] of Object.entries(pr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
-        const key = `${pr.test_key}|${mk}`;
+        const key = `${pr.source_key || ""}|${pr.test_key}|${mk}`;
         if (!previousMap.has(key)) previousMap.set(key, mv as number);
       }
     }
@@ -105,7 +106,7 @@ export default async function (req: Request): Promise<Response> {
     for (const hr of historicalResults) {
       for (const [mk, mv] of Object.entries(hr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
-        const key = `${hr.test_key}|${mk}`;
+        const key = `${hr.source_key || ""}|${hr.test_key}|${mk}`;
         if (!baselineMap.has(key)) baselineMap.set(key, []);
         baselineMap.get(key)!.push(mv);
       }
@@ -137,6 +138,11 @@ export default async function (req: Request): Promise<Response> {
     let thresholds: any[] = [];
     try {
       thresholds = await base44.asServiceRole.entities.EvaluationThresholdConfig.filter({ active: true }, "-updated_at", 500);
+    } catch { /* empty */ }
+
+    let baselineConfigs: any[] = [];
+    try {
+      baselineConfigs = await base44.asServiceRole.entities.EvaluationBaselineConfig.filter({ active: true }, "-created_at", 500);
     } catch { /* empty */ }
 
     // ── 10. Load metric definitions ──────────────────────────────────────────
@@ -181,17 +187,30 @@ export default async function (req: Request): Promise<Response> {
         if (metric_keys?.length && !metric_keys.includes(mk)) continue;
 
         const mapKey = `${r.test_key}|${mk}`;
+        const historicalKey = `${r.source_key || ""}|${r.test_key}|${mk}`;
 
-        // Baseline
-        const histValues = baselineMap.get(mapKey) || [];
-        const baseline = calculateBaseline(histValues, 3);
+        // Baseline: individual > plantel > respaldo del sistema.
+        const histValues = baselineMap.get(historicalKey) || [];
+        const baselineResolution = resolveBaselineConfig(baselineConfigs, {
+          playerId: player_id,
+          squadId: activeSquadId,
+          sourceKey: r.source_key,
+          testKey: r.test_key,
+          metricKey: mk,
+        });
+        const baseline = calculateConfiguredBaseline(histValues, baselineResolution);
         if (!baselines[mapKey]) {
           baselines[mapKey] = {
             value: baseline.value,
             std: baseline.std,
             sufficient: baseline.sufficient,
             sessions_used: baseline.count,
-            calculation: "mean",
+            calculation: baseline.calculation,
+            origin: baseline.origin,
+            origin_label: baseline.origin_label,
+            config_version: baseline.config_version,
+            period_type: baseline.period_type,
+            period_value: baseline.period_value,
           };
         }
 
@@ -221,7 +240,7 @@ export default async function (req: Request): Promise<Response> {
           : { anomaly: false, reason: "" };
 
         // Recent change vs previous session
-        const previousValue = previousMap.get(mapKey) ?? null;
+        const previousValue = previousMap.get(historicalKey) ?? null;
         const recentChange = calculateRecentChange(mv, previousValue);
         const classification = classifyChange(
           { changeAbs: recentChange.changeAbs, hasPrevious: recentChange.hasPrevious },
