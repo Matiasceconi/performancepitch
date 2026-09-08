@@ -1,0 +1,109 @@
+{
+  "name": "MedicalFollowUp",
+  "type": "object",
+  "properties": {
+    "medical_episode_id": {
+      "type": "string",
+      "description": "Episodio m\u00e9dico relacionado"
+    },
+    "player_id": {
+      "type": "string",
+      "description": "Player.id can\u00f3nico"
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string"
+    },
+    "follow_up_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "follow_up_time": {
+      "type": "string"
+    },
+    "professional_id": {
+      "type": "string"
+    },
+    "professional_name": {
+      "type": "string"
+    },
+    "note": {
+      "type": "string",
+      "description": "Nota de seguimiento cl\u00ednica"
+    },
+    "private_note": {
+      "type": "string",
+      "description": "Nota privada de personal m\u00e9dico"
+    },
+    "operational_note": {
+      "type": "string",
+      "description": "Nota operativa compartible"
+    },
+    "medical_status": {
+      "type": "string",
+      "enum": [
+        "lesionado",
+        "en_recuperacion",
+        "kinesiologia",
+        "consulta",
+        "alta"
+      ]
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "unavailable",
+        "physiotherapy",
+        "individual_field",
+        "modified_training",
+        "partial_integration",
+        "full_training",
+        "available_to_compete"
+      ]
+    },
+    "rehab_phase": {
+      "type": "string",
+      "enum": [
+        "clinical",
+        "rehabilitation",
+        "individual_field",
+        "partial_integration",
+        "full_training",
+        "available"
+      ]
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "continue",
+        "change_phase",
+        "change_availability",
+        "request_study",
+        "medical_clearance",
+        "reopen",
+        "other"
+      ],
+      "default": "continue"
+    },
+    "next_control_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "created_by_id": {
+      "type": "string"
+    },
+    "created_by_name": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "medical_episode_id",
+    "player_id",
+    "follow_up_date"
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "name": "MedicalAuditEvent",
+  "type": "object",
+  "properties": {
+    "player_id": {
+      "type": "string"
+    },
+    "medical_episode_id": {
+      "type": "string"
+    },
+    "medical_follow_up_id": {
+      "type": "string"
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string"
+    },
+    "action": {
+      "type": "string",
+      "enum": [
+        "episode_created",
+        "episode_updated",
+        "follow_up_created",
+        "availability_changed",
+        "phase_changed",
+        "medical_clearance",
+        "episode_reopened",
+        "wellness_signal_reviewed",
+        "wellness_signal_converted",
+        "sync_created",
+        "sync_updated",
+        "sync_conflict",
+        "legacy_migration"
+      ]
+    },
+    "actor_id": {
+      "type": "string"
+    },
+    "actor_name": {
+      "type": "string"
+    },
+    "actor_email": {
+      "type": "string"
+    },
+    "at": {
+      "type": "string"
+    },
+    "changes": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "note": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "action",
+    "at"
+  ]
+}

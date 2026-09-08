@@ -1,0 +1,69 @@
+{
+  "name": "MedicalWellnessSignal",
+  "type": "object",
+  "properties": {
+    "wellness_response_id": {
+      "type": "string",
+      "description": "WellnessResponse original; nunca se modifica desde m\u00e9dica"
+    },
+    "player_id": {
+      "type": "string"
+    },
+    "player_name": {
+      "type": "string"
+    },
+    "organization_id": {
+      "type": "string"
+    },
+    "squad_id": {
+      "type": "string"
+    },
+    "response_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "reported_at": {
+      "type": "string"
+    },
+    "pain_zone": {
+      "type": "string"
+    },
+    "pain_intensity": {
+      "type": "number"
+    },
+    "comment": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "pending_review",
+        "reviewed",
+        "dismissed",
+        "converted_to_consultation"
+      ],
+      "default": "pending_review"
+    },
+    "reviewed_at": {
+      "type": "string"
+    },
+    "reviewed_by_id": {
+      "type": "string"
+    },
+    "reviewed_by_name": {
+      "type": "string"
+    },
+    "review_note": {
+      "type": "string"
+    },
+    "medical_episode_id": {
+      "type": "string",
+      "description": "Consulta creada expl\u00edcitamente desde la se\u00f1al, si aplica"
+    }
+  },
+  "required": [
+    "wellness_response_id",
+    "player_id",
+    "response_date"
+  ]
+}
