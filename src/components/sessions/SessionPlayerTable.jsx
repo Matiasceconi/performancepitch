@@ -52,13 +52,8 @@ export default function SessionPlayerTable({ sessionPlayers, sessionId, onPlayer
 
   async function handleStatusChange(sp, newStatus) {
     await base44.entities.SessionPlayer.update(sp.id, { status_at_session: newStatus });
-    const playerStatusMap = {
-      disponible: "Disponible", lesionado: "Lesionado", molestia: "En recuperación",
-      suspendido: "Suspendido", reintegro: "Disponible",
-    };
-    if (playerStatusMap[newStatus] && sp.player_id) {
-      await base44.entities.Player.update(sp.player_id, { status: playerStatusMap[newStatus] });
-    }
+    // El estado de una sesión describe lo que ocurrió ese día. No modifica Player.status
+    // ni la disponibilidad médica para evitar fuentes de verdad circulares.
     const next = rows.map(r => r.id === sp.id ? { ...r, status_at_session: newStatus } : r);
     setRows(next);
     onPlayersUpdate?.(next);
@@ -66,11 +61,18 @@ export default function SessionPlayerTable({ sessionPlayers, sessionId, onPlayer
   }
 
   async function handleSaveDetails(sp, data) {
-    await base44.entities.SessionPlayer.update(sp.id, data);
-    const next = rows.map(r => r.id === sp.id ? { ...r, ...data } : r);
+    const response = await base44.functions.invoke("updateSessionPlayerLoadDetails", {
+      session_player_id: sp.id,
+      minutes: data.minutes,
+      rpe: data.rpe ?? null,
+      notes: data.notes,
+    });
+    const updated = response?.data?.session_player || response?.session_player;
+    const merged = updated || { ...sp, ...data };
+    const next = rows.map(r => r.id === sp.id ? merged : r);
     setRows(next);
     onPlayersUpdate?.(next);
-    toast({ title: "✓ Guardado" });
+    toast({ title: response?.data?.internal_load_pending ? "Guardado · falta definir minutos reales para sRPE" : "✓ Guardado" });
   }
 
   const present = rows.filter(r => r.attendance === "presente");
