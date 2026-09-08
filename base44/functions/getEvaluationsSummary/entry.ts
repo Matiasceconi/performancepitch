@@ -174,9 +174,11 @@ export default async function (req: Request): Promise<Response> {
       for (const [mk, mv] of Object.entries(cr.metrics || {})) {
         if (typeof mv !== "number" || !isFinite(mv)) continue;
 
-        // Collect squad values
-        if (!squadMetricValues.has(mk)) squadMetricValues.set(mk, []);
-        squadMetricValues.get(mk)!.push(mv);
+        // Las distribuciones de plantel se separan por prueba + métrica.
+        // Una métrica homónima en dos tests distintos no comparte referencia.
+        const squadMetricKey = `${cr.test_key}|${mk}`;
+        if (!squadMetricValues.has(squadMetricKey)) squadMetricValues.set(squadMetricKey, []);
+        squadMetricValues.get(squadMetricKey)!.push(mv);
 
         // Get baseline
         const baselineKey = `${playerId}|${cr.test_key}|${mk}`;
@@ -393,14 +395,11 @@ export default async function (req: Request): Promise<Response> {
     }
 
     // ── 11. Calculate squad z-scores ────────────────────────────────────────
-    for (const [mk, values] of squadMetricValues) {
+    for (const [mapMetricKey, values] of squadMetricValues) {
       const stats = calculateStats(values);
       for (const [, playerEntry] of changeMapPlayers) {
-        for (const [mapKey, entry] of Object.entries(playerEntry.metrics)) {
-          if (entry.metric_key === mk) {
-            entry.z_score_squad = zScore(entry.current_value, stats.mean, stats.std);
-          }
-        }
+        const entry = playerEntry.metrics[mapMetricKey];
+        if (entry) entry.z_score_squad = zScore(entry.current_value, stats.mean, stats.std);
       }
     }
 
