@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine, LabelList } from "recharts";
-import { fmtDate, fmtVal, ChartTooltip } from "@/lib/evaluationChartUtils";
+import { fmtDate, fmtVal } from "@/lib/evaluationChartUtils";
 
 export default function AsymmetryMode({ data }) {
   const { results, sessions, metric_definitions } = data;
