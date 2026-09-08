@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { Settings2, Loader2, Plus, Check, X, Edit2, Trash2, Search, Tag, Gauge, Users, BookOpen } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { evaluationsGateway } from "@/lib/evaluationsApi";
+import { BatteryTemplatesSection, BaselineConfigSection } from "@/components/evaluations/EvaluationAdvancedConfig";
 
 export default function EvaluationsConfig() {
   const { activeSquad } = useWorkspace();
@@ -10,6 +11,9 @@ export default function EvaluationsConfig() {
   const [metricDefs, setMetricDefs] = useState([]);
   const [thresholds, setThresholds] = useState([]);
   const [aliases, setAliases] = useState([]);
+  const [baselineConfigs, setBaselineConfigs] = useState([]);
+  const [batteryTemplates, setBatteryTemplates] = useState([]);
+  const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeSection, setActiveSection] = useState("sources");
@@ -25,6 +29,10 @@ export default function EvaluationsConfig() {
       setMetricDefs(data.metric_definitions || []);
       setThresholds(data.thresholds || []);
       setAliases(data.aliases || []);
+      setBaselineConfigs(data.baseline_configs || []);
+      setBatteryTemplates(data.battery_templates || []);
+      const squad = await evaluationsGateway("sessions", { squad_id: activeSquad.id });
+      setPlayers(squad.players || []);
     } catch (e) {
       setError(e.message || "No se pudo cargar la configuración");
     } finally {
@@ -41,6 +49,8 @@ export default function EvaluationsConfig() {
     { key: "sources", label: "Fuentes", icon: BookOpen },
     { key: "tests", label: "Pruebas", icon: Tag },
     { key: "metrics", label: "Catálogo de métricas", icon: Gauge },
+    { key: "batteries", label: "Baterías", icon: BookOpen },
+    { key: "baselines", label: "Líneas base", icon: Gauge },
     { key: "thresholds", label: "Umbrales", icon: Settings2 },
     { key: "aliases", label: "Alias de jugadores", icon: Users },
   ];
@@ -66,6 +76,8 @@ export default function EvaluationsConfig() {
       {activeSection === "sources" && <SourcesSection sources={sources} />}
       {activeSection === "tests" && <TestsSection testDefs={testDefs} metricDefs={metricDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
       {activeSection === "metrics" && <MetricsSection metricDefs={metricDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
+      {activeSection === "batteries" && <BatteryTemplatesSection templates={batteryTemplates} testDefs={testDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
+      {activeSection === "baselines" && <BaselineConfigSection configs={baselineConfigs} testDefs={testDefs} metricDefs={metricDefs} players={players} squadId={activeSquad?.id} onReload={loadConfig} />}
       {activeSection === "thresholds" && <ThresholdsSection thresholds={thresholds} testDefs={testDefs} metricDefs={metricDefs} squadId={activeSquad?.id} onReload={loadConfig} />}
       {activeSection === "aliases" && <AliasesSection aliases={aliases} squadId={activeSquad?.id} />}
     </div>
@@ -370,7 +382,7 @@ function ThresholdsSection({ thresholds: initialThresholds, testDefs, metricDefs
       <div className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
         <h3 className="text-sm font-bold text-white mb-3">Umbrales configurados ({thresholds.length})</h3>
         {!thresholds.length ? (
-          <p className="text-zinc-500 text-sm text-center py-4">No hay umbrales configurados. Se usan valores por defecto (1.0 SD moderado, 1.5 SD importante).</p>
+          <p className="text-zinc-500 text-sm text-center py-4">No hay umbrales configurados. No se generan alertas automáticas por defecto; los cambios se muestran de forma descriptiva hasta que el club defina sus criterios.</p>
         ) : (
           <div className="space-y-2">
             {thresholds.map((t) => (
