@@ -4,11 +4,15 @@
   "properties": {
     "player_id": {
       "type": "string",
-      "description": "ID del jugador vinculado (vac\u00edo si no se pudo vincular)"
+      "description": "ID can\u00f3nico de Player. Obligatorio para registros manuales."
+    },
+    "organization_id": {
+      "type": "string",
+      "description": "Organizaci\u00f3n propietaria del registro"
     },
     "squad_id": {
       "type": "string",
-      "description": "ID del plantel (si se pudo determinar)"
+      "description": "ID del plantel"
     },
     "season_id": {
       "type": "string",
@@ -16,45 +20,227 @@
     },
     "source_sheet_row_id": {
       "type": "string",
-      "description": "N\u00famero de fila de origen en Google Sheets (vac\u00edo si el episodio es manual)"
+      "description": "Fila de Google Sheets para compatibilidad"
     },
     "player_name_original": {
       "type": "string",
-      "description": "Nombre del jugador tal como figura en la fuente"
+      "description": "Nombre desnormalizado/original; no es clave relacional"
     },
     "categoria_division": {
       "type": "string",
-      "description": "Categor\u00eda / Divisi\u00f3n"
+      "description": "Campo legacy de categor\u00eda/divisi\u00f3n"
+    },
+    "record_type": {
+      "type": "string",
+      "enum": [
+        "injury",
+        "illness",
+        "consultation",
+        "discomfort_followup",
+        "control",
+        "rehabilitation",
+        "return_to_training"
+      ],
+      "default": "injury",
+      "description": "Tipo profesional de registro; no toda consulta es lesi\u00f3n"
+    },
+    "event_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha del evento/consulta"
+    },
+    "event_time": {
+      "type": "string",
+      "description": "Hora local HH:mm"
+    },
+    "professional_id": {
+      "type": "string",
+      "description": "ID del profesional responsable si existe"
+    },
+    "professional_name": {
+      "type": "string",
+      "description": "Profesional responsable desnormalizado"
+    },
+    "context_type": {
+      "type": "string",
+      "enum": [
+        "training",
+        "match",
+        "gym",
+        "outside_club",
+        "other"
+      ],
+      "description": "Contexto en que ocurri\u00f3/se registr\u00f3"
+    },
+    "training_session_id": {
+      "type": "string",
+      "description": "TrainingSession vinculada, sin duplicarla"
+    },
+    "match_report_id": {
+      "type": "string",
+      "description": "MatchReport vinculado, sin duplicarlo"
     },
     "lesion_consulta": {
       "type": "string",
-      "description": "Lesi\u00f3n o motivo de consulta"
+      "description": "Motivo/diagn\u00f3stico legado y resumen visible"
     },
     "mmii_afectado": {
       "type": "string",
-      "description": "Miembro inferior afectado"
+      "description": "Campo legacy. Se conserva durante migraci\u00f3n; usar body_region/body_area/laterality en registros nuevos"
+    },
+    "body_region": {
+      "type": "string",
+      "description": "Regi\u00f3n corporal extensible"
+    },
+    "body_area": {
+      "type": "string",
+      "description": "Zona anat\u00f3mica espec\u00edfica"
+    },
+    "laterality": {
+      "type": "string",
+      "enum": [
+        "left",
+        "right",
+        "bilateral",
+        "midline",
+        "not_applicable",
+        "unknown"
+      ],
+      "description": "Lateralidad estructurada"
+    },
+    "mechanism": {
+      "type": "string",
+      "description": "Mecanismo de lesi\u00f3n cuando corresponda"
+    },
+    "onset": {
+      "type": "string",
+      "enum": [
+        "acute",
+        "gradual",
+        "unknown"
+      ],
+      "description": "Inicio agudo/gradual"
+    },
+    "contact_type": {
+      "type": "string",
+      "enum": [
+        "contact",
+        "non_contact",
+        "unknown",
+        "not_applicable"
+      ],
+      "description": "Contacto/no contacto cuando corresponda"
+    },
+    "preliminary_diagnosis": {
+      "type": "string",
+      "description": "Diagn\u00f3stico preliminar"
+    },
+    "confirmed_diagnosis": {
+      "type": "string",
+      "description": "Diagn\u00f3stico confirmado"
+    },
+    "description": {
+      "type": "string",
+      "description": "Descripci\u00f3n cl\u00ednica del episodio"
+    },
+    "treatment": {
+      "type": "string",
+      "description": "Tratamiento indicado"
+    },
+    "studies": {
+      "type": "string",
+      "description": "Estudios realizados/solicitados"
+    },
+    "private_note": {
+      "type": "string",
+      "description": "Nota cl\u00ednica privada; s\u00f3lo personal m\u00e9dico autorizado"
+    },
+    "operational_note": {
+      "type": "string",
+      "description": "Informaci\u00f3n operativa compartible con staff autorizado"
     },
     "fecha_inicio_tto": {
       "type": "string",
       "format": "date",
-      "description": "Fecha de inicio de tratamiento"
+      "description": "Campo legacy: inicio de tratamiento"
     },
     "fecha_final_tto": {
       "type": "string",
       "format": "date",
-      "description": "Fecha final de tratamiento / alta"
+      "description": "Campo legacy. No implica alta autom\u00e1tica"
+    },
+    "expected_return_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Estimaci\u00f3n de retorno; nunca modifica disponibilidad autom\u00e1ticamente"
+    },
+    "actual_return_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha real de retorno al entrenamiento"
+    },
+    "medical_clearance_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha de alta m\u00e9dica expl\u00edcita"
+    },
+    "medical_clearance_at": {
+      "type": "string",
+      "description": "Timestamp de la acci\u00f3n de alta"
+    },
+    "medical_clearance_by_id": {
+      "type": "string",
+      "description": "Usuario/profesional que otorg\u00f3 el alta"
+    },
+    "medical_clearance_by_name": {
+      "type": "string",
+      "description": "Nombre desnormalizado de quien otorg\u00f3 el alta"
+    },
+    "medical_clearance_note": {
+      "type": "string",
+      "description": "Observaci\u00f3n de alta"
     },
     "perdida_dias": {
       "type": "number",
-      "description": "D\u00edas perdidos"
+      "description": "D\u00edas perdidos, cuando est\u00e9 documentado"
     },
     "etapa_rhb": {
       "type": "string",
-      "description": "Etapa de la rehabilitaci\u00f3n"
+      "description": "Campo legacy de rehabilitaci\u00f3n"
+    },
+    "rehab_phase": {
+      "type": "string",
+      "enum": [
+        "clinical",
+        "rehabilitation",
+        "individual_field",
+        "partial_integration",
+        "full_training",
+        "available"
+      ],
+      "description": "Fase actual de retorno. Configurable conceptualmente y registrada hist\u00f3ricamente mediante follow-ups"
+    },
+    "availability": {
+      "type": "string",
+      "enum": [
+        "unavailable",
+        "physiotherapy",
+        "individual_field",
+        "modified_training",
+        "partial_integration",
+        "full_training",
+        "available_to_compete"
+      ],
+      "description": "Disponibilidad deportiva actual del episodio; separada del diagn\u00f3stico"
+    },
+    "next_control_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Pr\u00f3ximo control previsto"
     },
     "observaciones": {
       "type": "string",
-      "description": "Observaciones"
+      "description": "Observaci\u00f3n legacy; no usar como historial mutable en registros nuevos"
     },
     "medical_status": {
       "type": "string",
@@ -65,37 +251,76 @@
         "consulta",
         "alta"
       ],
-      "description": "Clasificaci\u00f3n del episodio seg\u00fan su contenido"
+      "description": "Clasificaci\u00f3n legacy/compatibilidad. El alta nueva depende de medical_clearance_date"
+    },
+    "episode_state": {
+      "type": "string",
+      "enum": [
+        "active",
+        "closed"
+      ],
+      "default": "active",
+      "description": "Cierre expl\u00edcito del episodio; no depende de expected_return_date"
     },
     "medical_episode_key": {
       "type": "string",
-      "description": "Clave \u00fanica usada para hacer upsert y evitar duplicados en sincronizaciones repetidas"
+      "description": "Clave estable para idempotencia/importaci\u00f3n"
     },
     "linked": {
       "type": "boolean",
       "default": false,
-      "description": "Si el episodio qued\u00f3 vinculado a un jugador oficial de la plataforma"
+      "description": "Vinculado a Player.id"
     },
     "source": {
       "type": "string",
       "enum": [
         "google_sheets",
-        "app"
+        "app",
+        "legacy_import"
       ],
-      "default": "google_sheets",
-      "description": "Origen del registro: sincronizado desde Google Sheets o editado manualmente en la app"
+      "default": "app",
+      "description": "Origen del episodio"
+    },
+    "source_updated_at": {
+      "type": "string",
+      "description": "Timestamp de la fuente externa cuando existe"
     },
     "last_synced_at": {
       "type": "string",
-      "description": "Fecha/hora ISO de la \u00faltima sincronizaci\u00f3n desde Google Sheets"
+      "description": "\u00daltima sincronizaci\u00f3n de Sheets"
+    },
+    "sync_conflict": {
+      "type": "boolean",
+      "default": false,
+      "description": "Hay conflicto entre versi\u00f3n externa y edici\u00f3n local"
+    },
+    "sync_conflict_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Campos en conflicto con fuente externa"
+    },
+    "manual_fields": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "default": [],
+      "description": "Campos protegidos por edici\u00f3n manual frente a sincronizaci\u00f3n"
     },
     "edited_by": {
       "type": "string",
-      "description": "Nombre del usuario que edit\u00f3 manualmente este registro por \u00faltima vez"
+      "description": "Usuario que edit\u00f3 por \u00faltima vez"
+    },
+    "edited_by_id": {
+      "type": "string",
+      "description": "ID del usuario que edit\u00f3 por \u00faltima vez"
     },
     "edited_at": {
       "type": "string",
-      "description": "Fecha/hora ISO de la \u00faltima edici\u00f3n manual"
+      "description": "Timestamp de \u00faltima edici\u00f3n"
     }
   },
   "required": [
