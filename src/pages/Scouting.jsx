@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Binoculars, ClipboardList, ListChecks, Loader2, Plus, Search, SlidersHorizontal, Target, UsersRound } from "lucide-react";
+import { Binoculars, CalendarCheck, ClipboardList, GitCompareArrows, ListChecks, Loader2, Plus, Search, Shield, SlidersHorizontal, Target, UsersRound } from "lucide-react";
 import { scoutingOverview } from "@/lib/scoutingApi";
 import ProspectFormModal from "@/components/scouting/ProspectFormModal";
 import RecruitmentNeedModal from "@/components/scouting/RecruitmentNeedModal";
@@ -8,10 +8,13 @@ import ScoutingReportModal from "@/components/scouting/ScoutingReportModal";
 import ProspectDetailModal from "@/components/scouting/ProspectDetailModal";
 import RoleProfileModal from "@/components/scouting/RoleProfileModal";
 import WatchlistModal from "@/components/scouting/WatchlistModal";
+import ScoutingComparisonTab from "@/components/scouting/ScoutingComparisonTab";
+import ShadowSquadTab from "@/components/scouting/ShadowSquadTab";
+import RecruitmentMeetingsTab from "@/components/scouting/RecruitmentMeetingsTab";
 import { ASSIGNMENT_LABEL, HORIZON_LABEL, PIPELINE_STAGES, PRIORITY_LABEL, RECOMMENDATION_LABEL, STAGE_LABEL, fmtDate, fmtMoney, prospectAge } from "@/components/scouting/scoutingConstants";
 
 const TABS=[
- {id:"pipeline",label:"Pipeline",icon:ListChecks},{id:"prospects",label:"Prospectos",icon:UsersRound},{id:"needs",label:"Necesidades",icon:Target},{id:"assignments",label:"Asignaciones",icon:ClipboardList},{id:"watchlists",label:"Watchlists",icon:Binoculars},{id:"roles",label:"Perfiles de rol",icon:SlidersHorizontal},
+ {id:"pipeline",label:"Pipeline",icon:ListChecks},{id:"comparison",label:"Comparador",icon:GitCompareArrows},{id:"shadow",label:"Shadow Squad",icon:Shield},{id:"meetings",label:"Recruitment Meetings",icon:CalendarCheck},{id:"prospects",label:"Prospectos",icon:UsersRound},{id:"needs",label:"Necesidades",icon:Target},{id:"assignments",label:"Asignaciones",icon:ClipboardList},{id:"watchlists",label:"Watchlists",icon:Binoculars},{id:"roles",label:"Perfiles de rol",icon:SlidersHorizontal},
 ];
 function Card({label,value,sub,accent="text-white"}){return <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-4"><p className="text-[10px] uppercase tracking-wider text-zinc-600">{label}</p><p className={`text-2xl font-bold mt-1 ${accent}`}>{value}</p>{sub&&<p className="text-[11px] text-zinc-600 mt-1">{sub}</p>}</div>}
 function Badge({children,className=""}){return <span className={`inline-flex px-2 py-1 rounded-full border text-[10px] font-semibold ${className}`}>{children}</span>}
@@ -21,7 +24,7 @@ export default function Scouting(){
  const[selectedProspect,setSelectedProspect]=useState(null);const[editProspect,setEditProspect]=useState(null);const[editNeed,setEditNeed]=useState(null);const[editRole,setEditRole]=useState(null);const[showProspect,setShowProspect]=useState(false);const[showNeed,setShowNeed]=useState(false);const[showAssignment,setShowAssignment]=useState(false);const[assignmentProspect,setAssignmentProspect]=useState(null);const[showReport,setShowReport]=useState(false);const[reportProspect,setReportProspect]=useState(null);const[showRole,setShowRole]=useState(false);const[showWatchlist,setShowWatchlist]=useState(false);
  const load=useCallback(async()=>{setLoading(true);setError("");try{setData(await scoutingOverview())}catch(e){setError(e.message)}finally{setLoading(false)}},[]);
  useEffect(()=>{load()},[load]);
- const prospects=data?.prospects||[],needs=data?.needs||[],assignments=data?.assignments||[],reports=data?.reports||[],watchlists=data?.watchlists||[],items=data?.watchlist_items||[],roles=data?.role_profiles||[];
+ const prospects=data?.prospects||[],needs=data?.needs||[],assignments=data?.assignments||[],reports=data?.reports||[],watchlists=data?.watchlists||[],items=data?.watchlist_items||[],roles=data?.role_profiles||[],shadowPlans=data?.shadow_plans||[],shadowSlots=data?.shadow_slots||[],meetings=data?.meetings||[],decisions=data?.decisions||[];
  const reportByProspect=useMemo(()=>{const map=new Map();reports.forEach(r=>{if(!map.has(r.prospect_id))map.set(r.prospect_id,[]);map.get(r.prospect_id).push(r)});return map},[reports]);
  const latestReport=useMemo(()=>new Map([...reportByProspect.entries()].map(([id,rs])=>[id,[...rs].sort((a,b)=>String(b.observation_date||"").localeCompare(String(a.observation_date||"")))[0]])),[reportByProspect]);
  const activeProspects=prospects.filter(p=>p.status!=="archived"&&p.pipeline_stage!=="discarded");const openNeeds=needs.filter(n=>!["filled","cancelled"].includes(n.status));const pendingAssignments=assignments.filter(a=>["pending","in_progress"].includes(a.status));
@@ -38,6 +41,9 @@ export default function Scouting(){
   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3"><Card label="Prospectos activos" value={activeProspects.length}/><Card label="Shortlist" value={prospects.filter(p=>p.pipeline_stage==="shortlist").length} accent="text-blue-300"/><Card label="Prioridad" value={prospects.filter(p=>p.pipeline_stage==="priority").length} accent="text-amber-300"/><Card label="Necesidades abiertas" value={openNeeds.length}/><Card label="Asignaciones pendientes" value={pendingAssignments.length} accent={pendingAssignments.length?"text-violet-300":"text-white"}/><Card label="Informes" value={reports.length} sub="historial acumulado"/></div>
   <div className="flex items-center gap-1 overflow-x-auto border-b border-zinc-800">{TABS.map(t=><button key={t.id} onClick={()=>setTab(t.id)} className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap ${tab===t.id?"border-amber-400 text-amber-300":"border-transparent text-zinc-500 hover:text-white"}`}><t.icon size={15}/>{t.label}</button>)}</div>
   {tab==="pipeline"&&<Pipeline prospects={prospects} latestReport={latestReport} onSelect={setSelectedProspect}/>} 
+  {tab==="comparison"&&<ScoutingComparisonTab prospects={prospects} players={data?.players||[]}/>} 
+  {tab==="shadow"&&<ShadowSquadTab plans={shadowPlans} slots={shadowSlots} prospects={prospects} players={data?.players||[]} roles={roles} needs={needs} squads={data?.squads||[]} canCreate={canCreate} canEdit={canEdit} onChanged={refresh}/>} 
+  {tab==="meetings"&&<RecruitmentMeetingsTab meetings={meetings} decisions={decisions} prospects={prospects} needs={needs} staff={data?.staff||[]} squads={data?.squads||[]} canCreate={canCreate} canEdit={canEdit} onChanged={refresh}/>} 
   {tab==="prospects"&&<section className="space-y-3"><div className="flex gap-2 flex-wrap"><div className="relative flex-1 min-w-56"><Search size={14} className="absolute left-3 top-2.5 text-zinc-600"/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Jugador, club, posición, nacionalidad..." className="w-full bg-zinc-900 border border-zinc-800 rounded-lg pl-9 pr-3 py-2 text-sm text-white"/></div><select value={stageFilter} onChange={e=>setStageFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 py-2 text-sm text-zinc-300"><option value="">Todas las etapas</option>{PIPELINE_STAGES.map(s=><option key={s.id} value={s.id}>{s.label}</option>)}</select></div><ProspectTable prospects={filteredProspects} latestReport={latestReport} reportByProspect={reportByProspect} onSelect={setSelectedProspect}/></section>}
   {tab==="needs"&&<NeedsView needs={needs} roles={roles} prospects={prospects} onEdit={n=>{setEditNeed(n);setShowNeed(true)}} canEdit={canEdit}/>} 
   {tab==="assignments"&&<AssignmentsView assignments={assignments} prospects={prospects} onNew={()=>openAssignment()} canCreate={canCreate}/>} 
