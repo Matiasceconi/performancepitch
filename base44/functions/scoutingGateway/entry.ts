@@ -412,6 +412,60 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ slot: created });
     }
 
+    if (action === "create_meeting") {
+      const title = clean(body.title, 300);
+      const meetingDate = date(body.meeting_date);
+      if (!title || !meetingDate) return Response.json({ error: "Título y fecha son obligatorios" }, { status: 400 });
+      const created = await base44.asServiceRole.entities.RecruitmentMeeting.create({
+        organization_id: organizationId, squad_id: clean(body.squad_id, 200), squad_name: clean(body.squad_name, 200), season_id: clean(body.season_id, 100), title, meeting_date: meetingDate, meeting_time: clean(body.meeting_time, 10), status: body.status === "open" ? "open" : "draft",
+        participant_user_ids: Array.isArray(body.participant_user_ids) ? body.participant_user_ids : [], participant_names: Array.isArray(body.participant_names) ? body.participant_names : [], recruitment_need_ids: Array.isArray(body.recruitment_need_ids) ? body.recruitment_need_ids : [], prospect_ids: Array.isArray(body.prospect_ids) ? body.prospect_ids : [], agenda: clean(body.agenda, 7000), notes: clean(body.notes, 7000),
+        created_by_id: user.id, created_by_name: actorName(user), created_at: nowISO(), updated_at: nowISO(),
+      });
+      return Response.json({ meeting: created });
+    }
+
+    if (action === "update_meeting") {
+      const meeting = await getById(base44, "RecruitmentMeeting", clean(body.meeting_id, 200));
+      if (!isSameOrg(meeting, organizationId)) return Response.json({ error: "Reunión no encontrada" }, { status: 404 });
+      const allowed = ["title","meeting_date","meeting_time","status","participant_user_ids","participant_names","recruitment_need_ids","prospect_ids","agenda","notes","squad_id","squad_name","season_id"];
+      const changes: any = { updated_at: nowISO() };
+      for (const key of allowed) if (body[key] !== undefined) changes[key] = body[key];
+      if (changes.meeting_date !== undefined) changes.meeting_date = date(changes.meeting_date);
+      if (changes.status === "closed" && meeting.status !== "closed") changes.closed_at = nowISO();
+      const updated = await base44.asServiceRole.entities.RecruitmentMeeting.update(meeting.id, changes);
+      return Response.json({ meeting: updated });
+    }
+
+    if (action === "meeting_detail") {
+      const meeting = await getById(base44, "RecruitmentMeeting", clean(body.meeting_id, 200));
+      if (!isSameOrg(meeting, organizationId)) return Response.json({ error: "Reunión no encontrada" }, { status: 404 });
+      const decisions = await base44.asServiceRole.entities.RecruitmentDecision.filter({ organization_id: organizationId, meeting_id: meeting.id }, "-created_at", 1000).catch(() => []);
+      return Response.json({ capabilities: access.capabilities, meeting, decisions });
+    }
+
+    if (action === "record_meeting_decision") {
+      const [meeting, prospect] = await Promise.all([
+        getById(base44, "RecruitmentMeeting", clean(body.meeting_id, 200)),
+        getById(base44, "ScoutingProspect", clean(body.prospect_id, 200)),
+      ]);
+      if (!isSameOrg(meeting, organizationId) || !isSameOrg(prospect, organizationId)) return Response.json({ error: "Reunión o prospecto no encontrado" }, { status: 404 });
+      const decision = ["advance","hold","discard","request_more_info","market_check","medical_check","negotiation"].includes(body.decision) ? body.decision : "hold";
+      const targetStage = clean(body.target_stage, 80);
+      const applyStage = body.apply_pipeline_change === true;
+      if (applyStage && !STAGES.includes(targetStage)) return Response.json({ error: "Seleccioná una etapa de pipeline válida para aplicar el cambio" }, { status: 400 });
+      const created = await base44.asServiceRole.entities.RecruitmentDecision.create({
+        organization_id: organizationId, meeting_id: meeting.id, prospect_id: prospect.id, prospect_name: prospect.full_name, recruitment_need_id: clean(body.recruitment_need_id, 200), decision, target_stage: targetStage || null, rationale: clean(body.rationale, 5000), owner_user_id: clean(body.owner_user_id, 200), owner_name: clean(body.owner_name, 300), due_date: date(body.due_date), evidence_report_ids: Array.isArray(body.evidence_report_ids) ? body.evidence_report_ids : [], pipeline_change_applied: applyStage, actor_user_id: user.id, actor_name: actorName(user), created_at: nowISO(),
+      });
+      if (applyStage && targetStage !== prospect.pipeline_stage) {
+        await base44.asServiceRole.entities.ScoutingProspect.update(prospect.id, { pipeline_stage: targetStage, updated_by_id: user.id, updated_by_name: actorName(user), updated_at: nowISO() });
+        await base44.asServiceRole.entities.RecruitmentPipelineEvent.create({ organization_id: organizationId, prospect_id: prospect.id, recruitment_need_id: clean(body.recruitment_need_id, 200), from_stage: prospect.pipeline_stage || "", to_stage: targetStage, reason: `Decisión en reunión: ${meeting.title}`, decision_note: clean(body.rationale, 3000), evidence_report_ids: Array.isArray(body.evidence_report_ids) ? body.evidence_report_ids : [], actor_user_id: user.id, actor_name: actorName(user), created_at: nowISO() });
+      }
+      const nextProspects = [...new Set([...(meeting.prospect_ids || []), prospect.id])];
+      const nextNeeds = body.recruitment_need_id ? [...new Set([...(meeting.recruitment_need_ids || []), clean(body.recruitment_need_id, 200)])] : (meeting.recruitment_need_ids || []);
+      await base44.asServiceRole.entities.RecruitmentMeeting.update(meeting.id, { prospect_ids: nextProspects, recruitment_need_ids: nextNeeds, updated_at: nowISO() });
+      return Response.json({ decision: created, pipeline_changed: applyStage });
+    }
+
     if (action === "create_role_profile") {
       const name = clean(body.name, 300);
       if (!name) return Response.json({ error: "El nombre del perfil de rol es obligatorio" }, { status: 400 });
