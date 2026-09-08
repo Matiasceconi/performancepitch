@@ -141,6 +141,14 @@ export default async function(req: Request): Promise<Response> {
       remove_watchlist_item: "edit",
       create_role_profile: "create",
       update_role_profile: "edit",
+      comparison: "view",
+      create_shadow_plan: "create",
+      update_shadow_plan: "edit",
+      save_shadow_slot: "edit",
+      create_meeting: "create",
+      update_meeting: "edit",
+      meeting_detail: "view",
+      record_meeting_decision: "edit",
     };
     const permission = permissionByAction[action];
     if (!permission) return Response.json({ error: "Acción de Scouting no válida" }, { status: 400 });
