@@ -330,6 +330,35 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ item: updated });
     }
 
+    if (action === "comparison") {
+      const prospectIds = Array.isArray(body.prospect_ids) ? [...new Set(body.prospect_ids.map((id: any) => clean(id, 200)).filter(Boolean))].slice(0, 5) : [];
+      const currentPlayerIds = Array.isArray(body.current_player_ids) ? [...new Set(body.current_player_ids.map((id: any) => clean(id, 200)).filter(Boolean))].slice(0, 3) : [];
+      if (!prospectIds.length && !currentPlayerIds.length) return Response.json({ error: "Seleccioná al menos un candidato o jugador de referencia" }, { status: 400 });
+      const [allProspects, reports, allPlayers, competitionProfiles, gpsProfiles, minuteRows] = await Promise.all([
+        base44.asServiceRole.entities.ScoutingProspect.filter({ organization_id: organizationId }, "full_name", 2000).catch(() => []),
+        base44.asServiceRole.entities.ScoutingReport.filter({ organization_id: organizationId }, "-observation_date", 5000).catch(() => []),
+        base44.asServiceRole.entities.Player.list("full_name", 5000).catch(() => []),
+        base44.asServiceRole.entities.PlayerCompetitionProfile.list("-updated_at", 5000).catch(() => []),
+        base44.asServiceRole.entities.PlayerGPSProfile.list("-updated_at", 5000).catch(() => []),
+        base44.asServiceRole.entities.MatchPlayerMinutes.list("-match_date", 10000).catch(() => []),
+      ]);
+      const prospectRows = prospectIds.map((id: string) => {
+        const prospect = allProspects.find((item: any) => item.id === id);
+        if (!prospect) return null;
+        const ownReports = reports.filter((report: any) => report.prospect_id === id).sort((a: any, b: any) => String(b.observation_date || "").localeCompare(String(a.observation_date || "")));
+        return { prospect, report_count: ownReports.length, latest_report: reportSummary(ownReports[0]), reports: ownReports.slice(0, 10).map(reportSummary) };
+      }).filter(Boolean);
+      const currentRows = currentPlayerIds.map((id: string) => {
+        const player = allPlayers.find((item: any) => item.id === id);
+        if (!player) return null;
+        const competition = competitionProfiles.find((item: any) => item.player_id === id) || null;
+        const training = gpsProfiles.find((item: any) => item.player_id === id) || null;
+        const ownMinutes = minuteRows.filter((row: any) => row.player_id === id && Number(row.minutes_played ?? row.minutes_calculated ?? 0) > 0);
+        return { player, competition_profile: competition, training_profile: training, minutes_summary: { total_minutes: ownMinutes.reduce((sum: number, row: any) => sum + Number(row.minutes_played ?? row.minutes_calculated ?? 0), 0), matches: ownMinutes.length, source: "MatchPlayerMinutes disponibles en el sistema" } };
+      }).filter(Boolean);
+      return Response.json({ capabilities: access.capabilities, prospects: prospectRows, current_players: currentRows, methodology: { scouting_scores: "Promedios simples de criterios 0-10 del último informe; no sustituyen la decisión humana.", current_player_data: "Datos internos reales disponibles en PerformancePitch. No se fabrican equivalencias cuando falta una métrica comparable." } });
+    }
+
     if (action === "create_role_profile") {
       const name = clean(body.name, 300);
       if (!name) return Response.json({ error: "El nombre del perfil de rol es obligatorio" }, { status: 400 });
