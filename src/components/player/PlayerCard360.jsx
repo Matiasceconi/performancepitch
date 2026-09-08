@@ -24,6 +24,7 @@ import PlayerMedicalTab from "@/components/player/tabs/PlayerMedicalTab";
 import PlayerNutritionTab from "@/components/player/tabs/PlayerNutritionTab";
 import PlayerHistoryTab from "@/components/player/tabs/PlayerHistoryTab";
 import { getValidMinuteRecords } from "@/lib/minutesUtils";
+import { getPlayerMedicalHistory } from "@/lib/medicalApi";
 
 moment.locale("es");
 
@@ -96,7 +97,7 @@ export default function PlayerCard360() {
     ] = await Promise.all([
       base44.entities.SquadMembership.filter({ player_id: id, status: "activo" }, "-effective_from", 1),
       base44.entities.DailySquadStatus.filter({ player_id: id, date: today }, "-created_date", 1),
-      base44.entities.MedicalRecord.filter({ player_id: id }, "-injury_date", 30),
+      activeSquadId ? getPlayerMedicalHistory(activeSquadId, id).catch(() => ({ episodes: [], current_status: null, can_view_clinical: false })) : Promise.resolve({ episodes: [], current_status: null, can_view_clinical: false }),
       base44.entities.NutritionAssessment.filter({ player_id: id }, "-fecha", 100),
       base44.entities.MinutesRecord.filter({ player_id: id }, "-match_date", 100),
       base44.entities.SessionGPSData.filter({ player_id: id }, "-created_date", 200),
@@ -110,7 +111,7 @@ export default function PlayerCard360() {
     const membership = membershipsArr[0] || null;
     setActiveMembership(membership);
     setDayStatus(dayStatusArr[0] || null);
-    setMedical(medicalArr);
+    setMedical(medicalArr?.episodes || []);
     setNutrition(nutritionArr);
     setMinutes(minutesArr);
     setGpsData(gpsArr);
@@ -138,7 +139,7 @@ export default function PlayerCard360() {
       .filter(m => m.date >= today && (m.squad_called || []).includes(id))
       .sort((a, b) => (a.date || "").localeCompare(b.date || ""));
     setNextMatch(futureMatches[0] || null);
-  }, []);
+  }, [activeSquadId]);
 
   useEffect(() => {
     if (!playerId) return;
@@ -215,7 +216,11 @@ export default function PlayerCard360() {
   if (!player) return null;
 
   const badge = resolveBadge(dayStatus, todaysAttendance, player);
-  const activeInjury = medical.find(m => ["Activa", "activa", "En tratamiento"].includes(m.status)) || null;
+  const activeEpisode = medical.find((m) => m.episode_state !== "closed" && !m.medical_clearance_date) || null;
+  const activeInjury = activeEpisode ? {
+    ...activeEpisode,
+    diagnosis: activeEpisode.confirmed_diagnosis || activeEpisode.preliminary_diagnosis || activeEpisode.lesion_consulta || activeEpisode.operational_note || "Restricción médica activa",
+  } : null;
 
   // Solo se consideran válidos los minutos vinculados a un partido real, activo (no archivado),
   // del plantel activo y con minutes > 0 (los convocados con 0 minutos no cuentan como partido jugado)
