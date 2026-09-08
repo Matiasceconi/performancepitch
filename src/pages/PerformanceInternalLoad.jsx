@@ -5,12 +5,14 @@ import { HeartPulse } from 'lucide-react';
 import WellnessDailyTab from '@/components/internalLoad/WellnessDailyTab';
 import RpeBySessionTab from '@/components/internalLoad/RpeBySessionTab';
 import EvolutionTab from '@/components/internalLoad/EvolutionTab';
+import InternalLoadMicrocycleTab from '@/components/internalLoad/InternalLoadMicrocycleTab';
 import PlayerAccessManager from '@/components/internalLoad/PlayerAccessManager';
 
 const TABS = [
   { id: 'wellness', label: 'Wellness diario' },
   { id: 'rpe', label: 'RPE por sesión' },
   { id: 'evolution', label: 'Evolución' },
+  { id: 'microcycle', label: 'Microciclo' },
   { id: 'access', label: 'Accesos de jugadores' },
 ];
 
@@ -81,6 +83,7 @@ export default function PerformanceInternalLoad() {
           {tab === 'wellness' && <WellnessDailyTab wellness={data?.wellness || []} players={data?.roster?.length ? data.roster : (data?.players || [])} date={date} onDateChange={setDate} />}
           {tab === 'rpe' && <RpeBySessionTab sessions={data?.sessions || []} sessionPlayers={data?.sessionPlayers || []} players={data?.players || []} />}
           {tab === 'evolution' && <EvolutionTab wellness={data?.wellness || []} sessionPlayers={data?.sessionPlayers || []} sessions={data?.sessions || []} players={data?.players || []} />}
+          {tab === 'microcycle' && <InternalLoadMicrocycleTab sessions={data?.sessions || []} sessionPlayers={data?.sessionPlayers || []} players={data?.players || []} />}
           {tab === 'access' && <PlayerAccessManager />}
         </>
       )}
