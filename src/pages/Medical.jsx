@@ -29,6 +29,8 @@ const DEFAULT_COLUMNS = ["player","availability","restriction","reason","body","
 
 function fmtDate(value) { if (!value) return "—"; const [y,m,d] = String(value).slice(0,10).split("-"); return y && m && d ? `${d}/${m}/${y}` : value; }
 function daysSince(value) { if (!value) return "—"; const d = new Date(`${value}T12:00:00`); if (Number.isNaN(d.getTime())) return "—"; return Math.max(0, Math.floor((Date.now()-d.getTime())/86400000)); }
+function todayBA() { return new Intl.DateTimeFormat("en-CA", { timeZone:"America/Argentina/Buenos_Aires" }).format(new Date()); }
+function addDaysISO(iso, days) { const d = new Date(`${iso}T12:00:00-03:00`); d.setDate(d.getDate()+days); return new Intl.DateTimeFormat("en-CA", { timeZone:"America/Argentina/Buenos_Aires" }).format(d); }
 function playerName(p) { return p?.full_name || [p?.first_name,p?.last_name].filter(Boolean).join(" ") || p?.name || "Jugador"; }
 
 export default function Medical() {
@@ -70,8 +72,11 @@ export default function Medical() {
   const modified = statusRows.filter((r)=>["modified_training","partial_integration","individual_field"].includes(r.status.availability));
   const physio = statusRows.filter((r)=>r.status.availability === "physiotherapy");
   const returning = statusRows.filter((r)=>["individual_field","partial_integration","full_training"].includes(r.status.availability));
-  const today = new Date().toISOString().slice(0,10);
+  const today = todayBA();
+  const nextWeek = addDaysISO(today, 7);
   const controlsToday = statusRows.filter((r)=>r.status.next_control_date === today);
+  const overdueControls = statusRows.filter((r)=>r.status.next_control_date && r.status.next_control_date < today && r.status.availability !== "available_to_compete");
+  const upcomingControls = statusRows.filter((r)=>r.status.next_control_date && r.status.next_control_date > today && r.status.next_control_date <= nextWeek);
   const pendingPain = data.wellness_signals.filter((s)=>s.status === "pending_review");
   const recentClearances = data.episodes.filter((e)=>e.medical_clearance_date && String(e.medical_clearance_date) >= new Date(Date.now()-7*86400000).toISOString().slice(0,10));
 
@@ -102,7 +107,7 @@ export default function Medical() {
     </header>
 
     <nav className="flex gap-1 bg-zinc-900 border border-zinc-800 rounded-xl p-1 w-fit overflow-x-auto">
-      {[["dashboard","Dashboard"],["sheet","Planilla médica"],["pain",`Dolor Wellness${pendingPain.length?` (${pendingPain.length})`:""}`]].map(([id,label])=><button key={id} onClick={()=>setTab(id)} className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap ${tab===id?"bg-white text-zinc-950 font-semibold":"text-zinc-400 hover:text-white"}`}>{label}</button>)}
+      {[["dashboard","Dashboard"],["sheet","Planilla médica"],["controls",`Controles${overdueControls.length?` (${overdueControls.length} venc.)`:controlsToday.length?` (${controlsToday.length} hoy)`:""}`],["pain",`Dolor Wellness${pendingPain.length?` (${pendingPain.length})`:""}`]].map(([id,label])=><button key={id} onClick={()=>setTab(id)} className={`px-4 py-2 rounded-lg text-sm whitespace-nowrap ${tab===id?"bg-white text-zinc-950 font-semibold":"text-zinc-400 hover:text-white"}`}>{label}</button>)}
     </nav>
 
     {tab === "dashboard" && <>
@@ -111,8 +116,8 @@ export default function Medical() {
         <Kpi icon={Activity} label="Modificados" value={modified.length} tone="amber" onClick={()=>setTab("sheet")} />
         <Kpi icon={HeartPulse} label="Kinesiología" value={physio.length} tone="fuchsia" onClick={()=>{setAvailabilityFilter("physiotherapy");setTab("sheet")}} />
         <Kpi icon={RefreshCw} label="Retornando" value={returning.length} tone="blue" onClick={()=>setTab("sheet")} />
-        <Kpi icon={CalendarClock} label="Control hoy" value={controlsToday.length} tone="cyan" onClick={()=>setTab("sheet")} />
-        <Kpi icon={CheckCircle2} label="Altas 7 días" value={recentClearances.length} tone="emerald" />
+        <Kpi icon={CalendarClock} label="Control hoy" value={controlsToday.length} tone="cyan" onClick={()=>setTab("controls")} />
+        <Kpi icon={AlertTriangle} label="Controles vencidos" value={overdueControls.length} tone="red" onClick={()=>setTab("controls")} />
       </section>
 
       {pendingPain.length > 0 && <section className="border border-amber-500/25 bg-amber-500/5 rounded-xl p-4 flex items-center justify-between gap-4"><div><p className="text-sm text-amber-200 font-semibold">{pendingPain.length} reporte{pendingPain.length!==1?"s":""} de dolor pendiente{pendingPain.length!==1?"s":""}</p><p className="text-xs text-zinc-500 mt-0.5">Wellness no crea lesiones. El área médica decide si revisa, descarta o genera una consulta.</p></div><Button size="sm" variant="outline" onClick={()=>setTab("pain")} className="border-amber-500/30 text-amber-200">Revisar</Button></section>}
@@ -127,6 +132,8 @@ export default function Medical() {
       <div className="flex flex-col lg:flex-row gap-2 lg:items-center justify-between"><div className="flex flex-1 flex-wrap gap-2"><div className="relative min-w-[220px] flex-1 max-w-md"><Search size={14} className="absolute left-3 top-3 text-zinc-600"/><Input value={search} onChange={(e)=>setSearch(e.target.value)} placeholder="Jugador, diagnóstico, zona…" className="pl-9 bg-zinc-900 border-zinc-800"/></div><select value={availabilityFilter} onChange={(e)=>setAvailabilityFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-xs text-zinc-300"><option value="all">Todas las disponibilidades</option>{Object.entries(AVAILABILITY_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><select value={typeFilter} onChange={(e)=>setTypeFilter(e.target.value)} className="bg-zinc-900 border border-zinc-800 rounded-lg px-3 text-xs text-zinc-300"><option value="all">Todos los tipos</option>{Object.entries(TYPE_LABEL).map(([v,l])=><option key={v} value={v}>{l}</option>)}</select><label className="flex items-center gap-2 px-3 bg-zinc-900 border border-zinc-800 rounded-lg text-xs text-zinc-400"><input type="checkbox" checked={activeOnly} onChange={(e)=>setActiveOnly(e.target.checked)}/>Sólo activos</label></div><div className="relative"><Button variant="outline" onClick={()=>setShowColumns((v)=>!v)} className="border-zinc-700 text-zinc-300"><Settings2 size={14} className="mr-1.5"/>Columnas<ChevronDown size={13} className="ml-1"/></Button>{showColumns&&<ColumnPicker columns={columns} setColumns={setColumns} onClose={()=>setShowColumns(false)}/>}</div></div>
       <MedicalTable episodes={data.episodes} playerMap={playerMap} followUpsByEpisode={followUpsByEpisode} search={search} availabilityFilter={availabilityFilter} typeFilter={typeFilter} activeOnly={activeOnly} columns={columns} canEdit={canEdit} canViewClinical={data.can_view_clinical} onHistory={(p)=>setHistoryPlayer(p)} onFollow={(e)=>setFollowEpisode(e)} onClearance={(e)=>setClearanceEpisode(e)} onEdit={(e)=>setEditing(e)} />
     </section>}
+
+    {tab === "controls" && <ControlsBoard overdue={overdueControls} todayRows={controlsToday} upcoming={upcomingControls} onHistory={(p)=>setHistoryPlayer(p)} onFollow={(e)=>setFollowEpisode(e)} />}
 
     {tab === "pain" && <PainInbox signals={data.wellness_signals} playerMap={playerMap} squadId={activeSquadId} onChanged={load} />}
 
