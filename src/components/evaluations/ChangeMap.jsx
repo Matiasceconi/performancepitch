@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import { HelpCircle } from "lucide-react";
 import PlayerPhoto from "@/components/player/PlayerPhoto";
 
 function cellStyle(signal) {
