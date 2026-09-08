@@ -1,88 +1,53 @@
-import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
+import { createClientFromRequest } from 'npm:@base44/sdk@0.8.40';
+import { chooseCurrentEpisode, buildCurrentStatusPayload } from "../../shared/medicalDomain.ts";
 
-const STATUS_PRIORITY = ['lesionado', 'en_recuperacion', 'kinesiologia', 'consulta'];
-
-const PLAYER_STATUS_MAP = {
-  lesionado: 'Lesionado',
-  en_recuperacion: 'En recuperación',
-  alta: 'Disponible',
-};
-
-Deno.serve(async (req) => {
+/**
+ * Compatibility recalculation endpoint.
+ * Important domain rule: expected/final treatment dates NEVER imply medical clearance.
+ * MedicalCurrentStatus is recalculated from explicit episode_state / medical_clearance_date
+ * and the explicit availability stored in MedicalEpisode.
+ * Player.status is intentionally NOT mutated here to avoid circular sources of truth.
+ */
+export default async function(req: Request) {
   try {
     const base44 = createClientFromRequest(req);
+    const user = await base44.auth.me();
+    if (!user) return Response.json({ error: "No autenticado" }, { status: 401 });
 
-    const episodes = await base44.asServiceRole.entities.MedicalEpisode.filter({ linked: true }, '-fecha_inicio_tto', 5000);
+    const episodes = await base44.asServiceRole.entities.MedicalEpisode.list("-event_date", 5000);
+    const linked = episodes.filter((e: any) => e.player_id);
+    const byPlayer = new Map<string, any[]>();
+    for (const episode of linked) {
+      if (!byPlayer.has(episode.player_id)) byPlayer.set(episode.player_id, []);
+      byPlayer.get(episode.player_id)!.push(episode);
+    }
 
-    const byPlayer = {};
-    episodes.forEach((e) => {
-      if (!e.player_id) return;
-      if (!byPlayer[e.player_id]) byPlayer[e.player_id] = [];
-      byPlayer[e.player_id].push(e);
-    });
+    const existing = await base44.asServiceRole.entities.MedicalCurrentStatus.list("-updated_at", 5000);
+    const existingByPlayer = new Map(existing.map((s: any) => [s.player_id, s]));
+    let created = 0;
+    let updated = 0;
 
-    const existingStatuses = await base44.asServiceRole.entities.MedicalCurrentStatus.list('-updated_at', 3000);
-    const statusByPlayer = {};
-    existingStatuses.forEach((s) => { statusByPlayer[s.player_id] = s; });
-
-    let lesionadosCount = 0;
-    let seguimientoCount = 0;
-    let upserted = 0;
-
-    for (const [playerId, eps] of Object.entries(byPlayer)) {
-      const sorted = [...eps].sort((a, b) => (b.fecha_inicio_tto || '').localeCompare(a.fecha_inicio_tto || ''));
-      const active = sorted.filter((e) => !e.fecha_final_tto && e.medical_status !== 'alta');
-
-      let currentStatus = 'alta';
-      let activeEpisode = null;
-      for (const key of STATUS_PRIORITY) {
-        const found = active.find((e) => e.medical_status === key);
-        if (found) {
-          currentStatus = key === 'consulta' ? 'seguimiento' : key;
-          activeEpisode = found;
-          break;
-        }
-      }
-      if (!activeEpisode && active.length > 0) {
-        currentStatus = 'seguimiento';
-        activeEpisode = active[0];
-      }
-      if (!activeEpisode) {
-        currentStatus = 'alta';
-        activeEpisode = sorted[0] || null;
-      }
-
-      if (currentStatus === 'lesionado') lesionadosCount++;
-      if (currentStatus === 'en_recuperacion' || currentStatus === 'seguimiento') seguimientoCount++;
-
-      const payload = {
+    for (const [playerId, playerEpisodes] of byPlayer.entries()) {
+      const currentEpisode = chooseCurrentEpisode(playerEpisodes);
+      const payload: any = {
         player_id: playerId,
-        current_status: currentStatus,
-        active_episode_id: activeEpisode ? activeEpisode.id : '',
-        updated_at: new Date().toISOString(),
+        squad_id: currentEpisode?.squad_id || existingByPlayer.get(playerId)?.squad_id || "",
+        organization_id: currentEpisode?.organization_id || existingByPlayer.get(playerId)?.organization_id || "",
+        ...buildCurrentStatusPayload(currentEpisode, user),
       };
-
-      const existing = statusByPlayer[playerId];
-      if (existing) {
-        await base44.asServiceRole.entities.MedicalCurrentStatus.update(existing.id, payload);
+      const current = existingByPlayer.get(playerId);
+      if (current) {
+        await base44.asServiceRole.entities.MedicalCurrentStatus.update(current.id, payload);
+        updated += 1;
       } else {
         await base44.asServiceRole.entities.MedicalCurrentStatus.create(payload);
-      }
-      upserted++;
-
-      const playerStatusUpdate = PLAYER_STATUS_MAP[currentStatus];
-      if (playerStatusUpdate) {
-        await base44.asServiceRole.entities.Player.update(playerId, { status: playerStatusUpdate });
+        created += 1;
       }
     }
 
-    return Response.json({
-      success: true,
-      players_processed: upserted,
-      lesionados_actuales: lesionadosCount,
-      en_seguimiento: seguimientoCount,
-    });
-  } catch (error) {
-    return Response.json({ error: error.message }, { status: 500 });
+    return Response.json({ ok: true, players: byPlayer.size, created, updated, rule: "explicit_clearance_only" });
+  } catch (error: any) {
+    console.error("recalculateMedicalCurrentStatus error", error);
+    return Response.json({ error: error?.message || "Error al recalcular estados médicos" }, { status: 500 });
   }
-});
+}
