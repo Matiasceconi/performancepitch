@@ -3,6 +3,7 @@ import { createClientFromRequest } from 'npm:@base44/sdk@0.8.31';
 function matchColumn(raw) {
   const h = raw.toLowerCase().replace(/^\uFEFF/, "").trim();
   if (h === "name" || h === "jugador" || h === "player" || h === "nombre" || h === "athlete") return "player_name";
+  if (["period name", "period", "periodo", "período", "half", "segment", "activity name", "activity"].includes(h)) return "period_name";
   if (h === "total duration" || h === "tot dur") return "total_duration";
   if (h.includes("total distance") || h === "tot dist (m)" || h === "tot dist") return "total_distance";
   if (h.startsWith("d") && h.includes("19")) return "distance_hsr";
@@ -77,7 +78,7 @@ function parseCatapultCSV(text) {
     const obj = {};
     Object.entries(fieldMap).forEach(([colIdx, field]) => {
       const raw = cols[parseInt(colIdx)];
-      if (field === "player_name") obj[field] = raw || "";
+      if (field === "player_name" || field === "period_name") obj[field] = raw || "";
       else if (field === "total_duration") obj[field] = parseDuration(raw);
       else obj[field] = parseNum(raw);
     });
@@ -93,6 +94,81 @@ function normalizeName(name) {
   return (name || "")
     .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().trim().replace(/\s+/g, " ");
+}
+
+function normalizePeriodLabel(value, fallbackIndex = 0) {
+  const raw = String(value || "").trim();
+  const n = normalizeName(raw);
+  if (/^(1t|1er tiempo|primer tiempo|primera parte|first half|1st half|h1)$/.test(n) || n.includes("first half")) return { name: "1T", order: 1, kind: "period" };
+  if (/^(2t|2do tiempo|segundo tiempo|segunda parte|second half|2nd half|h2)$/.test(n) || n.includes("second half")) return { name: "2T", order: 2, kind: "period" };
+  if (/(partido|match|game|full|total|all periods|sesion completa|session total)/.test(n)) return { name: raw || "Partido completo", order: 0, kind: "full" };
+  if (raw) return { name: raw, order: fallbackIndex + 1, kind: "period" };
+  return { name: `Período ${fallbackIndex + 1}`, order: fallbackIndex + 1, kind: "period" };
+}
+
+const ADDITIVE_KEYS = ["total_duration", "total_distance", "distance_hsr", "sprint_distance", "sprint_efforts", "accelerations", "decelerations", "player_load"];
+const MAX_KEYS = ["max_velocity", "max_velocity_percentage"];
+
+function aggregatePlayerRows(rows) {
+  if (!rows.length) return null;
+  const enriched = rows.map((row, index) => ({ ...row, _period: normalizePeriodLabel(row.period_name, index) }));
+  const fullRows = enriched.filter((row) => row._period.kind === "full");
+  const periodRows = enriched.filter((row) => row._period.kind !== "full");
+  const canonical = fullRows.length
+    ? [...fullRows].sort((a, b) => Number(b.total_duration || 0) - Number(a.total_duration || 0))[0]
+    : null;
+  const sourceRows = canonical ? [canonical] : enriched;
+  const summary = {
+    player_id: rows[0].player_id || null,
+    player_name: rows[0].player_name,
+    csv_name: rows[0].csv_name,
+    photo_url: rows[0].photo_url || null,
+    jersey_number: rows[0].jersey_number || null,
+    position: rows[0].position || null,
+    unresolved: !!rows[0].unresolved,
+  };
+  ADDITIVE_KEYS.forEach((key) => {
+    const values = sourceRows.map((row) => Number(row[key])).filter(Number.isFinite);
+    summary[key] = values.length ? values.reduce((sum, value) => sum + value, 0) : null;
+  });
+  MAX_KEYS.forEach((key) => {
+    const values = sourceRows.map((row) => Number(row[key])).filter(Number.isFinite);
+    summary[key] = values.length ? Math.max(...values) : null;
+  });
+  if (summary.total_distance != null && Number(summary.total_duration) > 0) summary.meters_per_minute = summary.total_distance / summary.total_duration;
+  else {
+    const intensities = sourceRows.map((row) => Number(row.meters_per_minute)).filter(Number.isFinite);
+    summary.meters_per_minute = intensities.length ? intensities.reduce((sum, value) => sum + value, 0) / intensities.length : null;
+  }
+  const breakdownRows = periodRows.length ? periodRows : (canonical ? [] : enriched);
+  summary.period_breakdown = breakdownRows
+    .map((row) => ({
+      period_name: row._period.name,
+      period_order: row._period.order,
+      total_duration: row.total_duration ?? null,
+      total_distance: row.total_distance ?? null,
+      distance_hsr: row.distance_hsr ?? null,
+      sprint_distance: row.sprint_distance ?? null,
+      sprint_efforts: row.sprint_efforts ?? null,
+      accelerations: row.accelerations ?? null,
+      decelerations: row.decelerations ?? null,
+      player_load: row.player_load ?? null,
+      max_velocity: row.max_velocity ?? null,
+      max_velocity_percentage: row.max_velocity_percentage ?? null,
+      meters_per_minute: row.meters_per_minute ?? ((Number(row.total_duration) > 0 && Number(row.total_distance) >= 0) ? Number(row.total_distance) / Number(row.total_duration) : null),
+    }))
+    .sort((a, b) => (a.period_order || 99) - (b.period_order || 99));
+  return summary;
+}
+
+function buildPlayerSummaries(rows) {
+  const grouped = new Map();
+  rows.forEach((row) => {
+    const key = row.player_id || `csv:${normalizeName(row.csv_name || row.player_name)}`;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(row);
+  });
+  return Array.from(grouped.values()).map(aggregatePlayerRows).filter(Boolean);
 }
 
 function fuzzyMatch(gpsName, players) {
