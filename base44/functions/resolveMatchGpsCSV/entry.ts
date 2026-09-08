@@ -233,8 +233,11 @@ Deno.serve(async (req) => {
             const csvText = await fetch(body.csv_url).then(r => r.text());
             const parsed = parseCatapultCSV(csvText);
             if (!parsed.error) {
-              const playerRow = parsed.rows.find(r => normalizeName(r.player_name) === normalizeName(csv_name));
-              if (playerRow) {
+              const playerRows = parsed.rows
+                .filter(r => normalizeName(r.player_name) === normalizeName(csv_name))
+                .map(r => ({ ...r, player_id, player_name: officialName, csv_name }));
+              const playerSummary = aggregatePlayerRows(playerRows);
+              if (playerSummary) {
                 await base44.asServiceRole.entities.CatapultReport.create({
                   player_id: player_id,
                   player_name: officialName,
@@ -242,17 +245,18 @@ Deno.serve(async (req) => {
                   session_id: body.match_id,
                   session_label: body.csv_label || "Partido GPS",
                   file_url: body.csv_url,
-                  total_duration: playerRow.total_duration,
-                  total_distance: playerRow.total_distance,
-                  distance_hsr: playerRow.distance_hsr,
-                  sprint_distance: playerRow.sprint_distance,
-                  sprint_efforts: playerRow.sprint_efforts,
-                  accelerations: playerRow.accelerations,
-                  decelerations: playerRow.decelerations,
-                  player_load: playerRow.player_load,
-                  max_velocity: playerRow.max_velocity,
-                  max_velocity_percentage: playerRow.max_velocity_percentage,
-                  meters_per_minute: playerRow.meters_per_minute,
+                  total_duration: playerSummary.total_duration,
+                  total_distance: playerSummary.total_distance,
+                  distance_hsr: playerSummary.distance_hsr,
+                  sprint_distance: playerSummary.sprint_distance,
+                  sprint_efforts: playerSummary.sprint_efforts,
+                  accelerations: playerSummary.accelerations,
+                  decelerations: playerSummary.decelerations,
+                  player_load: playerSummary.player_load,
+                  max_velocity: playerSummary.max_velocity,
+                  max_velocity_percentage: playerSummary.max_velocity_percentage,
+                  meters_per_minute: playerSummary.meters_per_minute,
+                  period_breakdown: playerSummary.period_breakdown || [],
                 });
               }
             }
@@ -294,7 +298,6 @@ Deno.serve(async (req) => {
 
     const resolvedRows = [];
     const unresolvedNames = new Set();
-    const toUpsert = []; // rows to persist in CatapultReport
 
     for (const row of parseResult.rows) {
       const csvName = (row.player_name || "").trim();
@@ -341,10 +344,6 @@ Deno.serve(async (req) => {
           jersey_number: p?.jersey_number || null,
           position: p?.position || null,
         });
-        // Marcar para persistir si se proporcionó match_id
-        if (match_id && match_date) {
-          toUpsert.push({ row, playerId, officialName: officialName || csvName });
-        }
       } else {
         unresolvedNames.add(csvName);
         resolvedRows.push({
@@ -357,42 +356,45 @@ Deno.serve(async (req) => {
       }
     }
 
-    // ── Persistir en CatapultReport (upsert por player_id + session_id) ──────
-    if (match_id && match_date && toUpsert.length > 0) {
-      // Cargar registros existentes para este partido
+    const playerSummaries = buildPlayerSummaries(resolvedRows);
+    const resolvedSummaries = playerSummaries.filter((row) => row.player_id && !row.unresolved);
+
+    // ── Persistir una fila canónica por jugador + desglose por períodos ──────
+    if (match_id && match_date && resolvedSummaries.length > 0) {
       const existingReports = await base44.asServiceRole.entities.CatapultReport.filter({ session_id: match_id });
       const existingByPlayerId = Object.fromEntries(existingReports.map(r => [r.player_id, r]));
 
-      const incomingPlayerIds = new Set(toUpsert.map((item) => item.playerId));
+      const incomingPlayerIds = new Set(resolvedSummaries.map((item) => item.player_id));
       for (const existing of existingReports) {
         if (existing.player_id && !incomingPlayerIds.has(existing.player_id)) {
           await base44.asServiceRole.entities.CatapultReport.delete(existing.id);
         }
       }
 
-      for (const { row, playerId, officialName } of toUpsert) {
+      for (const summary of resolvedSummaries) {
         const reportData = {
-          player_id: playerId,
-          player_name: officialName,
+          player_id: summary.player_id,
+          player_name: summary.player_name,
           date: match_date,
           session_id: match_id,
           session_label: csv_label || "Partido GPS",
           file_url: csv_url,
-          total_duration: row.total_duration,
-          total_distance: row.total_distance,
-          distance_hsr: row.distance_hsr,
-          sprint_distance: row.sprint_distance,
-          sprint_efforts: row.sprint_efforts,
-          accelerations: row.accelerations,
-          decelerations: row.decelerations,
-          player_load: row.player_load,
-          max_velocity: row.max_velocity,
-          max_velocity_percentage: row.max_velocity_percentage,
-          meters_per_minute: row.meters_per_minute,
+          total_duration: summary.total_duration,
+          total_distance: summary.total_distance,
+          distance_hsr: summary.distance_hsr,
+          sprint_distance: summary.sprint_distance,
+          sprint_efforts: summary.sprint_efforts,
+          accelerations: summary.accelerations,
+          decelerations: summary.decelerations,
+          player_load: summary.player_load,
+          max_velocity: summary.max_velocity,
+          max_velocity_percentage: summary.max_velocity_percentage,
+          meters_per_minute: summary.meters_per_minute,
+          period_breakdown: summary.period_breakdown || [],
         };
 
-        if (existingByPlayerId[playerId]) {
-          await base44.asServiceRole.entities.CatapultReport.update(existingByPlayerId[playerId].id, reportData);
+        if (existingByPlayerId[summary.player_id]) {
+          await base44.asServiceRole.entities.CatapultReport.update(existingByPlayerId[summary.player_id].id, reportData);
         } else {
           await base44.asServiceRole.entities.CatapultReport.create(reportData);
         }
@@ -417,7 +419,8 @@ Deno.serve(async (req) => {
       unresolved: resolvedRows.filter(r => r.unresolved).length,
       unresolved_names: Array.from(unresolvedNames),
       player_options: playerOptions,
-      persisted: toUpsert.length,
+      player_summaries: playerSummaries,
+      persisted: resolvedSummaries.length,
     });
   } catch (error) {
     return Response.json({ error: error.message }, { status: 500 });
