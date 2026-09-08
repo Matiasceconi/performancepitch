@@ -359,6 +359,59 @@ export default async function(req: Request): Promise<Response> {
       return Response.json({ capabilities: access.capabilities, prospects: prospectRows, current_players: currentRows, methodology: { scouting_scores: "Promedios simples de criterios 0-10 del último informe; no sustituyen la decisión humana.", current_player_data: "Datos internos reales disponibles en PerformancePitch. No se fabrican equivalencias cuando falta una métrica comparable." } });
     }
 
+    if (action === "create_shadow_plan") {
+      const name = clean(body.name, 300);
+      if (!name) return Response.json({ error: "El nombre del Shadow Squad es obligatorio" }, { status: 400 });
+      const squad = body.squad_id ? await getById(base44, "Squad", clean(body.squad_id, 200)) : null;
+      const created = await base44.asServiceRole.entities.ShadowSquadPlan.create({
+        organization_id: organizationId, squad_id: squad?.id || null, squad_name: squad?.name || clean(body.squad_name, 200), season_id: clean(body.season_id || squad?.season, 100), name,
+        horizon: ["current","next_window","6_months","12_months","24_months"].includes(body.horizon) ? body.horizon : "next_window", formation: clean(body.formation, 40) || "4-3-3", status: "active", notes: clean(body.notes, 5000),
+        created_by_id: user.id, created_by_name: actorName(user), created_at: nowISO(), updated_at: nowISO(),
+      });
+      return Response.json({ plan: created });
+    }
+
+    if (action === "update_shadow_plan") {
+      const plan = await getById(base44, "ShadowSquadPlan", clean(body.plan_id, 200));
+      if (!isSameOrg(plan, organizationId)) return Response.json({ error: "Shadow Squad no encontrado" }, { status: 404 });
+      const allowed = ["name","horizon","formation","status","notes","squad_id","squad_name","season_id"];
+      const changes: any = { updated_at: nowISO() };
+      for (const key of allowed) if (body[key] !== undefined) changes[key] = body[key];
+      const updated = await base44.asServiceRole.entities.ShadowSquadPlan.update(plan.id, changes);
+      return Response.json({ plan: updated });
+    }
+
+    if (action === "save_shadow_slot") {
+      const plan = await getById(base44, "ShadowSquadPlan", clean(body.plan_id, 200));
+      if (!isSameOrg(plan, organizationId)) return Response.json({ error: "Shadow Squad no encontrado" }, { status: 404 });
+      const slotKey = clean(body.slot_key, 120);
+      if (!slotKey) return Response.json({ error: "Definí el puesto/slot" }, { status: 400 });
+      const candidateType = body.candidate_type === "current_player" ? "current_player" : "prospect";
+      let currentPlayer: any = null;
+      let prospect: any = null;
+      if (candidateType === "current_player") {
+        currentPlayer = await getById(base44, "Player", clean(body.current_player_id, 200));
+        if (!currentPlayer) return Response.json({ error: "Jugador actual no encontrado" }, { status: 404 });
+      } else {
+        prospect = await getById(base44, "ScoutingProspect", clean(body.prospect_id, 200));
+        if (!isSameOrg(prospect, organizationId)) return Response.json({ error: "Prospecto no encontrado" }, { status: 404 });
+      }
+      const payload = {
+        organization_id: organizationId, plan_id: plan.id, slot_key: slotKey, position: clean(body.position, 120), role_profile_id: clean(body.role_profile_id, 200), candidate_type: candidateType,
+        current_player_id: currentPlayer?.id || null, current_player_name: currentPlayer?.full_name || null, prospect_id: prospect?.id || null, prospect_name: prospect?.full_name || null,
+        rank: Math.max(1, num(body.rank) ?? 1), status: ["reference","first_option","alternative","monitor","remove"].includes(body.status) ? body.status : (candidateType === "current_player" ? "reference" : "alternative"),
+        recruitment_need_id: clean(body.recruitment_need_id, 200), rationale: clean(body.rationale, 4000), updated_at: nowISO(),
+      };
+      if (body.slot_id) {
+        const existing = await getById(base44, "ShadowSquadSlot", clean(body.slot_id, 200));
+        if (!isSameOrg(existing, organizationId) || existing.plan_id !== plan.id) return Response.json({ error: "Slot no encontrado" }, { status: 404 });
+        const updated = await base44.asServiceRole.entities.ShadowSquadSlot.update(existing.id, payload);
+        return Response.json({ slot: updated });
+      }
+      const created = await base44.asServiceRole.entities.ShadowSquadSlot.create({ ...payload, created_by_id: user.id, created_by_name: actorName(user), created_at: nowISO() });
+      return Response.json({ slot: created });
+    }
+
     if (action === "create_role_profile") {
       const name = clean(body.name, 300);
       if (!name) return Response.json({ error: "El nombre del perfil de rol es obligatorio" }, { status: 400 });
