@@ -173,8 +173,7 @@ export default async function(req: Request) {
     }
 
     // Recalculation uses explicit episode_state/clearance only and never Player.status.
-    const recalcReq = new Request(req.url, { method: 'POST', headers: req.headers, body: '{}' });
-    // Avoid an internal HTTP call; reproduce only linked squad players through current records.
+    // The Medical gateway/recalc endpoint handles explicit state changes; sync never infers clearance.
     const squadEpisodes = await base44.asServiceRole.entities.MedicalEpisode.filter({ squad_id: squadId, linked: true }, '-event_date', 5000);
     const playerIds = [...new Set(squadEpisodes.map((e: any) => e.player_id).filter(Boolean))];
     // Current statuses are deliberately not inferred here from dates. The gateway/recalc endpoint handles explicit state changes.
