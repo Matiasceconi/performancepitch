@@ -112,6 +112,7 @@ export default async function (req: Request): Promise<Response> {
       delete_alias: "admin",
       set_primary: "edit",
       restore_primary: "edit",
+      manual_create: "create",
     };
     const permission = permissionByAction[action];
     if (!permission) return Response.json({ error: "Acción no válida" }, { status: 400 });
@@ -142,6 +143,171 @@ export default async function (req: Request): Promise<Response> {
         });
       }
       return Response.json({ capabilities: access.capabilities, sessions, results, players });
+    }
+
+    if (action === "manual_create") {
+      const form = body.evaluation || {};
+      const assessmentDate = String(form.assessment_date || "");
+      const testKey = String(form.test_key || "").trim();
+      const context = String(form.context || "").trim();
+      const sessionName = String(form.session_name || "").trim() || `${assessmentDate} · ${testKey.toUpperCase()}`;
+      const entries = Array.isArray(form.entries) ? form.entries : [];
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(assessmentDate)) return Response.json({ error: "Fecha inválida" }, { status: 400 });
+      if (!testKey) return Response.json({ error: "Seleccioná una prueba" }, { status: 400 });
+      if (!entries.length) return Response.json({ error: "Agregá al menos un jugador con intentos" }, { status: 400 });
+
+      const [squads, testDefinitions, metricDefinitions, memberships, allPlayers] = await Promise.all([
+        base44.asServiceRole.entities.Squad.list("name", 300),
+        base44.asServiceRole.entities.EvaluationTestDefinition.list("display_order", 300).catch(() => []),
+        base44.asServiceRole.entities.EvaluationMetricDefinition.list("display_order", 1000).catch(() => []),
+        base44.asServiceRole.entities.SquadMembership.filter({ squad_id: squadId, status: "activo" }, "created_date", 3000).catch(() => []),
+        base44.asServiceRole.entities.Player.list("full_name", 3000),
+      ]);
+      const squad = squads.find((item: any) => item.id === squadId);
+      if (!squad) return Response.json({ error: "Plantel no encontrado" }, { status: 404 });
+      const allowedPlayerIds = new Set(memberships.map((m: any) => m.player_id));
+      const playerMap = new Map(allPlayers.map((p: any) => [p.id, p]));
+      const invalidEntry = entries.find((entry: any) => !entry.player_id || !allowedPlayerIds.has(entry.player_id) || !playerMap.has(entry.player_id));
+      if (invalidEntry) return Response.json({ error: "Hay un jugador fuera del plantel seleccionado" }, { status: 400 });
+
+      const definition = testDefinitions.find((item: any) => item.test_key === testKey && item.active !== false)
+        || testDefinitions.find((item: any) => item.test_key === testKey);
+      if (!definition) return Response.json({ error: "La prueba no existe en el catálogo. Configurala antes de cargar resultados." }, { status: 400 });
+      const validMetricKeys = new Set(metricDefinitions
+        .filter((metric: any) => metric.active !== false && (!metric.test_keys?.length || metric.test_keys.includes(testKey)))
+        .map((metric: any) => metric.metric_key));
+      const config = configForTest(testKey, definition);
+      const sessionId = crypto.randomUUID();
+      const organizationId = squad.organization_id || squad.club_id || null;
+      const now = new Date().toISOString();
+      const session = await base44.asServiceRole.entities.EvaluationSession.create({
+        session_id: sessionId,
+        organization_id: organizationId,
+        squad_id: squadId,
+        squad_name: squad.name,
+        assessment_date: assessmentDate,
+        assessment_time: form.assessment_time || null,
+        import_group_id: crypto.randomUUID(),
+        context,
+        name: sessionName,
+        source_keys: ["manual"],
+        test_keys: [testKey],
+        total_players: entries.length,
+        total_results: 0,
+        import_status: "completed",
+        ingestion_method: "manual",
+        created_by: user.id,
+        created_at: now,
+      });
+
+      const createdResults: any[] = [];
+      for (const entry of entries) {
+        const player: any = playerMap.get(entry.player_id);
+        const attempts = Array.isArray(entry.attempts) ? entry.attempts : [];
+        const cleanAttempts = attempts.map((attempt: any, index: number) => {
+          const metrics: Record<string, number> = {};
+          for (const [key, raw] of Object.entries(attempt.metrics || {})) {
+            const value = Number(raw);
+            if (!validMetricKeys.has(key) || !Number.isFinite(value)) continue;
+            metrics[key] = value;
+          }
+          return { attempt_number: Number(attempt.attempt_number) || index + 1, metrics };
+        }).filter((attempt: any) => Object.keys(attempt.metrics).length > 0);
+        if (!cleanAttempts.length) continue;
+
+        const battery = await base44.asServiceRole.entities.EvaluationBattery.create({
+          battery_id: crypto.randomUUID(),
+          session_id: sessionId,
+          player_id: player.id,
+          player_name_csv: player.full_name,
+          player_name_normalized: String(player.full_name || "").toLowerCase(),
+          squad_id: squadId,
+          squad_name: squad.name,
+          organization_id: organizationId,
+          test_keys: [testKey],
+          expected_test_keys: [testKey],
+          test_count: 1,
+          total_results: cleanAttempts.length,
+          complete: true,
+          linking_status: "linked",
+          linking_method: "manual_player_id",
+          created_at: now,
+        });
+
+        const candidates = cleanAttempts.map((attempt: any) => ({
+          result_id: crypto.randomUUID(),
+          attempt_number: attempt.attempt_number,
+          assessment_datetime: form.assessment_time ? `${assessmentDate}T${form.assessment_time}` : `${assessmentDate}T12:00:00`,
+          metrics: attempt.metrics,
+        }));
+        const automatic = config.primaryMetric ? selectPrimaryAttempt(candidates, config) : null;
+        const selectedId = automatic?.primaryId || candidates[0].result_id;
+        for (const candidate of candidates) {
+          const saved = await base44.asServiceRole.entities.EvaluationResult.create({
+            result_id: candidate.result_id,
+            session_id: sessionId,
+            battery_id: battery.battery_id,
+            player_id: player.id,
+            player_name_csv: player.full_name,
+            player_name_normalized: String(player.full_name || "").toLowerCase(),
+            squad_id: squadId,
+            squad_name: squad.name,
+            organization_id: organizationId,
+            source_key: "manual",
+            test_key: testKey,
+            test_side: entry.test_side || "Bilateral",
+            attempt_number: candidate.attempt_number,
+            retest: false,
+            is_primary: candidate.result_id === selectedId,
+            primary_selection_mode: "automatic",
+            primary_reason: candidate.result_id === selectedId ? (automatic?.reason || "Primer intento") : "",
+            primary_review_required: false,
+            automatic_candidate_result_id: selectedId,
+            automatic_candidate_reason: automatic?.reason || "Primer intento",
+            assessment_date: assessmentDate,
+            assessment_datetime: candidate.assessment_datetime,
+            metrics: candidate.metrics,
+            asymmetries: {},
+            raw_row: {},
+            linking_status: "linked",
+            linking_method: "manual_player_id",
+            quality_status: "ok",
+            ingestion_method: "manual",
+            provider: "manual",
+            sync_status: "local_only",
+            schema_version: 2,
+            created_at: now,
+          });
+          createdResults.push(saved);
+        }
+      }
+
+      if (!createdResults.length) {
+        await base44.asServiceRole.entities.EvaluationSession.delete(session.id);
+        return Response.json({ error: "No se ingresó ningún valor numérico válido" }, { status: 400 });
+      }
+      const actualPlayers = new Set(createdResults.map((r: any) => r.player_id)).size;
+      await base44.asServiceRole.entities.EvaluationSession.update(session.id, {
+        total_players: actualPlayers,
+        total_batteries: actualPlayers,
+        complete_batteries: actualPlayers,
+        incomplete_batteries: 0,
+        total_results: createdResults.length,
+        pending_results: 0,
+        retest_results: 0,
+        updated_by: user.id,
+        updated_at: now,
+      });
+      await writeAudit(base44, user, {
+        event_type: "manual_evaluation_created",
+        organization_id: organizationId,
+        squad_id: squadId,
+        session_id: sessionId,
+        test_key: testKey,
+        reason: "Evaluación cargada manualmente",
+        metadata: { total_players: actualPlayers, total_results: createdResults.length, session_name: sessionName },
+      });
+      return Response.json({ success: true, session_id: sessionId, total_players: actualPlayers, total_results: createdResults.length });
     }
 
     if (action === "config") {
