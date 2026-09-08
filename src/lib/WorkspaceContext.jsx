@@ -32,6 +32,7 @@ const LEGACY_MODULE_PATHS = {
   team: ["/team"],
   admin: ["/admin"],
   squad_manager: ["/squad-manager"],
+  scouting: ["/scouting"],
 };
 
 const PATH_AREA_MAP = {
@@ -53,6 +54,7 @@ const PATH_AREA_MAP = {
   "/field-library": "cuerpo_tecnico",
   "/strength-library": "cuerpo_tecnico",
   "/evaluations": "rendimiento_fisico",
+  "/scouting": "scouting",
   "/admin": "administracion",
   "/squad-manager": "administracion",
   "/users-access": "administracion",
