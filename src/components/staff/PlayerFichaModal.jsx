@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { base44 } from "@/api/base44Client";
-import { X, Plus, Trash2, Tag, Copy, Check, AlertCircle, User, GitMerge, Activity } from "lucide-react";
+import { X, Plus, Trash2, Tag, Copy, Check, AlertCircle, User, Activity } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { getPlayerMedicalHistory } from "@/lib/medicalApi";
