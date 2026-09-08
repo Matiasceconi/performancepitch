@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download, Loader2, ClipboardPlus } from "lucide-react";
+import { ClipboardCheck, CalendarDays, BarChart3, Users, Upload, Settings2, Download, Loader2, ClipboardPlus, BookOpen } from "lucide-react";
 import { useWorkspace } from "@/lib/WorkspaceContext";
 import { evaluationsGateway } from "@/lib/evaluationsApi";
 import EvaluationsSummary from "@/components/evaluations/EvaluationsSummary";
@@ -10,9 +10,11 @@ import EvaluationsPlayers from "@/components/evaluations/EvaluationsPlayers";
 import EvaluationsImportWizard from "@/components/evaluations/EvaluationsImportWizard";
 import EvaluationsConfig from "@/components/evaluations/EvaluationsConfig";
 import ManualEvaluationModal from "@/components/evaluations/ManualEvaluationModal";
+import EvaluationTestLibrary from "@/components/evaluations/EvaluationTestLibrary";
 
 const TABS = [
-  { key: "resumen", label: "Resumen", icon: ClipboardCheck },
+  { key: "resumen", label: "Panel", icon: ClipboardCheck },
+  { key: "biblioteca", label: "Biblioteca y baterías", icon: BookOpen },
   { key: "sesiones", label: "Fechas", icon: CalendarDays },
   { key: "plantel", label: "Análisis del plantel", icon: BarChart3 },
   { key: "jugadores", label: "Jugadores", icon: Users },
@@ -138,8 +140,8 @@ export default function Evaluations() {
             <ClipboardCheck size={24} className="text-blue-400" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white">Evaluaciones</h1>
-            <p className="text-xs text-zinc-500">Evaluaciones multisistema · ForceDecks · NordBord · ISO y más</p>
+            <h1 className="text-2xl font-bold text-white">Evaluaciones de rendimiento</h1>
+            <p className="text-xs text-zinc-500">Baterías configurables · protocolos repetibles · análisis longitudinal · múltiples fuentes</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -195,6 +197,7 @@ export default function Evaluations() {
         {!accessError && !capabilities && <div className="py-12 flex justify-center"><Loader2 size={20} className="text-zinc-500 animate-spin" /></div>}
         {!accessError && capabilities && <>
         {activeTab === "resumen" && <EvaluationsSummary key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
+        {activeTab === "biblioteca" && <EvaluationTestLibrary key={refreshKey} />}
         {activeTab === "sesiones" && <EvaluationsSessions key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
         {activeTab === "plantel" && <EvaluationsSquadAnalysis key={refreshKey} onSelectPlayer={handleSelectPlayer} />}
         {activeTab === "jugadores" && <EvaluationsPlayers key={refreshKey} selectedPlayerId={selectedPlayerId} onSelectPlayer={handleSelectPlayer} />}
