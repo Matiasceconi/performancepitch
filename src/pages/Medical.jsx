@@ -25,7 +25,7 @@ const AVAILABILITY_BADGE = {
 };
 const TYPE_LABEL = { injury:"Lesión", illness:"Enfermedad", consultation:"Consulta", discomfort_followup:"Molestia / seguimiento", control:"Control", rehabilitation:"Rehabilitación", return_to_training:"Retorno" };
 const PHASE_LABEL = { clinical:"Fase clínica", rehabilitation:"Rehabilitación", individual_field:"Campo individual", partial_integration:"Integración parcial", full_training:"Entrenamiento completo", available:"Disponible" };
-const DEFAULT_COLUMNS = ["player","availability","reason","body","start","days","phase","updated","control","professional","actions"];
+const DEFAULT_COLUMNS = ["player","availability","restriction","reason","body","start","days","phase","updated","control","expected","professional","actions"];
 
 function fmtDate(value) { if (!value) return "—"; const [y,m,d] = String(value).slice(0,10).split("-"); return y && m && d ? `${d}/${m}/${y}` : value; }
 function daysSince(value) { if (!value) return "—"; const d = new Date(`${value}T12:00:00`); if (Number.isNaN(d.getTime())) return "—"; return Math.max(0, Math.floor((Date.now()-d.getTime())/86400000)); }
